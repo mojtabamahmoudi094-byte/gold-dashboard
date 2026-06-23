@@ -11,10 +11,8 @@ import gregorian from 'react-date-object/calendars/gregorian'
 const DatePicker = dynamic(() => import('react-multi-date-picker'), { ssr: false })
 const TerminalChart = dynamic(() => import('./TerminalChart'), { ssr: false })
 
-// ── helpers ───────────────────────────────────────────────
 const safe = (v: any) => Number(v || 0)
 
-// convert "1404/03/15" (shamsi) → "2025-06-05" (gregorian) for the chart
 function shamsiToGregorian(shamsi: string): string {
   try {
     const d = new DateObject({ date: shamsi, format: 'YYYY/MM/DD', calendar: persian })
@@ -38,7 +36,6 @@ function stdDev(arr: number[]): number {
   return Math.sqrt(arr.reduce((a, b) => a + (b - avg) ** 2, 0) / arr.length)
 }
 
-// ── component ─────────────────────────────────────────────
 export default function TerminalPage() {
   const [date, setDate] = useState('')
   const [value, setValue] = useState('')
@@ -71,7 +68,6 @@ export default function TerminalPage() {
     setEditingId(null); loadData()
   }
 
-  // ── intelligence engine ─────────────────────────────────
   const intel = useMemo(() => {
     const vals = records.map(r => safe(r.trade_value))
     const n = vals.length
@@ -85,7 +81,6 @@ export default function TerminalPage() {
     const ma5arr = calcMA(vals, 5)
     const ma10arr = calcMA(vals, 10)
 
-    // SIGNAL: MA5 / MA10 crossover
     let signal = { label: 'WAIT', color: '#8B9DB0', bg: 'rgba(139,157,176,0.12)', desc: 'داده کافی نیست' }
     if (n >= 10) {
       const m5 = ma5arr[n - 1] ?? 0, m5p = ma5arr[n - 2] ?? 0
@@ -100,7 +95,6 @@ export default function TerminalPage() {
         signal = { label: 'HOLD', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', desc: 'روند نزولی پایدار' }
     }
 
-    // MARKET REGIME: based on volatility + trend
     const recent = vals.slice(-10)
     const vol = recent.length > 1 ? (stdDev(recent) / (avg || 1)) * 100 : 0
     const last5 = vals.slice(-5)
@@ -113,7 +107,6 @@ export default function TerminalPage() {
       else regime = { label: 'رنج / خنثی', color: '#00C8FF', desc: 'بازار بدون جهت مشخص' }
     }
 
-    // continuation probability (heuristic)
     const last3 = vals.slice(-3)
     let continuation = 50
     if (last3.length === 3) {
@@ -124,7 +117,6 @@ export default function TerminalPage() {
     }
     continuation = Math.round(continuation)
 
-    // anomalies (vs 7-day mean ± 2σ)
     const anomalyFlags = vals.map((v, i) => {
       if (i < 7) return false
       const w = vals.slice(i - 7, i)
@@ -132,7 +124,6 @@ export default function TerminalPage() {
       return Math.abs(v - a) > 2 * stdDev(w)
     })
 
-    // market score 0-100 (composite)
     let score = 50
     if (n >= 10) {
       score = 50
@@ -142,7 +133,6 @@ export default function TerminalPage() {
       score = Math.max(0, Math.min(100, Math.round(score)))
     }
 
-    // alerts
     const alerts: { type: string; msg: string }[] = []
     if (anomalyFlags.at(-1)) alerts.push({ type: 'danger', msg: 'ارزش آخرین روز خارج از محدوده نرمال است' })
     if (signal.label === 'BUY') alerts.push({ type: 'success', msg: 'سیگنال خرید فعال شد' })
@@ -150,8 +140,7 @@ export default function TerminalPage() {
     if (last >= max * 0.98 && n > 5) alerts.push({ type: 'info', msg: 'نزدیک سقف تاریخی' })
     if (vol > 5) alerts.push({ type: 'warn', msg: 'نوسانات بازار بالاست' })
 
-    // chart series (gregorian time)
-    const chartData = records.map((r) => ({ time: shamsiToGregorian(r.trade_date_shamsi), value: safe(r.trade_value) })).filter(p => p.time)
+    const chartData = records.map((r) => ({ time: shamsiToGregorian(r.trade_date_shamsi), value: safe(r.trade_value), shamsi: r.trade_date_shamsi })).filter(p => p.time)
     const ma5Data = records.map((r, i) => ({ time: shamsiToGregorian(r.trade_date_shamsi), value: ma5arr[i] })).filter(p => p.time && p.value != null) as { time: string; value: number }[]
     const ma10Data = records.map((r, i) => ({ time: shamsiToGregorian(r.trade_date_shamsi), value: ma10arr[i] })).filter(p => p.time && p.value != null) as { time: string; value: number }[]
     const anomalyData = records.map((r, i) => anomalyFlags[i] ? { time: shamsiToGregorian(r.trade_date_shamsi), value: safe(r.trade_value) } : null).filter(Boolean) as { time: string; value: number }[]
@@ -170,7 +159,6 @@ export default function TerminalPage() {
       minHeight: '100vh', background: '#060B14', color: '#E2E8F0',
       fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
     }}>
-      {/* TOPBAR */}
       <header style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '12px 24px', borderBottom: '0.5px solid rgba(0,200,255,0.12)',
@@ -196,17 +184,13 @@ export default function TerminalPage() {
 
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* INTELLIGENCE STRIP */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <IntelCard title="رژیم بازار" main={intel.regime.label} sub={intel.regime.desc} color={intel.regime.color} />
           <IntelCard title="سیگنال" main={intel.signal.label} sub={intel.signal.desc} color={intel.signal.color} />
-          <IntelCard title="احتمال ادامه روند" main={`${intel.continuation}٪`} sub="بر اساس مومنتوم" color="#00C8FF"
-            bar={intel.continuation} />
-          <IntelCard title="امتیاز بازار" main={`${intel.score}`} sub="۰ تا ۱۰۰" color={intel.score >= 60 ? '#00E5A0' : intel.score <= 40 ? '#FF4D6A' : '#F59E0B'}
-            bar={intel.score} />
+          <IntelCard title="احتمال ادامه روند" main={`${intel.continuation}٪`} sub="بر اساس مومنتوم" color="#00C8FF" bar={intel.continuation} />
+          <IntelCard title="امتیاز بازار" main={`${intel.score}`} sub="۰ تا ۱۰۰" color={intel.score >= 60 ? '#00E5A0' : intel.score <= 40 ? '#FF4D6A' : '#F59E0B'} bar={intel.score} />
         </div>
 
-        {/* ALERTS */}
         {intel.alerts.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {intel.alerts.map((a, i) => {
@@ -224,7 +208,6 @@ export default function TerminalPage() {
           </div>
         )}
 
-        {/* CHART + SIDE */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
           <Panel>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -251,7 +234,6 @@ export default function TerminalPage() {
             )}
           </Panel>
 
-          {/* FORM + STATS */}
           <Panel>
             <PanelTitle>ثبت داده جدید</PanelTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
@@ -263,8 +245,7 @@ export default function TerminalPage() {
               </div>
               <div>
                 <Label>ارزش معامله (تومان)</Label>
-                <input value={value} onChange={e => setValue(e.target.value)} placeholder="مثال: ۱۲۵۰۰۰۰۰"
-                  style={inputStyle} />
+                <input value={value} onChange={e => setValue(e.target.value)} placeholder="مثال: ۱۲۵۰۰۰۰۰" style={inputStyle} />
               </div>
               <button onClick={saveData} disabled={loading} style={{
                 width: '100%', background: loading ? 'rgba(0,200,255,0.04)' : 'rgba(0,200,255,0.1)',
@@ -285,7 +266,6 @@ export default function TerminalPage() {
           </Panel>
         </div>
 
-        {/* TABLE */}
         <Panel>
           <PanelTitle>آخرین رکوردها</PanelTitle>
           <div style={{ overflowX: 'auto', marginTop: 12 }}>
@@ -362,7 +342,6 @@ export default function TerminalPage() {
   )
 }
 
-// ── small presentational components ───────────────────────
 const inputStyle: React.CSSProperties = {
   width: '100%', background: '#060B14', border: '0.5px solid rgba(0,200,255,0.2)',
   borderRadius: 8, padding: '10px 12px', color: '#E2E8F0', fontSize: 13,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   createChart,
   AreaSeries,
@@ -14,8 +14,9 @@ import {
 } from 'lightweight-charts'
 
 export interface ChartPoint {
-  time: string   // "YYYY-MM-DD"
+  time: string        // gregorian "YYYY-MM-DD" (for ordering / internal)
   value: number
+  shamsi?: string     // shamsi label to show on axis
 }
 
 interface Props {
@@ -33,7 +34,12 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
   const ma5Ref = useRef<ISeriesApi<'Line'> | null>(null)
   const ma10Ref = useRef<ISeriesApi<'Line'> | null>(null)
 
-  // create chart once
+  // map gregorian time -> shamsi label, for axis + tooltip
+  const shamsiMap = useRef<Record<string, string>>({})
+
+  const [showMA5, setShowMA5] = useState(true)
+  const [showMA10, setShowMA10] = useState(true)
+
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -44,6 +50,7 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
         textColor: '#4A6B8A',
         fontFamily: 'Vazirmatn, Arial, sans-serif',
         fontSize: 11,
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: 'rgba(0,200,255,0.04)' },
@@ -56,11 +63,28 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
       timeScale: {
         borderColor: 'rgba(0,200,255,0.1)',
         timeVisible: false,
+        // show shamsi label on the axis
+        tickMarkFormatter: (time: any) => {
+          const key = typeof time === 'string'
+            ? time
+            : `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`
+          const s = shamsiMap.current[key]
+          if (s) {
+            // show "MM/DD" part of "YYYY/MM/DD"
+            const parts = s.split('/')
+            return parts.length === 3 ? `${parts[1]}/${parts[2]}` : s
+          }
+          return ''
+        },
       },
-      crosshair: {
-        mode: 1,
-        vertLine: { color: 'rgba(0,200,255,0.3)', width: 1, style: LineStyle.Dashed, labelBackgroundColor: '#0D1726' },
-        horzLine: { color: 'rgba(0,200,255,0.3)', width: 1, style: LineStyle.Dashed, labelBackgroundColor: '#0D1726' },
+      localization: {
+        // shamsi label on crosshair
+        timeFormatter: (time: any) => {
+          const key = typeof time === 'string'
+            ? time
+            : `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`
+          return shamsiMap.current[key] || String(time)
+        },
       },
     })
 
@@ -93,7 +117,6 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
     })
     ma10Ref.current = ma10Series
 
-    // responsive
     const ro = new ResizeObserver(entries => {
       const w = entries[0].contentRect.width
       chart.applyOptions({ width: w })
@@ -111,29 +134,84 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
   useEffect(() => {
     if (!areaRef.current) return
 
+    // rebuild shamsi map
+    const map: Record<string, string> = {}
+    data.forEach(p => { if (p.time && p.shamsi) map[p.time] = p.shamsi })
+    shamsiMap.current = map
+
     const toSeries = (arr: ChartPoint[]) =>
       arr
-        .filter(p => p.value != null && !Number.isNaN(p.value))
+        .filter(p => p.value != null && !Number.isNaN(p.value) && p.time)
         .map(p => ({ time: p.time as Time, value: p.value }))
+        .sort((a, b) => String(a.time).localeCompare(String(b.time)))
 
     areaRef.current.setData(toSeries(data))
-    ma5Ref.current?.setData(toSeries(ma5))
-    ma10Ref.current?.setData(toSeries(ma10))
+    ma5Ref.current?.setData(showMA5 ? toSeries(ma5) : [])
+    ma10Ref.current?.setData(showMA10 ? toSeries(ma10) : [])
 
-    // anomaly markers
     if (areaRef.current) {
-      const markers = anomalies.map(a => ({
-        time: a.time as Time,
-        position: 'aboveBar' as const,
-        color: '#FF4D6A',
-        shape: 'circle' as const,
-        text: '⚠',
-      }))
+      const markers = anomalies
+        .slice()
+        .sort((a, b) => String(a.time).localeCompare(String(b.time)))
+        .map(a => ({
+          time: a.time as Time,
+          position: 'aboveBar' as const,
+          color: '#FF4D6A',
+          shape: 'circle' as const,
+          text: '⚠',
+        }))
       createSeriesMarkers(areaRef.current, markers)
     }
 
     chartRef.current?.timeScale().fitContent()
-  }, [data, ma5, ma10, anomalies])
+  }, [data, ma5, ma10, anomalies, showMA5, showMA10])
 
-  return <div ref={containerRef} style={{ width: '100%' }} />
+  // toggle MA visibility
+  const toggleMA5 = () => {
+    const next = !showMA5
+    setShowMA5(next)
+  }
+  const toggleMA10 = () => {
+    const next = !showMA10
+    setShowMA10(next)
+  }
+
+  return (
+    <div>
+      {/* MA toggle buttons */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button
+          onClick={toggleMA5}
+          style={{
+            fontSize: 11,
+            padding: '4px 12px',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            background: showMA5 ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)',
+            border: `0.5px solid ${showMA5 ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)'}`,
+            color: showMA5 ? '#F59E0B' : '#4A6B8A',
+          }}
+        >
+          MA5 {showMA5 ? '●' : '○'}
+        </button>
+        <button
+          onClick={toggleMA10}
+          style={{
+            fontSize: 11,
+            padding: '4px 12px',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            background: showMA10 ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
+            border: `0.5px solid ${showMA10 ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.1)'}`,
+            color: showMA10 ? '#8B5CF6' : '#4A6B8A',
+          }}
+        >
+          MA10 {showMA10 ? '●' : '○'}
+        </button>
+      </div>
+      <div ref={containerRef} style={{ width: '100%' }} />
+    </div>
+  )
 }
