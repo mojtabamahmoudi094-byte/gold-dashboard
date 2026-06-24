@@ -78,6 +78,7 @@ export default function TerminalPage() {
   const [isDark, setIsDark] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [signalHistory, setSignalHistory] = useState<any[]>([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const [page, setPage] = useState(1)
   const perPage = 15
 
@@ -114,6 +115,7 @@ export default function TerminalPage() {
       .order('id', { ascending: false })
       .limit(20)
     if (data) setSignalHistory(data)
+    setHistoryLoaded(true)
   }
 
   useEffect(() => { loadData(); loadSignalHistory() }, [])
@@ -230,13 +232,24 @@ export default function TerminalPage() {
   // auto-save signal to history when it changes (admin only)
   useEffect(() => {
     if (!isLoggedIn) return
+    if (!historyLoaded) return          // wait until previous history is fully loaded
     if (intel.n < 10) return
     if (intel.signal.label === 'منتظر') return
 
     const lastSaved = signalHistory[0]?.signal_type
-    if (lastSaved === intel.signal.label) return
+    if (lastSaved === intel.signal.label) return   // same as last → skip
 
+    let cancelled = false
     const saveSignal = async () => {
+      // double-check right before insert to avoid duplicate
+      const { data: latest } = await supabase
+        .from('signals')
+        .select('signal_type')
+        .order('id', { ascending: false })
+        .limit(1)
+      if (cancelled) return
+      if (latest && latest[0]?.signal_type === intel.signal.label) return
+
       const lastRecord = records.at(-1)
       const { error } = await supabase.from('signals').insert([{
         signal_date_shamsi: lastRecord?.trade_date_shamsi || '',
@@ -244,10 +257,12 @@ export default function TerminalPage() {
         market_value: intel.last,
         note: intel.signal.desc,
       }])
-      if (!error) loadSignalHistory()
+      if (!error && !cancelled) loadSignalHistory()
     }
     saveSignal()
-  }, [intel.signal.label, isLoggedIn, intel.n])
+
+    return () => { cancelled = true }
+  }, [intel.signal.label, isLoggedIn, historyLoaded])
 
   return (
     <main style={{
@@ -271,7 +286,7 @@ export default function TerminalPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-       <button
+        <button
             onClick={() => router.push('/signals')}
             style={{
               fontSize: 12, padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
