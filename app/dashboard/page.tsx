@@ -81,6 +81,8 @@ export default function TerminalPage() {
   const [signalHistory, setSignalHistory] = useState<any[]>([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [assets, setAssets] = useState<any[]>([])
+  const [selectedAsset, setSelectedAsset] = useState<any>(null)
   const [page, setPage] = useState(1)
   const perPage = 15
 
@@ -102,10 +104,24 @@ export default function TerminalPage() {
     setIsLoggedIn(false)
   }
 
-  const loadData = async () => {
+  const loadAssets = async () => {
+    const { data } = await supabase
+      .from('assets')
+      .select('*')
+      .order('id', { ascending: true })
+    if (data && data.length > 0) {
+      setAssets(data)
+     setSelectedAsset((prev: any) => prev || data[0])
+    }
+  }
+
+  const loadData = async (assetId?: number) => {
+    const id = assetId ?? selectedAsset?.id
+    if (!id) return
     const { data } = await supabase
       .from('gold_funds')
       .select('*')
+      .eq('asset_id', id)
       .order('id', { ascending: true })
     if (data) setRecords(data)
   }
@@ -120,12 +136,22 @@ export default function TerminalPage() {
     setHistoryLoaded(true)
   }
 
-  useEffect(() => { loadData(); loadSignalHistory() }, [])
+  // load assets once on mount
+  useEffect(() => { loadAssets(); loadSignalHistory() }, [])
+
+  // reload data whenever the selected asset changes
+  useEffect(() => {
+    if (selectedAsset?.id) {
+      loadData(selectedAsset.id)
+      setPage(1)
+    }
+  }, [selectedAsset])
 
   const saveData = async () => {
     if (!date || !value) return alert('تاریخ و مقدار را وارد کنید')
+    if (!selectedAsset?.id) return alert('دارایی انتخاب نشده است')
     setLoading(true)
-    const { error } = await supabase.from('gold_funds').insert([{ trade_date_shamsi: date, trade_value: safe(value) }])
+    const { error } = await supabase.from('gold_funds').insert([{ trade_date_shamsi: date, trade_value: safe(value), asset_id: selectedAsset.id }])
     setLoading(false)
     if (error) return alert('خطا: فقط مدیر می‌تواند داده ثبت کند')
     setDate(''); setValue(''); loadData()
@@ -134,6 +160,7 @@ export default function TerminalPage() {
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!selectedAsset?.id) { alert('دارایی انتخاب نشده است'); return }
     setImporting(true)
 
     try {
@@ -145,7 +172,7 @@ export default function TerminalPage() {
       // skip header row (row 0), read from row 1
       const dataRows = rows.slice(1)
 
-      const toInsert: { trade_date_shamsi: string; trade_value: number }[] = []
+      const toInsert: { trade_date_shamsi: string; trade_value: number; asset_id: number }[] = []
       for (const row of dataRows) {
         const rawDate = row[0]
         const rawValue = row[1]
@@ -153,7 +180,7 @@ export default function TerminalPage() {
         const d = String(rawDate).trim()
         const v = safe(rawValue)
         if (!d || !v) continue
-        toInsert.push({ trade_date_shamsi: d, trade_value: v })
+        toInsert.push({ trade_date_shamsi: d, trade_value: v, asset_id: selectedAsset.id })
       }
 
       if (toInsert.length === 0) {
@@ -342,6 +369,26 @@ export default function TerminalPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {assets.length > 0 && (
+            <select
+              value={selectedAsset?.id || ''}
+              onChange={(e) => {
+                const a = assets.find(x => x.id === Number(e.target.value))
+                if (a) setSelectedAsset(a)
+              }}
+              style={{
+                fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
+                background: t.panel, border: `0.5px solid ${t.borderStrong}`,
+                color: t.text, fontFamily: 'inherit', outline: 'none',
+              }}
+            >
+              {assets.map(a => (
+                <option key={a.id} value={a.id} style={{ background: t.panelSolid, color: t.text }}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             onClick={() => router.push('/signals')}
             style={{
