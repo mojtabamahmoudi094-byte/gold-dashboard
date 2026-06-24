@@ -74,6 +74,7 @@ export default function TerminalPage() {
   const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [editDate, setEditDate] = useState('')
   const [isDark, setIsDark] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [page, setPage] = useState(1)
@@ -121,7 +122,10 @@ export default function TerminalPage() {
     loadData()
   }
   const saveEdit = async (id: number) => {
-    const { error } = await supabase.from('gold_funds').update({ trade_value: safe(editValue) }).eq('id', id)
+    const { error } = await supabase.from('gold_funds').update({
+      trade_value: safe(editValue),
+      trade_date_shamsi: editDate,
+    }).eq('id', id)
     if (error) return alert('خطا: فقط مدیر می‌تواند ویرایش کند')
     setEditingId(null); loadData()
   }
@@ -393,7 +397,13 @@ export default function TerminalPage() {
                   return (
                     <tr key={r.id} style={{ borderBottom: `0.5px solid ${t.border}`, background: isAnomaly ? 'rgba(255,77,106,0.04)' : 'transparent' }}>
                       <td style={{ padding: '9px 10px', color: t.faint }}>{r.id}</td>
-                      <td style={{ padding: '9px 10px', color: t.text }}>{r.trade_date_shamsi}</td>
+                      <td style={{ padding: '9px 10px', color: t.text }}>
+                        {editingId === r.id ? (
+                          <input value={editDate} onChange={e => setEditDate(e.target.value)}
+                            placeholder="۱۴۰۴/۰۳/۱۵"
+                            style={{ background: t.inputBg, border: `0.5px solid ${t.borderStrong}`, borderRadius: 6, padding: '4px 8px', color: t.text, fontSize: 12, fontFamily: 'inherit', width: 110, direction: 'ltr', textAlign: 'center' }} />
+                        ) : r.trade_date_shamsi}
+                      </td>
                       <td style={{ padding: '9px 10px', color: t.textBright, fontWeight: 500 }}>
                         {editingId === r.id ? (
                           <input value={editValue} onChange={e => setEditValue(e.target.value)}
@@ -416,7 +426,7 @@ export default function TerminalPage() {
                             <span onClick={() => saveEdit(r.id)} style={{ color: t.accent, cursor: 'pointer', fontSize: 11 }}>ذخیره</span>
                           ) : (
                             <span style={{ display: 'flex', gap: 10 }}>
-                              <span onClick={() => { setEditingId(r.id); setEditValue(String(r.trade_value)) }} style={{ color: t.muted, cursor: 'pointer', fontSize: 11 }}>ویرایش</span>
+                              <span onClick={() => { setEditingId(r.id); setEditValue(String(r.trade_value)); setEditDate(r.trade_date_shamsi) }} style={{ color: t.muted, cursor: 'pointer', fontSize: 11 }}>ویرایش</span>
                               <span onClick={() => deleteRecord(r.id)} style={{ color: '#FF4D6A', cursor: 'pointer', fontSize: 11 }}>حذف</span>
                             </span>
                           )}
