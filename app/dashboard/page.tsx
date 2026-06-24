@@ -8,6 +8,7 @@ import persian from 'react-date-object/calendars/persian'
 import persian_fa from 'react-date-object/locales/persian_fa'
 import DateObject from 'react-date-object'
 import gregorian from 'react-date-object/calendars/gregorian'
+import * as XLSX from 'xlsx'
 
 const DatePicker = dynamic(() => import('react-multi-date-picker'), { ssr: false })
 const TerminalChart = dynamic(() => import('./TerminalChart'), { ssr: false })
@@ -79,6 +80,7 @@ export default function TerminalPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [signalHistory, setSignalHistory] = useState<any[]>([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [page, setPage] = useState(1)
   const perPage = 15
 
@@ -127,6 +129,60 @@ export default function TerminalPage() {
     setLoading(false)
     if (error) return alert('خطا: فقط مدیر می‌تواند داده ثبت کند')
     setDate(''); setValue(''); loadData()
+  }
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+
+    try {
+      const buffer = await file.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array' })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][]
+
+      // skip header row (row 0), read from row 1
+      const dataRows = rows.slice(1)
+
+      const toInsert: { trade_date_shamsi: string; trade_value: number }[] = []
+      for (const row of dataRows) {
+        const rawDate = row[0]
+        const rawValue = row[1]
+        if (rawDate == null || rawValue == null) continue
+        const d = String(rawDate).trim()
+        const v = safe(rawValue)
+        if (!d || !v) continue
+        toInsert.push({ trade_date_shamsi: d, trade_value: v })
+      }
+
+      if (toInsert.length === 0) {
+        alert('هیچ داده‌ی معتبری در فایل پیدا نشد')
+        setImporting(false)
+        e.target.value = ''
+        return
+      }
+
+      const ok = confirm(`${toInsert.length} ردیف پیدا شد. وارد شود؟`)
+      if (!ok) {
+        setImporting(false)
+        e.target.value = ''
+        return
+      }
+
+      const { error } = await supabase.from('gold_funds').insert(toInsert)
+      if (error) {
+        alert('خطا: فقط مدیر می‌تواند داده وارد کند')
+      } else {
+        alert(`${toInsert.length} ردیف با موفقیت وارد شد`)
+        loadData()
+      }
+    } catch (err) {
+      alert('خطا در خواندن فایل. مطمئن شوید فایل اکسل یا CSV معتبر است')
+    }
+
+    setImporting(false)
+    e.target.value = ''
   }
   const deleteRecord = async (id: number) => {
     if (!confirm('حذف شود؟')) return
@@ -286,7 +342,7 @@ export default function TerminalPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button
+          <button
             onClick={() => router.push('/signals')}
             style={{
               fontSize: 12, padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
@@ -419,6 +475,23 @@ export default function TerminalPage() {
                 }}>
                   {loading ? 'در حال ثبت...' : 'ثبت رکورد'}
                 </button>
+
+                <label style={{
+                  width: '100%', boxSizing: 'border-box', textAlign: 'center',
+                  background: importing ? 'rgba(0,229,160,0.05)' : 'rgba(0,229,160,0.1)',
+                  border: '0.5px solid rgba(0,229,160,0.4)', borderRadius: 8, color: '#00E5A0',
+                  fontSize: 13, fontWeight: 700, padding: '11px', cursor: importing ? 'wait' : 'pointer',
+                  fontFamily: 'inherit', display: 'block',
+                }}>
+                  {importing ? 'در حال وارد کردن...' : '📑 وارد کردن اکسل / CSV'}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleImport}
+                    disabled={importing}
+                    style={{ display: 'none' }}
+                  />
+                </label>
 
                 <div style={{ borderTop: `0.5px solid ${t.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <Stat t={t} label="میانگین کل" val={intel.avg.toLocaleString('fa-IR')} />
