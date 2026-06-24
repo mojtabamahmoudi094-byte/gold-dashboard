@@ -77,6 +77,7 @@ export default function TerminalPage() {
   const [editDate, setEditDate] = useState('')
   const [isDark, setIsDark] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [signalHistory, setSignalHistory] = useState<any[]>([])
   const [page, setPage] = useState(1)
   const perPage = 15
 
@@ -105,7 +106,17 @@ export default function TerminalPage() {
       .order('id', { ascending: true })
     if (data) setRecords(data)
   }
-  useEffect(() => { loadData() }, [])
+
+  const loadSignalHistory = async () => {
+    const { data } = await supabase
+      .from('signals')
+      .select('*')
+      .order('id', { ascending: false })
+      .limit(20)
+    if (data) setSignalHistory(data)
+  }
+
+  useEffect(() => { loadData(); loadSignalHistory() }, [])
 
   const saveData = async () => {
     if (!date || !value) return alert('تاریخ و مقدار را وارد کنید')
@@ -216,6 +227,28 @@ export default function TerminalPage() {
 
   const isUp = intel.change >= 0
 
+  // auto-save signal to history when it changes (admin only)
+  useEffect(() => {
+    if (!isLoggedIn) return
+    if (intel.n < 10) return
+    if (intel.signal.label === 'منتظر') return
+
+    const lastSaved = signalHistory[0]?.signal_type
+    if (lastSaved === intel.signal.label) return
+
+    const saveSignal = async () => {
+      const lastRecord = records.at(-1)
+      const { error } = await supabase.from('signals').insert([{
+        signal_date_shamsi: lastRecord?.trade_date_shamsi || '',
+        signal_type: intel.signal.label,
+        market_value: intel.last,
+        note: intel.signal.desc,
+      }])
+      if (!error) loadSignalHistory()
+    }
+    saveSignal()
+  }, [intel.signal.label, isLoggedIn, intel.n])
+
   return (
     <main style={{
       minHeight: '100vh', background: t.bg, color: t.text,
@@ -238,6 +271,18 @@ export default function TerminalPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+       <button
+            onClick={() => router.push('/signals')}
+            style={{
+              fontSize: 12, padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
+              background: 'linear-gradient(135deg, #FFD24A, #E0A500)',
+              border: 'none',
+              color: '#1A1200', fontFamily: 'inherit', fontWeight: 700,
+              boxShadow: '0 2px 10px rgba(224,165,0,0.4)',
+            }}
+          >
+            ★ تاریخچه سیگنال
+          </button>
           {isLoggedIn ? (
             <button
               onClick={logout}
