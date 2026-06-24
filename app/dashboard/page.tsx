@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import dynamic from 'next/dynamic'
 import persian from 'react-date-object/calendars/persian'
@@ -36,8 +37,6 @@ function stdDev(arr: number[]): number {
   return Math.sqrt(arr.reduce((a, b) => a + (b - avg) ** 2, 0) / arr.length)
 }
 
-// ── THEME TOKENS ──────────────────────────────────────────
-type Theme = typeof darkTheme
 const darkTheme = {
   bg: '#060B14',
   panel: 'rgba(13,23,38,0.8)',
@@ -46,7 +45,7 @@ const darkTheme = {
   borderStrong: 'rgba(0,200,255,0.2)',
   text: '#E2E8F0',
   textBright: '#FFFFFF',
-  muted: '#7B93AC',        // brightened from #4A6B8A for readability
+  muted: '#7B93AC',
   faint: '#5A7088',
   accent: '#00C8FF',
   inputBg: '#060B14',
@@ -68,6 +67,7 @@ const lightTheme = {
 }
 
 export default function TerminalPage() {
+  const router = useRouter()
   const [date, setDate] = useState('')
   const [value, setValue] = useState('')
   const [records, setRecords] = useState<any[]>([])
@@ -75,8 +75,25 @@ export default function TerminalPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editValue, setEditValue] = useState('')
   const [isDark, setIsDark] = useState(true)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  const t: Theme = isDark ? darkTheme : (lightTheme as any)
+  const t: any = isDark ? darkTheme : lightTheme
+
+  // check auth status
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setIsLoggedIn(!!data.session)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  const logout = async () => {
+    await supabase.auth.signOut()
+    setIsLoggedIn(false)
+  }
 
   const loadData = async () => {
     const { data } = await supabase
@@ -90,15 +107,20 @@ export default function TerminalPage() {
   const saveData = async () => {
     if (!date || !value) return alert('تاریخ و مقدار را وارد کنید')
     setLoading(true)
-    await supabase.from('gold_funds').insert([{ trade_date_shamsi: date, trade_value: safe(value) }])
-    setLoading(false); setDate(''); setValue(''); loadData()
+    const { error } = await supabase.from('gold_funds').insert([{ trade_date_shamsi: date, trade_value: safe(value) }])
+    setLoading(false)
+    if (error) return alert('خطا: فقط مدیر می‌تواند داده ثبت کند')
+    setDate(''); setValue(''); loadData()
   }
   const deleteRecord = async (id: number) => {
     if (!confirm('حذف شود؟')) return
-    await supabase.from('gold_funds').delete().eq('id', id); loadData()
+    const { error } = await supabase.from('gold_funds').delete().eq('id', id)
+    if (error) return alert('خطا: فقط مدیر می‌تواند حذف کند')
+    loadData()
   }
   const saveEdit = async (id: number) => {
-    await supabase.from('gold_funds').update({ trade_value: safe(editValue) }).eq('id', id)
+    const { error } = await supabase.from('gold_funds').update({ trade_value: safe(editValue) }).eq('id', id)
+    if (error) return alert('خطا: فقط مدیر می‌تواند ویرایش کند')
     setEditingId(null); loadData()
   }
 
@@ -210,6 +232,29 @@ export default function TerminalPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isLoggedIn ? (
+            <button
+              onClick={logout}
+              style={{
+                fontSize: 12, padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
+                background: 'rgba(255,77,106,0.1)', border: '0.5px solid rgba(255,77,106,0.4)',
+                color: '#FF4D6A', fontFamily: 'inherit', fontWeight: 700,
+              }}
+            >
+              خروج
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push('/admin')}
+              style={{
+                fontSize: 12, padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
+                background: `${t.accent}1A`, border: `0.5px solid ${t.accent}66`,
+                color: t.accent, fontFamily: 'inherit', fontWeight: 700,
+              }}
+            >
+              ورود مدیر
+            </button>
+          )}
           <button
             onClick={() => setIsDark(!isDark)}
             title="تغییر قالب"
@@ -221,8 +266,8 @@ export default function TerminalPage() {
           >
             {isDark ? '☀' : '☾'}
           </button>
-          <Badge t={t} color={intel.signal.color} bg={intel.signal.bg} bold>{intel.signal.label}</Badge>
-          <Badge t={t} color={isUp ? '#00E5A0' : '#FF4D6A'} bg={isUp ? 'rgba(0,229,160,0.08)' : 'rgba(255,77,106,0.08)'} bold>
+          <Badge color={intel.signal.color} bg={intel.signal.bg} bold>{intel.signal.label}</Badge>
+          <Badge color={isUp ? '#00E5A0' : '#FF4D6A'} bg={isUp ? 'rgba(0,229,160,0.08)' : 'rgba(255,77,106,0.08)'} bold>
             {isUp ? '+' : ''}{intel.change.toFixed(2)}٪
           </Badge>
         </div>
@@ -254,7 +299,7 @@ export default function TerminalPage() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isLoggedIn ? '1fr 300px' : '1fr', gap: 16 }}>
           <Panel t={t}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <PanelTitle t={t}>نمودار ارزش معاملات</PanelTitle>
@@ -281,41 +326,43 @@ export default function TerminalPage() {
             )}
           </Panel>
 
-          <Panel t={t}>
-            <PanelTitle t={t}>ثبت داده جدید</PanelTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-              <div>
-                <Label t={t}>تاریخ شمسی</Label>
-                <DatePicker calendar={persian} locale={persian_fa} value={date}
-                  onChange={(v: any) => setDate(v?.format?.('YYYY/MM/DD') || '')}
-                  inputClass="db-input" />
-              </div>
-              <div>
-                <Label t={t}>ارزش معامله (تومان)</Label>
-                <input value={value} onChange={e => setValue(e.target.value)} placeholder="مثال: ۱۲۵۰۰۰۰۰"
-                  style={{
-                    width: '100%', background: t.inputBg, border: `0.5px solid ${t.borderStrong}`,
-                    borderRadius: 8, padding: '10px 12px', color: t.text, fontSize: 13,
-                    outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', direction: 'rtl',
-                  }} />
-              </div>
-              <button onClick={saveData} disabled={loading} style={{
-                width: '100%', background: loading ? `${t.accent}0A` : `${t.accent}1A`,
-                border: `0.5px solid ${t.accent}59`, borderRadius: 8, color: t.accent,
-                fontSize: 13, fontWeight: 700, padding: '11px', cursor: loading ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit',
-              }}>
-                {loading ? 'در حال ثبت...' : 'ثبت رکورد'}
-              </button>
+          {isLoggedIn && (
+            <Panel t={t}>
+              <PanelTitle t={t}>ثبت داده جدید</PanelTitle>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+                <div>
+                  <Label t={t}>تاریخ شمسی</Label>
+                  <DatePicker calendar={persian} locale={persian_fa} value={date}
+                    onChange={(v: any) => setDate(v?.format?.('YYYY/MM/DD') || '')}
+                    inputClass="db-input" />
+                </div>
+                <div>
+                  <Label t={t}>ارزش معامله (تومان)</Label>
+                  <input value={value} onChange={e => setValue(e.target.value)} placeholder="مثال: ۱۲۵۰۰۰۰۰"
+                    style={{
+                      width: '100%', background: t.inputBg, border: `0.5px solid ${t.borderStrong}`,
+                      borderRadius: 8, padding: '10px 12px', color: t.text, fontSize: 13,
+                      outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', direction: 'rtl',
+                    }} />
+                </div>
+                <button onClick={saveData} disabled={loading} style={{
+                  width: '100%', background: loading ? `${t.accent}0A` : `${t.accent}1A`,
+                  border: `0.5px solid ${t.accent}59`, borderRadius: 8, color: t.accent,
+                  fontSize: 13, fontWeight: 700, padding: '11px', cursor: loading ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}>
+                  {loading ? 'در حال ثبت...' : 'ثبت رکورد'}
+                </button>
 
-              <div style={{ borderTop: `0.5px solid ${t.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <Stat t={t} label="میانگین کل" val={intel.avg.toLocaleString('fa-IR')} />
-                <Stat t={t} label="سقف تاریخی" val={intel.max.toLocaleString('fa-IR')} />
-                <Stat t={t} label="کف تاریخی" val={intel.min.toLocaleString('fa-IR')} />
-                <Stat t={t} label="نوسان" val={`${intel.vol.toFixed(1)}٪`} />
+                <div style={{ borderTop: `0.5px solid ${t.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <Stat t={t} label="میانگین کل" val={intel.avg.toLocaleString('fa-IR')} />
+                  <Stat t={t} label="سقف تاریخی" val={intel.max.toLocaleString('fa-IR')} />
+                  <Stat t={t} label="کف تاریخی" val={intel.min.toLocaleString('fa-IR')} />
+                  <Stat t={t} label="نوسان" val={`${intel.vol.toFixed(1)}٪`} />
+                </div>
               </div>
-            </div>
-          </Panel>
+            </Panel>
+          )}
         </div>
 
         <Panel t={t}>
@@ -324,7 +371,7 @@ export default function TerminalPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
-                  {['#', 'تاریخ', 'ارزش معامله', 'تغییر', 'وضعیت', 'عملیات'].map(h => (
+                  {['#', 'تاریخ', 'ارزش معامله', 'تغییر', 'وضعیت', ...(isLoggedIn ? ['عملیات'] : [])].map(h => (
                     <th key={h} style={{ color: t.muted, fontWeight: 500, textAlign: 'right', padding: '8px 10px', borderBottom: `0.5px solid ${t.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -356,16 +403,18 @@ export default function TerminalPage() {
                       <td style={{ padding: '9px 10px' }}>
                         {isAnomaly && <span style={{ background: 'rgba(255,77,106,0.1)', color: '#FF4D6A', borderRadius: 4, padding: '2px 7px', fontSize: 10 }}>⚠ ناهنجاری</span>}
                       </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        {editingId === r.id ? (
-                          <span onClick={() => saveEdit(r.id)} style={{ color: t.accent, cursor: 'pointer', fontSize: 11 }}>ذخیره</span>
-                        ) : (
-                          <span style={{ display: 'flex', gap: 10 }}>
-                            <span onClick={() => { setEditingId(r.id); setEditValue(String(r.trade_value)) }} style={{ color: t.muted, cursor: 'pointer', fontSize: 11 }}>ویرایش</span>
-                            <span onClick={() => deleteRecord(r.id)} style={{ color: '#FF4D6A', cursor: 'pointer', fontSize: 11 }}>حذف</span>
-                          </span>
-                        )}
-                      </td>
+                      {isLoggedIn && (
+                        <td style={{ padding: '9px 10px' }}>
+                          {editingId === r.id ? (
+                            <span onClick={() => saveEdit(r.id)} style={{ color: t.accent, cursor: 'pointer', fontSize: 11 }}>ذخیره</span>
+                          ) : (
+                            <span style={{ display: 'flex', gap: 10 }}>
+                              <span onClick={() => { setEditingId(r.id); setEditValue(String(r.trade_value)) }} style={{ color: t.muted, cursor: 'pointer', fontSize: 11 }}>ویرایش</span>
+                              <span onClick={() => deleteRecord(r.id)} style={{ color: '#FF4D6A', cursor: 'pointer', fontSize: 11 }}>حذف</span>
+                            </span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
