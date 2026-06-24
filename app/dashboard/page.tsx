@@ -76,6 +76,8 @@ export default function TerminalPage() {
   const [editValue, setEditValue] = useState('')
   const [isDark, setIsDark] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [page, setPage] = useState(1)
+  const perPage = 15
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -366,8 +368,13 @@ export default function TerminalPage() {
         </div>
 
         <Panel t={t}>
-          <PanelTitle t={t}>آخرین رکوردها</PanelTitle>
-          <div style={{ overflowX: 'auto', marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <PanelTitle t={t}>آخرین رکوردها</PanelTitle>
+            <span style={{ fontSize: 11, color: t.muted }}>
+              {records.length.toLocaleString('fa-IR')} رکورد
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
@@ -377,7 +384,7 @@ export default function TerminalPage() {
                 </tr>
               </thead>
               <tbody>
-                {[...records].reverse().map((r) => {
+                {[...records].reverse().slice((page - 1) * perPage, page * perPage).map((r) => {
                   const idx = records.findIndex(x => x.id === r.id)
                   const prevVal = safe(records[idx - 1]?.trade_value)
                   const cur = safe(r.trade_value)
@@ -421,6 +428,41 @@ export default function TerminalPage() {
               </tbody>
             </table>
           </div>
+
+          {/* pagination controls */}
+          {records.length > perPage && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 16 }}>
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                style={{
+                  fontSize: 12, padding: '6px 16px', borderRadius: 8, fontFamily: 'inherit',
+                  background: page === 1 ? 'transparent' : `${t.accent}1A`,
+                  border: `0.5px solid ${page === 1 ? t.border : `${t.accent}59`}`,
+                  color: page === 1 ? t.faint : t.accent,
+                  cursor: page === 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                قبلی
+              </button>
+              <span style={{ fontSize: 12, color: t.muted }}>
+                صفحه {page.toLocaleString('fa-IR')} از {Math.ceil(records.length / perPage).toLocaleString('fa-IR')}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(Math.ceil(records.length / perPage), p + 1))}
+                disabled={page >= Math.ceil(records.length / perPage)}
+                style={{
+                  fontSize: 12, padding: '6px 16px', borderRadius: 8, fontFamily: 'inherit',
+                  background: page >= Math.ceil(records.length / perPage) ? 'transparent' : `${t.accent}1A`,
+                  border: `0.5px solid ${page >= Math.ceil(records.length / perPage) ? t.border : `${t.accent}59`}`,
+                  color: page >= Math.ceil(records.length / perPage) ? t.faint : t.accent,
+                  cursor: page >= Math.ceil(records.length / perPage) ? 'not-allowed' : 'pointer',
+                }}
+              >
+                بعدی
+              </button>
+            </div>
+          )}
         </Panel>
       </div>
 
