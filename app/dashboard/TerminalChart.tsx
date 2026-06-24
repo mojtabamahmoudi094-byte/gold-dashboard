@@ -6,6 +6,7 @@ import {
   AreaSeries,
   LineSeries,
   createSeriesMarkers,
+  type ISeriesMarkersPluginApi,
   ColorType,
   LineStyle,
   type IChartApi,
@@ -14,9 +15,9 @@ import {
 } from 'lightweight-charts'
 
 export interface ChartPoint {
-  time: string        // gregorian "YYYY-MM-DD" (for ordering / internal)
+  time: string
   value: number
-  shamsi?: string     // shamsi label to show on axis
+  shamsi?: string
 }
 
 interface Props {
@@ -25,20 +26,25 @@ interface Props {
   ma10: ChartPoint[]
   anomalies: { time: string; value: number }[]
   height?: number
+  isDark?: boolean
 }
 
-export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360 }: Props) {
+export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360, isDark = true }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const areaRef = useRef<ISeriesApi<'Area'> | null>(null)
   const ma5Ref = useRef<ISeriesApi<'Line'> | null>(null)
   const ma10Ref = useRef<ISeriesApi<'Line'> | null>(null)
-
-  // map gregorian time -> shamsi label, for axis + tooltip
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const shamsiMap = useRef<Record<string, string>>({})
 
   const [showMA5, setShowMA5] = useState(true)
   const [showMA10, setShowMA10] = useState(true)
+  const [showAnomaly, setShowAnomaly] = useState(true)
+
+  const colors = isDark
+    ? { text: '#7B93AC', grid: 'rgba(0,200,255,0.04)', border: 'rgba(0,200,255,0.1)', accent: '#00C8FF', cross: 'rgba(0,200,255,0.3)', crossBg: '#0D1726' }
+    : { text: '#5A6B7E', grid: 'rgba(0,120,170,0.06)', border: 'rgba(0,120,170,0.15)', accent: '#0095C8', cross: 'rgba(0,120,170,0.4)', crossBg: '#FFFFFF' }
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -47,30 +53,28 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
       height,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#4A6B8A',
+        textColor: colors.text,
         fontFamily: 'Vazirmatn, Arial, sans-serif',
         fontSize: 11,
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: 'rgba(0,200,255,0.04)' },
-        horzLines: { color: 'rgba(0,200,255,0.04)' },
+        vertLines: { color: colors.grid },
+        horzLines: { color: colors.grid },
       },
       rightPriceScale: {
-        borderColor: 'rgba(0,200,255,0.1)',
+        borderColor: colors.border,
         scaleMargins: { top: 0.15, bottom: 0.1 },
       },
       timeScale: {
-        borderColor: 'rgba(0,200,255,0.1)',
+        borderColor: colors.border,
         timeVisible: false,
-        // show shamsi label on the axis
         tickMarkFormatter: (time: any) => {
           const key = typeof time === 'string'
             ? time
             : `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`
           const s = shamsiMap.current[key]
           if (s) {
-            // show "MM/DD" part of "YYYY/MM/DD"
             const parts = s.split('/')
             return parts.length === 3 ? `${parts[1]}/${parts[2]}` : s
           }
@@ -78,7 +82,6 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
         },
       },
       localization: {
-        // shamsi label on crosshair
         timeFormatter: (time: any) => {
           const key = typeof time === 'string'
             ? time
@@ -86,18 +89,26 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
           return shamsiMap.current[key] || String(time)
         },
       },
+      crosshair: {
+        mode: 1,
+        vertLine: { color: colors.cross, width: 1, style: LineStyle.Dashed, labelBackgroundColor: colors.crossBg },
+        horzLine: { color: colors.cross, width: 1, style: LineStyle.Dashed, labelBackgroundColor: colors.crossBg },
+      },
     })
 
     chartRef.current = chart
 
     const area = chart.addSeries(AreaSeries, {
-      lineColor: '#00C8FF',
-      topColor: 'rgba(0,200,255,0.18)',
-      bottomColor: 'rgba(0,200,255,0)',
+      lineColor: colors.accent,
+      topColor: isDark ? 'rgba(0,200,255,0.18)' : 'rgba(0,149,200,0.18)',
+      bottomColor: isDark ? 'rgba(0,200,255,0)' : 'rgba(0,149,200,0)',
       lineWidth: 2,
       priceLineVisible: false,
     })
     areaRef.current = area
+
+    // create the markers plugin ONCE and keep a handle to it
+    markersRef.current = createSeriesMarkers(area, [])
 
     const ma5Series = chart.addSeries(LineSeries, {
       color: '#F59E0B',
@@ -127,14 +138,14 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
       ro.disconnect()
       chart.remove()
       chartRef.current = null
+      markersRef.current = null
     }
-  }, [height])
+  }, [height, isDark])
 
-  // update data
+  // update line data
   useEffect(() => {
     if (!areaRef.current) return
 
-    // rebuild shamsi map
     const map: Record<string, string> = {}
     data.forEach(p => { if (p.time && p.shamsi) map[p.time] = p.shamsi })
     shamsiMap.current = map
@@ -149,66 +160,47 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
     ma5Ref.current?.setData(showMA5 ? toSeries(ma5) : [])
     ma10Ref.current?.setData(showMA10 ? toSeries(ma10) : [])
 
-    if (areaRef.current) {
-      const markers = anomalies
-        .slice()
-        .sort((a, b) => String(a.time).localeCompare(String(b.time)))
-        .map(a => ({
-          time: a.time as Time,
-          position: 'aboveBar' as const,
-          color: '#FF4D6A',
-          shape: 'circle' as const,
-          text: '⚠',
-        }))
-      createSeriesMarkers(areaRef.current, markers)
-    }
-
     chartRef.current?.timeScale().fitContent()
-  }, [data, ma5, ma10, anomalies, showMA5, showMA10])
+  }, [data, ma5, ma10, showMA5, showMA10, isDark])
 
-  // toggle MA visibility
-  const toggleMA5 = () => {
-    const next = !showMA5
-    setShowMA5(next)
-  }
-  const toggleMA10 = () => {
-    const next = !showMA10
-    setShowMA10(next)
-  }
+  // update anomaly markers separately (so toggle works reliably)
+  useEffect(() => {
+    if (!markersRef.current) return
+
+    const markers = showAnomaly
+      ? anomalies
+          .slice()
+          .sort((a, b) => String(a.time).localeCompare(String(b.time)))
+          .map(a => ({
+            time: a.time as Time,
+            position: 'aboveBar' as const,
+            color: '#FF4D6A',
+            shape: 'circle' as const,
+            text: '⚠',
+          }))
+      : []
+
+    markersRef.current.setMarkers(markers)
+  }, [anomalies, showAnomaly, isDark])
+
+  const btnStyle = (active: boolean, activeColor: string) => ({
+    fontSize: 11, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' as const,
+    background: active ? `${activeColor}26` : 'rgba(128,128,128,0.08)',
+    border: `0.5px solid ${active ? `${activeColor}80` : 'rgba(128,128,128,0.25)'}`,
+    color: active ? activeColor : colors.text,
+  })
 
   return (
     <div>
-      {/* MA toggle buttons */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-        <button
-          onClick={toggleMA5}
-          style={{
-            fontSize: 11,
-            padding: '4px 12px',
-            borderRadius: 6,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            background: showMA5 ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)',
-            border: `0.5px solid ${showMA5 ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)'}`,
-            color: showMA5 ? '#F59E0B' : '#4A6B8A',
-          }}
-        >
-          MA5 {showMA5 ? '●' : '○'}
+        <button onClick={() => setShowMA5(!showMA5)} style={btnStyle(showMA5, '#F59E0B')}>
+          میانگین ۵ {showMA5 ? '●' : '○'}
         </button>
-        <button
-          onClick={toggleMA10}
-          style={{
-            fontSize: 11,
-            padding: '4px 12px',
-            borderRadius: 6,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            background: showMA10 ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
-            border: `0.5px solid ${showMA10 ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.1)'}`,
-            color: showMA10 ? '#8B5CF6' : '#4A6B8A',
-          }}
-        >
-          MA10 {showMA10 ? '●' : '○'}
+        <button onClick={() => setShowMA10(!showMA10)} style={btnStyle(showMA10, '#8B5CF6')}>
+          میانگین ۱۰ {showMA10 ? '●' : '○'}
+        </button>
+        <button onClick={() => setShowAnomaly(!showAnomaly)} style={btnStyle(showAnomaly, '#FF4D6A')}>
+          ناهنجاری {showAnomaly ? '●' : '○'}
         </button>
       </div>
       <div ref={containerRef} style={{ width: '100%' }} />
