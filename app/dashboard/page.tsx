@@ -14,6 +14,9 @@ const DatePicker = dynamic(() => import('react-multi-date-picker'), { ssr: false
 const TerminalChart = dynamic(() => import('./TerminalChart'), { ssr: false })
 
 const safe = (v: any) => Number(v || 0)
+// نمایش ارزش به میلیارد تومان
+const fmtVal = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
+const UNIT = 'میلیارد تومان'
 
 function shamsiToGregorian(shamsi: string): string {
   try {
@@ -541,9 +544,9 @@ export default function TerminalPage() {
                 </label>
 
                 <div style={{ borderTop: `0.5px solid ${t.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <Stat t={t} label="میانگین کل" val={intel.avg.toLocaleString('fa-IR')} />
-                  <Stat t={t} label="سقف تاریخی" val={intel.max.toLocaleString('fa-IR')} />
-                  <Stat t={t} label="کف تاریخی" val={intel.min.toLocaleString('fa-IR')} />
+                  <Stat t={t} label="میانگین کل" val={`${fmtVal(intel.avg)} ${UNIT}`} />
+                  <Stat t={t} label="سقف تاریخی" val={`${fmtVal(intel.max)} ${UNIT}`} />
+                  <Stat t={t} label="کف تاریخی" val={`${fmtVal(intel.min)} ${UNIT}`} />
                   <Stat t={t} label="نوسان" val={`${intel.vol.toFixed(1)}٪`} />
                 </div>
               </div>
@@ -588,7 +591,7 @@ export default function TerminalPage() {
                         {editingId === r.id ? (
                           <input value={editValue} onChange={e => setEditValue(e.target.value)}
                             style={{ background: t.inputBg, border: `0.5px solid ${t.borderStrong}`, borderRadius: 6, padding: '4px 8px', color: t.text, fontSize: 12, fontFamily: 'inherit', width: 130 }} />
-                        ) : cur.toLocaleString('fa-IR')}
+                        ) : <span>{fmtVal(cur)} <span style={{ color: t.faint, fontSize: 10 }}>{UNIT}</span></span>}
                       </td>
                       <td style={{ padding: '9px 10px' }}>
                         {chg !== null && (
