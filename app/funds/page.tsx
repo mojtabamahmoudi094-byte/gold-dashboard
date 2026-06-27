@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 
 const safe = (v: any) => Number(v || 0)
@@ -201,7 +202,9 @@ export default function FundsPage() {
                         onMouseEnter={e => (e.currentTarget.style.background = `${t.accent}08`)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <td style={{ padding: '10px 8px', fontWeight: 700, color: t.textBright }}>{f.symbol}</td>
+                        <td style={{ padding: '10px 8px', fontWeight: 700 }}>
+                          <Link href={`/fund/${f.slug}`} style={{ color: t.accent, textDecoration: 'none' }}>{f.symbol}</Link>
+                        </td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{f.priceClose.toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{f.priceLast.toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '10px 8px' }}>
@@ -262,10 +265,12 @@ export default function FundsPage() {
                   const isMedium = pct > 3
 
                   return (
-                    <div
+                    <Link
+                      href={`/fund/${f.slug}`}
                       key={i}
                       title={`${f.symbol}\nتغییر: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}٪\nارزش معاملات: ${fmtVal(f.tradeValue)} میلیارد تومان`}
                       style={{
+                        textDecoration: 'none',
                         flexBasis: `${Math.max(pct, 2.5)}%`,
                         flexGrow: 1,
                         minWidth: 50,
@@ -312,7 +317,7 @@ export default function FundsPage() {
                           {fmtVal(f.tradeValue)} م.ت
                         </div>
                       )}
-                    </div>
+                    </Link>
                   )
                 })
               })()}
