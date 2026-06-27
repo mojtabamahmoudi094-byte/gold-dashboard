@@ -80,6 +80,7 @@ export default function TerminalPage() {
   const [editValue, setEditValue] = useState('')
   const [editDate, setEditDate] = useState('')
   const [isDark, setIsDark] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
 
   // خواندن قالب از حافظه و گوش دادن به تغییرات هدر
   useEffect(() => {
@@ -90,7 +91,15 @@ export default function TerminalPage() {
       setIsDark(th !== 'light')
     }
     window.addEventListener('themechange', handler)
-    return () => window.removeEventListener('themechange', handler)
+
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
+    return () => {
+      window.removeEventListener('themechange', handler)
+      window.removeEventListener('resize', checkMobile)
+    }
   }, [])
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [signalHistory, setSignalHistory] = useState<any[]>([])
@@ -370,7 +379,7 @@ export default function TerminalPage() {
       transition: 'background 0.3s, color 0.3s',
     }}>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '12px 12px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* نوار ابزار */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -385,7 +394,7 @@ export default function TerminalPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
           <IntelCard t={t} title="رژیم بازار" main={intel.regime.label} sub={intel.regime.desc} color={intel.regime.color} tooltip="وضعیت کلی بازار: صعودی، نزولی، رنج یا پرنوسان" />
           <IntelCard t={t} title="سیگنال" main={intel.signal.label} sub={intel.signal.desc} color={intel.signal.color} tooltip="پیشنهاد خرید، فروش یا نگه‌داری بر اساس تحلیل میانگین‌ها" />
           <IntelCard t={t} title="احتمال ادامه روند" main={`${intel.continuation}٪`} sub="بر اساس مومنتوم" color={t.accent} bar={intel.continuation} tooltip="احتمال ادامه‌ی روند فعلی بازار بر اساس شتاب حرکت قیمت" />
@@ -409,7 +418,7 @@ export default function TerminalPage() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: isLoggedIn ? '1fr 300px' : '1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isLoggedIn && !isMobile ? '1fr 300px' : '1fr', gap: 16 }}>
           <Panel t={t}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <PanelTitle t={t}>نمودار ارزش معاملات</PanelTitle>
