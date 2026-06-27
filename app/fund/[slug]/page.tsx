@@ -28,6 +28,7 @@ export default function FundDetailPage() {
   const [record, setRecord] = useState<any>(null)
   const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -37,7 +38,15 @@ export default function FundDetailPage() {
     if (saved === 'light') setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
-    return () => window.removeEventListener('themechange', handler)
+
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
+    return () => {
+      window.removeEventListener('themechange', handler)
+      window.removeEventListener('resize', checkMobile)
+    }
   }, [])
 
   useEffect(() => {
@@ -140,7 +149,7 @@ export default function FundDetailPage() {
         </div>
 
         {/* کارت‌های اصلی */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
           <MetricCard t={t} label="قیمت پایانی" value={`${safe(record.price_close).toLocaleString('fa-IR')} تومان`} />
           <MetricCard t={t} label="آخرین قیمت" value={`${safe(record.price_last).toLocaleString('fa-IR')} تومان`} />
           <MetricCard t={t} label="ارزش معاملات" value={`${fmtVal(record.trade_value)} میلیارد تومان`} />
@@ -148,7 +157,7 @@ export default function FundDetailPage() {
         </div>
 
         {/* ردیف دوم کارت‌ها */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
           <MetricCard t={t} label="حجم معاملات" value={safe(record.volume).toLocaleString('fa-IR')} />
           <MetricCard t={t} label="جریان پول حقیقی"
             value={`${netFlowBillion >= 0 ? '+' : ''}${netFlowBillion.toLocaleString('fa-IR')} میلیارد`}
@@ -166,7 +175,7 @@ export default function FundDetailPage() {
           <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 12 }}>
             جزئیات معاملات حقیقی
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
             {/* خریداران */}
             <div style={{ background: 'rgba(0,229,160,0.04)', borderRadius: 10, padding: 14 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#00E5A0', marginBottom: 10 }}>خریداران حقیقی</div>

@@ -24,6 +24,7 @@ export default function FundsPage() {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<string>('trade_value')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [isMobile, setIsMobile] = useState(false)
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -31,12 +32,17 @@ export default function FundsPage() {
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
     if (saved === 'light') setIsDark(false)
-    const handler = () => {
-      const th = window.localStorage.getItem('theme')
-      setIsDark(th !== 'light')
-    }
+    const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
-    return () => window.removeEventListener('themechange', handler)
+
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
+    return () => {
+      window.removeEventListener('themechange', handler)
+      window.removeEventListener('resize', checkMobile)
+    }
   }, [])
 
   useEffect(() => {
@@ -141,7 +147,7 @@ export default function FundsPage() {
         </div>
 
         {/* کارت‌های خلاصه */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
           <SummaryCard t={t} label="ارزش کل معاملات" value={`${fmtVal(totalTradeValue)} میلیارد`} tooltip="مجموع ارزش معاملات همه‌ی صندوق‌ها" />
           <SummaryCard t={t} label="میانگین تغییر" value={`${avgChange >= 0 ? '+' : ''}${avgChange.toFixed(2)}٪`}
             color={avgChange >= 0 ? '#00E5A0' : '#FF4D6A'} tooltip="میانگین درصد تغییر قیمت پایانی همه‌ی صندوق‌ها" />
