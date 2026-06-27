@@ -80,6 +80,18 @@ export default function TerminalPage() {
   const [editValue, setEditValue] = useState('')
   const [editDate, setEditDate] = useState('')
   const [isDark, setIsDark] = useState(true)
+
+  // خواندن قالب از حافظه و گوش دادن به تغییرات هدر
+  useEffect(() => {
+    const saved = window.localStorage.getItem('theme')
+    if (saved === 'light') setIsDark(false)
+    const handler = () => {
+      const th = window.localStorage.getItem('theme')
+      setIsDark(th !== 'light')
+    }
+    window.addEventListener('themechange', handler)
+    return () => window.removeEventListener('themechange', handler)
+  }, [])
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [signalHistory, setSignalHistory] = useState<any[]>([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
@@ -111,10 +123,11 @@ export default function TerminalPage() {
     const { data } = await supabase
       .from('assets')
       .select('*')
-      .order('id', { ascending: true })
+      .eq('slug', 'gold')
+      .limit(1)
     if (data && data.length > 0) {
       setAssets(data)
-     setSelectedAsset((prev: any) => prev || data[0])
+      setSelectedAsset((prev: any) => prev || data[0])
     }
   }
 
@@ -356,102 +369,27 @@ export default function TerminalPage() {
       fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
       transition: 'background 0.3s, color 0.3s',
     }}>
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 24px', borderBottom: `0.5px solid ${t.border}`,
-        background: t.headerBg, position: 'sticky', top: 0, zIndex: 50,
-        backdropFilter: 'blur(8px)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.accent, boxShadow: `0 0 8px ${t.accent}` }} />
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: t.textBright, letterSpacing: '0.02em' }}>
-              ترمینال هوشمند بازار طلا
-            </div>
-            <div style={{ fontSize: 10, color: t.muted }}>شاگرد تنبل بازار · t.me/shagerdebazar</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {assets.length > 0 && (
-            <select
-              value={selectedAsset?.id || ''}
-              onChange={(e) => {
-                const a = assets.find(x => x.id === Number(e.target.value))
-                if (a) setSelectedAsset(a)
-              }}
-              style={{
-                fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
-                background: t.panel, border: `0.5px solid ${t.borderStrong}`,
-                color: t.text, fontFamily: 'inherit', outline: 'none',
-              }}
-            >
-              {assets.map(a => (
-                <option key={a.id} value={a.id} style={{ background: t.panelSolid, color: t.text }}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            onClick={() => router.push('/signals')}
-            style={{
-              fontSize: 12, padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
-              background: 'linear-gradient(135deg, #FFD24A, #E0A500)',
-              border: 'none',
-              color: '#1A1200', fontFamily: 'inherit', fontWeight: 700,
-              boxShadow: '0 2px 10px rgba(224,165,0,0.4)',
-            }}
-          >
-            ★ تاریخچه سیگنال
-          </button>
-          {isLoggedIn ? (
-            <button
-              onClick={logout}
-              style={{
-                fontSize: 12, padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
-                background: 'rgba(255,77,106,0.1)', border: '0.5px solid rgba(255,77,106,0.4)',
-                color: '#FF4D6A', fontFamily: 'inherit', fontWeight: 700,
-              }}
-            >
-              خروج
-            </button>
-          ) : (
-            <button
-              onClick={() => router.push('/admin')}
-              style={{
-                fontSize: 12, padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
-                background: `${t.accent}1A`, border: `0.5px solid ${t.accent}66`,
-                color: t.accent, fontFamily: 'inherit', fontWeight: 700,
-              }}
-            >
-              ورود مدیر
-            </button>
-          )}
-          <button
-            onClick={() => setIsDark(!isDark)}
-            title="تغییر قالب"
-            style={{
-              fontSize: 15, padding: '5px 12px', borderRadius: 20, cursor: 'pointer',
-              background: t.panel, border: `0.5px solid ${t.borderStrong}`, color: t.text,
-              fontFamily: 'inherit',
-            }}
-          >
-            {isDark ? '☀' : '☾'}
-          </button>
-          <Badge color={intel.signal.color} bg={intel.signal.bg} bold>{intel.signal.label}</Badge>
-          <Badge color={isUp ? '#00E5A0' : '#FF4D6A'} bg={isUp ? 'rgba(0,229,160,0.08)' : 'rgba(255,77,106,0.08)'} bold>
-            {isUp ? '+' : ''}{intel.change.toFixed(2)}٪
-          </Badge>
-        </div>
-      </header>
 
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+        {/* نوار ابزار */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: t.textBright }}>
+            ارزش معاملات صندوق‌های طلا
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Badge color={intel.signal.color} bg={intel.signal.bg} bold>{intel.signal.label}</Badge>
+            <Badge color={isUp ? '#00E5A0' : '#FF4D6A'} bg={isUp ? 'rgba(0,229,160,0.08)' : 'rgba(255,77,106,0.08)'} bold>
+              {isUp ? '+' : ''}{intel.change.toFixed(2)}٪
+            </Badge>
+          </div>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          <IntelCard t={t} title="رژیم بازار" main={intel.regime.label} sub={intel.regime.desc} color={intel.regime.color} />
-          <IntelCard t={t} title="سیگنال" main={intel.signal.label} sub={intel.signal.desc} color={intel.signal.color} />
-          <IntelCard t={t} title="احتمال ادامه روند" main={`${intel.continuation}٪`} sub="بر اساس مومنتوم" color={t.accent} bar={intel.continuation} />
-          <IntelCard t={t} title="امتیاز بازار" main={`${intel.score}`} sub="۰ تا ۱۰۰" color={intel.score >= 60 ? '#00E5A0' : intel.score <= 40 ? '#FF4D6A' : '#F59E0B'} bar={intel.score} />
+          <IntelCard t={t} title="رژیم بازار" main={intel.regime.label} sub={intel.regime.desc} color={intel.regime.color} tooltip="وضعیت کلی بازار: صعودی، نزولی، رنج یا پرنوسان" />
+          <IntelCard t={t} title="سیگنال" main={intel.signal.label} sub={intel.signal.desc} color={intel.signal.color} tooltip="پیشنهاد خرید، فروش یا نگه‌داری بر اساس تحلیل میانگین‌ها" />
+          <IntelCard t={t} title="احتمال ادامه روند" main={`${intel.continuation}٪`} sub="بر اساس مومنتوم" color={t.accent} bar={intel.continuation} tooltip="احتمال ادامه‌ی روند فعلی بازار بر اساس شتاب حرکت قیمت" />
+          <IntelCard t={t} title="امتیاز بازار" main={`${intel.score}`} sub="۰ تا ۱۰۰" color={intel.score >= 60 ? '#00E5A0' : intel.score <= 40 ? '#FF4D6A' : '#F59E0B'} bar={intel.score} tooltip="امتیاز کلی سلامت بازار از ۰ (بدترین) تا ۱۰۰ (بهترین)" />
         </div>
 
         {intel.alerts.length > 0 && (
@@ -479,7 +417,9 @@ export default function TerminalPage() {
                 <span style={{ color: t.accent }}>● ارزش</span>
                 <span style={{ color: '#F59E0B' }}>● میانگین ۵</span>
                 <span style={{ color: '#8B5CF6' }}>● میانگین ۱۰</span>
-                <span style={{ color: '#FF4D6A' }}>⚠ ناهنجاری</span>
+                <Tooltip text="زمانی که ارزش معاملات به‌طور غیرعادی بالا یا پایین باشد نسبت به میانگین ۷ روزه" t={t}>
+                  <span style={{ color: '#FF4D6A', cursor: 'help' }}>⚠ ناهنجاری</span>
+                </Tooltip>
               </div>
             </div>
             {intel.n > 0 ? (
@@ -543,6 +483,14 @@ export default function TerminalPage() {
                   />
                 </label>
 
+                <button onClick={logout} style={{
+                  fontSize: 11, padding: '6px', borderRadius: 8, cursor: 'pointer',
+                  background: 'transparent', border: `0.5px solid ${t.border}`,
+                  color: t.muted, fontFamily: 'inherit',
+                }}>
+                  خروج از حساب
+                </button>
+
                 <div style={{ borderTop: `0.5px solid ${t.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <Stat t={t} label="میانگین کل" val={`${fmtVal(intel.avg)} ${UNIT}`} />
                   <Stat t={t} label="سقف تاریخی" val={`${fmtVal(intel.max)} ${UNIT}`} />
@@ -601,7 +549,11 @@ export default function TerminalPage() {
                         )}
                       </td>
                       <td style={{ padding: '9px 10px' }}>
-                        {isAnomaly && <span style={{ background: 'rgba(255,77,106,0.1)', color: '#FF4D6A', borderRadius: 4, padding: '2px 7px', fontSize: 10 }}>⚠ ناهنجاری</span>}
+                        {isAnomaly && (
+                          <Tooltip text="ارزش معاملات این روز به‌طور غیرعادی بالا یا پایین بوده نسبت به میانگین ۷ روزه" t={t}>
+                            <span style={{ background: 'rgba(255,77,106,0.1)', color: '#FF4D6A', borderRadius: 4, padding: '2px 7px', fontSize: 10, cursor: 'help' }}>⚠ ناهنجاری</span>
+                          </Tooltip>
+                        )}
                       </td>
                       {isLoggedIn && (
                         <td style={{ padding: '9px 10px' }}>
@@ -693,17 +645,53 @@ function Badge({ children, color, bg, bold }: any) {
 function Stat({ label, val, t }: any) {
   return <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}><span style={{ color: t.muted }}>{label}</span><span style={{ color: t.text }}>{val}</span></div>
 }
-function IntelCard({ title, main, sub, color, bar, t }: any) {
+function Tooltip({ text, children, t }: any) {
+  const [show, setShow] = useState(false)
   return (
-    <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', backdropFilter: 'blur(12px)' }}>
-      <div style={{ fontSize: 10, color: t.muted, marginBottom: 8 }}>{title}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color }}>{main}</div>
-      <div style={{ fontSize: 10, color: t.faint, marginTop: 4 }}>{sub}</div>
-      {typeof bar === 'number' && (
-        <div style={{ marginTop: 8, height: 3, background: `${t.accent}1A`, borderRadius: 2, overflow: 'hidden' }}>
-          <div style={{ width: `${bar}%`, height: '100%', background: color, borderRadius: 2 }} />
+    <div
+      style={{ position: 'relative', display: 'inline-block', width: '100%' }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      {children}
+      {show && text && (
+        <div style={{
+          position: 'absolute', bottom: '105%', right: 0, left: 0,
+          zIndex: 100, pointerEvents: 'none',
+          display: 'flex', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: t.panelSolid || '#0D1726',
+            border: `1px solid ${t.accent}44`,
+            borderRadius: 10, padding: '10px 14px',
+            fontSize: 11, color: t.text || '#E2E8F0', lineHeight: 1.7,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 12px ${t.accent}22`,
+            backdropFilter: 'blur(16px)',
+            maxWidth: 260, textAlign: 'center',
+            fontFamily: 'Vazirmatn, Arial, sans-serif',
+            direction: 'rtl',
+          }}>
+            {text}
+          </div>
         </div>
       )}
     </div>
+  )
+}
+
+function IntelCard({ title, main, sub, color, bar, t, tooltip }: any) {
+  return (
+    <Tooltip text={tooltip} t={t}>
+      <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', backdropFilter: 'blur(12px)', cursor: tooltip ? 'help' : 'default' }}>
+        <div style={{ fontSize: 10, color: t.muted, marginBottom: 8 }}>{title}</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color }}>{main}</div>
+        <div style={{ fontSize: 10, color: t.faint, marginTop: 4 }}>{sub}</div>
+        {typeof bar === 'number' && (
+          <div style={{ marginTop: 8, height: 3, background: `${t.accent}1A`, borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ width: `${bar}%`, height: '100%', background: color, borderRadius: 2 }} />
+          </div>
+        )}
+      </div>
+    </Tooltip>
   )
 }
