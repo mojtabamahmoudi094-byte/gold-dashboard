@@ -228,6 +228,98 @@ export default function FundsPage() {
           )}
         </div>
 
+        {/* نقشه‌ی بازار */}
+        {!loading && funds.length > 0 && (
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
+            <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 12 }}>
+              نقشه‌ی بازار صندوق‌های کالایی
+              <span style={{ fontSize: 10, color: t.faint, marginRight: 8 }}>اندازه: ارزش معاملات · رنگ: درصد تغییر</span>
+            </div>
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: 2,
+              borderRadius: 8, overflow: 'hidden',
+              minHeight: 300,
+            }}>
+              {(() => {
+                const sortedByValue = [...funds].sort((a, b) => b.tradeValue - a.tradeValue)
+                const totalSqrt = sortedByValue.reduce((s, f) => s + Math.sqrt(f.tradeValue), 0)
+                return sortedByValue.map((f, i) => {
+                  const pct = (Math.sqrt(f.tradeValue) / totalSqrt) * 100
+                  const changePct = f.changePct
+
+                  // رنگ بر اساس درصد تغییر
+                  let bgColor: string
+                  let textColor: string
+                  if (changePct > 1.5) { bgColor = '#00A86B'; textColor = '#FFFFFF' }
+                  else if (changePct > 0.5) { bgColor = '#2E8B57'; textColor = '#FFFFFF' }
+                  else if (changePct > 0) { bgColor = '#1A5C38'; textColor = '#C0E8D0' }
+                  else if (changePct === 0) { bgColor = '#333333'; textColor = '#AAAAAA' }
+                  else if (changePct > -0.5) { bgColor = '#6B1A1A'; textColor = '#E8C0C0' }
+                  else if (changePct > -1.5) { bgColor = '#8B2E2E'; textColor = '#FFFFFF' }
+                  else { bgColor = '#C0392B'; textColor = '#FFFFFF' }
+
+                  const isLarge = pct > 5
+                  const isMedium = pct > 3
+
+                  return (
+                    <div
+                      key={i}
+                      title={`${f.symbol}\nتغییر: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}٪\nارزش معاملات: ${fmtVal(f.tradeValue)} میلیارد تومان`}
+                      style={{
+                        flexBasis: `${Math.max(pct, 2.5)}%`,
+                        flexGrow: 1,
+                        minWidth: 50,
+                        minHeight: isLarge ? 90 : isMedium ? 70 : 50,
+                        background: bgColor,
+                        borderRadius: 4,
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        padding: '6px 4px',
+                        cursor: 'pointer',
+                        transition: 'transform 0.15s, box-shadow 0.15s',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'scale(1.03)'
+                        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.4)'
+                        e.currentTarget.style.zIndex = '10'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = 'scale(1)'
+                        e.currentTarget.style.boxShadow = 'none'
+                        e.currentTarget.style.zIndex = '1'
+                      }}
+                    >
+                      <div style={{
+                        fontSize: isLarge ? 13 : isMedium ? 11 : 9,
+                        fontWeight: 700, color: textColor,
+                        textAlign: 'center',
+                        lineHeight: 1.2,
+                      }}>
+                        {f.symbol}
+                      </div>
+                      <div style={{
+                        fontSize: isLarge ? 12 : isMedium ? 10 : 8,
+                        fontWeight: 600, color: textColor,
+                        opacity: 0.9,
+                        marginTop: 2,
+                      }}>
+                        {changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}٪
+                      </div>
+                      {isLarge && (
+                        <div style={{ fontSize: 9, color: textColor, opacity: 0.6, marginTop: 2 }}>
+                          {fmtVal(f.tradeValue)} م.ت
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          </div>
+        )}
+
       </div>
 
       <style>{`
