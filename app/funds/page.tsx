@@ -384,9 +384,9 @@ export default function FundsPage() {
               return (
                 <div style={{ overflowX: 'auto' }}>
                   {/* میله‌ها */}
-                  <div style={{ display: 'flex', alignItems: 'center', minWidth: flows.length * 30, height: barMaxH * 2 + 20, position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: flows.length * 30, height: barMaxH * 2 + 50, position: 'relative', paddingTop: 25 }}>
                     {/* خط صفر */}
-                    <div style={{ position: 'absolute', left: 0, right: 0, top: barMaxH + 10, height: 1, background: `${t.muted}33` }} />
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: barMaxH + 35, height: 1, background: `${t.muted}33` }} />
 
                     {flows.map((f, i) => {
                       const isPos = f.net >= 0
@@ -396,7 +396,7 @@ export default function FundsPage() {
                           {/* عدد */}
                           <div style={{
                             position: 'absolute',
-                            top: isPos ? barMaxH + 10 - h - 18 : barMaxH + 10 + h + 4,
+                            top: isPos ? barMaxH + 35 - h - 20 : barMaxH + 35 + h + 4,
                             fontSize: 9, fontWeight: 800,
                             color: isPos ? '#00E5A0' : '#FF4D6A',
                             whiteSpace: 'nowrap',
@@ -408,7 +408,7 @@ export default function FundsPage() {
                           {/* میله */}
                           <div style={{
                             position: 'absolute',
-                            top: isPos ? barMaxH + 10 - h : barMaxH + 11,
+                            top: isPos ? barMaxH + 35 - h : barMaxH + 36,
                             width: '60%', maxWidth: 22,
                             height: h,
                             borderRadius: isPos ? '3px 3px 0 0' : '0 0 3px 3px',
