@@ -20,13 +20,20 @@ const lightTheme = {
 
 export default function FundsPage() {
   const [isDark, setIsDark] = useState(true)
-  const [funds, setFunds] = useState<any[]>([])
+  const [allFunds, setAllFunds] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<string>('trade_value')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [isMobile, setIsMobile] = useState(false)
+  const [category, setCategory] = useState<string>('طلا')
 
   const t: any = isDark ? darkTheme : lightTheme
+
+  const CATEGORIES = [
+    { key: 'طلا', label: 'صندوق‌های طلا', emoji: '🥇' },
+    { key: 'نقره', label: 'صندوق‌های نقره', emoji: '🥈' },
+    { key: 'زعفران', label: 'صندوق‌های زعفران', emoji: '🌿' },
+  ]
 
   // خواندن قالب از حافظه
   useEffect(() => {
@@ -50,7 +57,7 @@ export default function FundsPage() {
       // گرفتن لیست دارایی‌ها (بدون صندوق طلای قدیمی)
       const { data: assets } = await supabase
         .from('assets')
-        .select('id, name, slug')
+        .select('id, name, slug, category')
         .neq('slug', 'gold')
         .order('id', { ascending: true })
 
@@ -81,6 +88,7 @@ export default function FundsPage() {
         return {
           symbol: asset.name,
           slug: asset.slug,
+          category: asset.category || 'طلا',
           tradeValue: safe(rec?.trade_value),
           priceClose: safe(rec?.price_close),
           priceLast: safe(rec?.price_last),
@@ -95,11 +103,14 @@ export default function FundsPage() {
         }
       }).filter(f => f.tradeValue > 0) // فقط صندوق‌هایی که داده دارن
 
-      setFunds(combined)
+      setAllFunds(combined)
       setLoading(false)
     }
     load()
   }, [])
+
+  // فیلتر بر اساس دسته‌بندی
+  const funds = allFunds.filter(f => f.category === category)
 
   // مرتب‌سازی
   const sorted = [...funds].sort((a, b) => {
@@ -137,13 +148,34 @@ export default function FundsPage() {
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* نوار ابزار */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: t.textBright }}>
             دیدبان صندوق‌های کالایی
             <span style={{ fontSize: 11, color: t.muted, fontWeight: 400, marginRight: 10 }}>
               {funds.length > 0 ? `${funds[0].date} · ${funds.length} صندوق` : ''}
             </span>
           </div>
+        </div>
+
+        {/* تب‌های دسته‌بندی */}
+        <div style={{ display: 'flex', gap: 6, direction: 'rtl' }}>
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.key}
+              onClick={() => setCategory(cat.key)}
+              style={{
+                fontSize: 12, padding: isMobile ? '8px 12px' : '8px 20px',
+                borderRadius: 10, cursor: 'pointer',
+                background: category === cat.key ? `${t.accent}1A` : 'transparent',
+                border: `0.5px solid ${category === cat.key ? `${t.accent}66` : t.border}`,
+                color: category === cat.key ? t.accent : t.muted,
+                fontFamily: 'inherit', fontWeight: category === cat.key ? 700 : 500,
+                transition: 'all 0.2s',
+              }}
+            >
+              {cat.emoji} {cat.label}
+            </button>
+          ))}
         </div>
 
         {/* کارت‌های خلاصه */}
@@ -251,9 +283,9 @@ export default function FundsPage() {
             }}>
               {(() => {
                 const sortedByValue = [...funds].sort((a, b) => b.tradeValue - a.tradeValue)
-                const totalSqrt = sortedByValue.reduce((s, f) => s + Math.sqrt(f.tradeValue), 0)
+                const totalLog = sortedByValue.reduce((s, f) => s + Math.log(f.tradeValue + 1), 0)
                 return sortedByValue.map((f, i) => {
-                  const pct = (Math.sqrt(f.tradeValue) / totalSqrt) * 100
+                  const pct = (Math.log(f.tradeValue + 1) / totalLog) * 100
                   const changePct = f.changePct
 
                   // رنگ بر اساس درصد تغییر
