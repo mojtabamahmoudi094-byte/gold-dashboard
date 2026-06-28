@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import Header from './components/Header'
+import Footer from './components/Footer'
 
 export const metadata: Metadata = {
   title: 'بورسنج | ترمینال هوشمند بازار',
@@ -23,6 +24,7 @@ export default function RootLayout({
       <body style={{ margin: 0, padding: 0 }}>
         <Header />
         {children}
+        <Footer />
       </body>
     </html>
   )
