@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
+import { darkTheme, lightTheme } from '../../lib/theme'
 import dynamic from 'next/dynamic'
 import persian from 'react-date-object/calendars/persian'
 import persian_fa from 'react-date-object/locales/persian_fa'
@@ -40,35 +41,6 @@ function stdDev(arr: number[]): number {
   if (!arr.length) return 0
   const avg = arr.reduce((a, b) => a + b, 0) / arr.length
   return Math.sqrt(arr.reduce((a, b) => a + (b - avg) ** 2, 0) / arr.length)
-}
-
-const darkTheme = {
-  bg: '#060B14',
-  panel: 'rgba(13,23,38,0.8)',
-  panelSolid: '#0D1726',
-  border: 'rgba(0,200,255,0.1)',
-  borderStrong: 'rgba(0,200,255,0.2)',
-  text: '#E2E8F0',
-  textBright: '#FFFFFF',
-  muted: '#7B93AC',
-  faint: '#5A7088',
-  accent: '#00C8FF',
-  inputBg: '#060B14',
-  headerBg: 'rgba(6,11,20,0.97)',
-}
-const lightTheme = {
-  bg: '#F4F7FB',
-  panel: 'rgba(255,255,255,0.9)',
-  panelSolid: '#FFFFFF',
-  border: 'rgba(0,120,170,0.15)',
-  borderStrong: 'rgba(0,120,170,0.3)',
-  text: '#1A2433',
-  textBright: '#0A0E16',
-  muted: '#5A6B7E',
-  faint: '#8595A8',
-  accent: '#0095C8',
-  inputBg: '#FFFFFF',
-  headerBg: 'rgba(244,247,251,0.97)',
 }
 
 export default function TerminalPage() {
@@ -360,11 +332,15 @@ export default function TerminalPage() {
       if (latest && latest[0]?.signal_type === intel.signal.label) return
 
       const lastRecord = records.at(-1)
+      const reasonParts = [intel.signal.desc]
+      if (intel.regime.label !== 'نامشخص') reasonParts.push(`رژیم: ${intel.regime.label} — ${intel.regime.desc}`)
       const { error } = await supabase.from('signals').insert([{
         signal_date_shamsi: lastRecord?.trade_date_shamsi || '',
         signal_type: intel.signal.label,
         market_value: intel.last,
         note: intel.signal.desc,
+        reason: reasonParts.join(' · '),
+        confidence: intel.continuation,
       }])
       if (!error && !cancelled) loadSignalHistory()
     }

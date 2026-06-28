@@ -4,20 +4,10 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
+import { darkTheme, lightTheme } from '../../../lib/theme'
 
 const safe = (v: any) => Number(v || 0)
 const fmtVal = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
-
-const darkTheme = {
-  bg: '#060B14', panel: 'rgba(13,23,38,0.8)', border: 'rgba(0,200,255,0.1)',
-  borderStrong: 'rgba(0,200,255,0.2)', text: '#E2E8F0', textBright: '#FFFFFF',
-  muted: '#7B93AC', faint: '#5A7088', accent: '#00C8FF', panelSolid: '#0D1726',
-}
-const lightTheme = {
-  bg: '#F4F7FB', panel: 'rgba(255,255,255,0.9)', border: 'rgba(0,120,170,0.15)',
-  borderStrong: 'rgba(0,120,170,0.3)', text: '#1A2433', textBright: '#0A0E16',
-  muted: '#5A6B7E', faint: '#8595A8', accent: '#0095C8', panelSolid: '#FFFFFF',
-}
 
 export default function FundDetailPage() {
   const params = useParams()

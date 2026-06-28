@@ -3,33 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import { darkTheme, lightTheme } from '../../lib/theme'
 
 const safe = (v: any) => Number(v || 0)
-
-const darkTheme = {
-  bg: '#060B14',
-  panel: 'rgba(13,23,38,0.8)',
-  border: 'rgba(0,200,255,0.1)',
-  borderStrong: 'rgba(0,200,255,0.2)',
-  text: '#E2E8F0',
-  textBright: '#FFFFFF',
-  muted: '#7B93AC',
-  faint: '#5A7088',
-  accent: '#00C8FF',
-  headerBg: 'rgba(6,11,20,0.97)',
-}
-const lightTheme = {
-  bg: '#F4F7FB',
-  panel: 'rgba(255,255,255,0.9)',
-  border: 'rgba(0,120,170,0.15)',
-  borderStrong: 'rgba(0,120,170,0.3)',
-  text: '#1A2433',
-  textBright: '#0A0E16',
-  muted: '#5A6B7E',
-  faint: '#8595A8',
-  accent: '#0095C8',
-  headerBg: 'rgba(244,247,251,0.97)',
-}
 
 export default function SignalsPage() {
   const router = useRouter()
@@ -130,24 +106,40 @@ export default function SignalsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
-                    {['تاریخ', 'سیگنال', 'ارزش بازار', 'توضیح'].map(h => (
-                      <th key={h} style={{ color: t.muted, fontWeight: 500, textAlign: 'right', padding: '8px 10px', borderBottom: `0.5px solid ${t.border}` }}>{h}</th>
+                    {['تاریخ', 'سیگنال', 'اعتماد', 'دلیل', 'ارزش بازار'].map(h => (
+                      <th key={h} style={{ color: t.muted, fontWeight: 500, textAlign: 'right', padding: '8px 10px', borderBottom: `0.5px solid ${t.border}`, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {signals.map((s) => {
                     const sigColor = s.signal_type === 'خرید' ? '#00E5A0' : s.signal_type === 'فروش' ? '#FF4D6A' : t.accent
+                    const conf = typeof s.confidence === 'number' ? s.confidence : null
+                    const confColor = conf === null ? t.faint : conf >= 70 ? '#00E5A0' : conf >= 40 ? '#F59E0B' : '#FF4D6A'
                     return (
                       <tr key={s.id} style={{ borderBottom: `0.5px solid ${t.border}` }}>
-                        <td style={{ padding: '10px', color: t.text }}>{s.signal_date_shamsi}</td>
+                        <td style={{ padding: '10px', color: t.text, whiteSpace: 'nowrap' }}>{s.signal_date_shamsi}</td>
                         <td style={{ padding: '10px' }}>
                           <span style={{ display: 'inline-block', background: `${sigColor}1A`, color: sigColor, borderRadius: 4, padding: '3px 12px', fontSize: 11, fontWeight: 700 }}>
                             {s.signal_type}
                           </span>
                         </td>
-                        <td style={{ padding: '10px', color: t.textBright, fontWeight: 500 }}>{safe(s.market_value).toLocaleString('fa-IR')}</td>
-                        <td style={{ padding: '10px', color: t.muted, fontSize: 11 }}>{s.note}</td>
+                        <td style={{ padding: '10px', minWidth: 90 }}>
+                          {conf !== null ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: confColor, fontFamily: 'system-ui, sans-serif' }}>{conf}٪</span>
+                              <div style={{ height: 4, borderRadius: 2, background: `${t.border}`, overflow: 'hidden', width: 60 }}>
+                                <div style={{ height: '100%', width: `${conf}%`, background: confColor, borderRadius: 2, transition: 'width 0.3s' }} />
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ color: t.faint, fontSize: 10 }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px', color: t.muted, fontSize: 11, maxWidth: 260 }}>
+                          {s.reason || s.note || <span style={{ color: t.faint }}>—</span>}
+                        </td>
+                        <td style={{ padding: '10px', color: t.textBright, fontWeight: 500, whiteSpace: 'nowrap' }}>{safe(s.market_value).toLocaleString('fa-IR')}</td>
                       </tr>
                     )
                   })}

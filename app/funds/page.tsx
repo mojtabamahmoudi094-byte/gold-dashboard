@@ -3,24 +3,15 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
+import { darkTheme, lightTheme } from '../../lib/theme'
 
 const safe = (v: any) => Number(v || 0)
 const fmtVal = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
 
-const darkTheme = {
-  bg: '#060B14', panel: 'rgba(13,23,38,0.8)', border: 'rgba(0,200,255,0.1)',
-  borderStrong: 'rgba(0,200,255,0.2)', text: '#E2E8F0', textBright: '#FFFFFF',
-  muted: '#7B93AC', faint: '#5A7088', accent: '#00C8FF', panelSolid: '#0D1726',
-}
-const lightTheme = {
-  bg: '#F4F7FB', panel: 'rgba(255,255,255,0.9)', border: 'rgba(0,120,170,0.15)',
-  borderStrong: 'rgba(0,120,170,0.3)', text: '#1A2433', textBright: '#0A0E16',
-  muted: '#5A6B7E', faint: '#8595A8', accent: '#0095C8', panelSolid: '#FFFFFF',
-}
-
 export default function FundsPage() {
   const [isDark, setIsDark] = useState(true)
   const [allFunds, setAllFunds] = useState<any[]>([])
+  const [anomalies, setAnomalies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<string>('trade_value')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -104,6 +95,62 @@ export default function FundsPage() {
       }).filter(f => f.tradeValue > 0) // فقط صندوق‌هایی که داده دارن
 
       setAllFunds(combined)
+
+      // ---- تشخیص ورود/خروج پول غیرعادی (۷ روز اخیر) ----
+      const { data: histRows } = await supabase
+        .from('gold_funds')
+        .select('trade_date_shamsi, asset_id, buy_i_volume, sell_i_volume, price_close')
+        .neq('trade_date_shamsi', latestDate)
+        .order('id', { ascending: false })
+        .limit(300)
+
+      const uniqueHistDates = [...new Set((histRows || []).map((r: any) => r.trade_date_shamsi))].slice(0, 6)
+
+      if (uniqueHistDates.length >= 4) {
+        const detectedAnomalies: any[] = []
+
+        for (const asset of assets) {
+          const todayRec = records.find(r => r.asset_id === asset.id)
+          if (!todayRec) continue
+
+          const hist = (histRows || []).filter((r: any) =>
+            r.asset_id === asset.id && uniqueHistDates.includes(r.trade_date_shamsi)
+          )
+          if (hist.length < 4) continue
+
+          const histFlows = hist.map((r: any) =>
+            (safe(r.buy_i_volume) - safe(r.sell_i_volume)) * safe(r.price_close)
+          )
+          const histAvg = histFlows.reduce((a: number, b: number) => a + b, 0) / histFlows.length
+          const histStd = Math.sqrt(
+            histFlows.reduce((a: number, b: number) => a + (b - histAvg) ** 2, 0) / histFlows.length
+          )
+
+          const todayFlow = (safe(todayRec.buy_i_volume) - safe(todayRec.sell_i_volume)) * safe(todayRec.price_close)
+
+          if (histStd > 0 && Math.abs(todayFlow - histAvg) > 2 * histStd) {
+            const magnitude = Math.abs(todayFlow - histAvg) / histStd
+            const direction: 'inflow' | 'outflow' = todayFlow > histAvg ? 'inflow' : 'outflow'
+            const flowBT = Math.round(todayFlow / 1_000_000_000 * 10) / 10
+            const avgBT = Math.round(histAvg / 1_000_000_000 * 10) / 10
+            detectedAnomalies.push({
+              symbol: asset.name,
+              slug: asset.slug,
+              category: asset.category || 'طلا',
+              direction,
+              magnitude,
+              flowBT,
+              avgBT,
+            })
+          }
+        }
+
+        setAnomalies(
+          detectedAnomalies.sort((a, b) => b.magnitude - a.magnitude).slice(0, 5)
+        )
+      }
+      // ---- پایان تشخیص ----
+
       setLoading(false)
     }
     load()
@@ -215,6 +262,45 @@ export default function FundsPage() {
           <SummaryCard t={t} label="جریان پول حقیقی" value={netFlow >= 0 ? 'ورودی' : 'خروجی'}
             color={netFlow >= 0 ? '#00E5A0' : '#FF4D6A'} tooltip="تفاوت حجم خرید و فروش حقیقی‌ها — نشان‌دهنده‌ی جهت پول هوشمند" />
         </div>
+
+        {/* هشدارهای ورود/خروج پول غیرعادی */}
+        {!loading && anomalies.filter(a => a.category === category).length > 0 && (
+          <div style={{ background: t.panel, border: `0.5px solid rgba(245,158,11,0.35)`, borderRadius: 12, padding: '16px 20px', backdropFilter: 'blur(12px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 16 }}>⚡</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#F59E0B' }}>هشدار جریان پول غیرعادی</span>
+              <span style={{ fontSize: 9, color: t.faint, background: 'rgba(245,158,11,0.12)', padding: '2px 8px', borderRadius: 6 }}>بر اساس ۷ روز اخیر</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {anomalies.filter(a => a.category === category).map((a, i) => {
+                const isIn = a.direction === 'inflow'
+                const color = isIn ? '#00E5A0' : '#FF4D6A'
+                const bg = isIn ? 'rgba(0,229,160,0.08)' : 'rgba(255,77,106,0.08)'
+                const border = isIn ? 'rgba(0,229,160,0.25)' : 'rgba(255,77,106,0.25)'
+                return (
+                  <div key={i} style={{
+                    background: bg, border: `0.5px solid ${border}`, borderRadius: 10,
+                    padding: '10px 16px', minWidth: 160, flex: '1 1 160px', maxWidth: 220,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color }}>{a.symbol}</span>
+                      <span style={{ fontSize: 10, color, fontWeight: 700 }}>{isIn ? '▲ ورود' : '▼ خروج'}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: t.text, marginBottom: 2 }}>
+                      امروز: <span style={{ fontWeight: 700, color }}>{a.flowBT > 0 ? '+' : ''}{a.flowBT.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: t.faint }}>
+                      میانگین ۷ روز: {a.avgBT.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت
+                    </div>
+                    <div style={{ fontSize: 10, color: t.faint, marginTop: 2 }}>
+                      شدت: {a.magnitude.toFixed(1)}σ
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* تحلیل هوشمند بازار */}
         {!loading && funds.length > 0 && (
