@@ -267,6 +267,66 @@ export default function FundDetailPage() {
           </div>
         )}
 
+        {/* نمودار سرانه‌ی خرید و فروش روزانه */}
+        {history.length > 0 && (
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 11, color: t.muted }}>سرانه‌ی خرید و فروش حقیقی روزانه <span style={{ fontSize: 10, color: t.faint }}>میلیون تومان</span></div>
+              <div style={{ display: 'flex', gap: 14, fontSize: 10 }}>
+                <span style={{ color: '#00E5A0' }}>■ خرید</span>
+                <span style={{ color: '#FF4D6A' }}>■ فروش</span>
+              </div>
+            </div>
+            {(() => {
+              const caps = [...history].map(r => {
+                const bCnt = safe(r.buy_count_i)
+                const sCnt = safe(r.sell_count_i)
+                const bAvg = bCnt > 0 ? Math.round((safe(r.buy_i_volume) * safe(r.price_close)) / bCnt / 1000000) : 0
+                const sAvg = sCnt > 0 ? Math.round((safe(r.sell_i_volume) * safe(r.price_close)) / sCnt / 1000000) : 0
+                const power = sAvg > 0 ? Math.round((bAvg / sAvg) * 100) / 100 : 0
+                return { date: r.trade_date_shamsi || '', bAvg, sAvg, power }
+              })
+
+              const maxVal = Math.max(...caps.map(f => Math.max(f.bAvg, f.sAvg)), 1)
+              const barMaxH = 100
+
+              return (
+                <div style={{ overflowX: 'auto', direction: 'ltr' }}>
+                  <div style={{ display: 'flex', minWidth: caps.length * 50, height: barMaxH + 40, alignItems: 'flex-end', paddingBottom: 25 }}>
+                    {caps.map((f, i) => {
+                      const buyH = Math.max((f.bAvg / maxVal) * barMaxH, 2)
+                      const sellH = Math.max((f.sAvg / maxVal) * barMaxH, 2)
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{ fontSize: 7, fontWeight: 800, color: '#00E5A0', marginBottom: 2, fontFamily: 'system-ui, sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                                {f.bAvg}
+                              </div>
+                              <div title={`سرانه خرید: ${f.bAvg} م.ت`} style={{ width: 12, height: buyH, borderRadius: '3px 3px 0 0', background: 'linear-gradient(0deg, rgba(0,229,160,0.4), rgba(0,229,160,0.8))' }} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{ fontSize: 7, fontWeight: 800, color: '#FF4D6A', marginBottom: 2, fontFamily: 'system-ui, sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                                {f.sAvg}
+                              </div>
+                              <div title={`سرانه فروش: ${f.sAvg} م.ت`} style={{ width: 12, height: sellH, borderRadius: '3px 3px 0 0', background: 'linear-gradient(0deg, rgba(255,77,106,0.4), rgba(255,77,106,0.8))' }} />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', minWidth: caps.length * 50, direction: 'ltr' }}>
+                    {caps.map((f, i) => (
+                      <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: t.muted }}>{f.date.slice(5)}</div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
         {/* تاریخچه */}
         {history.length > 1 && (
           <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>

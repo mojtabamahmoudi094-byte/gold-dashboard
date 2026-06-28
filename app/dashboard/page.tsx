@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import dynamic from 'next/dynamic'
 import persian from 'react-date-object/calendars/persian'
@@ -381,10 +382,15 @@ export default function TerminalPage() {
 
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '12px 12px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* نوار ابزار */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: t.textBright }}>
-            ارزش معاملات صندوق‌های طلا
+        {/* هیرو */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: t.textBright }}>
+              ارزش معاملات صندوق‌های طلا
+            </div>
+            <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>
+              تحلیل هوشمند روند ارزش معاملات · {records.length > 0 ? `${records.length} روز داده` : ''}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <Badge color={intel.signal.color} bg={intel.signal.bg} bold>{intel.signal.label}</Badge>
@@ -511,6 +517,17 @@ export default function TerminalPage() {
           )}
         </div>
 
+        {/* لینک‌های سریع */}
+        {!isLoggedIn && (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>
+            <QuickLink t={t} href="/funds" emoji="📊" title="دیدبان صندوق‌ها" desc="جدول، نقشه‌ی بازار و ورود/خروج پول حقیقی" />
+            <QuickLink t={t} href="/signals" emoji="📡" title="تاریخچه سیگنال" desc="سیگنال‌های خرید و فروش صادر شده" />
+            <QuickLink t={t} href="/funds" emoji="🗺️" title="نقشه‌ی بازار" desc="نقشه‌ی حرارتی صندوق‌های کالایی" />
+          </div>
+        )}
+
+        {/* جدول رکوردها - فقط مدیر */}
+        {isLoggedIn && (
         <Panel t={t}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <PanelTitle t={t}>آخرین رکوردها</PanelTitle>
@@ -618,6 +635,7 @@ export default function TerminalPage() {
             </div>
           )}
         </Panel>
+        )}
       </div>
 
       <style>{`
@@ -702,5 +720,24 @@ function IntelCard({ title, main, sub, color, bar, t, tooltip }: any) {
         )}
       </div>
     </Tooltip>
+  )
+}
+
+function QuickLink({ t, href, emoji, title, desc }: any) {
+  return (
+    <Link href={href} style={{ textDecoration: 'none' }}>
+      <div style={{
+        background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12,
+        padding: '18px 16px', backdropFilter: 'blur(12px)',
+        cursor: 'pointer', transition: 'border-color 0.2s, transform 0.15s',
+      }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = t.accent; e.currentTarget.style.transform = 'translateY(-2px)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.transform = 'translateY(0)' }}
+      >
+        <div style={{ fontSize: 20, marginBottom: 8 }}>{emoji}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 11, color: t.muted, lineHeight: 1.6 }}>{desc}</div>
+      </div>
+    </Link>
   )
 }

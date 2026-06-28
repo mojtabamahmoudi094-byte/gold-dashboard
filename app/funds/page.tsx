@@ -437,6 +437,82 @@ export default function FundsPage() {
           </div>
         )}
 
+        {/* نمودار سرانه‌ی خرید و فروش حقیقی */}
+        {!loading && funds.length > 0 && (
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em' }}>
+                سرانه‌ی خرید و فروش حقیقی
+              </div>
+              <div style={{ display: 'flex', gap: 14, fontSize: 10 }}>
+                <span style={{ color: '#00E5A0' }}>■ سرانه خریدار</span>
+                <span style={{ color: '#FF4D6A' }}>■ سرانه فروشنده</span>
+              </div>
+            </div>
+            {(() => {
+              const caps = funds.map(f => {
+                const buyAvg = f.buyCountI > 0 ? Math.round((f.buyIVolume * f.priceClose) / f.buyCountI / 1000000) : 0
+                const sellAvg = f.sellCountI > 0 ? Math.round((f.sellIVolume * f.priceClose) / f.sellCountI / 1000000) : 0
+                const power = sellAvg > 0 ? Math.round((buyAvg / sellAvg) * 100) / 100 : 0
+                return { symbol: f.symbol, buyAvg, sellAvg, power, slug: f.slug }
+              }).sort((a, b) => b.power - a.power)
+
+              const maxVal = Math.max(...caps.map(f => Math.max(f.buyAvg, f.sellAvg)), 1)
+              const barMaxH = 120
+
+              return (
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ display: 'flex', minWidth: caps.length * 40, height: barMaxH + 50, position: 'relative', alignItems: 'flex-end', paddingBottom: 30 }}>
+                    {caps.map((f, i) => {
+                      const buyH = Math.max((f.buyAvg / maxVal) * barMaxH, 2)
+                      const sellH = Math.max((f.sellAvg / maxVal) * barMaxH, 2)
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                          {/* دو میله با عدد بالای هر کدوم */}
+                          <div style={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{ fontSize: 7, fontWeight: 800, color: '#00E5A0', marginBottom: 2, fontFamily: 'system-ui, sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                                {f.buyAvg}
+                              </div>
+                              <div
+                                title={`${f.symbol} سرانه خرید: ${f.buyAvg.toLocaleString('fa-IR')} میلیون تومان`}
+                                style={{
+                                  width: isMobile ? 8 : 10, height: buyH, borderRadius: '3px 3px 0 0',
+                                  background: 'linear-gradient(0deg, rgba(0,229,160,0.4), rgba(0,229,160,0.8))',
+                                }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{ fontSize: 7, fontWeight: 800, color: '#FF4D6A', marginBottom: 2, fontFamily: 'system-ui, sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                                {f.sellAvg}
+                              </div>
+                              <div
+                                title={`${f.symbol} سرانه فروش: ${f.sellAvg.toLocaleString('fa-IR')} میلیون تومان`}
+                                style={{
+                                  width: isMobile ? 8 : 10, height: sellH, borderRadius: '3px 3px 0 0',
+                                  background: 'linear-gradient(0deg, rgba(255,77,106,0.4), rgba(255,77,106,0.8))',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {/* اسم‌ها */}
+                  <div style={{ display: 'flex', minWidth: caps.length * 40 }}>
+                    {caps.map((f, i) => (
+                      <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: t.muted }}>
+                        {f.symbol}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
       </div>
 
       <style>{`
