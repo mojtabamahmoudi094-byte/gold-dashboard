@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 const NAV = [
   { label: 'خانه', href: '/' },
   { label: 'صندوق‌ها', href: '/funds' },
+  { label: 'مقایسه', href: '/compare' },
   { label: 'تاریخچه سیگنال', href: '/signals' },
 ]
 
