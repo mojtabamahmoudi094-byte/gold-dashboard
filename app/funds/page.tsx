@@ -363,6 +363,80 @@ export default function FundsPage() {
           </div>
         )}
 
+        {/* نمودار ورود و خروج پول حقیقی */}
+        {!loading && funds.length > 0 && (
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
+            <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 16 }}>
+              ورود و خروج پول حقیقی
+              <span style={{ fontSize: 10, color: t.faint, marginRight: 8 }}>میلیارد تومان</span>
+            </div>
+            {(() => {
+              const flows = funds.map(f => {
+                const buyVal = f.buyIVolume * f.priceClose
+                const sellVal = f.sellIVolume * f.priceClose
+                const net = Math.round((buyVal - sellVal) / 1000000000 * 10) / 10
+                return { symbol: f.symbol, net, slug: f.slug }
+              }).sort((a, b) => b.net - a.net)
+
+              const maxAbs = Math.max(...flows.map(f => Math.abs(f.net)), 1)
+              const barMaxH = 120
+
+              return (
+                <div style={{ overflowX: 'auto' }}>
+                  {/* میله‌ها */}
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: flows.length * 30, height: barMaxH * 2 + 20, position: 'relative' }}>
+                    {/* خط صفر */}
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: barMaxH + 10, height: 1, background: `${t.muted}33` }} />
+
+                    {flows.map((f, i) => {
+                      const isPos = f.net >= 0
+                      const h = Math.max((Math.abs(f.net) / maxAbs) * barMaxH, 3)
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', height: '100%' }}>
+                          {/* عدد */}
+                          <div style={{
+                            position: 'absolute',
+                            top: isPos ? barMaxH + 10 - h - 18 : barMaxH + 10 + h + 4,
+                            fontSize: 9, fontWeight: 800,
+                            color: isPos ? '#00E5A0' : '#FF4D6A',
+                            whiteSpace: 'nowrap',
+                            textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                            fontFamily: 'system-ui, -apple-system, sans-serif',
+                          }}>
+                            {isPos ? '+' : ''}{f.net}
+                          </div>
+                          {/* میله */}
+                          <div style={{
+                            position: 'absolute',
+                            top: isPos ? barMaxH + 10 - h : barMaxH + 11,
+                            width: '60%', maxWidth: 22,
+                            height: h,
+                            borderRadius: isPos ? '3px 3px 0 0' : '0 0 3px 3px',
+                            background: isPos
+                              ? 'linear-gradient(0deg, rgba(0,229,160,0.4), rgba(0,229,160,0.8))'
+                              : 'linear-gradient(180deg, rgba(255,77,106,0.4), rgba(255,77,106,0.8))',
+                            cursor: 'pointer',
+                          }}
+                            title={`${f.symbol}: ${isPos ? '+' : ''}${f.net} میلیارد تومان`}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {/* اسم‌ها */}
+                  <div style={{ display: 'flex', minWidth: flows.length * 30, marginTop: 4 }}>
+                    {flows.map((f, i) => (
+                      <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: t.muted, lineHeight: 1.2 }}>
+                        {f.symbol}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
       </div>
 
       <style>{`
