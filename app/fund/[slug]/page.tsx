@@ -29,6 +29,8 @@ export default function FundDetailPage() {
   const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+  const historyPerPage = 10
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -197,6 +199,74 @@ export default function FundDetailPage() {
           </div>
         </div>
 
+        {/* نمودار ورود/خروج پول روزانه */}
+        {history.length > 0 && (
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
+            <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 16 }}>
+              ورود و خروج پول حقیقی روزانه
+              <span style={{ fontSize: 10, color: t.faint, marginRight: 8 }}>میلیارد تومان</span>
+            </div>
+            {(() => {
+              const flows = [...history].map(r => {
+                const buyVal = safe(r.buy_i_volume) * safe(r.price_close)
+                const sellVal = safe(r.sell_i_volume) * safe(r.price_close)
+                const net = Math.round((buyVal - sellVal) / 1000000000 * 10) / 10
+                return { date: r.trade_date_shamsi || '', net }
+              })
+
+              const maxAbs = Math.max(...flows.map(f => Math.abs(f.net)), 1)
+              const barMaxH = 100
+
+              return (
+                <div style={{ overflowX: 'auto', direction: 'ltr' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: flows.length * 50, height: barMaxH * 2 + 20, position: 'relative', direction: 'ltr' }}>
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: barMaxH + 10, height: 1, background: `${t.muted}33` }} />
+
+                    {flows.map((f, i) => {
+                      const isPos = f.net >= 0
+                      const h = Math.max((Math.abs(f.net) / maxAbs) * barMaxH, 3)
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', height: '100%' }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: isPos ? barMaxH + 10 - h - 18 : barMaxH + 10 + h + 4,
+                            fontSize: 9, fontWeight: 800,
+                            color: isPos ? '#00E5A0' : '#FF4D6A',
+                            whiteSpace: 'nowrap',
+                            textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                            fontFamily: 'system-ui, -apple-system, sans-serif',
+                          }}>
+                            {isPos ? '+' : ''}{f.net}
+                          </div>
+                          <div style={{
+                            position: 'absolute',
+                            top: isPos ? barMaxH + 10 - h : barMaxH + 11,
+                            width: '60%', maxWidth: 30,
+                            height: h,
+                            borderRadius: isPos ? '3px 3px 0 0' : '0 0 3px 3px',
+                            background: isPos
+                              ? 'linear-gradient(0deg, rgba(0,229,160,0.4), rgba(0,229,160,0.8))'
+                              : 'linear-gradient(180deg, rgba(255,77,106,0.4), rgba(255,77,106,0.8))',
+                          }}
+                            title={`${f.date}: ${isPos ? '+' : ''}${f.net} میلیارد تومان`}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', minWidth: flows.length * 50, marginTop: 4 }}>
+                    {flows.map((f, i) => (
+                      <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: t.muted }}>
+                        {f.date.slice(5)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
         {/* تاریخچه */}
         {history.length > 1 && (
           <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
@@ -213,7 +283,7 @@ export default function FundDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...history].reverse().map((r, i) => {
+                  {[...history].reverse().slice((historyPage - 1) * historyPerPage, historyPage * historyPerPage).map((r, i) => {
                     const chg = safe(r.price_change_pct)
                     return (
                       <tr key={i} style={{ borderBottom: `0.5px solid ${t.border}` }}>
@@ -235,6 +305,41 @@ export default function FundDetailPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* صفحه‌بندی */}
+            {history.length > historyPerPage && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 14 }}>
+                <button
+                  onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                  disabled={historyPage === 1}
+                  style={{
+                    fontSize: 12, padding: '6px 16px', borderRadius: 8, fontFamily: 'inherit',
+                    background: historyPage === 1 ? 'transparent' : `${t.accent}1A`,
+                    border: `0.5px solid ${historyPage === 1 ? t.border : `${t.accent}59`}`,
+                    color: historyPage === 1 ? t.faint : t.accent,
+                    cursor: historyPage === 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  قبلی
+                </button>
+                <span style={{ fontSize: 12, color: t.muted }}>
+                  صفحه {historyPage.toLocaleString('fa-IR')} از {Math.ceil(history.length / historyPerPage).toLocaleString('fa-IR')}
+                </span>
+                <button
+                  onClick={() => setHistoryPage(p => Math.min(Math.ceil(history.length / historyPerPage), p + 1))}
+                  disabled={historyPage >= Math.ceil(history.length / historyPerPage)}
+                  style={{
+                    fontSize: 12, padding: '6px 16px', borderRadius: 8, fontFamily: 'inherit',
+                    background: historyPage >= Math.ceil(history.length / historyPerPage) ? 'transparent' : `${t.accent}1A`,
+                    border: `0.5px solid ${historyPage >= Math.ceil(history.length / historyPerPage) ? t.border : `${t.accent}59`}`,
+                    color: historyPage >= Math.ceil(history.length / historyPerPage) ? t.faint : t.accent,
+                    cursor: historyPage >= Math.ceil(history.length / historyPerPage) ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  بعدی
+                </button>
+              </div>
+            )}
           </div>
         )}
 
