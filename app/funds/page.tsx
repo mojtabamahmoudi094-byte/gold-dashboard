@@ -112,8 +112,35 @@ export default function FundsPage() {
   // فیلتر بر اساس دسته‌بندی
   const funds = allFunds.filter(f => f.category === category)
 
+  // محاسبه‌ی امتیاز هوشمند هر صندوق
+  const calcScore = (f: any) => {
+    let score = 0
+    // تغییر قیمت (۲۰ امتیاز) — مثبت‌تر = بهتر
+    score += Math.min(Math.max((f.changePct + 3) / 6 * 20, 0), 20)
+    // جریان پول (۲۵ امتیاز)
+    const netFlow = (f.buyIVolume - f.sellIVolume) * f.priceClose
+    const maxFlow = Math.max(...funds.map(x => Math.abs((x.buyIVolume - x.sellIVolume) * x.priceClose)), 1)
+    score += Math.min(Math.max(((netFlow / maxFlow) + 1) / 2 * 25, 0), 25)
+    // قدرت خریدار (۲۰ امتیاز)
+    const buyAvg = f.buyCountI > 0 ? (f.buyIVolume * f.priceClose) / f.buyCountI : 0
+    const sellAvg = f.sellCountI > 0 ? (f.sellIVolume * f.priceClose) / f.sellCountI : 0
+    const power = sellAvg > 0 ? buyAvg / sellAvg : 1
+    score += Math.min(Math.max(power / 2 * 20, 0), 20)
+    // ارزش معاملات (۱۵ امتیاز)
+    const maxTrade = Math.max(...funds.map(x => x.tradeValue), 1)
+    score += (f.tradeValue / maxTrade) * 15
+    // نسبت خریدار به فروشنده (۲۰ امتیاز)
+    const total = f.buyCountI + f.sellCountI
+    const buyRatio = total > 0 ? f.buyCountI / total : 0.5
+    score += buyRatio * 20
+    return Math.round(score)
+  }
+
+  // اضافه کردن امتیاز به هر صندوق
+  const fundsWithScore = funds.map(f => ({ ...f, score: calcScore(f) }))
+
   // مرتب‌سازی
-  const sorted = [...funds].sort((a, b) => {
+  const sorted = [...fundsWithScore].sort((a, b) => {
     const av = (a as any)[sortBy] ?? 0
     const bv = (b as any)[sortBy] ?? 0
     return sortDir === 'desc' ? bv - av : av - bv
@@ -271,6 +298,7 @@ export default function FundsPage() {
                 <thead>
                   <tr>
                     {[
+                      { key: 'score', label: 'امتیاز 🤖' },
                       { key: 'symbol', label: 'نماد' },
                       { key: 'priceClose', label: 'قیمت پایانی' },
                       { key: 'priceLast', label: 'آخرین قیمت' },
@@ -309,6 +337,17 @@ export default function FundsPage() {
                         onMouseEnter={e => (e.currentTarget.style.background = `${t.accent}08`)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
+                        <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                          <span title="امتیاز هوشمند از ۰ تا ۱۰۰ بر اساس: تغییر قیمت (۲۰٪)، جریان پول حقیقی (۲۵٪)، قدرت خریدار (۲۰٪)، ارزش معاملات (۱۵٪)، نسبت خریدار به فروشنده (۲۰٪)" style={{
+                            display: 'inline-block', padding: '3px 10px', borderRadius: 6,
+                            fontSize: 12, fontWeight: 800, cursor: 'help',
+                            fontFamily: 'system-ui, sans-serif',
+                            background: f.score >= 60 ? 'rgba(0,229,160,0.12)' : f.score >= 40 ? 'rgba(245,158,11,0.12)' : 'rgba(255,77,106,0.12)',
+                            color: f.score >= 60 ? '#00E5A0' : f.score >= 40 ? '#F59E0B' : '#FF4D6A',
+                          }}>
+                            {f.score}
+                          </span>
+                        </td>
                         <td style={{ padding: '10px 8px', fontWeight: 700 }}>
                           <Link href={`/fund/${f.slug}`} style={{ color: t.accent, textDecoration: 'none' }}>{f.symbol}</Link>
                         </td>

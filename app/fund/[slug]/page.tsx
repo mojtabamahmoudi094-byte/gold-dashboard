@@ -135,7 +135,33 @@ export default function FundDetailPage() {
         {/* هدر صندوق */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: t.textBright }}>{asset.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, color: t.textBright }}>{asset.name}</span>
+              {(() => {
+                // محاسبه امتیاز
+                let score = 0
+                const cp = changePct
+                score += Math.min(Math.max((cp + 3) / 6 * 20, 0), 20)
+                score += netFlowBillion > 0 ? Math.min(15 + netFlowBillion / 10, 25) : Math.max(12.5 + netFlowBillion / 10, 0)
+                const pw = Number(buyPower) || 1
+                score += Math.min(Math.max(pw / 2 * 20, 0), 20)
+                score += 10 // ارزش معاملات نسبی - بدون مقایسه فقط نرمال
+                const total = safe(record.buy_count_i) + safe(record.sell_count_i)
+                const buyR = total > 0 ? safe(record.buy_count_i) / total : 0.5
+                score += buyR * 20
+                const s = Math.round(score)
+                return (
+                  <span title="امتیاز هوشمند بورسنج: تغییر قیمت (۲۰٪) + جریان پول (۲۵٪) + قدرت خریدار (۲۰٪) + ارزش معاملات (۱۵٪) + نسبت خریدار/فروشنده (۲۰٪)" style={{
+                    padding: '4px 12px', borderRadius: 8, fontSize: 14, fontWeight: 800, cursor: 'help',
+                    fontFamily: 'system-ui, sans-serif',
+                    background: s >= 60 ? 'rgba(0,229,160,0.15)' : s >= 40 ? 'rgba(245,158,11,0.15)' : 'rgba(255,77,106,0.15)',
+                    color: s >= 60 ? '#00E5A0' : s >= 40 ? '#F59E0B' : '#FF4D6A',
+                  }}>
+                    {s}
+                  </span>
+                )
+              })()}
+            </div>
             <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>
               {slug} · {record.trade_date_shamsi}
             </div>
