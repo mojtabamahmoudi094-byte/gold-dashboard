@@ -189,6 +189,75 @@ export default function FundsPage() {
             color={netFlow >= 0 ? '#00E5A0' : '#FF4D6A'} tooltip="تفاوت حجم خرید و فروش حقیقی‌ها — نشان‌دهنده‌ی جهت پول هوشمند" />
         </div>
 
+        {/* تحلیل هوشمند بازار */}
+        {!loading && funds.length > 0 && (
+          <div style={{ background: t.panel, border: `0.5px solid ${t.accent}22`, borderRadius: 12, padding: '18px 20px', backdropFilter: 'blur(12px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 18 }}>🤖</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: t.textBright }}>تحلیل هوشمند بازار</span>
+              <span style={{ fontSize: 9, color: t.faint, background: `${t.accent}15`, padding: '2px 8px', borderRadius: 6 }}>خودکار</span>
+            </div>
+            <div style={{ fontSize: 12, color: t.text, lineHeight: 2.2, direction: 'rtl' }}>
+              {(() => {
+                // محاسبات
+                const topGainer = [...funds].sort((a, b) => b.changePct - a.changePct)[0]
+                const topLoser = [...funds].sort((a, b) => a.changePct - b.changePct)[0]
+                const topVolume = [...funds].sort((a, b) => b.tradeValue - a.tradeValue)[0]
+
+                const topInflow = [...funds].sort((a, b) => {
+                  const aNet = (a.buyIVolume * a.priceClose) - (a.sellIVolume * a.priceClose)
+                  const bNet = (b.buyIVolume * b.priceClose) - (b.sellIVolume * b.priceClose)
+                  return bNet - aNet
+                })[0]
+                const topOutflow = [...funds].sort((a, b) => {
+                  const aNet = (a.buyIVolume * a.priceClose) - (a.sellIVolume * a.priceClose)
+                  const bNet = (b.buyIVolume * b.priceClose) - (b.sellIVolume * b.priceClose)
+                  return aNet - bNet
+                })[0]
+
+                const topInflowVal = Math.round(((topInflow.buyIVolume * topInflow.priceClose) - (topInflow.sellIVolume * topInflow.priceClose)) / 1000000000 * 10) / 10
+                const topOutflowVal = Math.round(((topOutflow.buyIVolume * topOutflow.priceClose) - (topOutflow.sellIVolume * topOutflow.priceClose)) / 1000000000 * 10) / 10
+
+                // تشخیص روند
+                const trend = avgChange > 0.5 ? 'صعودی قوی' : avgChange > 0 ? 'صعودی ملایم' : avgChange > -0.5 ? 'نزولی ملایم' : 'نزولی قوی'
+                const trendColor = avgChange > 0 ? '#00E5A0' : '#FF4D6A'
+                const trendEmoji = avgChange > 0.5 ? '🚀' : avgChange > 0 ? '📈' : avgChange > -0.5 ? '📉' : '🔻'
+
+                const catLabel = CATEGORIES.find(c => c.key === category)?.label || 'صندوق‌ها'
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <p style={{ margin: 0 }}>
+                      {trendEmoji} بازار {catLabel} امروز <span style={{ color: trendColor, fontWeight: 700 }}>{trend}</span> بود.
+                      از <span style={{ fontWeight: 700 }}>{funds.length.toLocaleString('fa-IR')}</span> صندوق،{' '}
+                      <span style={{ color: '#00E5A0', fontWeight: 700 }}>{positiveCount.toLocaleString('fa-IR')} مثبت</span> و{' '}
+                      <span style={{ color: '#FF4D6A', fontWeight: 700 }}>{negativeCount.toLocaleString('fa-IR')} منفی</span> بودند.
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      🏆 بیشترین رشد: <span style={{ color: '#00E5A0', fontWeight: 700 }}>{topGainer.symbol} ({topGainer.changePct > 0 ? '+' : ''}{topGainer.changePct.toFixed(2)}٪)</span>
+                      {' · '}بیشترین افت: <span style={{ color: '#FF4D6A', fontWeight: 700 }}>{topLoser.symbol} ({topLoser.changePct.toFixed(2)}٪)</span>
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      💰 بیشترین ورود پول حقیقی: <span style={{ color: '#00E5A0', fontWeight: 700 }}>{topInflow.symbol} (+{topInflowVal} میلیارد)</span>
+                      {' · '}بیشترین خروج: <span style={{ color: '#FF4D6A', fontWeight: 700 }}>{topOutflow.symbol} ({topOutflowVal} میلیارد)</span>
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      📊 بیشترین ارزش معاملات: <span style={{ fontWeight: 700, color: t.accent }}>{topVolume.symbol} ({fmtVal(topVolume.tradeValue)} میلیارد تومان)</span>
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      🧭 جمع‌بندی: {avgChange > 0
+                        ? `فضای بازار مثبت است. ${positiveCount > negativeCount * 2 ? 'اکثریت قاطع صندوق‌ها مثبتند و نشانه‌ی اعتماد بالای بازار است.' : 'اما تعداد قابل‌توجهی منفی‌ هستند. احتیاط لازم است.'}`
+                        : `فضای بازار منفی است. ${negativeCount > positiveCount * 2 ? 'اکثریت صندوق‌ها منفی‌اند و فشار فروش بالاست.' : 'اما تعدادی صندوق مثبت هستند. ممکن است بازار در حال تغییر جهت باشد.'}`
+                      }
+                      {topInflowVal > 50 && ` ورود پول سنگین به ${topInflow.symbol} نشانه‌ی توجه حقیقی‌ها به این صندوق است.`}
+                    </p>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* جدول اصلی */}
         <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
 
