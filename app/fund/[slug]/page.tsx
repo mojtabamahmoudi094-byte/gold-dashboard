@@ -353,49 +353,44 @@ export default function FundDetailPage() {
                 rows={h10} colorA={t.accent} labelA="ارزش"
                 getA={r => safe(r.trade_value)} />
 
-              <BarChartPanel t={t} title="حجم معاملات ۱۰ روز" subtitle="واحد صندوق"
+              <BarChartPanel t={t} title="حجم معاملات ۱۰ روز" subtitle="میلیون سهم"
                 rows={h10} colorA="#A78BFA" labelA="حجم"
-                getA={r => safe(r.volume)} />
+                getA={r => safe(r.volume) / 1_000_000} />
 
-              <BarChartPanel t={t} title="قدرت خریدار حقیقی ۱۰ روز" subtitle="برابر"
-                rows={h10} colorA="#00E5A0" labelA="قدرت"
-                getA={r => {
+              <LineChartPanel t={t} title="قدرت خریدار حقیقی ۱۰ روز" subtitle="برابر · بالای ۱ = خریدار قوی‌تر"
+                rows={h10}
+                getValue={r => {
                   const bc = safe(r.buy_count_i), sc = safe(r.sell_count_i)
                   const bA = bc > 0 ? safe(r.buy_i_volume) / bc : 0
                   const sA = sc > 0 ? safe(r.sell_i_volume) / sc : 0
                   return sA > 0 ? Math.round(bA / sA * 100) / 100 : 0
                 }}
-                getColorA={r => {
-                  const bc = safe(r.buy_count_i), sc = safe(r.sell_count_i)
-                  const bA = bc > 0 ? safe(r.buy_i_volume) / bc : 0
-                  const sA = sc > 0 ? safe(r.sell_i_volume) / sc : 0
-                  return sA > 0 && bA / sA >= 1 ? '#00E5A0' : '#FF4D6A'
-                }} />
+                colorAbove="#00E5A0" colorBelow="#FF4D6A" threshold={1} />
 
               <BarChartPanel t={t} title="تعداد کدهای معاملاتی حقیقی" subtitle="نفر"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خریدار" labelB="فروشنده"
                 getA={r => safe(r.buy_count_i)}
                 getB={r => safe(r.sell_count_i)} />
 
-              <BarChartPanel t={t} title="ارزش خرید و فروش حقیقی" subtitle="میلیارد تومان"
+              <BarChartPanel t={t} title="ارزش خرید و فروش حقیقی" subtitle="میلیون تومان"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
-                getA={r => Math.round(safe(r.buy_i_volume) * safe(r.price_close) / 1_000_000_000 * 10) / 10}
-                getB={r => Math.round(safe(r.sell_i_volume) * safe(r.price_close) / 1_000_000_000 * 10) / 10} />
+                getA={r => Math.round(safe(r.buy_i_volume) * safe(r.price_close) / 1_000_000 * 10) / 10}
+                getB={r => Math.round(safe(r.sell_i_volume) * safe(r.price_close) / 1_000_000 * 10) / 10} />
 
-              <BarChartPanel t={t} title="ارزش خرید و فروش حقوقی" subtitle="میلیارد تومان"
+              <BarChartPanel t={t} title="ارزش خرید و فروش حقوقی" subtitle="میلیون تومان"
                 rows={h10} colorA="#60A5FA" colorB="#F59E0B" labelA="خرید" labelB="فروش"
-                getA={r => Math.round(Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) * safe(r.price_close) / 1_000_000_000 * 10) / 10}
-                getB={r => Math.round(Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) * safe(r.price_close) / 1_000_000_000 * 10) / 10} />
+                getA={r => Math.round(Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) * safe(r.price_close) / 1_000_000 * 10) / 10}
+                getB={r => Math.round(Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) * safe(r.price_close) / 1_000_000 * 10) / 10} />
 
-              <BarChartPanel t={t} title="حجم خرید و فروش حقیقی" subtitle="واحد صندوق"
+              <BarChartPanel t={t} title="حجم خرید و فروش حقیقی" subtitle="میلیون سهم"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
-                getA={r => safe(r.buy_i_volume)}
-                getB={r => safe(r.sell_i_volume)} />
+                getA={r => safe(r.buy_i_volume) / 1_000_000}
+                getB={r => safe(r.sell_i_volume) / 1_000_000} />
 
-              <BarChartPanel t={t} title="حجم خرید و فروش حقوقی" subtitle="واحد صندوق"
+              <BarChartPanel t={t} title="حجم خرید و فروش حقوقی" subtitle="میلیون سهم"
                 rows={h10} colorA="#60A5FA" colorB="#F59E0B" labelA="خرید" labelB="فروش"
-                getA={r => Math.max(safe(r.volume) - safe(r.buy_i_volume), 0)}
-                getB={r => Math.max(safe(r.volume) - safe(r.sell_i_volume), 0)} />
+                getA={r => Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) / 1_000_000}
+                getB={r => Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) / 1_000_000} />
 
             </div>
           )
@@ -489,6 +484,14 @@ export default function FundDetailPage() {
           transform-origin: bottom;
           animation: barGrow 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
         }
+        @keyframes lineFade {
+          from { opacity: 0; transform: scaleY(0.85); }
+          to   { opacity: 1; transform: scaleY(1); }
+        }
+        .chart-line-path, .chart-line-area {
+          transform-origin: bottom;
+          animation: lineFade 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
       `}</style>
     </main>
   )
@@ -511,6 +514,113 @@ function StatRow({ label, value, color }: any) {
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
       <span style={{ color: '#A0B4C8' }}>{label}</span>
       <span style={{ color, fontWeight: 600 }}>{value}</span>
+    </div>
+  )
+}
+
+function LineChartPanel({ t, title, subtitle, rows, getValue, colorAbove, colorBelow, threshold }: {
+  t: any, title: string, subtitle?: string,
+  rows: any[], getValue: (r: any) => number,
+  colorAbove?: string, colorBelow?: string, threshold?: number,
+}) {
+  if (!rows || rows.length < 2) return null
+
+  const above = colorAbove ?? '#00E5A0'
+  const below = colorBelow ?? '#FF4D6A'
+  const th = threshold ?? 1
+
+  const vals = rows.map(r => { const v = getValue(r); return isFinite(v) ? v : 0 })
+  const minV = Math.min(...vals, th * 0.8)
+  const maxV = Math.max(...vals, th * 1.2)
+  const range = Math.max(maxV - minV, 0.01)
+
+  const W = 420, H = 90, PX = 18, PY = 26
+  const chartH = H - PY - 8
+
+  const xOf = (i: number) => PX + (i / (vals.length - 1)) * (W - 2 * PX)
+  const yOf = (v: number) => PY + (1 - (v - minV) / range) * chartH
+
+  const pts = vals.map((v, i) => ({ x: xOf(i), y: yOf(v), v }))
+
+  // Smooth cubic bezier through all points
+  const linePath = pts.reduce((acc, pt, i) => {
+    if (i === 0) return `M${pt.x.toFixed(1)},${pt.y.toFixed(1)}`
+    const prev = pts[i - 1]
+    const mx = ((pt.x + prev.x) / 2).toFixed(1)
+    return `${acc} C${mx},${prev.y.toFixed(1)} ${mx},${pt.y.toFixed(1)} ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`
+  }, '')
+
+  const bottomY = PY + chartH
+  const areaPath = `${linePath} L${pts[pts.length - 1].x},${bottomY} L${pts[0].x},${bottomY} Z`
+  const thY = yOf(th)
+
+  return (
+    <div style={{
+      background: t.panel, border: `0.5px solid ${t.border}`,
+      borderTop: `2px solid ${above}55`, borderRadius: 14,
+      padding: '14px 16px', backdropFilter: 'blur(12px)',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
+    }}>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: t.muted }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 10, color: t.faint, marginTop: 3 }}>{subtitle}</div>}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H + 22}`} style={{ width: '100%', overflow: 'visible', display: 'block' }} direction="ltr">
+        <defs>
+          <linearGradient id="lgLine" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={above} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={above} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {/* Horizontal grid */}
+        {[0, 0.33, 0.66, 1].map(f => {
+          const gy = PY + f * chartH
+          return <line key={f} x1={PX} y1={gy} x2={W - PX} y2={gy} stroke={t.border} strokeWidth={0.5} opacity={0.6} />
+        })}
+        {/* Threshold dashed line */}
+        {thY >= PY && thY <= bottomY && (
+          <>
+            <line x1={PX} y1={thY} x2={W - PX} y2={thY}
+              stroke={t.muted} strokeWidth={1} strokeDasharray="5 3" opacity={0.6} />
+            <rect x={W - PX - 14} y={thY - 8} width={14} height={12} rx={2} fill={t.panel} />
+            <text x={W - PX - 7} y={thY + 2} textAnchor="middle" fontSize={8}
+              fill={t.faint} fontFamily="system-ui, sans-serif">۱</text>
+          </>
+        )}
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#lgLine)" className="chart-line-area" />
+        {/* Smooth line */}
+        <path d={linePath} fill="none" stroke={above} strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round" className="chart-line-path" />
+        {/* Points with dark-box labels */}
+        {pts.map((pt, i) => {
+          const col = pt.v >= th ? above : below
+          const label = pt.v.toLocaleString('fa-IR', { maximumFractionDigits: 2 })
+          const lw = label.length * 5.6 + 10
+          const lx = Math.min(Math.max(pt.x - lw / 2, PX), W - PX - lw)
+          const ly = Math.max(pt.y - 20, 2)
+          return (
+            <g key={i}>
+              <rect x={lx} y={ly} width={lw} height={14} rx={3} fill="rgba(0,0,0,0.84)" />
+              <rect x={lx} y={ly} width={lw} height={14} rx={3}
+                fill="none" stroke={col} strokeWidth={0.5} opacity={0.8} />
+              <text x={lx + lw / 2} y={ly + 10} textAnchor="middle"
+                fontSize={8} fontWeight="800" fill="#fff" fontFamily="system-ui, sans-serif">
+                {label}
+              </text>
+              <circle cx={pt.x} cy={pt.y} r={4} fill={col} />
+              <circle cx={pt.x} cy={pt.y} r={7} fill={col} fillOpacity="0.18" />
+            </g>
+          )
+        })}
+        {/* Date labels */}
+        {rows.map((r, i) => (
+          <text key={i} x={xOf(i)} y={H + 16} textAnchor="middle"
+            fontSize={9} fill={t.faint} fontFamily="Vazirmatn, Arial, sans-serif">
+            {r.trade_date_shamsi?.slice(5)}
+          </text>
+        ))}
+      </svg>
     </div>
   )
 }
@@ -575,23 +685,24 @@ function BarChartPanel({ t, title, subtitle, rows, getA, getB, labelA, labelB, c
             const barColorA = getColorA ? getColorA(r) : colorA
             return (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {/*
-                  Stagger: label A at flex-end (bottom of 32px zone),
-                  label B at flex-start (top) → ~25px vertical separation → no overlap
-                */}
-                <div style={{ display: 'flex', gap: 4, height: 32, width: '100%', justifyContent: 'center', alignItems: 'flex-end', marginBottom: 3 }}>
+                {/* Dark-box labels: A at bottom, B at top of 22px zone → no clip, clear stagger */}
+                <div style={{ display: 'flex', gap: 3, height: 22, width: '100%', justifyContent: 'center', alignItems: 'flex-end', marginBottom: 3 }}>
                   <div style={{
-                    fontSize: 7, fontWeight: 800, color: barColorA,
+                    fontSize: 8, fontWeight: 800, color: '#fff',
+                    background: 'rgba(0,0,0,0.82)',
+                    border: `0.5px solid ${barColorA}70`,
+                    borderRadius: 3, padding: '1px 4px',
                     fontFamily: 'system-ui, sans-serif',
-                    textShadow: '0 1px 3px rgba(0,0,0,0.55)',
-                    whiteSpace: 'nowrap', lineHeight: 1,
+                    whiteSpace: 'nowrap', lineHeight: 1.4,
                   }}>{fmt(vA)}</div>
                   {isPaired && vB !== null && (
                     <div style={{
-                      fontSize: 7, fontWeight: 800, color: colorB,
+                      fontSize: 8, fontWeight: 800, color: '#fff',
+                      background: 'rgba(0,0,0,0.82)',
+                      border: `0.5px solid ${colorB}70`,
+                      borderRadius: 3, padding: '1px 4px',
                       fontFamily: 'system-ui, sans-serif',
-                      textShadow: '0 1px 3px rgba(0,0,0,0.55)',
-                      whiteSpace: 'nowrap', lineHeight: 1,
+                      whiteSpace: 'nowrap', lineHeight: 1.4,
                       alignSelf: 'flex-start',
                     }}>{fmt(vB)}</div>
                   )}
