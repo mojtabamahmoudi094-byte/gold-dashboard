@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { supabase } from '../../../lib/supabase'
 
 const fmt = (n: number | null, decimals = 0) =>
   n == null ? '—' : Math.round(n).toLocaleString('fa-IR', { maximumFractionDigits: decimals })
@@ -37,10 +38,23 @@ const changeColor = (n: number | null) => {
   return n > 0 ? '#00E5A0' : n < 0 ? '#FF4D6A' : '#5A7088'
 }
 
+const DEFAULT_CONSTANTS = {
+  gramsPerOz: 31.103431,
+  AED_PER_USD: 3.6732,
+  coinPurity: 22,
+  mithqalW: 4.6055,
+  fullCoinW: 8.13,
+  halfCoinW: 4.066,
+  quarterCoinW: 2.033,
+  mintCost: 5000,
+}
+
 export default function GoldAnalysisPage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [lastFetch, setLastFetch] = useState<Date | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [constants, setConstants] = useState(DEFAULT_CONSTANTS)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -55,9 +69,75 @@ export default function GoldAnalysisPage() {
 
   useEffect(() => {
     load()
-    const timer = setInterval(load, 5 * 60 * 1000) // refresh every 5 min
+    const timer = setInterval(load, 5 * 60 * 1000)
     return () => clearInterval(timer)
   }, [load])
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: d }) => setIsAdmin(d.user != null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
+      setIsAdmin(s?.user != null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // Client-side recalculation — runs when constants change or data refreshes
+  const derived = useMemo(() => {
+    if (!data?.inputs) return null
+    const { goldUsd, dollarT, dirhamT } = data.inputs
+    const mkt = {
+      gram24: data.gram?.market24 ?? null,
+      gram18: data.gram?.market18 ?? null,
+      mesghal: data.mesghal?.market ?? null,
+      half: data.coins?.half?.market ?? null,
+      quarter: data.coins?.quarter?.market ?? null,
+      full: data.coins?.full?.market ?? null,
+    }
+    const c = constants
+
+    const dollarViaDirham = dirhamT != null ? dirhamT * c.AED_PER_USD : null
+    const bubbleDollar = dollarT && dollarViaDirham ? (dollarT - dollarViaDirham) / dollarViaDirham : null
+
+    const fairGram24 = goldUsd && dollarT ? (goldUsd * dollarT) / c.gramsPerOz : null
+    const fairGram18 = fairGram24 ? fairGram24 * (18 / 24) : null
+    const fairGram22 = fairGram24 ? fairGram24 * (c.coinPurity / 24) : null
+    const fairMesghal = fairGram18 ? fairGram18 * c.mithqalW : null
+    const fairFull = fairGram22 ? fairGram22 * c.fullCoinW + c.mintCost : null
+    const fairHalf = fairGram22 ? fairGram22 * c.halfCoinW + c.mintCost : null
+    const fairQuarter = fairGram22 ? fairGram22 * c.quarterCoinW + c.mintCost : null
+
+    const bub = (m: number | null, f: number | null) => m != null && f != null ? (m - f) / f : null
+    const imp = (mT: number | null, oz: number | null, ozFraction: number) =>
+      mT && oz ? (mT / ozFraction) / oz : null
+
+    return {
+      derived: { dollarViaDirham, bubbleDollar, bubbleUsdt: bubbleDollar, AED_PER_USD: c.AED_PER_USD },
+      gram: {
+        fair24: fairGram24, market24: mkt.gram24, bubble24: bub(mkt.gram24, fairGram24),
+        impliedDollar24: imp(mkt.gram24, goldUsd, 1 / c.gramsPerOz),
+        fair18: fairGram18, market18: mkt.gram18, bubble18: bub(mkt.gram18, fairGram18),
+        impliedDollar18: imp(mkt.gram18, goldUsd, (18 / 24) / c.gramsPerOz),
+      },
+      mesghal: {
+        fair: fairMesghal, market: mkt.mesghal, bubble: bub(mkt.mesghal, fairMesghal),
+        impliedDollar: imp(mkt.mesghal, goldUsd, c.mithqalW * (18 / 24) / c.gramsPerOz),
+        changePct: data.mesghal?.changePct ?? null,
+      },
+      coins: {
+        full: { fair: fairFull, market: mkt.full, bubble: bub(mkt.full, fairFull), weight: c.fullCoinW },
+        half: {
+          fair: fairHalf, market: mkt.half, bubble: bub(mkt.half, fairHalf), weight: c.halfCoinW,
+          impliedDollar: imp(mkt.half, goldUsd, c.halfCoinW * (c.coinPurity / 24) / c.gramsPerOz),
+          changePct: data.coins?.half?.changePct ?? null,
+        },
+        quarter: {
+          fair: fairQuarter, market: mkt.quarter, bubble: bub(mkt.quarter, fairQuarter), weight: c.quarterCoinW,
+          impliedDollar: imp(mkt.quarter, goldUsd, c.quarterCoinW * (c.coinPurity / 24) / c.gramsPerOz),
+          changePct: data.coins?.quarter?.changePct ?? null,
+        },
+      },
+    }
+  }, [data, constants])
 
   const bg = '#060B14'
   const panel = 'rgba(10,18,30,0.88)'
@@ -160,25 +240,25 @@ export default function GoldAnalysisPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <DollarCard
               label="دلار با درهم"
-              formula={`درهم × ${data?.constants?.AED_PER_USD ?? '۳.۶۷۳'}`}
-              value={fmt(data?.derived?.dollarViaDirham)}
+              formula={`درهم × ${constants.AED_PER_USD}`}
+              value={fmt(derived?.derived?.dollarViaDirham ?? null)}
               unit="تومان"
               accent={accent}
             />
             <DollarCard
               label="حباب دلار بازار"
               formula="دلار بازار ÷ دلار درهم"
-              value={fmtPct(data?.derived?.bubbleDollar)}
-              color={bubbleColor(data?.derived?.bubbleDollar)}
-              desc={bubbleLabel(data?.derived?.bubbleDollar)}
+              value={fmtPct(derived?.derived?.bubbleDollar ?? null)}
+              color={bubbleColor(derived?.derived?.bubbleDollar ?? null)}
+              desc={bubbleLabel(derived?.derived?.bubbleDollar ?? null)}
               accent={accent}
             />
             <DollarCard
               label="حباب تتر"
               formula="تتر ÷ دلار درهم"
-              value={fmtPct(data?.derived?.bubbleUsdt)}
-              color={bubbleColor(data?.derived?.bubbleUsdt)}
-              desc={bubbleLabel(data?.derived?.bubbleUsdt)}
+              value={fmtPct(derived?.derived?.bubbleUsdt ?? null)}
+              color={bubbleColor(derived?.derived?.bubbleUsdt ?? null)}
+              desc={bubbleLabel(derived?.derived?.bubbleUsdt ?? null)}
               accent={accent}
             />
           </div>
@@ -201,26 +281,27 @@ export default function GoldAnalysisPage() {
               <tbody>
                 <GoldRow
                   label="هر گرم ۲۴ عیار"
-                  fair={data?.gram?.fair24}
-                  market={data?.gram?.market24}
-                  bubble={data?.gram?.bubble24}
-                  impliedDollar={data?.gram?.impliedDollar24}
+                  fair={derived?.gram?.fair24}
+                  market={derived?.gram?.market24}
+                  bubble={derived?.gram?.bubble24}
+                  impliedDollar={derived?.gram?.impliedDollar24}
                   border={border} muted={muted} text={text}
                 />
                 <GoldRow
                   label="هر گرم ۱۸ عیار"
-                  fair={data?.gram?.fair18}
-                  market={data?.gram?.market18}
-                  bubble={data?.gram?.bubble18}
+                  fair={derived?.gram?.fair18}
+                  market={derived?.gram?.market18}
+                  bubble={derived?.gram?.bubble18}
+                  impliedDollar={derived?.gram?.impliedDollar18}
                   border={border} muted={muted} text={text}
                 />
                 <GoldRow
                   label="مثقال طلا (۱۸ عیار)"
-                  fair={data?.mesghal?.fair}
-                  market={data?.mesghal?.market}
-                  bubble={data?.mesghal?.bubble}
-                  impliedDollar={data?.mesghal?.impliedDollar}
-                  marketChange={data?.mesghal?.changePct}
+                  fair={derived?.mesghal?.fair}
+                  market={derived?.mesghal?.market}
+                  bubble={derived?.mesghal?.bubble}
+                  impliedDollar={derived?.mesghal?.impliedDollar}
+                  marketChange={derived?.mesghal?.changePct}
                   border={border} muted={muted} text={text}
                 />
               </tbody>
@@ -229,7 +310,7 @@ export default function GoldAnalysisPage() {
         </Section>
 
         {/* ── Row 4: Coins Table ── */}
-        <Section title="سکه‌های طلا" subtitle="وزن عیار ۲۲ + هزینه ضرب ۵۰۰۰ تومان">
+        <Section title="سکه‌های طلا" subtitle="وزن عیار ۲۲ + هزینه ضرب">
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
@@ -244,27 +325,27 @@ export default function GoldAnalysisPage() {
               </thead>
               <tbody>
                 <CoinRow
-                  label="تمام سکه" weight={8.13}
-                  fair={data?.coins?.full?.fair}
-                  market={data?.coins?.full?.market}
-                  bubble={data?.coins?.full?.bubble}
-                  marketNote="API ندارد"
+                  label="تمام سکه" weight={derived?.coins?.full?.weight ?? 8.13}
+                  fair={derived?.coins?.full?.fair}
+                  market={derived?.coins?.full?.market}
+                  bubble={derived?.coins?.full?.bubble}
+                  marketNote="≈ نیم × ۲"
                   border={border} muted={muted} text={text}
                 />
                 <CoinRow
-                  label="نیم سکه" weight={4.066}
-                  fair={data?.coins?.half?.fair}
-                  market={data?.coins?.half?.market}
-                  bubble={data?.coins?.half?.bubble}
-                  marketChange={data?.coins?.half?.changePct}
+                  label="نیم سکه" weight={derived?.coins?.half?.weight ?? 4.066}
+                  fair={derived?.coins?.half?.fair}
+                  market={derived?.coins?.half?.market}
+                  bubble={derived?.coins?.half?.bubble}
+                  marketChange={derived?.coins?.half?.changePct}
                   border={border} muted={muted} text={text}
                 />
                 <CoinRow
-                  label="ربع سکه" weight={2.033}
-                  fair={data?.coins?.quarter?.fair}
-                  market={data?.coins?.quarter?.market}
-                  bubble={data?.coins?.quarter?.bubble}
-                  marketChange={data?.coins?.quarter?.changePct}
+                  label="ربع سکه" weight={derived?.coins?.quarter?.weight ?? 2.033}
+                  fair={derived?.coins?.quarter?.fair}
+                  market={derived?.coins?.quarter?.market}
+                  bubble={derived?.coins?.quarter?.bubble}
+                  marketChange={derived?.coins?.quarter?.changePct}
                   border={border} muted={muted} text={text}
                 />
               </tbody>
@@ -272,41 +353,29 @@ export default function GoldAnalysisPage() {
           </div>
         </Section>
 
-        {/* ── Row 5: Constants ── */}
-        <Section title="ثوابت محاسباتی" subtitle="مقادیر فیزیکی و مالی ثابت">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
-            {[
-              { label: 'گرم در هر انس', value: '۳۱.۱۰۳ گرم' },
-              { label: 'نرخ تبدیل درهم', value: '۱ دلار = ۳.۶۷۳۲ درهم' },
-              { label: 'عیار سکه', value: '۲۲ عیار' },
-              { label: 'عیار شمش', value: '۲۴ عیار' },
-              { label: 'وزن تمام سکه', value: '۸.۱۳ گرم' },
-              { label: 'وزن نیم سکه', value: '۴.۰۶۶ گرم' },
-              { label: 'وزن ربع سکه', value: '۲.۰۳۳ گرم' },
-              { label: 'هزینه ضرب سکه', value: '۵۰۰۰ تومان' },
-              { label: 'نرخ اخزا', value: '۲.۳٪' },
-              { label: 'نرخ سود بانکی', value: '۲.۶٪' },
-              { label: 'نرخ تامین مالی', value: '۴.۳٪' },
-            ].map(c => (
-              <div key={c.label} style={{
-                background: 'rgba(0,200,255,0.03)', border: `0.5px solid ${border}`,
-                borderRadius: 8, padding: '10px 14px', display: 'flex',
-                justifyContent: 'space-between', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{ fontSize: 11, color: muted }}>{c.label}</span>
-                <span style={{ fontSize: 12, color: text, fontWeight: 600, fontFamily: 'system-ui' }}>{c.value}</span>
-              </div>
-            ))}
-          </div>
-        </Section>
+        {/* ── Row 5: Constants — Admin only ── */}
+        {isAdmin && (
+          <AdminConstants
+            constants={constants}
+            onChange={setConstants}
+            border={border}
+            muted={muted}
+            text={text}
+            accent={accent}
+          />
+        )}
 
         <div style={{ textAlign: 'center', fontSize: 10, color: muted, paddingBottom: 24 }}>
           داده از TGJU · بروزرسانی خودکار هر ۵ دقیقه · تمام قیمت‌ها به تومان
+          {isAdmin && <span style={{ marginRight: 8, color: accent }}>· حالت ادمین فعال</span>}
         </div>
       </div>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
+        input[type=number] { -moz-appearance: textfield; }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
       `}</style>
     </main>
   )
@@ -424,6 +493,7 @@ function GoldRow({ label, fair, market, bubble, impliedDollar, marketChange, bor
 
 function CoinRow({ label, weight, fair, market, bubble, marketChange, marketNote, border, muted, text }: any) {
   const bc = bubbleColor(bubble)
+  const hasEstimate = marketNote != null && market != null
   return (
     <tr style={{ borderBottom: `0.5px solid ${border}` }}>
       <td style={{ padding: '10px 12px', color: text, fontWeight: 500 }}>{label}</td>
@@ -435,16 +505,19 @@ function CoinRow({ label, weight, fair, market, bubble, marketChange, marketNote
       </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         {market != null ? (
-          <>
+          <div>
             <div style={{ color: text, fontFamily: 'system-ui' }}>{fmt(market)}</div>
+            {hasEstimate && (
+              <div style={{ fontSize: 9, color: muted }}>{marketNote}</div>
+            )}
             {marketChange != null && (
               <div style={{ fontSize: 10, color: changeColor(marketChange) }}>
                 {marketChange > 0 ? '▲' : '▼'} {Math.abs(marketChange).toFixed(2)}٪
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <span style={{ color: muted, fontSize: 11 }}>{marketNote ?? '—'}</span>
+          <span style={{ color: muted, fontSize: 11 }}>—</span>
         )}
       </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
@@ -461,5 +534,116 @@ function CoinRow({ label, weight, fair, market, bubble, marketChange, marketNote
         {bubbleLabel(bubble)}
       </td>
     </tr>
+  )
+}
+
+const CONST_LABELS: Record<string, string> = {
+  gramsPerOz: 'گرم در هر انس',
+  AED_PER_USD: 'نرخ درهم در برابر دلار',
+  coinPurity: 'عیار سکه',
+  mithqalW: 'وزن مثقال (گرم)',
+  fullCoinW: 'وزن تمام سکه (گرم)',
+  halfCoinW: 'وزن نیم سکه (گرم)',
+  quarterCoinW: 'وزن ربع سکه (گرم)',
+  mintCost: 'هزینه ضرب (تومان)',
+}
+
+function AdminConstants({ constants, onChange, border, muted, text, accent }: any) {
+  const [editing, setEditing] = useState(false)
+  const [local, setLocal] = useState(constants)
+
+  const handleApply = () => {
+    onChange(local)
+    setEditing(false)
+  }
+
+  const handleReset = () => {
+    setLocal(DEFAULT_CONSTANTS)
+    onChange(DEFAULT_CONSTANTS)
+  }
+
+  return (
+    <div style={{
+      background: 'rgba(10,18,30,0.6)', border: `0.5px solid rgba(0,200,255,0.2)`,
+      borderRadius: 16, overflow: 'hidden',
+    }}>
+      <div style={{
+        padding: '14px 18px', borderBottom: `0.5px solid ${border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: text }}>ثوابت محاسباتی</span>
+            <span style={{
+              fontSize: 9, padding: '2px 8px', borderRadius: 4, fontWeight: 700,
+              background: 'rgba(0,200,255,0.12)', border: `0.5px solid ${accent}44`,
+              color: accent, fontFamily: 'system-ui',
+            }}>ADMIN</span>
+          </div>
+          <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>
+            تغییر ثوابت → محاسبه مجدد همه قیمت‌های واقعی
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {editing ? (
+            <>
+              <button onClick={handleApply} style={{
+                fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
+                background: 'rgba(0,229,160,0.1)', border: `0.5px solid rgba(0,229,160,0.4)`,
+                color: '#00E5A0', fontFamily: 'inherit',
+              }}>اعمال</button>
+              <button onClick={handleReset} style={{
+                fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
+                background: 'rgba(255,77,106,0.08)', border: `0.5px solid rgba(255,77,106,0.3)`,
+                color: '#FF4D6A', fontFamily: 'inherit',
+              }}>بازنشانی</button>
+              <button onClick={() => { setEditing(false); setLocal(constants) }} style={{
+                fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
+                background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${border}`,
+                color: muted, fontFamily: 'inherit',
+              }}>لغو</button>
+            </>
+          ) : (
+            <button onClick={() => setEditing(true)} style={{
+              fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
+              background: `rgba(0,200,255,0.08)`, border: `0.5px solid ${accent}44`,
+              color: accent, fontFamily: 'inherit',
+            }}>ویرایش</button>
+          )}
+        </div>
+      </div>
+      <div style={{ padding: '16px 18px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+          {Object.entries(editing ? local : constants).map(([key, value]) => (
+            <div key={key} style={{
+              background: 'rgba(0,200,255,0.03)', border: `0.5px solid ${editing ? 'rgba(0,200,255,0.25)' : border}`,
+              borderRadius: 8, padding: '10px 14px', display: 'flex',
+              justifyContent: 'space-between', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ fontSize: 11, color: muted, flexShrink: 0 }}>
+                {CONST_LABELS[key] ?? key}
+              </span>
+              {editing ? (
+                <input
+                  type="number"
+                  value={local[key]}
+                  onChange={e => setLocal((prev: any) => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))}
+                  style={{
+                    width: 100, background: 'rgba(0,200,255,0.06)',
+                    border: `0.5px solid ${accent}44`, borderRadius: 6,
+                    color: text, fontSize: 12, fontFamily: 'system-ui',
+                    padding: '4px 8px', textAlign: 'left', outline: 'none',
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: 12, color: text, fontWeight: 600, fontFamily: 'system-ui' }}>
+                  {Number(value).toLocaleString('fa-IR', { maximumFractionDigits: 6 })}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }

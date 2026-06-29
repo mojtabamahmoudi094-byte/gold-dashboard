@@ -102,6 +102,9 @@ export async function GET() {
     const impliedDollar = (marketToman: number | null, goldOz: number | null, ozFraction: number) =>
       marketToman && goldOz ? (marketToman / ozFraction) / goldOz : null
 
+    // تمام سکه: TGJU endpoint broken — estimate from half coin × 2
+    const marketFull = marketHalf != null ? marketHalf * 2 : null
+
     return NextResponse.json({
       updatedAt: new Date().toISOString(),
       lastMarketDate: dollar?.shamsiDate ?? null,
@@ -124,10 +127,11 @@ export async function GET() {
         fair24: fairGram24,
         market24: marketGram24,
         bubble24: bubble(marketGram24, fairGram24),
+        impliedDollar24: impliedDollar(marketGram24, goldUsd, 1 / gramsPerOz),
         fair18: fairGram18,
         market18: marketGram18,
         bubble18: bubble(marketGram18, fairGram18),
-        impliedDollar24: impliedDollar(marketGram24, goldUsd, 1 / gramsPerOz),
+        impliedDollar18: impliedDollar(marketGram18, goldUsd, (18 / 24) / gramsPerOz),
       },
       mesghal: {
         fair: fairMesghal,
@@ -140,9 +144,10 @@ export async function GET() {
       coins: {
         full: {
           fair: fairFull,
-          market: null, // TGJU sekke endpoint unavailable
-          bubble: null,
+          market: marketFull,
+          bubble: bubble(marketFull, fairFull),
           weight: fullCoinW,
+          marketIsEstimate: true, // derived from نیم سکه × 2
         },
         half: {
           fair: fairHalf,
