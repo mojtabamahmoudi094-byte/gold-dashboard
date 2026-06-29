@@ -353,11 +353,11 @@ export default function FundDetailPage() {
                 rows={h10} colorA={t.accent} labelA="ارزش"
                 getA={r => safe(r.trade_value)} />
 
-              <BarChartPanel t={t} title="حجم معاملات ۱۰ روز" subtitle="واحد"
+              <BarChartPanel t={t} title="حجم معاملات ۱۰ روز" subtitle="واحد صندوق"
                 rows={h10} colorA="#A78BFA" labelA="حجم"
                 getA={r => safe(r.volume)} />
 
-              <BarChartPanel t={t} title="قدرت خریدار حقیقی ۱۰ روز" subtitle="نسبت سرانه خرید / فروش"
+              <BarChartPanel t={t} title="قدرت خریدار حقیقی ۱۰ روز" subtitle="برابر"
                 rows={h10} colorA="#00E5A0" labelA="قدرت"
                 getA={r => {
                   const bc = safe(r.buy_count_i), sc = safe(r.sell_count_i)
@@ -372,7 +372,7 @@ export default function FundDetailPage() {
                   return sA > 0 && bA / sA >= 1 ? '#00E5A0' : '#FF4D6A'
                 }} />
 
-              <BarChartPanel t={t} title="تعداد کدهای معاملاتی حقیقی" subtitle="خریدار و فروشنده"
+              <BarChartPanel t={t} title="تعداد کدهای معاملاتی حقیقی" subtitle="نفر"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خریدار" labelB="فروشنده"
                 getA={r => safe(r.buy_count_i)}
                 getB={r => safe(r.sell_count_i)} />
@@ -387,12 +387,12 @@ export default function FundDetailPage() {
                 getA={r => Math.round(Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) * safe(r.price_close) / 1_000_000_000 * 10) / 10}
                 getB={r => Math.round(Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) * safe(r.price_close) / 1_000_000_000 * 10) / 10} />
 
-              <BarChartPanel t={t} title="حجم خرید و فروش حقیقی" subtitle="واحد"
+              <BarChartPanel t={t} title="حجم خرید و فروش حقیقی" subtitle="واحد صندوق"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
                 getA={r => safe(r.buy_i_volume)}
                 getB={r => safe(r.sell_i_volume)} />
 
-              <BarChartPanel t={t} title="حجم خرید و فروش حقوقی" subtitle="واحد"
+              <BarChartPanel t={t} title="حجم خرید و فروش حقوقی" subtitle="واحد صندوق"
                 rows={h10} colorA="#60A5FA" colorB="#F59E0B" labelA="خرید" labelB="فروش"
                 getA={r => Math.max(safe(r.volume) - safe(r.buy_i_volume), 0)}
                 getB={r => Math.max(safe(r.volume) - safe(r.sell_i_volume), 0)} />
@@ -481,6 +481,14 @@ export default function FundDetailPage() {
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
+        @keyframes barGrow {
+          from { transform: scaleY(0); opacity: 0; }
+          to   { transform: scaleY(1); opacity: 1; }
+        }
+        .chart-bar {
+          transform-origin: bottom;
+          animation: barGrow 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
       `}</style>
     </main>
   )
@@ -523,54 +531,108 @@ function BarChartPanel({ t, title, subtitle, rows, getA, getB, labelA, labelB, c
     return v.toLocaleString('fa-IR', { maximumFractionDigits: 2 })
   }
 
-  const allVals = rows.flatMap(r => getB ? [getA(r), getB(r)] : [getA(r)]).filter(v => isFinite(v) && !isNaN(v))
+  const isPaired = !!getB
+  const allVals = rows.flatMap(r => isPaired ? [getA(r), getB!(r)] : [getA(r)]).filter(v => isFinite(v) && !isNaN(v))
   const maxVal = Math.max(...allVals, 0.001)
   const barMaxH = 80
-  const barW = getB ? 11 : 20
+  const barW = isPaired ? 14 : 22
+  const colW = isPaired ? 58 : 40
 
   return (
-    <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', backdropFilter: 'blur(12px)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+    <div style={{
+      background: t.panel,
+      border: `0.5px solid ${t.border}`,
+      borderTop: `2px solid ${colorA}55`,
+      borderRadius: 14,
+      padding: '14px 16px',
+      backdropFilter: 'blur(12px)',
+      boxShadow: `0 4px 24px rgba(0,0,0,0.14)`,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 6 }}>
         <div>
-          <span style={{ fontSize: 11, color: t.muted }}>{title}</span>
-          {subtitle && <span style={{ fontSize: 10, color: t.faint, marginRight: 6 }}>{subtitle}</span>}
+          <div style={{ fontSize: 11, fontWeight: 600, color: t.muted }}>{title}</div>
+          {subtitle && (
+            <div style={{ fontSize: 10, color: t.faint, marginTop: 3, direction: 'rtl' }}>
+              {subtitle}
+            </div>
+          )}
         </div>
-        {getB && (
-          <div style={{ display: 'flex', gap: 10, fontSize: 10 }}>
-            <span style={{ color: colorA }}>■ {labelA}</span>
-            <span style={{ color: colorB }}>■ {labelB}</span>
+        {isPaired && (
+          <div style={{ display: 'flex', gap: 10, fontSize: 10, flexShrink: 0 }}>
+            <span style={{ color: colorA }}>● {labelA}</span>
+            <span style={{ color: colorB }}>● {labelB}</span>
           </div>
         )}
       </div>
+
       <div style={{ overflowX: 'auto', direction: 'ltr' }}>
-        <div style={{ display: 'flex', minWidth: rows.length * 46, height: barMaxH + 30, alignItems: 'flex-end', paddingBottom: 18 }}>
+        <div style={{ display: 'flex', minWidth: rows.length * colW, height: barMaxH + 52, alignItems: 'flex-end', paddingBottom: 20 }}>
           {rows.map((r, i) => {
             const vA = getA(r)
-            const vB = getB ? getB(r) : null
+            const vB = isPaired ? getB!(r) : null
             const hA = Math.max((vA / maxVal) * barMaxH, 2)
             const hB = vB !== null ? Math.max((vB / maxVal) * barMaxH, 2) : 0
             const barColorA = getColorA ? getColorA(r) : colorA
             return (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ fontSize: 7, fontWeight: 800, color: barColorA, marginBottom: 2, fontFamily: 'system-ui, sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>{fmt(vA)}</div>
-                    <div title={`${labelA}: ${fmt(vA)}`} style={{ width: barW, height: hA, borderRadius: '3px 3px 0 0', background: `linear-gradient(0deg, ${barColorA}55, ${barColorA}cc)` }} />
-                  </div>
-                  {getB && vB !== null && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div style={{ fontSize: 7, fontWeight: 800, color: colorB, marginBottom: 2, fontFamily: 'system-ui, sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>{fmt(vB)}</div>
-                      <div title={`${labelB}: ${fmt(vB)}`} style={{ width: barW, height: hB, borderRadius: '3px 3px 0 0', background: `linear-gradient(0deg, ${colorB}55, ${colorB}cc)` }} />
-                    </div>
+                {/*
+                  Stagger: label A at flex-end (bottom of 32px zone),
+                  label B at flex-start (top) → ~25px vertical separation → no overlap
+                */}
+                <div style={{ display: 'flex', gap: 4, height: 32, width: '100%', justifyContent: 'center', alignItems: 'flex-end', marginBottom: 3 }}>
+                  <div style={{
+                    fontSize: 7, fontWeight: 800, color: barColorA,
+                    fontFamily: 'system-ui, sans-serif',
+                    textShadow: '0 1px 3px rgba(0,0,0,0.55)',
+                    whiteSpace: 'nowrap', lineHeight: 1,
+                  }}>{fmt(vA)}</div>
+                  {isPaired && vB !== null && (
+                    <div style={{
+                      fontSize: 7, fontWeight: 800, color: colorB,
+                      fontFamily: 'system-ui, sans-serif',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.55)',
+                      whiteSpace: 'nowrap', lineHeight: 1,
+                      alignSelf: 'flex-start',
+                    }}>{fmt(vB)}</div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+                  <div
+                    title={`${labelA}: ${fmt(vA)}`}
+                    className="chart-bar"
+                    style={{
+                      width: barW, height: hA,
+                      borderRadius: '4px 4px 0 0',
+                      background: `linear-gradient(0deg, ${barColorA}40, ${barColorA}e0)`,
+                      boxShadow: `0 0 8px ${barColorA}35`,
+                      animationDelay: `${i * 0.045}s`,
+                    }}
+                  />
+                  {isPaired && vB !== null && (
+                    <div
+                      title={`${labelB}: ${fmt(vB)}`}
+                      className="chart-bar"
+                      style={{
+                        width: barW, height: hB,
+                        borderRadius: '4px 4px 0 0',
+                        background: `linear-gradient(0deg, ${colorB}40, ${colorB}e0)`,
+                        boxShadow: `0 0 8px ${colorB}35`,
+                        animationDelay: `${i * 0.045 + 0.022}s`,
+                      }}
+                    />
                   )}
                 </div>
               </div>
             )
           })}
         </div>
-        <div style={{ display: 'flex', minWidth: rows.length * 46 }}>
+
+        <div style={{ display: 'flex', minWidth: rows.length * colW }}>
           {rows.map((r, i) => (
-            <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: t.faint }}>{r.trade_date_shamsi?.slice(5)}</div>
+            <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: t.faint }}>
+              {r.trade_date_shamsi?.slice(5)}
+            </div>
           ))}
         </div>
       </div>
