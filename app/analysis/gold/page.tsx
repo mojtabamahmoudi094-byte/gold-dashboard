@@ -59,7 +59,7 @@ export default function GoldAnalysisPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/gold-analysis')
+      const res = await fetch('/api/gold-analysis', { cache: 'no-store' })
       const json = await res.json()
       setData(json)
       setLastFetch(new Date())
@@ -69,7 +69,7 @@ export default function GoldAnalysisPage() {
 
   useEffect(() => {
     load()
-    const timer = setInterval(load, 5 * 60 * 1000)
+    const timer = setInterval(load, 60 * 1000)
     return () => clearInterval(timer)
   }, [load])
 
@@ -140,11 +140,9 @@ export default function GoldAnalysisPage() {
   }, [data, constants])
 
   const bg = '#060B14'
-  const panel = 'rgba(10,18,30,0.88)'
   const border = 'rgba(0,200,255,0.12)'
   const accent = '#00C8FF'
   const green = '#00E5A0'
-  const red = '#FF4D6A'
   const muted = '#5A7088'
   const text = '#E8F4FF'
 
@@ -366,7 +364,7 @@ export default function GoldAnalysisPage() {
         )}
 
         <div style={{ textAlign: 'center', fontSize: 10, color: muted, paddingBottom: 24 }}>
-          داده از TGJU · بروزرسانی خودکار هر ۵ دقیقه · تمام قیمت‌ها به تومان
+          داده از TGJU · بروزرسانی خودکار هر ۱ دقیقه · تمام قیمت‌ها به تومان
           {isAdmin && <span style={{ marginRight: 8, color: accent }}>· حالت ادمین فعال</span>}
         </div>
       </div>

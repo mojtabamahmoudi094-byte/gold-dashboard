@@ -74,9 +74,10 @@ export default function FundsPage() {
 
       if (!records) { setLoading(false); return }
 
-      // ترکیب داده‌ها
+      // ترکیب داده‌ها — pick highest id per asset (latest insert wins)
+      const recordsDesc = [...records].sort((a: any, b: any) => b.id - a.id)
       const combined = assets.map(asset => {
-        const rec = records.find(r => r.asset_id === asset.id)
+        const rec = recordsDesc.find((r: any) => r.asset_id === asset.id)
         return {
           symbol: asset.name,
           slug: asset.slug,
