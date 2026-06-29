@@ -21,6 +21,7 @@ export default function FundDetailPage() {
   const [isMobile, setIsMobile] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
   const historyPerPage = 10
+  const [user, setUser] = useState<any>(null)
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -35,9 +36,15 @@ export default function FundDetailPage() {
     checkMobile()
     window.addEventListener('resize', checkMobile)
 
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null)
+    })
+
     return () => {
       window.removeEventListener('themechange', handler)
       window.removeEventListener('resize', checkMobile)
+      subscription.unsubscribe()
     }
   }, [])
 
@@ -187,6 +194,9 @@ export default function FundDetailPage() {
             color={Number(buyPower) > 1 ? '#00E5A0' : Number(buyPower) < 1 ? '#FF4D6A' : t.textBright}
             tooltip="نسبت سرانه خریدار به سرانه فروشنده. بالای ۱ یعنی خریداران قوی‌ترند" />
         </div>
+
+        {/* ─── بخش گیت‌شده: فقط برای اعضا ─── */}
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* نمودار قیمت */}
         {history.length >= 3 && (
@@ -476,6 +486,64 @@ export default function FundDetailPage() {
             )}
           </div>
         )}
+
+          {/* blur gate — فقط وقتی کاربر لاگین نیست */}
+          {!user && history.length > 0 && (
+            <div style={{
+              position: 'absolute', inset: 0, zIndex: 20,
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              background: 'rgba(6,11,20,0.5)',
+              borderRadius: 14,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              minHeight: 280,
+            }}>
+              <div style={{
+                background: 'rgba(10,18,30,0.94)',
+                border: '0.5px solid rgba(0,200,255,0.22)',
+                borderRadius: 18,
+                padding: '32px 40px',
+                textAlign: 'center',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+                backdropFilter: 'blur(24px)',
+                boxShadow: '0 0 60px rgba(0,200,255,0.06), 0 16px 48px rgba(0,0,0,0.6)',
+                maxWidth: 360, margin: '0 auto',
+              }}>
+                <div style={{ fontSize: 32, lineHeight: 1 }}>🔒</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: '#E8F4FF' }}>
+                  نمودارها قفل است
+                </div>
+                <div style={{ fontSize: 12, color: '#5A7088', lineHeight: 1.9 }}>
+                  تحلیل کامل صندوق فقط برای اعضای بورسنج<br />
+                  در دسترس است. ثبت‌نام رایگان است.
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <a href="/auth" style={{
+                    display: 'inline-block', padding: '11px 28px', borderRadius: 10,
+                    background: 'linear-gradient(135deg, rgba(0,229,160,0.18), rgba(0,229,160,0.28))',
+                    border: '0.5px solid rgba(0,229,160,0.55)',
+                    color: '#00E5A0', fontSize: 13, fontWeight: 700,
+                    textDecoration: 'none',
+                  }}>
+                    ثبت‌نام رایگان
+                  </a>
+                  <a href="/auth" style={{
+                    display: 'inline-block', padding: '11px 24px', borderRadius: 10,
+                    background: 'rgba(0,200,255,0.08)',
+                    border: '0.5px solid rgba(0,200,255,0.3)',
+                    color: '#00C8FF', fontSize: 13, fontWeight: 600,
+                    textDecoration: 'none',
+                  }}>
+                    ورود
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+        {/* ─── پایان بخش گیت‌شده ─── */}
 
       </div>
 

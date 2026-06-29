@@ -1,8 +1,9 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 
 const NAV = [
   { label: 'خانه', href: '/' },
@@ -13,9 +14,11 @@ const NAV = [
 
 export default function Header() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isDark, setIsDark] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -24,8 +27,22 @@ export default function Header() {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
     checkMobile()
     window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      window.removeEventListener('resize', checkMobile)
+      subscription.unsubscribe()
+    }
   }, [])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
 
   // بستن منو وقتی صفحه عوض شد
   useEffect(() => { setMenuOpen(false) }, [pathname])
@@ -92,6 +109,35 @@ export default function Header() {
             }}>
               {isDark ? '☀' : '☾'}
             </button>
+
+            {user ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 4 }}>
+                <div style={{
+                  fontSize: 11, color: '#A0B4C8',
+                  background: 'rgba(0,200,255,0.06)',
+                  border: '0.5px solid rgba(0,200,255,0.2)',
+                  borderRadius: 8, padding: '5px 12px',
+                  maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {user.user_metadata?.first_name
+                    ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim()
+                    : user.email?.split('@')[0]}
+                </div>
+                <button onClick={handleLogout} style={{
+                  fontSize: 11, padding: '5px 12px', borderRadius: 8, cursor: 'pointer',
+                  background: 'rgba(255,77,106,0.08)', border: '0.5px solid rgba(255,77,106,0.3)',
+                  color: '#FF4D6A', fontFamily: 'inherit',
+                }}>خروج</button>
+              </div>
+            ) : (
+              <Link href="/auth" style={{
+                fontSize: 12, padding: '6px 16px', borderRadius: 8,
+                background: 'rgba(0,229,160,0.1)', border: '0.5px solid rgba(0,229,160,0.4)',
+                color: '#00E5A0', textDecoration: 'none', fontWeight: 700, marginRight: 4,
+              }}>
+                ورود / ثبت‌نام
+              </Link>
+            )}
           </div>
         )}
 
@@ -138,6 +184,30 @@ export default function Header() {
               </Link>
             )
           })}
+          <div style={{ borderTop: '0.5px solid rgba(0,200,255,0.1)', marginTop: 8, paddingTop: 8 }}>
+            {user ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px' }}>
+                <span style={{ fontSize: 13, color: '#A0B4C8' }}>
+                  {user.user_metadata?.first_name
+                    ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim()
+                    : user.email?.split('@')[0]}
+                </span>
+                <button onClick={handleLogout} style={{
+                  fontSize: 12, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
+                  background: 'rgba(255,77,106,0.08)', border: '0.5px solid rgba(255,77,106,0.3)',
+                  color: '#FF4D6A', fontFamily: 'inherit',
+                }}>خروج</button>
+              </div>
+            ) : (
+              <Link href="/auth" style={{
+                display: 'block', fontSize: 14, fontWeight: 700,
+                color: '#00E5A0', padding: '12px 16px', borderRadius: 8,
+                background: 'rgba(0,229,160,0.08)', textDecoration: 'none',
+              }}>
+                ورود / ثبت‌نام
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </header>
