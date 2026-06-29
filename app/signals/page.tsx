@@ -10,6 +10,8 @@ const safe = (v: any) => Number(v || 0)
 export default function SignalsPage() {
   const router = useRouter()
   const [signals, setSignals] = useState<any[]>([])
+  const [goldDates, setGoldDates] = useState<string[]>([])
+  const [goldValMap, setGoldValMap] = useState<Record<string, number>>({})
   const [isDark, setIsDark] = useState(true)
   const [loading, setLoading] = useState(true)
 
@@ -17,20 +19,64 @@ export default function SignalsPage() {
 
   useEffect(() => {
     const load = async () => {
+      // سیگنال‌ها
       const { data } = await supabase
         .from('signals')
         .select('*')
         .order('id', { ascending: false })
       if (data) setSignals(data)
+
+      // تاریخچه قیمت طلا برای محاسبه نتیجه سیگنال
+      const { data: goldAsset } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('slug', 'gold')
+        .single()
+      if (goldAsset) {
+        const { data: prices } = await supabase
+          .from('gold_funds')
+          .select('trade_date_shamsi, trade_value')
+          .eq('asset_id', goldAsset.id)
+          .order('id', { ascending: true })
+        if (prices && prices.length > 0) {
+          const dates = prices.map((p: any) => p.trade_date_shamsi as string)
+          const valMap: Record<string, number> = {}
+          prices.forEach((p: any) => { valMap[p.trade_date_shamsi] = safe(p.trade_value) })
+          setGoldDates(dates)
+          setGoldValMap(valMap)
+        }
+      }
+
       setLoading(false)
     }
     load()
   }, [])
 
+  // محاسبه نتیجه سیگنال: درصد تغییر ارزش معاملات ۱۰ روز معاملاتی بعد از سیگنال
+  const getOutcome = (signalDate: string, signalType: string): number | null => {
+    const N = 10
+    const idx = goldDates.findIndex(d => d >= signalDate)
+    if (idx < 0 || idx + N >= goldDates.length) return null
+    const entry = goldValMap[goldDates[idx]]
+    const exit_ = goldValMap[goldDates[idx + N]]
+    if (!entry || !exit_) return null
+    const ret = (exit_ - entry) / entry * 100
+    return signalType === 'فروش' ? -ret : ret
+  }
+
   // count by type
   const buyCount = signals.filter(s => s.signal_type === 'خرید').length
   const sellCount = signals.filter(s => s.signal_type === 'فروش').length
   const holdCount = signals.filter(s => s.signal_type === 'نگه‌داری').length
+
+  // win rate (بدون نگه‌داری)
+  const tradingSignals = signals.filter(s => s.signal_type !== 'نگه‌داری')
+  const evaluated = tradingSignals.filter(s => getOutcome(s.signal_date_shamsi, s.signal_type) !== null)
+  const won = evaluated.filter(s => (getOutcome(s.signal_date_shamsi, s.signal_type) ?? 0) > 0)
+  const winRate = evaluated.length > 0 ? Math.round(won.length / evaluated.length * 100) : null
+  const avgReturn = evaluated.length > 0
+    ? evaluated.reduce((sum, s) => sum + (getOutcome(s.signal_date_shamsi, s.signal_type) ?? 0), 0) / evaluated.length
+    : null
 
   return (
     <main style={{
@@ -82,10 +128,16 @@ export default function SignalsPage() {
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* SUMMARY CARDS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
           <SummaryCard t={t} label="سیگنال خرید" count={buyCount} color="#00E5A0" />
           <SummaryCard t={t} label="سیگنال فروش" count={sellCount} color="#FF4D6A" />
           <SummaryCard t={t} label="سیگنال نگه‌داری" count={holdCount} color={t.accent} />
+          {winRate !== null && (
+            <SummaryCard t={t} label="نرخ موفقیت" count={winRate} suffix="٪" color={winRate >= 60 ? '#00E5A0' : winRate >= 40 ? '#F59E0B' : '#FF4D6A'} />
+          )}
+          {avgReturn !== null && (
+            <SummaryCard t={t} label="میانگین بازده ۱۰ روزه" count={Math.abs(avgReturn)} suffix={`٪ ${avgReturn >= 0 ? '↑' : '↓'}`} color={avgReturn >= 0 ? '#00E5A0' : '#FF4D6A'} />
+          )}
         </div>
 
         {/* TABLE */}
@@ -106,7 +158,7 @@ export default function SignalsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
-                    {['تاریخ', 'سیگنال', 'اعتماد', 'دلیل', 'ارزش بازار'].map(h => (
+                    {['تاریخ', 'سیگنال', 'اعتماد', 'نتیجه ۱۰ روزه', 'دلیل', 'ارزش بازار'].map(h => (
                       <th key={h} style={{ color: t.muted, fontWeight: 500, textAlign: 'right', padding: '8px 10px', borderBottom: `0.5px solid ${t.border}`, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -116,6 +168,8 @@ export default function SignalsPage() {
                     const sigColor = s.signal_type === 'خرید' ? '#00E5A0' : s.signal_type === 'فروش' ? '#FF4D6A' : t.accent
                     const conf = typeof s.confidence === 'number' ? s.confidence : null
                     const confColor = conf === null ? t.faint : conf >= 70 ? '#00E5A0' : conf >= 40 ? '#F59E0B' : '#FF4D6A'
+                    const outcome = s.signal_type !== 'نگه‌داری' ? getOutcome(s.signal_date_shamsi, s.signal_type) : null
+                    const outcomeColor = outcome === null ? t.faint : outcome > 0 ? '#00E5A0' : '#FF4D6A'
                     return (
                       <tr key={s.id} style={{ borderBottom: `0.5px solid ${t.border}` }}>
                         <td style={{ padding: '10px', color: t.text, whiteSpace: 'nowrap' }}>{s.signal_date_shamsi}</td>
@@ -134,6 +188,19 @@ export default function SignalsPage() {
                             </div>
                           ) : (
                             <span style={{ color: t.faint, fontSize: 10 }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                          {outcome !== null ? (
+                            <span style={{
+                              display: 'inline-block', fontFamily: 'system-ui, sans-serif',
+                              fontSize: 11, fontWeight: 800, color: outcomeColor,
+                              background: `${outcomeColor}15`, borderRadius: 4, padding: '2px 8px',
+                            }}>
+                              {outcome > 0 ? '+' : ''}{outcome.toFixed(1)}٪
+                            </span>
+                          ) : (
+                            <span style={{ color: t.faint, fontSize: 10 }}>در انتظار</span>
                           )}
                         </td>
                         <td style={{ padding: '10px', color: t.muted, fontSize: 11, maxWidth: 260 }}>
@@ -157,11 +224,14 @@ export default function SignalsPage() {
   )
 }
 
-function SummaryCard({ label, count, color, t }: any) {
+function SummaryCard({ label, count, color, suffix, t }: any) {
   return (
     <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
       <div style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 700, color }}>{count.toLocaleString('fa-IR')}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color, fontFamily: 'system-ui, sans-serif' }}>
+        {typeof count === 'number' ? count.toLocaleString('fa-IR', { maximumFractionDigits: 1 }) : count}
+        {suffix && <span style={{ fontSize: 14, marginRight: 2 }}>{suffix}</span>}
+      </div>
     </div>
   )
 }

@@ -17,6 +17,7 @@ export default function FundsPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [isMobile, setIsMobile] = useState(false)
   const [category, setCategory] = useState<string>('طلا')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -156,8 +157,11 @@ export default function FundsPage() {
     load()
   }, [])
 
-  // فیلتر بر اساس دسته‌بندی
-  const funds = allFunds.filter(f => f.category === category)
+  // فیلتر بر اساس دسته‌بندی و جستجو
+  const q = searchQuery.trim()
+  const funds = allFunds
+    .filter(f => f.category === category)
+    .filter(f => !q || f.symbol.includes(q) || f.slug.toLowerCase().includes(q.toLowerCase()))
 
   // محاسبه‌ی امتیاز هوشمند هر صندوق
   const calcScore = (f: any) => {
@@ -231,9 +235,10 @@ export default function FundsPage() {
           </div>
         </div>
 
-        {/* تب‌های دسته‌بندی */}
-        <div style={{ display: 'flex', gap: 6, direction: 'rtl' }}>
-          {CATEGORIES.map(cat => (
+        {/* نوار جستجو + دسته‌بندی */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 6, direction: 'rtl', flexWrap: 'wrap' }}>
+            {CATEGORIES.map(cat => (
             <button
               key={cat.key}
               onClick={() => setCategory(cat.key)}
@@ -249,7 +254,33 @@ export default function FundsPage() {
             >
               {cat.emoji} {cat.label}
             </button>
-          ))}
+            ))}
+          </div>
+          {/* جستجوی نماد */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="text"
+              placeholder="جستجوی نماد..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                background: t.inputBg, border: `0.5px solid ${searchQuery ? t.accent : t.border}`,
+                borderRadius: 8, padding: '7px 14px', color: t.text,
+                fontSize: 12, fontFamily: 'Vazirmatn, inherit', outline: 'none',
+                width: 160, direction: 'rtl', transition: 'border 0.2s',
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{
+                  fontSize: 11, padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                  background: 'rgba(255,77,106,0.1)', border: '0.5px solid rgba(255,77,106,0.3)',
+                  color: '#FF4D6A', fontFamily: 'inherit',
+                }}
+              >✕</button>
+            )}
+          </div>
         </div>
 
         {/* کارت‌های خلاصه */}

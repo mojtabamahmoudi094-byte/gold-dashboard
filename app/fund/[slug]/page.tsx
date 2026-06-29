@@ -188,6 +188,11 @@ export default function FundDetailPage() {
             tooltip="نسبت سرانه خریدار به سرانه فروشنده. بالای ۱ یعنی خریداران قوی‌ترند" />
         </div>
 
+        {/* نمودار قیمت */}
+        {history.length >= 3 && (
+          <FundPriceChart t={t} history={history} />
+        )}
+
         {/* جدول معاملات حقیقی */}
         <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
           <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 12 }}>
@@ -514,6 +519,136 @@ function StatRow({ label, value, color }: any) {
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
       <span style={{ color: '#A0B4C8' }}>{label}</span>
       <span style={{ color, fontWeight: 600 }}>{value}</span>
+    </div>
+  )
+}
+
+function FundPriceChart({ t, history }: { t: any, history: any[] }) {
+  if (!history || history.length < 3) return null
+
+  const prices = history.map(r => safe(r.price_close))
+  const volumes = history.map(r => safe(r.volume))
+  const n = prices.length
+
+  const minP = Math.min(...prices) * 0.998
+  const maxP = Math.max(...prices) * 1.002
+  const maxV = Math.max(...volumes, 1)
+
+  const W = 560, H = 130, PX = 52, PY = 18
+  const VH = 28
+  const chartH = H - PY - 6
+
+  const xOf = (i: number) => PX + (i / (n - 1)) * (W - PX - 10)
+  const yOf = (v: number) => PY + (1 - (v - minP) / (maxP - minP)) * chartH
+
+  const linePath = prices.reduce((acc, p, i) => {
+    const x = xOf(i), y = yOf(p)
+    if (i === 0) return `M${x.toFixed(1)},${y.toFixed(1)}`
+    const px2 = xOf(i - 1), py2 = yOf(prices[i - 1])
+    const mx = ((x + px2) / 2).toFixed(1)
+    return `${acc} C${mx},${py2.toFixed(1)} ${mx},${y.toFixed(1)} ${x.toFixed(1)},${y.toFixed(1)}`
+  }, '')
+
+  const bottomY = PY + chartH
+  const areaPath = `${linePath} L${xOf(n - 1)},${bottomY} L${xOf(0)},${bottomY} Z`
+
+  const totalChange = ((prices[n - 1] - prices[0]) / prices[0]) * 100
+  const lineColor = totalChange >= 0 ? '#00E5A0' : '#FF4D6A'
+
+  // Y-axis ticks
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => ({
+    y: PY + f * chartH,
+    val: (maxP - f * (maxP - minP)).toLocaleString('fa-IR', { maximumFractionDigits: 0 }),
+  }))
+
+  // X-axis date labels: first, last, and every ~5th
+  const step = Math.max(1, Math.round(n / 5))
+
+  return (
+    <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderTop: `2px solid ${lineColor}55`, borderRadius: 14, padding: '14px 16px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>
+          نمودار قیمت پایانی
+          <span style={{ fontSize: 10, color: t.faint, marginRight: 8 }}>· {n} روز</span>
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 800, color: lineColor, fontFamily: 'system-ui, sans-serif' }}>
+          {totalChange >= 0 ? '+' : ''}{totalChange.toFixed(2)}٪
+        </span>
+      </div>
+      <div style={{ overflowX: 'auto', direction: 'ltr' }}>
+        <svg viewBox={`0 0 ${W} ${H + VH + 22}`} style={{ width: '100%', minWidth: 300, display: 'block', overflow: 'visible' }}>
+          <defs>
+            <linearGradient id="pgFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lineColor} stopOpacity="0.3" />
+              <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
+          {/* Y grid + labels */}
+          {yTicks.map((tk, i) => (
+            <g key={i}>
+              <line x1={PX} y1={tk.y} x2={W - 10} y2={tk.y} stroke={t.border} strokeWidth={0.5} />
+              <text x={PX - 4} y={tk.y + 4} textAnchor="end" fontSize={8}
+                fill={t.faint} fontFamily="system-ui, sans-serif">{tk.val}</text>
+            </g>
+          ))}
+
+          {/* Area fill */}
+          <path d={areaPath} fill="url(#pgFill)" />
+
+          {/* Price line */}
+          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2.2" strokeLinecap="round" />
+
+          {/* Dot on last price */}
+          <circle cx={xOf(n - 1)} cy={yOf(prices[n - 1])} r={3.5} fill={lineColor} />
+          <circle cx={xOf(n - 1)} cy={yOf(prices[n - 1])} r={7} fill={lineColor} fillOpacity={0.18} />
+
+          {/* Last price label */}
+          {(() => {
+            const lx = xOf(n - 1), ly = yOf(prices[n - 1])
+            const label = prices[n - 1].toLocaleString('fa-IR', { maximumFractionDigits: 0 })
+            const lw = label.length * 5.8 + 10
+            return (
+              <g>
+                <rect x={lx + 8} y={ly - 9} width={lw} height={14} rx={3} fill="rgba(0,0,0,0.82)" />
+                <rect x={lx + 8} y={ly - 9} width={lw} height={14} rx={3} fill="none" stroke={lineColor} strokeWidth={0.5} opacity={0.7} />
+                <text x={lx + 8 + lw / 2} y={ly + 1} textAnchor="middle"
+                  fontSize={8} fontWeight="800" fill="#fff" fontFamily="system-ui, sans-serif">
+                  {label}
+                </text>
+              </g>
+            )
+          })()}
+
+          {/* Volume bars */}
+          <line x1={PX} y1={H + VH} x2={W - 10} y2={H + VH} stroke={t.border} strokeWidth={0.5} />
+          {history.map((r, i) => {
+            const bh = Math.max((safe(r.volume) / maxV) * VH, 2)
+            const bw = Math.max((W - PX - 10) / n - 1, 3)
+            return (
+              <rect key={i}
+                x={xOf(i) - bw / 2} y={H + VH - bh} width={bw} height={bh}
+                fill={lineColor} opacity={0.3} rx={1}>
+                <title>{`حجم: ${safe(r.volume).toLocaleString('fa-IR')}`}</title>
+              </rect>
+            )
+          })}
+          <text x={PX - 4} y={H + VH - 4} textAnchor="end" fontSize={7.5} fill={t.faint} fontFamily="system-ui">حجم</text>
+
+          {/* Date labels */}
+          {history.map((r, i) => {
+            const show = i === 0 || i === n - 1 || i % step === 0
+            if (!show) return null
+            return (
+              <text key={i} x={xOf(i)} y={H + VH + 16}
+                textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
+                fontSize={8.5} fill={t.faint} fontFamily="Vazirmatn, Arial, sans-serif">
+                {r.trade_date_shamsi?.slice(5)}
+              </text>
+            )
+          })}
+        </svg>
+      </div>
     </div>
   )
 }
