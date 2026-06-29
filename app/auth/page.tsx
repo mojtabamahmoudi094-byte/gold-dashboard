@@ -14,6 +14,7 @@ export default function AuthPage() {
   const [tab, setTab] = useState<Tab>('register')
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<Msg | null>(null)
+  const [registered, setRegistered] = useState(false)
 
   // login fields
   const [loginEmail, setLoginEmail] = useState('')
@@ -57,10 +58,15 @@ export default function AuthPage() {
     }
     setLoading(true)
     setMsg(null)
+    const redirectTo = typeof window !== 'undefined'
+      ? window.location.origin + '/auth'
+      : '/auth'
+
     const { error } = await supabase.auth.signUp({
       email: regEmail,
       password: regPassword,
       options: {
+        emailRedirectTo: redirectTo,
         data: { first_name: firstName, last_name: lastName, phone, province, city },
       },
     })
@@ -74,8 +80,7 @@ export default function AuthPage() {
           : 'خطا در ثبت‌نام. لطفاً دوباره تلاش کنید'
       setMsg({ type: 'error', text: errMsg })
     } else {
-      setMsg({ type: 'success', text: 'ثبت‌نام موفق! اگر تأیید ایمیل فعال است، لینک ارسال شد. در غیر این صورت هم‌اکنون وارد شده‌اید.' })
-      setTimeout(() => router.push('/funds'), 2500)
+      setRegistered(true)
     }
   }
 
@@ -136,6 +141,48 @@ export default function AuthPage() {
         boxShadow: '0 0 100px rgba(0,200,255,0.05), 0 24px 80px rgba(0,0,0,0.6)',
         margin: '24px',
       }}>
+
+        {registered ? (
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: 'rgba(0,229,160,0.1)',
+              border: '0.5px solid rgba(0,229,160,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 28,
+            }}>✉️</div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#00E5A0', marginBottom: 8 }}>ثبت‌نام موفق!</div>
+              <div style={{ fontSize: 13, color: '#A0B4C8', lineHeight: 1.8 }}>
+                لینک تأیید به ایمیل <span style={{ color: '#E8F4FF', fontWeight: 600 }}>{regEmail}</span> ارسال شد.
+              </div>
+              <div style={{ fontSize: 12, color: '#5A7088', marginTop: 6, lineHeight: 1.7 }}>
+                ایمیل را باز کنید، روی لینک تأیید کلیک کنید، سپس وارد شوید.
+              </div>
+            </div>
+            <div style={{
+              padding: '12px 16px', borderRadius: 10,
+              background: 'rgba(0,229,160,0.06)',
+              border: '0.5px solid rgba(0,229,160,0.2)',
+              fontSize: 12, color: '#5A7088', lineHeight: 1.7, textAlign: 'right', width: '100%',
+            }}>
+              اسپم رو هم چک کنید اگر ایمیل نیومد.
+            </div>
+            <button
+              onClick={() => { setRegistered(false); setTab('login'); setMsg(null) }}
+              style={{
+                width: '100%', padding: '13px', borderRadius: 11,
+                fontSize: 14, fontWeight: 700,
+                background: 'linear-gradient(135deg, rgba(0,200,255,0.13), rgba(0,200,255,0.22))',
+                border: '0.5px solid rgba(0,200,255,0.5)',
+                color: '#00C8FF', cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              ورود به سایت
+            </button>
+          </div>
+        ) : (<>
 
         {/* logo row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
@@ -319,6 +366,7 @@ export default function AuthPage() {
             </div>
           </form>
         )}
+        </>)}
       </div>
 
       <style>{`
