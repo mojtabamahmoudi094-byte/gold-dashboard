@@ -22,9 +22,9 @@ export default function FundsPage() {
   const t: any = isDark ? darkTheme : lightTheme
 
   const CATEGORIES = [
-    { key: 'طلا', label: 'صندوق‌های طلا', emoji: '🥇' },
-    { key: 'نقره', label: 'صندوق‌های نقره', emoji: '🥈' },
-    { key: 'زعفران', label: 'صندوق‌های زعفران', emoji: '🌿' },
+    { key: 'طلا', label: 'طلا' },
+    { key: 'نقره', label: 'نقره' },
+    { key: 'زعفران', label: 'زعفران' },
   ]
 
   // خواندن قالب از حافظه
@@ -237,24 +237,25 @@ export default function FundsPage() {
         </div>
 
         {/* نوار جستجو + دسته‌بندی */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 6, direction: 'rtl', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 6, direction: 'rtl' }}>
             {CATEGORIES.map(cat => (
-            <button
-              key={cat.key}
-              onClick={() => setCategory(cat.key)}
-              style={{
-                fontSize: 12, padding: isMobile ? '8px 12px' : '8px 20px',
-                borderRadius: 10, cursor: 'pointer',
-                background: category === cat.key ? `${t.accent}1A` : 'transparent',
-                border: `0.5px solid ${category === cat.key ? `${t.accent}66` : t.border}`,
-                color: category === cat.key ? t.accent : t.muted,
-                fontFamily: 'inherit', fontWeight: category === cat.key ? 700 : 500,
-                transition: 'all 0.2s',
-              }}
-            >
-              {cat.emoji} {cat.label}
-            </button>
+              <button
+                key={cat.key}
+                onClick={() => setCategory(cat.key)}
+                style={{
+                  flex: isMobile ? '1' : undefined,
+                  fontSize: 12, padding: '9px 16px',
+                  borderRadius: 10, cursor: 'pointer',
+                  background: category === cat.key ? `${t.accent}1A` : 'transparent',
+                  border: `0.5px solid ${category === cat.key ? `${t.accent}66` : t.border}`,
+                  color: category === cat.key ? t.accent : t.muted,
+                  fontFamily: 'inherit', fontWeight: category === cat.key ? 700 : 500,
+                  transition: 'all 0.2s',
+                }}
+              >
+                {cat.label}
+              </button>
             ))}
           </div>
           {/* جستجوی نماد */}
@@ -266,20 +267,21 @@ export default function FundsPage() {
               onChange={e => setSearchQuery(e.target.value)}
               style={{
                 background: t.inputBg, border: `0.5px solid ${searchQuery ? t.accent : t.border}`,
-                borderRadius: 8, padding: '7px 14px', color: t.text,
+                borderRadius: 8, padding: '9px 14px', color: t.text,
                 fontSize: 12, fontFamily: 'Vazirmatn, inherit', outline: 'none',
-                width: 160, direction: 'rtl', transition: 'border 0.2s',
+                width: isMobile ? '100%' : 160, flex: isMobile ? 1 : undefined,
+                direction: 'rtl', transition: 'border 0.2s',
               }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 style={{
-                  fontSize: 11, padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                  fontSize: 11, padding: '7px 12px', borderRadius: 6, cursor: 'pointer',
                   background: 'rgba(255,77,106,0.1)', border: '0.5px solid rgba(255,77,106,0.3)',
-                  color: '#FF4D6A', fontFamily: 'inherit',
+                  color: '#FF4D6A', fontFamily: 'inherit', whiteSpace: 'nowrap',
                 }}
-              >✕</button>
+              >پاک کن</button>
             )}
           </div>
         </div>
@@ -403,20 +405,126 @@ export default function FundsPage() {
           </div>
         )}
 
-        {/* جدول اصلی */}
-        <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
+        {/* جدول / کارت اصلی */}
+        <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: isMobile ? '12px' : '16px 18px', backdropFilter: 'blur(12px)' }}>
 
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center', color: t.muted }}>در حال بارگذاری...</div>
           ) : funds.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: t.muted }}>داده‌ای یافت نشد</div>
+          ) : isMobile ? (
+            /* ── کارت موبایل ── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* مرتب‌سازی موبایل */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+                {[
+                  { key: 'score', label: 'امتیاز' },
+                  { key: 'changePct', label: 'تغییر' },
+                  { key: 'tradeValue', label: 'ارزش' },
+                ].map(col => (
+                  <button
+                    key={col.key}
+                    onClick={() => toggleSort(col.key)}
+                    style={{
+                      fontSize: 11, padding: '5px 12px', borderRadius: 8, cursor: 'pointer',
+                      background: sortBy === col.key ? `${t.accent}15` : 'transparent',
+                      border: `0.5px solid ${sortBy === col.key ? `${t.accent}50` : t.border}`,
+                      color: sortBy === col.key ? t.accent : t.muted,
+                      fontFamily: 'inherit', transition: 'all 0.15s',
+                    }}
+                  >
+                    {col.label}{sortArrow(col.key)}
+                  </button>
+                ))}
+              </div>
+
+              {sorted.map((f, i) => {
+                const isPositive = f.changePct > 0
+                const isNegative = f.changePct < 0
+                const chgColor = isPositive ? '#00E5A0' : isNegative ? '#FF4D6A' : t.muted
+                const scoreColor = f.score >= 60 ? '#00E5A0' : f.score >= 40 ? '#F59E0B' : '#FF4D6A'
+                const scoreBg = f.score >= 60 ? 'rgba(0,229,160,0.1)' : f.score >= 40 ? 'rgba(245,158,11,0.1)' : 'rgba(255,77,106,0.1)'
+                const netFlow = (f.buyIVolume - f.sellIVolume) * f.priceClose
+                const netFlowBT = Math.round(netFlow / 1_000_000_000 * 10) / 10
+                return (
+                  <Link
+                    key={i}
+                    href={`/fund/${f.slug}`}
+                    style={{
+                      textDecoration: 'none',
+                      display: 'block',
+                      background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                      border: `0.5px solid ${t.border}`,
+                      borderRadius: 10,
+                      padding: '12px 14px',
+                      transition: 'background 0.15s, border-color 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = isDark ? 'rgba(0,200,255,0.05)' : 'rgba(0,120,170,0.05)'
+                      e.currentTarget.style.borderColor = `${t.accent}40`
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'
+                      e.currentTarget.style.borderColor = t.border
+                    }}
+                  >
+                    {/* ردیف اول: نماد + امتیاز + تغییر */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: t.accent }}>{f.symbol}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          fontSize: 13, fontWeight: 700, color: chgColor,
+                          background: isPositive ? 'rgba(0,229,160,0.1)' : isNegative ? 'rgba(255,77,106,0.1)' : `${t.accent}10`,
+                          padding: '2px 10px', borderRadius: 6,
+                        }}>
+                          {isPositive ? '+' : ''}{f.changePct.toFixed(2)}٪
+                        </span>
+                        <span style={{
+                          fontSize: 12, fontWeight: 700, color: scoreColor,
+                          background: scoreBg, padding: '2px 8px', borderRadius: 6,
+                        }}>
+                          {f.score}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ردیف دوم: شبکه متریک‌ها */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>قیمت پایانی</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{f.priceClose.toLocaleString('fa-IR')}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>ارزش معاملات</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{fmtVal(f.tradeValue)} <span style={{ fontSize: 10, color: t.faint }}>م.ت</span></div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>خریدار / فروشنده</div>
+                        <div style={{ fontSize: 13 }}>
+                          <span style={{ color: '#00E5A0', fontWeight: 600 }}>{f.buyCountI.toLocaleString('fa-IR')}</span>
+                          <span style={{ color: t.faint }}> / </span>
+                          <span style={{ color: '#FF4D6A', fontWeight: 600 }}>{f.sellCountI.toLocaleString('fa-IR')}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>جریان پول حقیقی</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: netFlow >= 0 ? '#00E5A0' : '#FF4D6A' }}>
+                          {netFlow >= 0 ? '+' : ''}{netFlowBT.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
           ) : (
+            /* ── جدول دسکتاپ ── */
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
                     {[
-                      { key: 'score', label: 'امتیاز 🤖' },
+                      { key: 'score', label: 'امتیاز' },
                       { key: 'symbol', label: 'نماد' },
                       { key: 'priceClose', label: 'قیمت پایانی' },
                       { key: 'priceLast', label: 'آخرین قیمت' },
@@ -456,7 +564,7 @@ export default function FundsPage() {
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
                         <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                          <span title="امتیاز هوشمند از ۰ تا ۱۰۰ بر اساس: تغییر قیمت (۲۰٪)، جریان پول حقیقی (۲۵٪)، قدرت خریدار (۲۰٪)، ارزش معاملات (۱۵٪)، نسبت خریدار به فروشنده (۲۰٪)" style={{
+                          <span title="امتیاز هوشمند از ۰ تا ۱۰۰" style={{
                             display: 'inline-block', padding: '3px 10px', borderRadius: 6,
                             fontSize: 12, fontWeight: 800, cursor: 'help',
                             fontFamily: 'system-ui, sans-serif',
