@@ -343,6 +343,64 @@ export default function FundDetailPage() {
           </div>
         )}
 
+        {/* ۸ نمودار تحلیلی */}
+        {history.length > 0 && (() => {
+          const h10 = history.slice(-10)
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+
+              <BarChartPanel t={t} title="ارزش معاملات ۱۰ روز" subtitle="میلیارد تومان"
+                rows={h10} colorA={t.accent} labelA="ارزش"
+                getA={r => safe(r.trade_value)} />
+
+              <BarChartPanel t={t} title="حجم معاملات ۱۰ روز" subtitle="واحد"
+                rows={h10} colorA="#A78BFA" labelA="حجم"
+                getA={r => safe(r.volume)} />
+
+              <BarChartPanel t={t} title="قدرت خریدار حقیقی ۱۰ روز" subtitle="نسبت سرانه خرید / فروش"
+                rows={h10} colorA="#00E5A0" labelA="قدرت"
+                getA={r => {
+                  const bc = safe(r.buy_count_i), sc = safe(r.sell_count_i)
+                  const bA = bc > 0 ? safe(r.buy_i_volume) / bc : 0
+                  const sA = sc > 0 ? safe(r.sell_i_volume) / sc : 0
+                  return sA > 0 ? Math.round(bA / sA * 100) / 100 : 0
+                }}
+                getColorA={r => {
+                  const bc = safe(r.buy_count_i), sc = safe(r.sell_count_i)
+                  const bA = bc > 0 ? safe(r.buy_i_volume) / bc : 0
+                  const sA = sc > 0 ? safe(r.sell_i_volume) / sc : 0
+                  return sA > 0 && bA / sA >= 1 ? '#00E5A0' : '#FF4D6A'
+                }} />
+
+              <BarChartPanel t={t} title="تعداد کدهای معاملاتی حقیقی" subtitle="خریدار و فروشنده"
+                rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خریدار" labelB="فروشنده"
+                getA={r => safe(r.buy_count_i)}
+                getB={r => safe(r.sell_count_i)} />
+
+              <BarChartPanel t={t} title="ارزش خرید و فروش حقیقی" subtitle="میلیارد تومان"
+                rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
+                getA={r => Math.round(safe(r.buy_i_volume) * safe(r.price_close) / 1_000_000_000 * 10) / 10}
+                getB={r => Math.round(safe(r.sell_i_volume) * safe(r.price_close) / 1_000_000_000 * 10) / 10} />
+
+              <BarChartPanel t={t} title="ارزش خرید و فروش حقوقی" subtitle="میلیارد تومان"
+                rows={h10} colorA="#60A5FA" colorB="#F59E0B" labelA="خرید" labelB="فروش"
+                getA={r => Math.round(Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) * safe(r.price_close) / 1_000_000_000 * 10) / 10}
+                getB={r => Math.round(Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) * safe(r.price_close) / 1_000_000_000 * 10) / 10} />
+
+              <BarChartPanel t={t} title="حجم خرید و فروش حقیقی" subtitle="واحد"
+                rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
+                getA={r => safe(r.buy_i_volume)}
+                getB={r => safe(r.sell_i_volume)} />
+
+              <BarChartPanel t={t} title="حجم خرید و فروش حقوقی" subtitle="واحد"
+                rows={h10} colorA="#60A5FA" colorB="#F59E0B" labelA="خرید" labelB="فروش"
+                getA={r => Math.max(safe(r.volume) - safe(r.buy_i_volume), 0)}
+                getB={r => Math.max(safe(r.volume) - safe(r.sell_i_volume), 0)} />
+
+            </div>
+          )
+        })()}
+
         {/* تاریخچه */}
         {history.length > 1 && (
           <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
@@ -445,6 +503,77 @@ function StatRow({ label, value, color }: any) {
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
       <span style={{ color: '#A0B4C8' }}>{label}</span>
       <span style={{ color, fontWeight: 600 }}>{value}</span>
+    </div>
+  )
+}
+
+function BarChartPanel({ t, title, subtitle, rows, getA, getB, labelA, labelB, colorA, colorB, getColorA }: {
+  t: any, title: string, subtitle?: string, rows: any[],
+  getA: (r: any) => number, getB?: (r: any) => number,
+  labelA: string, labelB?: string,
+  colorA: string, colorB?: string,
+  getColorA?: (r: any) => string,
+}) {
+  if (!rows || rows.length === 0) return null
+
+  const fmt = (v: number) => {
+    if (!isFinite(v) || isNaN(v)) return '۰'
+    if (v >= 1_000_000) return `${(v / 1_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}م`
+    if (v >= 1_000) return `${(v / 1_000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}ه`
+    return v.toLocaleString('fa-IR', { maximumFractionDigits: 2 })
+  }
+
+  const allVals = rows.flatMap(r => getB ? [getA(r), getB(r)] : [getA(r)]).filter(v => isFinite(v) && !isNaN(v))
+  const maxVal = Math.max(...allVals, 0.001)
+  const barMaxH = 80
+  const barW = getB ? 11 : 20
+
+  return (
+    <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', backdropFilter: 'blur(12px)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+        <div>
+          <span style={{ fontSize: 11, color: t.muted }}>{title}</span>
+          {subtitle && <span style={{ fontSize: 10, color: t.faint, marginRight: 6 }}>{subtitle}</span>}
+        </div>
+        {getB && (
+          <div style={{ display: 'flex', gap: 10, fontSize: 10 }}>
+            <span style={{ color: colorA }}>■ {labelA}</span>
+            <span style={{ color: colorB }}>■ {labelB}</span>
+          </div>
+        )}
+      </div>
+      <div style={{ overflowX: 'auto', direction: 'ltr' }}>
+        <div style={{ display: 'flex', minWidth: rows.length * 46, height: barMaxH + 30, alignItems: 'flex-end', paddingBottom: 18 }}>
+          {rows.map((r, i) => {
+            const vA = getA(r)
+            const vB = getB ? getB(r) : null
+            const hA = Math.max((vA / maxVal) * barMaxH, 2)
+            const hB = vB !== null ? Math.max((vB / maxVal) * barMaxH, 2) : 0
+            const barColorA = getColorA ? getColorA(r) : colorA
+            return (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ fontSize: 7, fontWeight: 800, color: barColorA, marginBottom: 2, fontFamily: 'system-ui, sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>{fmt(vA)}</div>
+                    <div title={`${labelA}: ${fmt(vA)}`} style={{ width: barW, height: hA, borderRadius: '3px 3px 0 0', background: `linear-gradient(0deg, ${barColorA}55, ${barColorA}cc)` }} />
+                  </div>
+                  {getB && vB !== null && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div style={{ fontSize: 7, fontWeight: 800, color: colorB, marginBottom: 2, fontFamily: 'system-ui, sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>{fmt(vB)}</div>
+                      <div title={`${labelB}: ${fmt(vB)}`} style={{ width: barW, height: hB, borderRadius: '3px 3px 0 0', background: `linear-gradient(0deg, ${colorB}55, ${colorB}cc)` }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', minWidth: rows.length * 46 }}>
+          {rows.map((r, i) => (
+            <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: t.faint }}>{r.trade_date_shamsi?.slice(5)}</div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
