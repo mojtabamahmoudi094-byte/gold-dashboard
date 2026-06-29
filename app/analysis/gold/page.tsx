@@ -325,11 +325,11 @@ export default function GoldAnalysisPage() {
               </thead>
               <tbody>
                 <CoinRow
-                  label="تمام سکه" weight={derived?.coins?.full?.weight ?? 8.13}
+                  label="تمام سکه بهار" weight={derived?.coins?.full?.weight ?? 8.13}
                   fair={derived?.coins?.full?.fair}
                   market={derived?.coins?.full?.market}
                   bubble={derived?.coins?.full?.bubble}
-                  marketNote="≈ نیم × ۲"
+                  marketNote={data?.coins?.full?.marketIsEstimate ? '≈ نیم × ۲' : null}
                   border={border} muted={muted} text={text}
                 />
                 <CoinRow

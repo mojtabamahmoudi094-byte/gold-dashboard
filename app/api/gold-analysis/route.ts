@@ -1,5 +1,29 @@
 import { NextResponse } from 'next/server'
 
+// ── nerkh.io — full coin market price (SEKE_BAHAR) ──
+// Prices returned in تومان. Token expires monthly — update NERKH_TOKEN env var.
+async function fetchNerkhGold() {
+  const token = process.env.NERKH_TOKEN
+  if (!token) return null
+  try {
+    const res = await fetch('https://api.nerkh.io/v1/prices/json/gold', {
+      headers: { Authorization: `Bearer ${token}` },
+      next: { revalidate: 300 },
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    const prices = json?.data?.prices
+    if (!prices) return null
+    return {
+      sekkeBahar: parseFloat(prices.SEKE_BAHAR?.current) || null,   // تمام سکه بهار آزادی — تومان
+      sekkeEmami: parseFloat(prices.SEKE_EMAMI?.current) || null,   // سکه امامی — تومان
+      updatedAt: prices.SEKE_BAHAR?.update ?? null,
+    }
+  } catch {
+    return null
+  }
+}
+
 // TGJU indicator slugs → what they represent
 const INDICATORS = {
   ons: 'ons',          // Gold USD/oz
@@ -46,8 +70,11 @@ async function fetchIndicator(slug: string) {
 
 export async function GET() {
   try {
-    const [ons, silver, dollar, dirham, mesghal, geram24, geram18, nim, rob] =
-      await Promise.all(Object.values(INDICATORS).map(fetchIndicator))
+    const [[ons, silver, dollar, dirham, mesghal, geram24, geram18, nim, rob], nerkh] =
+      await Promise.all([
+        Promise.all(Object.values(INDICATORS).map(fetchIndicator)),
+        fetchNerkhGold(),
+      ])
 
     // IRR → Toman: divide by 10
     const t = (v: number | null | undefined) =>
@@ -102,8 +129,12 @@ export async function GET() {
     const impliedDollar = (marketToman: number | null, goldOz: number | null, ozFraction: number) =>
       marketToman && goldOz ? (marketToman / ozFraction) / goldOz : null
 
-    // تمام سکه: TGJU endpoint broken — estimate from half coin × 2
-    const marketFull = marketHalf != null ? marketHalf * 2 : null
+    // تمام سکه: nerkh.io SEKE_BAHAR (already in تومان), fallback to نیم × 2
+    const marketFull: number | null =
+      nerkh?.sekkeBahar != null
+        ? nerkh.sekkeBahar
+        : marketHalf != null ? marketHalf * 2 : null
+    const fullMarketIsEstimate = nerkh?.sekkeBahar == null
 
     return NextResponse.json({
       updatedAt: new Date().toISOString(),
@@ -147,7 +178,8 @@ export async function GET() {
           market: marketFull,
           bubble: bubble(marketFull, fairFull),
           weight: fullCoinW,
-          marketIsEstimate: true, // derived from نیم سکه × 2
+          marketIsEstimate: fullMarketIsEstimate,
+          marketSource: fullMarketIsEstimate ? 'نیم × ۲' : 'nerkh.io',
         },
         half: {
           fair: fairHalf,
