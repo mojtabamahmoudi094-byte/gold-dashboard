@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 const NAV = [
   { label: 'خانه', href: '/' },
   { label: 'صندوق‌ها', href: '/funds' },
+  { label: 'تحلیل', href: '/analysis' },
   { label: 'مقایسه', href: '/compare' },
   { label: 'تاریخچه سیگنال', href: '/signals' },
 ]
