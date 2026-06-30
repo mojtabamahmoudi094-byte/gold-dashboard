@@ -86,29 +86,30 @@ function isMarketOpen() {
 // ── Jalali date ──────────────────────────────────────────────────────────────
 // محاسبه ساده بدون کتابخانه خارجی
 function toJalali(gy, gm, gd) {
-  const g_d_no = 365 * gy + Math.floor((gy + 3) / 4) - Math.floor((gy + 99) / 100) + Math.floor((gy + 399) / 400)
-  const g_days = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-  if (gy % 4 === 0 && (gy % 100 !== 0 || gy % 400 === 0)) g_days[2] = 29
-  let g_d_no2 = g_d_no
-  for (let i = 1; i < gm; i++) g_d_no2 += g_days[i]
-  g_d_no2 += gd - 1
-
-  let j_d_no = g_d_no2 - 79
-  const j_np = Math.floor(j_d_no / 12053)
-  j_d_no %= 12053
-  let jy = 979 + 33 * j_np + 4 * Math.floor(j_d_no / 1461)
-  j_d_no %= 1461
-  if (j_d_no >= 366) {
-    jy += Math.floor((j_d_no - 1) / 365)
-    j_d_no = (j_d_no - 1) % 365
+  const g_y = gy - 1600
+  const g_m = gm - 1
+  const g_d = gd - 1
+  const isLeap = g_y % 4 === 0 && (g_y % 100 !== 0 || g_y % 400 === 0)
+  const g_days = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  let g_day_no = 365 * g_y + Math.floor((g_y + 3) / 4) - Math.floor((g_y + 99) / 100) + Math.floor((g_y + 399) / 400)
+  for (let i = 0; i < g_m; i++) g_day_no += g_days[i]
+  g_day_no += g_d
+  let j_day_no = g_day_no - 79
+  const j_np = Math.floor(j_day_no / 12053)
+  j_day_no %= 12053
+  let jy = 979 + 33 * j_np + 4 * Math.floor(j_day_no / 1461)
+  j_day_no %= 1461
+  if (j_day_no >= 366) {
+    jy += Math.floor((j_day_no - 1) / 365)
+    j_day_no = (j_day_no - 1) % 365
   }
   const j_days = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29]
   let jm = 0
   for (jm = 0; jm < 11; jm++) {
-    if (j_d_no < j_days[jm]) break
-    j_d_no -= j_days[jm]
+    if (j_day_no < j_days[jm]) break
+    j_day_no -= j_days[jm]
   }
-  return [jy, jm + 1, j_d_no + 1]
+  return [jy, jm + 1, j_day_no + 1]
 }
 
 function todayShamsi() {
@@ -129,17 +130,17 @@ function pick(...keys) {
 }
 
 const FIELD = {
-  symbol:        pick('symbol', 'nsc_code', 'ticker', 'fund_code'),
-  price_close:   pick('close_price', 'final_price', 'price_close', 'close'),
-  price_last:    pick('last_price', 'price_last', 'last'),
-  change_pct:    pick('change_percent', 'price_change_pct', 'change_pct', 'pct_change'),
-  trade_value:   pick('trade_value', 'value', 'turnover', 'trade_val'),
-  volume:        pick('volume', 'trade_volume', 'qty', 'quantity'),
-  market_value:  pick('market_cap', 'market_value', 'mkt_cap'),
-  buy_i_vol:     pick('buy_individual_volume', 'buy_i_volume', 'i_buy_vol', 'real_buy_vol'),
-  sell_i_vol:    pick('sell_individual_volume', 'sell_i_volume', 'i_sell_vol', 'real_sell_vol'),
-  buy_i_count:   pick('buy_individual_count', 'buy_count_i', 'i_buy_count', 'real_buy_count'),
-  sell_i_count:  pick('sell_individual_count', 'sell_count_i', 'i_sell_count', 'real_sell_count'),
+  symbol:        pick('isin', 'symbol', 'nsc_code', 'ticker', 'fund_code'),
+  price_close:   pick('pf', 'pc', 'close_price', 'final_price', 'price_close', 'close'),
+  price_last:    pick('pl', 'last_price', 'price_last', 'last'),
+  change_pct:    pick('pcp', 'change_percent', 'price_change_pct', 'change_pct', 'pct_change'),
+  trade_value:   pick('tval', 'trade_value', 'value', 'turnover', 'trade_val'),
+  volume:        pick('tvol', 'volume', 'trade_volume', 'qty', 'quantity'),
+  market_value:  pick('mv', 'market_cap', 'market_value', 'mkt_cap', 'bvol'),
+  buy_i_vol:     pick('Buy_I_Volume', 'buy_individual_volume', 'buy_i_volume', 'i_buy_vol', 'real_buy_vol'),
+  sell_i_vol:    pick('Sell_I_Volume', 'sell_individual_volume', 'sell_i_volume', 'i_sell_vol', 'real_sell_vol'),
+  buy_i_count:   pick('Buy_CountI', 'buy_individual_count', 'buy_count_i', 'i_buy_count', 'real_buy_count'),
+  sell_i_count:  pick('Sell_CountI', 'sell_individual_count', 'sell_count_i', 'i_sell_count', 'real_sell_count'),
   date_shamsi:   pick('date_shamsi', 'trade_date', 'jdate', 'j_date', 'date'),
 }
 

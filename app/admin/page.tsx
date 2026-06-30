@@ -2,33 +2,36 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+// supabase used only for auth (login/session), NOT for data queries (those go via /api/*)
 
 const BRSAPI_KEY = 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const BRSAPI_URL = `https://api.brsapi.ir/IME/Fund.php?key=${BRSAPI_KEY}`
 
 function toJalali(gy: number, gm: number, gd: number): [number, number, number] {
-  const g_d_no = 365 * gy + Math.floor((gy + 3) / 4) - Math.floor((gy + 99) / 100) + Math.floor((gy + 399) / 400)
-  const g_days = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-  if (gy % 4 === 0 && (gy % 100 !== 0 || gy % 400 === 0)) g_days[2] = 29
-  let g_d_no2 = g_d_no
-  for (let i = 1; i < gm; i++) g_d_no2 += g_days[i]
-  g_d_no2 += gd - 1
-  let j_d_no = g_d_no2 - 79
-  const j_np = Math.floor(j_d_no / 12053)
-  j_d_no %= 12053
-  let jy = 979 + 33 * j_np + 4 * Math.floor(j_d_no / 1461)
-  j_d_no %= 1461
-  if (j_d_no >= 366) {
-    jy += Math.floor((j_d_no - 1) / 365)
-    j_d_no = (j_d_no - 1) % 365
+  const g_y = gy - 1600
+  const g_m = gm - 1
+  const g_d = gd - 1
+  const isLeap = g_y % 4 === 0 && (g_y % 100 !== 0 || g_y % 400 === 0)
+  const g_days = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  let g_day_no = 365 * g_y + Math.floor((g_y + 3) / 4) - Math.floor((g_y + 99) / 100) + Math.floor((g_y + 399) / 400)
+  for (let i = 0; i < g_m; i++) g_day_no += g_days[i]
+  g_day_no += g_d
+  let j_day_no = g_day_no - 79
+  const j_np = Math.floor(j_day_no / 12053)
+  j_day_no %= 12053
+  let jy = 979 + 33 * j_np + 4 * Math.floor(j_day_no / 1461)
+  j_day_no %= 1461
+  if (j_day_no >= 366) {
+    jy += Math.floor((j_day_no - 1) / 365)
+    j_day_no = (j_day_no - 1) % 365
   }
   const j_days = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29]
   let jm = 0
   for (; jm < 11; jm++) {
-    if (j_d_no < j_days[jm]) break
-    j_d_no -= j_days[jm]
+    if (j_day_no < j_days[jm]) break
+    j_day_no -= j_days[jm]
   }
-  return [jy, jm + 1, j_d_no + 1]
+  return [jy, jm + 1, j_day_no + 1]
 }
 
 function todayShamsi(): string {
@@ -58,6 +61,7 @@ function pickNum(obj: Record<string, unknown>, ...keys: string[]): number | null
 }
 
 async function runSync(addLog: (msg: string) => void): Promise<void> {
+  // ── Step 1: fetch fund data from BrsAPI (browser, Iranian IP) ────────────
   addLog('دریافت داده از BrsAPI...')
   const res = await fetch(BRSAPI_URL, { cache: 'no-store' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -72,22 +76,25 @@ async function runSync(addLog: (msg: string) => void): Promise<void> {
   if (items.length === 0) { addLog('❌ پاسخ خالی'); return }
   if (items[0]) addLog(`کلیدهای API: ${Object.keys(items[0]).join(', ')}`)
 
-  const { data: assets, error: assetErr } = await supabase
-    .from('assets').select('id, slug, name').neq('slug', 'gold')
-  if (assetErr || !assets?.length) { addLog('❌ assets خالی یا خطا'); return }
+  // ── Step 2: fetch assets list via server route (Render → Supabase) ───────
+  addLog('دریافت لیست صندوق‌ها از سرور...')
+  const assetsRes = await fetch('/api/funds', { cache: 'no-store' })
+  if (!assetsRes.ok) { addLog('❌ دریافت assets از سرور شکست'); return }
+  const { assets } = await assetsRes.json() as { assets: { id: number; slug: string; name: string }[] }
+  if (!assets?.length) { addLog('❌ assets خالی'); return }
 
   const isinMap: Record<string, number> = {}
-  assets.forEach((a: { id: number; slug: string; name: string }) => { isinMap[a.slug] = a.id })
+  assets.forEach((a: { id: number; slug: string }) => { isinMap[a.slug] = a.id })
   addLog(`${assets.length} صندوق در assets یافت شد`)
 
   const date = todayShamsi()
   addLog(`تاریخ شمسی: ${date}`)
 
+  // ── Step 3: map API items to rows ─────────────────────────────────────────
   const rows: Record<string, unknown>[] = []
   const unmatched: string[] = []
 
   for (const item of items) {
-    // روش اول: اسکن تمام مقادیر string برای پیدا کردن ISIN در isinMap
     let assetId: number | undefined
     for (const val of Object.values(item)) {
       if (typeof val === 'string' && isinMap[val]) {
@@ -95,12 +102,10 @@ async function runSync(addLog: (msg: string) => void): Promise<void> {
         break
       }
     }
-    // روش دوم: کلیدهای شناخته‌شده ISIN
     if (!assetId) {
       const isin = pickStr(item, 'nsc_code', 'isin', 'ins_code', 'fund_id', 'id')
       if (isin && isinMap[isin]) assetId = isinMap[isin]
     }
-
     if (!assetId) {
       unmatched.push(pickStr(item, 'nsc_code', 'symbol', 'l18', 'name') ?? '?')
       continue
@@ -110,63 +115,58 @@ async function runSync(addLog: (msg: string) => void): Promise<void> {
     rows.push({
       asset_id:          assetId,
       trade_date_shamsi: dateFromApi || date,
-      price_close:       pickNum(item, 'close_price', 'final_price', 'price_close', 'close', 'pc', 'pf'),
-      price_last:        pickNum(item, 'last_price', 'price_last', 'last', 'pl'),
-      price_change_pct:  pickNum(item, 'change_percent', 'price_change_pct', 'pct_change', 'pcp', 'change_pct'),
-      trade_value:       pickNum(item, 'trade_value', 'value', 'turnover', 'trade_val', 'tv') ?? 0,
-      volume:            pickNum(item, 'volume', 'trade_volume', 'qty', 'quantity', 'vol'),
-      market_value:      pickNum(item, 'market_cap', 'market_value', 'mkt_cap', 'bvol'),
-      buy_i_volume:      pickNum(item, 'buy_individual_volume', 'buy_i_volume', 'i_buy_vol', 'real_buy_vol'),
-      sell_i_volume:     pickNum(item, 'sell_individual_volume', 'sell_i_volume', 'i_sell_vol', 'real_sell_vol'),
-      buy_count_i:       pickNum(item, 'buy_individual_count', 'buy_count_i', 'i_buy_count', 'real_buy_count'),
-      sell_count_i:      pickNum(item, 'sell_individual_count', 'sell_count_i', 'i_sell_count', 'real_sell_count'),
+      price_close:       pickNum(item, 'pf', 'pc', 'close_price', 'final_price', 'price_close'),
+      price_last:        pickNum(item, 'pl', 'last_price', 'price_last', 'last'),
+      price_change_pct:  pickNum(item, 'pcp', 'change_percent', 'price_change_pct', 'pct_change'),
+      trade_value:       pickNum(item, 'tval', 'trade_value', 'value', 'turnover') ?? 0,
+      volume:            pickNum(item, 'tvol', 'volume', 'trade_volume', 'qty'),
+      market_value:      pickNum(item, 'mv', 'market_cap', 'market_value', 'bvol'),
+      buy_i_volume:      pickNum(item, 'Buy_I_Volume', 'buy_individual_volume', 'buy_i_volume'),
+      sell_i_volume:     pickNum(item, 'Sell_I_Volume', 'sell_individual_volume', 'sell_i_volume'),
+      buy_count_i:       pickNum(item, 'Buy_CountI', 'buy_individual_count', 'buy_count_i'),
+      sell_count_i:      pickNum(item, 'Sell_CountI', 'sell_individual_count', 'sell_count_i'),
     })
   }
 
   if (unmatched.length > 0) addLog(`⚠️ ${unmatched.length} نماد match نشد: ${unmatched.slice(0, 6).join(', ')}`)
   if (rows.length === 0) { addLog('❌ هیچ ردیفی match نشد — ISIN در API پیدا نشد'); return }
-  addLog(`${rows.length} ردیف آماده برای درج`)
+  addLog(`${rows.length} ردیف آماده برای ارسال به سرور`)
 
-  const assetIds = [...new Set(rows.map(r => r.asset_id as number))]
-  const { error: delErr } = await supabase.from('gold_funds')
-    .delete().eq('trade_date_shamsi', date).in('asset_id', assetIds)
-  if (delErr) addLog(`⚠️ حذف: ${delErr.message}`)
-  else addLog(`داده قدیمی ${date} پاک شد`)
-
-  const BATCH = 20
-  let inserted = 0
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const { error: insErr } = await supabase.from('gold_funds').insert(rows.slice(i, i + BATCH))
-    if (insErr) addLog(`❌ دسته ${Math.floor(i / BATCH) + 1}: ${insErr.message}`)
-    else inserted += Math.min(BATCH, rows.length - i)
-  }
-
-  addLog(`✅ ${inserted}/${rows.length} رکورد ذخیره شد (${date})`)
-
-  // ── sync gold prices → Supabase (for gold-analysis fallback) ──────────────
+  // ── Step 4: fetch gold cache data (browser, Iranian IP) ──────────────────
   addLog('دریافت قیمت طلا و ارز از BrsAPI...')
+  let goldCache: { raw_pro: unknown; raw_commodity: unknown } | undefined
   try {
     const [proRes, commodRes] = await Promise.all([
       fetch(`https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php?key=${BRSAPI_KEY}&section=gold,currency,cryptocurrency`, { cache: 'no-store' }),
       fetch(`https://api.brsapi.ir/Market/Commodity.php?key=${BRSAPI_KEY}`, { cache: 'no-store' }),
     ])
-    if (!proRes.ok || !commodRes.ok) throw new Error(`HTTP ${proRes.status}/${commodRes.status}`)
-    const raw_pro       = await proRes.json()
-    const raw_commodity = await commodRes.json()
-
-    // delete old cache row + insert fresh
-    await supabase.from('signals').delete().eq('signal_type', '_gold_cache')
-    const { error: cErr } = await supabase.from('signals').insert({
-      signal_type:        '_gold_cache',
-      signal_date_shamsi: date,
-      market_value:       0,
-      note:               JSON.stringify({ raw_pro, raw_commodity }),
-    })
-    if (cErr) addLog(`⚠️ ذخیره قیمت طلا: ${cErr.message}`)
-    else addLog('✅ قیمت طلا و ارز هم ذخیره شد')
+    if (proRes.ok && commodRes.ok) {
+      goldCache = { raw_pro: await proRes.json(), raw_commodity: await commodRes.json() }
+      addLog('قیمت طلا دریافت شد')
+    } else {
+      addLog(`⚠️ قیمت طلا HTTP ${proRes.status}/${commodRes.status}`)
+    }
   } catch (e: unknown) {
     addLog(`⚠️ قیمت طلا دریافت نشد: ${(e as Error).message}`)
   }
+
+  // ── Step 5: POST everything to server route (Render → Supabase) ──────────
+  addLog('ارسال به سرور برای ذخیره در دیتابیس...')
+  const saveRes = await fetch('/api/save-funds', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows, date, goldCache }),
+  })
+  const result = await saveRes.json()
+  if (!saveRes.ok) {
+    addLog(`❌ خطای سرور: ${result.error}`)
+    return
+  }
+  if (result.errors?.length) {
+    result.errors.forEach((e: string) => addLog(`⚠️ ${e}`))
+  }
+  addLog(`✅ ${result.inserted}/${result.total} رکورد ذخیره شد (${date})`)
+  if (goldCache) addLog('✅ قیمت طلا و ارز هم ذخیره شد')
 }
 
 export default function AdminPage() {
