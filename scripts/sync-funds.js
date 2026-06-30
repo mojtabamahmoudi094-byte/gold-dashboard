@@ -230,32 +230,45 @@ async function main() {
   // بارگذاری نقشه slug → asset_id از Supabase
   const { data: assets, error: assetErr } = await sb().from('assets').select('id, slug')
   if (assetErr) { console.error('[sync-funds] خطا در دریافت assets:', assetErr.message); return }
-  const slugMap = {}
-  assets?.forEach(a => { slugMap[a.slug] = a.id })
+  // کلید map = ISIN (slug در assets مثل IRTKMOFD0001)
+  const isinMap = {}
+  assets?.forEach(a => { isinMap[a.slug] = a.id })
 
   const date = todayShamsi()
   console.log(`[sync-funds] تاریخ امروز (شمسی): ${date}`)
 
-  // ساخت ردیف‌های آماده برای upsert
+  // ساخت ردیف‌های آماده برای insert
   const rows = []
   const unknownSymbols = []
 
   for (const item of items) {
-    const symbol = FIELD.symbol(item)
-    if (!symbol) continue
-    const assetId = slugMap[symbol]
-    if (!assetId) { unknownSymbols.push(symbol); continue }
+    // روش اول: اسکن همه مقادیر string رکورد برای ISIN (قوی‌ترین روش)
+    let assetId
+    for (const val of Object.values(item)) {
+      if (typeof val === 'string' && isinMap[val]) {
+        assetId = isinMap[val]
+        break
+      }
+    }
+    // روش دوم: کلیدهای شناخته‌شده ISIN
+    if (!assetId) {
+      const isin = FIELD.symbol(item)
+      if (isin && isinMap[isin]) assetId = isinMap[isin]
+    }
+
+    if (!assetId) { unknownSymbols.push(FIELD.symbol(item) || '?'); continue }
     rows.push(mapFundRow(item, assetId, date))
   }
 
   if (unknownSymbols.length > 0) {
-    console.warn(`[sync-funds] ${unknownSymbols.length} نماد در assets یافت نشد:`, unknownSymbols.slice(0,10).join(', '))
+    console.warn(`[sync-funds] ${unknownSymbols.length} نماد match نشد:`, unknownSymbols.slice(0,10).join(', '))
   }
 
   if (rows.length === 0) {
-    console.warn('[sync-funds] هیچ ردیف قابل درجی وجود ندارد — نمادها با assets مطابقت ندارند')
-    console.warn('یک symbol از API:', FIELD.symbol(items[0]))
-    console.warn('نمونه slug از assets:', Object.keys(slugMap).slice(0,5).join(', '))
+    console.warn('[sync-funds] 0 ردیف — ISIN در پاسخ API پیدا نشد')
+    console.warn('نمونه ISIN از assets:', Object.keys(isinMap).slice(0,5).join(', '))
+    if (items[0]) console.warn('همه کلیدهای اولین رکورد:', Object.keys(items[0]).join(', '))
+    if (items[0]) console.warn('همه مقادیر رکورد اول:', JSON.stringify(items[0]).slice(0, 300))
     return
   }
 

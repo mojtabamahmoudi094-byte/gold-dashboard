@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
 
 const safe = (v: any) => Number(v || 0)
@@ -46,37 +45,16 @@ export default function FundsPage() {
 
   useEffect(() => {
     const load = async () => {
-      // گرفتن لیست دارایی‌ها (بدون صندوق طلای قدیمی)
-      const { data: assets } = await supabase
-        .from('assets')
-        .select('id, name, slug, category')
-        .neq('slug', 'gold')
-        .order('id', { ascending: true })
+      const res = await fetch('/api/funds', { cache: 'no-store' })
+      if (!res.ok) { setLoading(false); return }
+      const { assets, records, histRows } = await res.json()
 
       if (!assets || assets.length === 0) { setLoading(false); return }
-
-      // گرفتن آخرین داده‌ی هر صندوق
-      // ابتدا آخرین تاریخ ثبت‌شده رو پیدا می‌کنیم
-      const { data: latest } = await supabase
-        .from('gold_funds')
-        .select('trade_date_shamsi')
-        .order('id', { ascending: false })
-        .limit(1)
-
-      const latestDate = latest?.[0]?.trade_date_shamsi
-      if (!latestDate) { setLoading(false); return }
-
-      // داده‌های آخرین روز
-      const { data: records } = await supabase
-        .from('gold_funds')
-        .select('*')
-        .eq('trade_date_shamsi', latestDate)
-
-      if (!records) { setLoading(false); return }
+      if (!records || records.length === 0) { setLoading(false); return }
 
       // ترکیب داده‌ها — pick highest id per asset (latest insert wins)
       const recordsDesc = [...records].sort((a: any, b: any) => b.id - a.id)
-      const combined = assets.map(asset => {
+      const combined = assets.map((asset: any) => {
         const rec = recordsDesc.find((r: any) => r.asset_id === asset.id)
         return {
           symbol: asset.name,
@@ -94,25 +72,18 @@ export default function FundsPage() {
           sellIVolume: safe(rec?.sell_i_volume),
           date: rec?.trade_date_shamsi || '',
         }
-      }).filter(f => f.tradeValue > 0) // فقط صندوق‌هایی که داده دارن
+      }).filter((f: any) => f.tradeValue > 0) // فقط صندوق‌هایی که داده دارن
 
       setAllFunds(combined)
 
       // ---- تشخیص ورود/خروج پول غیرعادی (۷ روز اخیر) ----
-      const { data: histRows } = await supabase
-        .from('gold_funds')
-        .select('trade_date_shamsi, asset_id, buy_i_volume, sell_i_volume, price_close')
-        .neq('trade_date_shamsi', latestDate)
-        .order('id', { ascending: false })
-        .limit(300)
-
       const uniqueHistDates = [...new Set((histRows || []).map((r: any) => r.trade_date_shamsi))].slice(0, 6)
 
       if (uniqueHistDates.length >= 4) {
         const detectedAnomalies: any[] = []
 
         for (const asset of assets) {
-          const todayRec = records.find(r => r.asset_id === asset.id)
+          const todayRec = records.find((r: any) => r.asset_id === asset.id)
           if (!todayRec) continue
 
           const hist = (histRows || []).filter((r: any) =>
