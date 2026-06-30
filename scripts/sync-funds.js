@@ -55,12 +55,30 @@ const FORCE    = process.argv.includes('--force')   // اجرا خارج از س
 let _sb = null
 function sb() {
   if (_sb) return _sb
+  let createClient
   try {
-    const { createClient } = require('@supabase/supabase-js')
+    createClient = require('@supabase/supabase-js').createClient
+  } catch (e) {
+    console.error('[sync-funds] پکیج @supabase/supabase-js نصب نیست. اجرا کنید: npm install @supabase/supabase-js')
+    console.error('[sync-funds] require error:', e.message)
+    process.exit(1)
+  }
+  if (!SUPABASE_URL || !SUPABASE_URL.startsWith('http')) {
+    console.error(`[sync-funds] SUPABASE_URL نامعتبر: "${SUPABASE_URL}"`)
+    console.error('[sync-funds] مقدار باید https://xxxx.supabase.co باشد')
+    process.exit(1)
+  }
+  if (!SUPABASE_KEY || SUPABASE_KEY.length < 20) {
+    console.error(`[sync-funds] SUPABASE_KEY نامعتبر یا تنظیم نشده (طول: ${SUPABASE_KEY?.length ?? 0})`)
+    process.exit(1)
+  }
+  try {
     _sb = createClient(SUPABASE_URL, SUPABASE_KEY)
     return _sb
-  } catch {
-    console.error('[sync-funds] پکیج @supabase/supabase-js نصب نیست. اجرا کنید: npm install @supabase/supabase-js')
+  } catch (e) {
+    console.error('[sync-funds] خطا در ایجاد Supabase client:', e.message)
+    console.error('[sync-funds] URL:', SUPABASE_URL)
+    console.error('[sync-funds] KEY طول:', SUPABASE_KEY.length, '| شروع:', SUPABASE_KEY.slice(0, 20) + '...')
     process.exit(1)
   }
 }
