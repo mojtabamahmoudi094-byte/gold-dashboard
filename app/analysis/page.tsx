@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 const analyses = [
@@ -31,13 +32,23 @@ const analyses = [
 ]
 
 export default function AnalysisPage() {
-  const bg = '#060B14'
-  const panel = 'rgba(10,18,30,0.88)'
-  const border = 'rgba(0,200,255,0.12)'
-  const text = '#E8F4FF'
-  const muted = '#5A7088'
+  const [isDark, setIsDark] = useState(true)
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('theme')
+    if (saved === 'light') setIsDark(false)
+    const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
+    window.addEventListener('themechange', handler)
+    return () => window.removeEventListener('themechange', handler)
+  }, [])
+
+  const bg     = isDark ? '#060B14' : '#F4F7FB'
+  const panel  = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
+  const border = isDark ? 'rgba(0,200,255,0.12)' : 'rgba(0,120,170,0.15)'
+  const text   = isDark ? '#E8F4FF' : '#0F1E2E'
+  const muted  = isDark ? '#5A7088' : '#6B7F90'
   const accent = '#00C8FF'
-  const green = '#00E5A0'
+  const green  = '#00E5A0'
 
   return (
     <main style={{
@@ -116,7 +127,6 @@ export default function AnalysisPage() {
           })}
         </div>
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');`}</style>
     </main>
   )
 }

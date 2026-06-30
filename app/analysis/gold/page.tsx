@@ -370,7 +370,6 @@ export default function GoldAnalysisPage() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
         input[type=number] { -moz-appearance: textfield; }
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }

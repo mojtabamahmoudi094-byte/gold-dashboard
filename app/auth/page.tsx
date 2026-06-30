@@ -370,7 +370,6 @@ export default function AuthPage() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
         input::placeholder { color: rgba(90,112,136,0.6); }
         input:focus, select:focus {
           border-color: rgba(0,200,255,0.55) !important;

@@ -615,7 +615,6 @@ export default function TerminalPage() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
         .db-input {
           width: 100% !important; background: ${t.inputBg} !important;
           border: 0.5px solid ${t.borderStrong} !important; border-radius: 8px !important;

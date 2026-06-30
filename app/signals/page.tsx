@@ -1,14 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
 
 const safe = (v: any) => Number(v || 0)
 
 export default function SignalsPage() {
-  const router = useRouter()
   const [signals, setSignals] = useState<any[]>([])
   const [goldDates, setGoldDates] = useState<string[]>([])
   const [goldValMap, setGoldValMap] = useState<Record<string, number>>({})
@@ -16,6 +14,15 @@ export default function SignalsPage() {
   const [loading, setLoading] = useState(true)
 
   const t: any = isDark ? darkTheme : lightTheme
+
+  // sync با تم جهانی Header
+  useEffect(() => {
+    const saved = window.localStorage.getItem('theme')
+    if (saved === 'light') setIsDark(false)
+    const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
+    window.addEventListener('themechange', handler)
+    return () => window.removeEventListener('themechange', handler)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -84,48 +91,7 @@ export default function SignalsPage() {
       fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
       transition: 'background 0.3s, color 0.3s',
     }}>
-      {/* HEADER */}
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 24px', borderBottom: `0.5px solid ${t.border}`,
-        background: t.headerBg, position: 'sticky', top: 0, zIndex: 50,
-        backdropFilter: 'blur(8px)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.accent, boxShadow: `0 0 8px ${t.accent}` }} />
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: t.textBright, letterSpacing: '0.02em' }}>
-              تاریخچه سیگنال‌ها
-            </div>
-            <div style={{ fontSize: 10, color: t.muted }}>شاگرد تنبل بازار · t.me/shagerdebazar</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            onClick={() => router.push('/dashboard')}
-            style={{
-              fontSize: 12, padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
-              background: `${t.accent}1A`, border: `0.5px solid ${t.accent}66`,
-              color: t.accent, fontFamily: 'inherit', fontWeight: 700,
-            }}
-          >
-            بازگشت به داشبورد
-          </button>
-          <button
-            onClick={() => setIsDark(!isDark)}
-            title="تغییر قالب"
-            style={{
-              fontSize: 15, padding: '5px 12px', borderRadius: 20, cursor: 'pointer',
-              background: t.panel, border: `0.5px solid ${t.borderStrong}`, color: t.text,
-              fontFamily: 'inherit',
-            }}
-          >
-            {isDark ? '☀' : '☾'}
-          </button>
-        </div>
-      </header>
-
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* SUMMARY CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
@@ -216,10 +182,6 @@ export default function SignalsPage() {
           )}
         </div>
       </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
-      `}</style>
     </main>
   )
 }

@@ -548,7 +548,6 @@ export default function FundDetailPage() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
         @keyframes barGrow {
           from { transform: scaleY(0); opacity: 0; }
           to   { transform: scaleY(1); opacity: 1; }
