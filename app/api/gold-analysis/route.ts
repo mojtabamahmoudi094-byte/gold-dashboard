@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const BRSAPI_KEY = process.env.BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
-const DOMESTIC_URL  = `https://api.brsapi.ir/Market/Gold_Currency.php?key=${BRSAPI_KEY}`
+const BRSAPI_KEY   = process.env.BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const PRO_URL      = `https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php?key=${BRSAPI_KEY}&section=gold,currency,cryptocurrency`
 const COMMODITY_URL = `https://api.brsapi.ir/Market/Commodity.php?key=${BRSAPI_KEY}`
 
-// 60s server-side cache per endpoint → well under 10,000/day limit
+// 60s server-side cache → well under 10,000/day limit
 const CACHE_TTL = 60_000
 
-let domesticCache:  { data: unknown; at: number } | null = null
+let proCache:       { data: unknown; at: number } | null = null
 let commodityCache: { data: unknown; at: number } | null = null
 
 async function fetchWithCache(
@@ -37,6 +37,7 @@ async function fetchWithCache(
   }
 }
 
+// Pro API organises data by sub-arrays per category
 function bySymbol(arr: any[], sym: string): any | null {
   return arr?.find((x: any) => x.symbol === sym) ?? null
 }
@@ -46,41 +47,54 @@ function n(v: unknown): number | null {
   return isNaN(x) || x === 0 ? null : x
 }
 
+// Pro API currency.free prices are in ریال → convert to تومان
+function rialToToman(v: unknown): number | null {
+  const x = n(v)
+  return x ? x / 10 : null
+}
+
 export async function GET() {
   try {
-    const [domestic, commodity] = await Promise.all([
-      fetchWithCache(DOMESTIC_URL,  domesticCache,  c => { domesticCache  = c }, 'Gold_Currency'),
+    const [pro, commodity] = await Promise.all([
+      fetchWithCache(PRO_URL,       proCache,       c => { proCache       = c }, 'Gold_Currency_Pro'),
       fetchWithCache(COMMODITY_URL, commodityCache, c => { commodityCache = c }, 'Commodity'),
     ])
 
-    const golds      = domestic.data?.gold ?? []
-    const currencies = domestic.data?.currency ?? []
-    const metals     = commodity.data?.metal_precious ?? []
+    // Pro API sections
+    const goldOunce  = pro.data?.gold?.ounce     ?? []   // XAUUSD in USD
+    const goldTypes  = pro.data?.gold?.type       ?? []   // 18K/24K/MELTED in تومان
+    const goldCoins  = pro.data?.gold?.coin       ?? []   // سکه‌ها in تومان
+    const freeCurr   = pro.data?.currency?.free   ?? []   // USD/AED etc. in ریال
+    const cryptos    = pro.data?.cryptocurrency   ?? []   // list, USDT has price_toman
 
-    const dollarEntry = bySymbol(currencies, 'USD')
-    const dirhamEntry = bySymbol(currencies, 'AED')
-    const usdtEntry   = bySymbol(currencies, 'USDT_IRT')
-    const goldCEntry  = bySymbol(metals, 'XAUUSD')
+    // Commodity API (only for silver XAGUSD)
+    const metals = commodity.data?.metal_precious ?? []
+
+    const ounceEntry  = goldOunce[0]                      // single item array
     const silverEntry = bySymbol(metals, 'XAGUSD')
+    const dollarEntry = bySymbol(freeCurr, 'USD')
+    const dirhamEntry = bySymbol(freeCurr, 'AED')
+    const usdtEntry   = bySymbol(cryptos, 'USDT')
 
-    // International prices from Commodity API (more accurate)
-    const goldUsd  = n(goldCEntry?.price)
+    // International prices
+    const goldUsd   = n(ounceEntry?.price)
     const silverUsd = n(silverEntry?.price)
 
-    // Domestic prices from Gold_Currency API
-    const dollarT = n(dollarEntry?.price)
-    const dirhamT = n(dirhamEntry?.price)
-    const usdtT   = n(usdtEntry?.price)
+    // Domestic prices — currency.free is in ریال → تومان
+    const dollarT = rialToToman(dollarEntry?.price)
+    const dirhamT = rialToToman(dirhamEntry?.price)
+    const usdtT   = n(usdtEntry?.price_toman)            // already تومان
 
-    const marketGram24  = n(bySymbol(golds, 'IR_GOLD_24K')?.price)
-    const marketGram18  = n(bySymbol(golds, 'IR_GOLD_18K')?.price)
-    const marketMesghal = n(bySymbol(golds, 'IR_GOLD_MELTED')?.price)
-    const marketFull    = n(bySymbol(golds, 'IR_COIN_BAHAR')?.price)
-    const marketHalf    = n(bySymbol(golds, 'IR_COIN_HALF')?.price)
-    const marketQuarter = n(bySymbol(golds, 'IR_COIN_QUARTER')?.price)
+    // Gold domestic (all in تومان)
+    const marketGram24  = n(bySymbol(goldTypes, 'IR_GOLD_24K')?.price)
+    const marketGram18  = n(bySymbol(goldTypes, 'IR_GOLD_18K')?.price)
+    const marketMesghal = n(bySymbol(goldTypes, 'IR_GOLD_MELTED')?.price)
+    const marketFull    = n(bySymbol(goldCoins, 'IR_COIN_BAHAR')?.price)
+    const marketHalf    = n(bySymbol(goldCoins, 'IR_COIN_HALF')?.price)
+    const marketQuarter = n(bySymbol(goldCoins, 'IR_COIN_QUARTER')?.price)
 
-    // change_percent from brsapi is already % (e.g. -0.74); page expects decimal fraction
-    const goldUsdChange = goldCEntry?.change_percent != null ? goldCEntry.change_percent / 100 : null
+    // change_percent from brsapi is already % → divide by 100 for decimal fraction
+    const goldUsdChange = ounceEntry?.change_percent  != null ? ounceEntry.change_percent  / 100 : null
     const dollarChange  = dollarEntry?.change_percent != null ? dollarEntry.change_percent / 100 : null
 
     const AED_PER_USD  = 3.6732
@@ -108,12 +122,12 @@ export async function GET() {
     const imp = (mT: number | null, oz: number | null, frac: number) =>
       mT && oz ? (mT / frac) / oz : null
 
-    const stale = domestic.stale || commodity.stale
+    const stale = pro.stale || commodity.stale
 
     return NextResponse.json({
       updatedAt: new Date().toISOString(),
       _stale: stale,
-      _cacheAge: Math.max(domestic.age, commodity.age),
+      _cacheAge: Math.max(pro.age, commodity.age),
       inputs: {
         goldUsd,
         silverUsd,
