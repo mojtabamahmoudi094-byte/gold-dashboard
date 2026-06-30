@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 // supabase used only for auth (login/session), NOT for data queries (those go via /api/*)
 
@@ -176,6 +176,8 @@ export default function AdminPage() {
   const [loading, setLoading]   = useState(true)
   const [syncing, setSyncing]   = useState(false)
   const [log, setLog]           = useState<string[]>([])
+  const [autoSync, setAutoSync] = useState(false)
+  const syncingRef              = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -185,6 +187,10 @@ export default function AdminPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    syncingRef.current = syncing
+  }, [syncing])
 
   const addLog = (msg: string) =>
     setLog(prev => [`[${new Date().toLocaleTimeString('fa-IR')}] ${msg}`, ...prev])
@@ -202,6 +208,7 @@ export default function AdminPage() {
   }
 
   const syncFunds = async () => {
+    if (syncingRef.current) return
     setSyncing(true)
     setLog([])
     try {
@@ -212,6 +219,17 @@ export default function AdminPage() {
       setSyncing(false)
     }
   }
+
+  useEffect(() => {
+    if (!autoSync || !session) return
+    addLog('⏱ بروزرسانی خودکار هر ۱۵ دقیقه فعال شد')
+    const id = setInterval(() => {
+      addLog('⏱ بروزرسانی خودکار...')
+      syncFunds()
+    }, 15 * 60 * 1000)
+    return () => clearInterval(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSync, session])
 
   if (loading) return (
     <main className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -274,14 +292,27 @@ export default function AdminPage() {
                 باید از IP ایران اجرا شود.
               </p>
             </div>
-            <button
-              onClick={syncFunds}
-              disabled={syncing}
-              type="button"
-              className="shrink-0 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-5 py-2 rounded-xl text-sm transition-colors"
-            >
-              {syncing ? '⏳ در حال sync...' : 'Sync Now'}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setAutoSync(v => !v)}
+                type="button"
+                className={`text-xs px-3 py-2 rounded-xl border transition-colors font-medium ${
+                  autoSync
+                    ? 'bg-green-500/20 border-green-500/50 text-green-400'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                }`}
+              >
+                {autoSync ? '⏱ خودکار روشن' : '⏱ خودکار'}
+              </button>
+              <button
+                onClick={syncFunds}
+                disabled={syncing}
+                type="button"
+                className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-5 py-2 rounded-xl text-sm transition-colors"
+              >
+                {syncing ? '⏳ در حال sync...' : 'Sync Now'}
+              </button>
+            </div>
           </div>
         </div>
 

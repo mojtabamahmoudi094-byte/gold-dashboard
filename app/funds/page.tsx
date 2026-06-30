@@ -5,7 +5,14 @@ import Link from 'next/link'
 import { darkTheme, lightTheme } from '../../lib/theme'
 
 const safe = (v: any) => Number(v || 0)
-const fmtVal = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
+const fmtVal = (v: any) => {
+  const n = safe(v)
+  if (n === 0) return '—'
+  const len = String(Math.floor(n)).length
+  if (len <= 5) return n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
+  const div = Math.pow(10, len - 5)
+  return Math.round(n / div).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
+}
 
 export default function FundsPage() {
   const [isDark, setIsDark] = useState(true)
@@ -291,13 +298,13 @@ export default function FundsPage() {
                       <span style={{ fontSize: 13, fontWeight: 800, color }}>{a.symbol}</span>
                       <span style={{ fontSize: 10, color, fontWeight: 700 }}>{isIn ? '▲ ورود' : '▼ خروج'}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: t.text, marginBottom: 2 }}>
+                    <div style={{ fontSize: 11, color: t.muted, marginBottom: 2 }}>
                       امروز: <span style={{ fontWeight: 700, color }}>{a.flowBT > 0 ? '+' : ''}{a.flowBT.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت</span>
                     </div>
-                    <div style={{ fontSize: 10, color: t.faint }}>
+                    <div style={{ fontSize: 10, color: t.muted }}>
                       میانگین ۷ روز: {a.avgBT.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت
                     </div>
-                    <div style={{ fontSize: 10, color: t.faint, marginTop: 2 }}>
+                    <div style={{ fontSize: 10, color: t.muted, marginTop: 2 }}>
                       شدت: {a.magnitude.toFixed(1)}σ
                     </div>
                   </div>
