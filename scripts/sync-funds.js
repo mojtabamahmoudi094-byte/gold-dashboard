@@ -55,30 +55,36 @@ const FORCE    = process.argv.includes('--force')   // اجرا خارج از س
 let _sb = null
 function sb() {
   if (_sb) return _sb
+
   let createClient
   try {
     createClient = require('@supabase/supabase-js').createClient
   } catch (e) {
-    console.error('[sync-funds] پکیج @supabase/supabase-js نصب نیست. اجرا کنید: npm install @supabase/supabase-js')
-    console.error('[sync-funds] require error:', e.message)
+    console.error('[sync-funds] پکیج @supabase/supabase-js نصب نیست:', e.message)
     process.exit(1)
   }
+
   if (!SUPABASE_URL || !SUPABASE_URL.startsWith('http')) {
     console.error(`[sync-funds] SUPABASE_URL نامعتبر: "${SUPABASE_URL}"`)
-    console.error('[sync-funds] مقدار باید https://xxxx.supabase.co باشد')
     process.exit(1)
   }
   if (!SUPABASE_KEY || SUPABASE_KEY.length < 20) {
-    console.error(`[sync-funds] SUPABASE_KEY نامعتبر یا تنظیم نشده (طول: ${SUPABASE_KEY?.length ?? 0})`)
+    console.error(`[sync-funds] SUPABASE_KEY نامعتبر (طول: ${SUPABASE_KEY?.length ?? 0})`)
     process.exit(1)
   }
+
+  // Node.js < 22 lacks native WebSocket — pass ws package explicitly
+  let wsTransport
+  try { wsTransport = require('ws') } catch { /* Node 22+ fine without it */ }
+
   try {
-    _sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+    const opts = wsTransport ? { realtime: { transport: wsTransport } } : {}
+    _sb = createClient(SUPABASE_URL, SUPABASE_KEY, opts)
     return _sb
   } catch (e) {
     console.error('[sync-funds] خطا در ایجاد Supabase client:', e.message)
     console.error('[sync-funds] URL:', SUPABASE_URL)
-    console.error('[sync-funds] KEY طول:', SUPABASE_KEY.length, '| شروع:', SUPABASE_KEY.slice(0, 20) + '...')
+    console.error('[sync-funds] KEY طول:', SUPABASE_KEY.length)
     process.exit(1)
   }
 }
