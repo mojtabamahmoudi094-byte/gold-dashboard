@@ -350,11 +350,11 @@ async function main() {
   console.log(`[sync-funds] ✅ ${inserted}/${rows.length} رکورد با موفقیت ذخیره شد (تاریخ: ${date})`)
 
   // ── مجموع ارزش معاملات → asset طلا (برای صفحه dashboard) ─────────────────
-  // tval از BrsAPI به میلیارد ریال است — ÷10 = میلیارد تومان (همان واحد ورودی دستی)
+  // trade_value از BrsAPI به ریال است — ÷10^10 = میلیارد تومان (همان واحد ورودی دستی)
   const goldAsset = assets?.find(a => a.slug === 'gold')
   if (goldAsset && rows.length > 0) {
     const totalTval = rows.reduce((s, r) => s + (r.trade_value || 0), 0)
-    const totalBT   = Math.round(totalTval / 10 * 100) / 100  // میلیارد تومان
+    const totalBT   = Math.round(totalTval / 1e10 * 100) / 100  // میلیارد تومان
     await sb().from('gold_funds').delete()
       .eq('trade_date_shamsi', date).eq('asset_id', goldAsset.id)
     const { error: aggErr } = await sb().from('gold_funds').insert({
