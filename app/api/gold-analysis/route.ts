@@ -2,87 +2,90 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const NERKH_TOKEN = process.env.NERKH_TOKEN
+const BRSAPI_KEY = process.env.BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const BRSAPI_URL = `https://api.brsapi.ir/Market/Gold_Currency.php?key=${BRSAPI_KEY}`
 
-async function fetchNerkh(category: string) {
-  if (!NERKH_TOKEN) return null
+// 60s server-side cache → max ~1440 req/day, under 1500 limit
+const CACHE_TTL = 60_000
+
+let rawCache: { data: unknown; at: number } | null = null
+
+async function getOrFetch(): Promise<{ data: any; stale: boolean; age: number }> {
+  const now = Date.now()
+  if (rawCache && now - rawCache.at < CACHE_TTL) {
+    return { data: rawCache.data, stale: false, age: Math.round((now - rawCache.at) / 1000) }
+  }
   try {
-    const res = await fetch(`https://api.nerkh.io/v1/prices/json/${category}`, {
-      headers: { Authorization: `Bearer ${NERKH_TOKEN}` },
+    const res = await fetch(BRSAPI_URL, {
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(8_000),
     })
-    if (!res.ok) return null
+    if (!res.ok) throw new Error(`brsapi ${res.status}`)
     const json = await res.json()
-    return json?.data?.prices ?? null
+    rawCache = { data: json, at: now }
+    return { data: json, stale: false, age: 0 }
   } catch (e) {
-    console.error(`nerkh ${category} error:`, e)
-    return null
+    if (rawCache) {
+      console.warn('[gold-analysis] brsapi failed, serving stale cache:', e)
+      return { data: rawCache.data, stale: true, age: Math.round((now - rawCache.at) / 1000) }
+    }
+    throw e
   }
 }
 
-// Parse nerkh price string/number → number or null
+function bySymbol(arr: any[], sym: string): any | null {
+  return arr?.find((x: any) => x.symbol === sym) ?? null
+}
+
 function n(v: unknown): number | null {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
   return isNaN(x) || x === 0 ? null : x
 }
 
-// TGJU silver — not in nerkh.io, with timeout so it never blocks
-async function fetchTgjuSilver() {
-  try {
-    const res = await fetch(
-      'https://api.tgju.org/v1/market/indicator/summary-table-data/silver',
-      { cache: 'no-store', signal: AbortSignal.timeout(5000) }
-    )
-    if (!res.ok) return null
-    const row = (await res.json())?.data?.[0]
-    if (!row) return null
-    const isLow = String(row[5]).includes('low')
-    const pct = parseFloat(String(row[5]).replace(/<[^>]+>/g, '').replace('%', '').trim())
-    return {
-      close: parseFloat(String(row[3]).replace(/,/g, '')),
-      changePct: isLow ? -pct : pct,
-    }
-  } catch {
-    return null
-  }
-}
-
 export async function GET() {
   try {
-    const [gold, currency, silver] = await Promise.all([
-      fetchNerkh('gold'),
-      fetchNerkh('currency'),
-      fetchTgjuSilver(),
-    ])
+    const { data: raw, stale, age } = await getOrFetch()
 
-    // nerkh.io currency prices are already in تومان
-    const goldUsd  = n(gold?.OUNCE?.current)
-    const dollarT  = n(currency?.USD?.current)
-    const dirhamT  = n(currency?.AED?.current)
+    const golds      = raw?.gold ?? []
+    const currencies = raw?.currency ?? []
 
-    const r2t = (key: string) => n(gold?.[key]?.current)
-    const marketGram24  = r2t('GOLD24K')
-    const marketGram18  = r2t('GOLD18K')
-    const marketFull    = r2t('SEKE_BAHAR')
-    const marketHalf    = r2t('SEKE_NIM')
-    const marketQuarter = r2t('SEKE_ROB')
-    const marketMesghal = r2t('MAZANEH')
+    const goldEntry   = bySymbol(golds, 'XAUUSD')
+    const dollarEntry = bySymbol(currencies, 'USD')
+    const dirhamEntry = bySymbol(currencies, 'AED')
+    const usdtEntry   = bySymbol(currencies, 'USDT_IRT')
 
-    const AED_PER_USD   = 3.6732
-    const gramsPerOz    = 31.103431
-    const mithqalW      = 4.6055
-    const fullCoinW     = 8.13
-    const halfCoinW     = 4.066
-    const quarterCoinW  = 2.033
-    const mintCost      = 5000
+    const goldUsd = n(goldEntry?.price)
+    const dollarT = n(dollarEntry?.price)
+    const dirhamT = n(dirhamEntry?.price)
+    const usdtT   = n(usdtEntry?.price)
+
+    const marketGram24  = n(bySymbol(golds, 'IR_GOLD_24K')?.price)
+    const marketGram18  = n(bySymbol(golds, 'IR_GOLD_18K')?.price)
+    const marketMesghal = n(bySymbol(golds, 'IR_GOLD_MELTED')?.price)
+    const marketFull    = n(bySymbol(golds, 'IR_COIN_BAHAR')?.price)
+    const marketHalf    = n(bySymbol(golds, 'IR_COIN_HALF')?.price)
+    const marketQuarter = n(bySymbol(golds, 'IR_COIN_QUARTER')?.price)
+
+    // brsapi change_percent is already % (e.g. -0.74); page expects decimal fraction
+    const goldUsdChange = goldEntry?.change_percent != null ? goldEntry.change_percent / 100 : null
+    const dollarChange  = dollarEntry?.change_percent != null ? dollarEntry.change_percent / 100 : null
+
+    const AED_PER_USD  = 3.6732
+    const gramsPerOz   = 31.103431
+    const mithqalW     = 4.6055
+    const fullCoinW    = 8.13
+    const halfCoinW    = 4.066
+    const quarterCoinW = 2.033
+    const mintCost     = 5000
 
     const dollarViaDirham = dirhamT ? dirhamT * AED_PER_USD : null
-    const bubbleDollar    = dollarViaDirham && dollarT ? (dollarT - dollarViaDirham) / dollarViaDirham : null
+    const bubbleDollar    = dollarT && dollarViaDirham ? (dollarT - dollarViaDirham) / dollarViaDirham : null
+    const bubbleUsdt      = usdtT && dollarViaDirham ? (usdtT - dollarViaDirham) / dollarViaDirham : null
 
     const fairGram24  = goldUsd && dollarT ? (goldUsd * dollarT) / gramsPerOz : null
     const fairGram18  = fairGram24 ? fairGram24 * (18 / 24) : null
     const fairGram22  = fairGram24 ? fairGram24 * (22 / 24) : null
+    // IR_GOLD_MELTED = آبشده نقدی, per مثقال, treated as 18K equivalent
     const fairMesghal = fairGram18 ? fairGram18 * mithqalW : null
     const fairFull    = fairGram22 ? fairGram22 * fullCoinW + mintCost : null
     const fairHalf    = fairGram22 ? fairGram22 * halfCoinW + mintCost : null
@@ -92,20 +95,20 @@ export async function GET() {
     const imp = (mT: number | null, oz: number | null, frac: number) =>
       mT && oz ? (mT / frac) / oz : null
 
-    console.log('[gold-analysis] goldUsd:', goldUsd, '| dollar:', dollarT, '| half:', marketHalf)
-
     return NextResponse.json({
       updatedAt: new Date().toISOString(),
+      _stale: stale,
+      _cacheAge: age,
       inputs: {
         goldUsd,
-        silverUsd: silver?.close ?? null,
+        silverUsd: null,
         dollarT,
         dirhamT,
-        usdtT: dollarT,
-        goldUsdChange: null,
-        dollarChange: null,
+        usdtT,
+        goldUsdChange,
+        dollarChange,
       },
-      derived: { dollarViaDirham, bubbleDollar, bubbleUsdt: bubbleDollar, AED_PER_USD },
+      derived: { dollarViaDirham, bubbleDollar, bubbleUsdt, AED_PER_USD },
       gram: {
         fair24: fairGram24, market24: marketGram24, bubble24: bub(marketGram24, fairGram24),
         impliedDollar24: imp(marketGram24, goldUsd, 1 / gramsPerOz),
@@ -120,16 +123,18 @@ export async function GET() {
       coins: {
         full: {
           fair: fairFull, market: marketFull, bubble: bub(marketFull, fairFull),
-          weight: fullCoinW, marketIsEstimate: false, marketSource: 'nerkh.io',
+          weight: fullCoinW, marketIsEstimate: false, marketSource: 'brsapi.ir',
         },
         half: {
           fair: fairHalf, market: marketHalf, bubble: bub(marketHalf, fairHalf),
-          weight: halfCoinW, impliedDollar: imp(marketHalf, goldUsd, halfCoinW * (22 / 24) / gramsPerOz),
+          weight: halfCoinW,
+          impliedDollar: imp(marketHalf, goldUsd, halfCoinW * (22 / 24) / gramsPerOz),
           changePct: null,
         },
         quarter: {
           fair: fairQuarter, market: marketQuarter, bubble: bub(marketQuarter, fairQuarter),
-          weight: quarterCoinW, impliedDollar: imp(marketQuarter, goldUsd, quarterCoinW * (22 / 24) / gramsPerOz),
+          weight: quarterCoinW,
+          impliedDollar: imp(marketQuarter, goldUsd, quarterCoinW * (22 / 24) / gramsPerOz),
           changePct: null,
         },
       },
