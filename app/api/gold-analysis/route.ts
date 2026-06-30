@@ -37,6 +37,20 @@ function bySymbol(arr: any[], sym: string): any | null {
   return arr?.find((x: any) => x.symbol === sym) ?? null
 }
 
+async function fetchTgjuSilver(): Promise<number | null> {
+  try {
+    const res = await fetch(
+      'https://api.tgju.org/v1/market/indicator/summary-table-data/silver',
+      { cache: 'no-store', signal: AbortSignal.timeout(5_000) }
+    )
+    if (!res.ok) return null
+    const row = (await res.json())?.data?.[0]
+    return row ? parseFloat(String(row[3]).replace(/,/g, '')) || null : null
+  } catch {
+    return null
+  }
+}
+
 function n(v: unknown): number | null {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
   return isNaN(x) || x === 0 ? null : x
@@ -44,7 +58,10 @@ function n(v: unknown): number | null {
 
 export async function GET() {
   try {
-    const { data: raw, stale, age } = await getOrFetch()
+    const [{ data: raw, stale, age }, silverUsd] = await Promise.all([
+      getOrFetch(),
+      fetchTgjuSilver(),
+    ])
 
     const golds      = raw?.gold ?? []
     const currencies = raw?.currency ?? []
@@ -101,7 +118,7 @@ export async function GET() {
       _cacheAge: age,
       inputs: {
         goldUsd,
-        silverUsd: null,
+        silverUsd,
         dollarT,
         dirhamT,
         usdtT,
