@@ -266,7 +266,7 @@ export default function FundsPage() {
 
         {/* کارت‌های خلاصه */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
-          <SummaryCard t={t} label="ارزش کل معاملات" value={`${fmtVal(totalTradeValue)} میلیارد`} tooltip="مجموع ارزش معاملات همه‌ی صندوق‌ها" />
+          <SummaryCard t={t} label="ارزش کل معاملات" value={`${fmtVal(totalTradeValue * 100)} م.ت`} tooltip="مجموع ارزش معاملات همه‌ی صندوق‌ها — میلیون تومان" />
           <SummaryCard t={t} label="میانگین تغییر" value={`${avgChange >= 0 ? '+' : ''}${avgChange.toFixed(2)}٪`}
             color={avgChange >= 0 ? '#00E5A0' : '#FF4D6A'} tooltip="میانگین درصد تغییر قیمت پایانی همه‌ی صندوق‌ها" />
           <SummaryCard t={t} label="مثبت / منفی" value={`${positiveCount.toLocaleString('fa-IR')} / ${negativeCount.toLocaleString('fa-IR')}`}
@@ -367,7 +367,7 @@ export default function FundsPage() {
                       {' · '}بیشترین خروج: <span style={{ color: '#FF4D6A', fontWeight: 700 }}>{topOutflow.symbol} ({topOutflowVal} میلیارد)</span>
                     </p>
                     <p style={{ margin: 0 }}>
-                      📊 بیشترین ارزش معاملات: <span style={{ fontWeight: 700, color: t.accent }}>{topVolume.symbol} ({fmtVal(topVolume.tradeValue)} میلیارد تومان)</span>
+                      📊 بیشترین ارزش معاملات: <span style={{ fontWeight: 700, color: t.accent }}>{topVolume.symbol} ({fmtVal(topVolume.tradeValue * 100)} م.ت)</span>
                     </p>
                     <p style={{ margin: 0 }}>
                       🧭 جمع‌بندی: {avgChange > 0
@@ -474,7 +474,7 @@ export default function FundsPage() {
                       </div>
                       <div>
                         <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>ارزش معاملات</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{fmtVal(f.tradeValue)} <span style={{ fontSize: 10, color: t.faint }}>م.ت</span></div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{fmtVal(f.tradeValue * 100)} <span style={{ fontSize: 10, color: t.faint }}>م.ت</span></div>
                       </div>
                       <div>
                         <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>خریدار / فروشنده</div>
@@ -567,8 +567,8 @@ export default function FundsPage() {
                             {isPositive ? '+' : ''}{f.changePct.toFixed(2)}٪
                           </span>
                         </td>
-                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.tradeValue)} <span style={{ color: t.faint, fontSize: 10 }}>م.ت</span></td>
-                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.marketValue)} <span style={{ color: t.faint, fontSize: 10 }}>م.ت</span></td>
+                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.tradeValue * 100)} <span style={{ color: t.faint, fontSize: 10 }}>م.ت</span></td>
+                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.marketValue)} <span style={{ color: t.faint, fontSize: 10 }}>م.ر</span></td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{f.volume.toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '10px 8px', color: '#00E5A0' }}>{f.buyCountI.toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '10px 8px', color: '#FF4D6A' }}>{f.sellCountI.toLocaleString('fa-IR')}</td>
@@ -618,7 +618,7 @@ export default function FundsPage() {
                     <Link
                       href={`/fund/${f.slug}`}
                       key={i}
-                      title={`${f.symbol}\nتغییر: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}٪\nارزش معاملات: ${fmtVal(f.tradeValue)} میلیارد تومان`}
+                      title={`${f.symbol}\nتغییر: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}٪\nارزش معاملات: ${fmtVal(f.tradeValue * 100)} م.ت`}
                       style={{
                         textDecoration: 'none',
                         flexBasis: `${Math.max(pct, 2.5)}%`,
@@ -664,7 +664,7 @@ export default function FundsPage() {
                       </div>
                       {isLarge && (
                         <div style={{ fontSize: 9, color: textColor, opacity: 0.6, marginTop: 2 }}>
-                          {fmtVal(f.tradeValue)} م.ت
+                          {fmtVal(f.tradeValue * 100)} م.ت
                         </div>
                       )}
                     </Link>
