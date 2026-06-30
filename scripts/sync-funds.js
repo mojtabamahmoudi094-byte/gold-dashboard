@@ -47,7 +47,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1)
 }
 
-const FUND_URL = `https://api.brsapi.ir/IME/Fund.php?key=${BRSAPI_KEY}`
+const FUND_URL      = `https://api.brsapi.ir/IME/Fund.php?key=${BRSAPI_KEY}`
+const GOLD_PRO_URL  = `https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php?key=${BRSAPI_KEY}&section=gold,currency,cryptocurrency`
+const COMMODITY_URL = `https://api.brsapi.ir/Market/Commodity.php?key=${BRSAPI_KEY}`
 const PROBE    = process.argv.includes('--probe')
 const FORCE    = process.argv.includes('--force')   // اجرا خارج از ساعت بازار
 
@@ -183,6 +185,29 @@ function mapFundRow(item, assetId, shamsiDate) {
     sell_i_volume:    FIELD.sell_i_vol(item),
     buy_count_i:      FIELD.buy_i_count(item),
     sell_count_i:     FIELD.sell_i_count(item),
+  }
+}
+
+// ── gold price sync ───────────────────────────────────────────────────────────
+async function syncGoldPrices(date) {
+  console.log('[sync-gold] دریافت قیمت طلا، ارز و کامودیتی...')
+  try {
+    const [rawPro, rawCommodity] = await Promise.all([
+      fetchJson(GOLD_PRO_URL),
+      fetchJson(COMMODITY_URL),
+    ])
+    const { error: delErr } = await sb().from('signals').delete().eq('signal_type', '_gold_cache')
+    if (delErr) console.warn('[sync-gold] حذف قدیمی:', delErr.message)
+    const { error: insErr } = await sb().from('signals').insert({
+      signal_type:        '_gold_cache',
+      signal_date_shamsi: date,
+      market_value:       0,
+      note:               JSON.stringify({ raw_pro: rawPro, raw_commodity: rawCommodity }),
+    })
+    if (insErr) console.error('[sync-gold] خطا در ذخیره:', insErr.message)
+    else        console.log('[sync-gold] ✅ قیمت طلا و ارز ذخیره شد')
+  } catch (e) {
+    console.warn('[sync-gold] ⚠️ ناموفق (ادامه می‌دهیم):', e.message)
   }
 }
 
@@ -322,6 +347,9 @@ async function main() {
   }
 
   console.log(`[sync-funds] ✅ ${inserted}/${rows.length} رکورد با موفقیت ذخیره شد (تاریخ: ${date})`)
+
+  // ── قیمت طلا و ارز ────────────────────────────────────────────────────────
+  await syncGoldPrices(date)
 }
 
 main().catch(e => {
