@@ -196,7 +196,8 @@ async function syncGoldPrices(date) {
       fetchJson(GOLD_PRO_URL),
       fetchJson(COMMODITY_URL),
     ])
-    const { error: delErr } = await sb().from('signals').delete().eq('signal_type', '_gold_cache')
+    const { error: delErr } = await sb().from('signals').delete()
+      .eq('signal_type', '_gold_cache').eq('signal_date_shamsi', date)
     if (delErr) console.warn('[sync-gold] حذف قدیمی:', delErr.message)
     const { error: insErr } = await sb().from('signals').insert({
       signal_type:        '_gold_cache',

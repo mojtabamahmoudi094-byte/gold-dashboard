@@ -33,11 +33,6 @@ const bubbleLabel = (n: number | null) => {
   return 'منصفانه'
 }
 
-const changeColor = (n: number | null) => {
-  if (n == null) return '#5A7088'
-  return n > 0 ? '#00E5A0' : n < 0 ? '#FF4D6A' : '#5A7088'
-}
-
 const DEFAULT_CONSTANTS = {
   gramsPerOz: 31.103431,
   AED_PER_USD: 3.6732,
@@ -81,29 +76,28 @@ export default function GoldAnalysisPage() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Client-side recalculation — runs when constants change or data refreshes
   const derived = useMemo(() => {
     if (!data?.inputs) return null
     const { goldUsd, dollarT, dirhamT } = data.inputs
     const mkt = {
-      gram24: data.gram?.market24 ?? null,
-      gram18: data.gram?.market18 ?? null,
-      mesghal: data.mesghal?.market ?? null,
-      half: data.coins?.half?.market ?? null,
-      quarter: data.coins?.quarter?.market ?? null,
-      full: data.coins?.full?.market ?? null,
+      gram24:   data.gram?.market24          ?? null,
+      gram18:   data.gram?.market18          ?? null,
+      mesghal:  data.mesghal?.market         ?? null,
+      half:     data.coins?.half?.market     ?? null,
+      quarter:  data.coins?.quarter?.market  ?? null,
+      full:     data.coins?.full?.market     ?? null,
     }
     const c = constants
 
     const dollarViaDirham = dirhamT != null ? dirhamT * c.AED_PER_USD : null
     const bubbleDollar = dollarT && dollarViaDirham ? (dollarT - dollarViaDirham) / dollarViaDirham : null
 
-    const fairGram24 = goldUsd && dollarT ? (goldUsd * dollarT) / c.gramsPerOz : null
-    const fairGram18 = fairGram24 ? fairGram24 * (18 / 24) : null
-    const fairGram22 = fairGram24 ? fairGram24 * (c.coinPurity / 24) : null
+    const fairGram24  = goldUsd && dollarT ? (goldUsd * dollarT) / c.gramsPerOz : null
+    const fairGram18  = fairGram24 ? fairGram24 * (18 / 24) : null
+    const fairGram22  = fairGram24 ? fairGram24 * (c.coinPurity / 24) : null
     const fairMesghal = fairGram18 ? fairGram18 * c.mithqalW : null
-    const fairFull = fairGram22 ? fairGram22 * c.fullCoinW + c.mintCost : null
-    const fairHalf = fairGram22 ? fairGram22 * c.halfCoinW + c.mintCost : null
+    const fairFull    = fairGram22 ? fairGram22 * c.fullCoinW + c.mintCost : null
+    const fairHalf    = fairGram22 ? fairGram22 * c.halfCoinW + c.mintCost : null
     const fairQuarter = fairGram22 ? fairGram22 * c.quarterCoinW + c.mintCost : null
 
     const bub = (m: number | null, f: number | null) => m != null && f != null ? (m - f) / f : null
@@ -121,30 +115,25 @@ export default function GoldAnalysisPage() {
       mesghal: {
         fair: fairMesghal, market: mkt.mesghal, bubble: bub(mkt.mesghal, fairMesghal),
         impliedDollar: imp(mkt.mesghal, goldUsd, c.mithqalW * (18 / 24) / c.gramsPerOz),
-        changePct: data.mesghal?.changePct ?? null,
       },
       coins: {
-        full: { fair: fairFull, market: mkt.full, bubble: bub(mkt.full, fairFull), weight: c.fullCoinW },
-        half: {
-          fair: fairHalf, market: mkt.half, bubble: bub(mkt.half, fairHalf), weight: c.halfCoinW,
-          impliedDollar: imp(mkt.half, goldUsd, c.halfCoinW * (c.coinPurity / 24) / c.gramsPerOz),
-          changePct: data.coins?.half?.changePct ?? null,
-        },
-        quarter: {
-          fair: fairQuarter, market: mkt.quarter, bubble: bub(mkt.quarter, fairQuarter), weight: c.quarterCoinW,
-          impliedDollar: imp(mkt.quarter, goldUsd, c.quarterCoinW * (c.coinPurity / 24) / c.gramsPerOz),
-          changePct: data.coins?.quarter?.changePct ?? null,
-        },
+        full:    { fair: fairFull,    market: mkt.full,    bubble: bub(mkt.full,    fairFull),    weight: c.fullCoinW },
+        half:    { fair: fairHalf,    market: mkt.half,    bubble: bub(mkt.half,    fairHalf),    weight: c.halfCoinW,
+                   impliedDollar: imp(mkt.half, goldUsd, c.halfCoinW * (c.coinPurity / 24) / c.gramsPerOz) },
+        quarter: { fair: fairQuarter, market: mkt.quarter, bubble: bub(mkt.quarter, fairQuarter), weight: c.quarterCoinW,
+                   impliedDollar: imp(mkt.quarter, goldUsd, c.quarterCoinW * (c.coinPurity / 24) / c.gramsPerOz) },
       },
     }
   }, [data, constants])
 
-  const bg = '#060B14'
+  const ch = data?.changes ?? {}
+
+  const bg     = '#060B14'
   const border = 'rgba(0,200,255,0.12)'
   const accent = '#00C8FF'
-  const green = '#00E5A0'
-  const muted = '#5A7088'
-  const text = '#E8F4FF'
+  const green  = '#00E5A0'
+  const muted  = '#5A7088'
+  const text   = '#E8F4FF'
 
   return (
     <main style={{
@@ -161,18 +150,14 @@ export default function GoldAnalysisPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <a href="/analysis" style={{ color: muted, textDecoration: 'none', fontSize: 12 }}>
-            تحلیل
-          </a>
+          <a href="/analysis" style={{ color: muted, textDecoration: 'none', fontSize: 12 }}>تحلیل</a>
           <span style={{ color: muted, fontSize: 10 }}>›</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 18 }}>🥇</span>
             <div>
               <div style={{ fontSize: 15, fontWeight: 700, color: text }}>تحلیل طلا</div>
               <div style={{ fontSize: 10, color: muted }}>
-                {data?.lastMarketDate
-                  ? `آخرین روز بازار: ${data.lastMarketDate}`
-                  : 'در حال بارگذاری...'}
+                {data?.lastMarketDate ? `آخرین روز بازار: ${data.lastMarketDate}` : 'در حال بارگذاری...'}
               </div>
             </div>
           </div>
@@ -184,11 +169,10 @@ export default function GoldAnalysisPage() {
             </span>
           )}
           <button
-            onClick={load}
-            disabled={loading}
+            onClick={load} disabled={loading}
             style={{
               fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: loading ? 'wait' : 'pointer',
-              background: `rgba(0,200,255,0.08)`, border: `0.5px solid ${accent}44`,
+              background: 'rgba(0,200,255,0.08)', border: `0.5px solid ${accent}44`,
               color: accent, fontFamily: 'inherit',
             }}
           >
@@ -202,34 +186,11 @@ export default function GoldAnalysisPage() {
         {/* ── Row 1: Live Inputs ── */}
         <Section title="ورودی‌های روزانه" subtitle="داده زنده از API" badge="LIVE" badgeColor={green}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-            <InputCard
-              icon="🪙" label="انس طلا" unit="دلار"
-              value={fmtUsd(data?.inputs?.goldUsd)}
-              change={data?.inputs?.goldUsdChange}
-              accent={accent}
-            />
-            <InputCard
-              icon="🥈" label="انس نقره" unit="دلار"
-              value={fmtUsd(data?.inputs?.silverUsd)}
-              accent="#C0C0D0"
-            />
-            <InputCard
-              icon="💵" label="ارز بازار" unit="تومان"
-              value={fmt(data?.inputs?.dollarT)}
-              change={data?.inputs?.dollarChange}
-              accent={green}
-            />
-            <InputCard
-              icon="🇦🇪" label="قیمت درهم" unit="تومان"
-              value={fmt(data?.inputs?.dirhamT)}
-              accent="#F59E0B"
-            />
-            <InputCard
-              icon="₮" label="تتر (USDT)" unit="تومان"
-              value={fmt(data?.inputs?.usdtT)}
-              note="≈ ارز بازار"
-              accent={accent}
-            />
+            <InputCard icon="🪙" label="انس طلا"    unit="دلار"  value={fmtUsd(data?.inputs?.goldUsd)}  change={ch.goldUsd   ?? null} accent={accent} />
+            <InputCard icon="🥈" label="انس نقره"   unit="دلار"  value={fmtUsd(data?.inputs?.silverUsd)} change={ch.silverUsd ?? null} accent="#C0C0D0" />
+            <InputCard icon="💵" label="ارز بازار"  unit="تومان" value={fmt(data?.inputs?.dollarT)}      change={ch.dollarT   ?? null} accent={green} />
+            <InputCard icon="🇦🇪" label="قیمت درهم" unit="تومان" value={fmt(data?.inputs?.dirhamT)}      change={ch.dirhamT   ?? null} accent="#F59E0B" />
+            <InputCard icon="₮"  label="تتر (USDT)" unit="تومان" value={fmt(data?.inputs?.usdtT)}        change={ch.usdtT     ?? null} note="≈ ارز بازار" accent={accent} />
           </div>
         </Section>
 
@@ -237,27 +198,20 @@ export default function GoldAnalysisPage() {
         <Section title="تحلیل نرخ ارز" subtitle="مقایسه روش‌های قیمت‌گذاری دلار">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <DollarCard
-              label="دلار با درهم"
-              formula={`درهم × ${constants.AED_PER_USD}`}
-              value={fmt(derived?.derived?.dollarViaDirham ?? null)}
-              unit="تومان"
-              accent={accent}
+              label="دلار با درهم" formula={`درهم × ${constants.AED_PER_USD}`}
+              value={fmt(derived?.derived?.dollarViaDirham ?? null)} unit="تومان" accent={accent}
             />
             <DollarCard
-              label="حباب دلار بازار"
-              formula="دلار بازار ÷ دلار درهم"
+              label="حباب دلار بازار" formula="دلار بازار ÷ دلار درهم"
               value={fmtPct(derived?.derived?.bubbleDollar ?? null)}
               color={bubbleColor(derived?.derived?.bubbleDollar ?? null)}
-              desc={bubbleLabel(derived?.derived?.bubbleDollar ?? null)}
-              accent={accent}
+              desc={bubbleLabel(derived?.derived?.bubbleDollar ?? null)} accent={accent}
             />
             <DollarCard
-              label="حباب تتر"
-              formula="تتر ÷ دلار درهم"
+              label="حباب تتر" formula="تتر ÷ دلار درهم"
               value={fmtPct(derived?.derived?.bubbleUsdt ?? null)}
               color={bubbleColor(derived?.derived?.bubbleUsdt ?? null)}
-              desc={bubbleLabel(derived?.derived?.bubbleUsdt ?? null)}
-              accent={accent}
+              desc={bubbleLabel(derived?.derived?.bubbleUsdt ?? null)} accent={accent}
             />
           </div>
         </Section>
@@ -268,7 +222,7 @@ export default function GoldAnalysisPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
-                  {['نوع', 'قیمت واقعی (تومان)', 'قیمت بازار (تومان)', 'حباب', 'ارزیابی', 'نرخ دلار ضمنی'].map(h => (
+                  {['نوع', 'قیمت واقعی (تومان)', 'قیمت بازار (تومان)', 'تغییر روزانه', 'حباب', 'ارزیابی', 'نرخ دلار ضمنی'].map(h => (
                     <th key={h} style={{
                       color: muted, fontWeight: 500, textAlign: 'right',
                       padding: '10px 12px', borderBottom: `0.5px solid ${border}`, whiteSpace: 'nowrap',
@@ -279,27 +233,23 @@ export default function GoldAnalysisPage() {
               <tbody>
                 <GoldRow
                   label="هر گرم ۲۴ عیار"
-                  fair={derived?.gram?.fair24}
-                  market={derived?.gram?.market24}
-                  bubble={derived?.gram?.bubble24}
-                  impliedDollar={derived?.gram?.impliedDollar24}
+                  fair={derived?.gram?.fair24}   market={derived?.gram?.market24}
+                  bubble={derived?.gram?.bubble24} impliedDollar={derived?.gram?.impliedDollar24}
+                  dailyChange={ch.gram24 ?? null}
                   border={border} muted={muted} text={text}
                 />
                 <GoldRow
                   label="هر گرم ۱۸ عیار"
-                  fair={derived?.gram?.fair18}
-                  market={derived?.gram?.market18}
-                  bubble={derived?.gram?.bubble18}
-                  impliedDollar={derived?.gram?.impliedDollar18}
+                  fair={derived?.gram?.fair18}   market={derived?.gram?.market18}
+                  bubble={derived?.gram?.bubble18} impliedDollar={derived?.gram?.impliedDollar18}
+                  dailyChange={ch.gram18 ?? null}
                   border={border} muted={muted} text={text}
                 />
                 <GoldRow
                   label="مثقال طلا (۱۸ عیار)"
-                  fair={derived?.mesghal?.fair}
-                  market={derived?.mesghal?.market}
-                  bubble={derived?.mesghal?.bubble}
-                  impliedDollar={derived?.mesghal?.impliedDollar}
-                  marketChange={derived?.mesghal?.changePct}
+                  fair={derived?.mesghal?.fair}  market={derived?.mesghal?.market}
+                  bubble={derived?.mesghal?.bubble} impliedDollar={derived?.mesghal?.impliedDollar}
+                  dailyChange={ch.mesghal ?? null}
                   border={border} muted={muted} text={text}
                 />
               </tbody>
@@ -313,7 +263,7 @@ export default function GoldAnalysisPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
-                  {['سکه', 'وزن (گرم)', 'قیمت واقعی (تومان)', 'قیمت بازار (تومان)', 'حباب', 'ارزیابی'].map(h => (
+                  {['سکه', 'وزن (گرم)', 'قیمت واقعی (تومان)', 'قیمت بازار (تومان)', 'تغییر روزانه', 'حباب', 'ارزیابی'].map(h => (
                     <th key={h} style={{
                       color: muted, fontWeight: 500, textAlign: 'right',
                       padding: '10px 12px', borderBottom: `0.5px solid ${border}`, whiteSpace: 'nowrap',
@@ -323,27 +273,25 @@ export default function GoldAnalysisPage() {
               </thead>
               <tbody>
                 <CoinRow
-                  label="تمام سکه بهار" weight={derived?.coins?.full?.weight ?? 8.13}
-                  fair={derived?.coins?.full?.fair}
-                  market={derived?.coins?.full?.market}
+                  label="تمام سکه بهار"   weight={derived?.coins?.full?.weight    ?? 8.13}
+                  fair={derived?.coins?.full?.fair}    market={derived?.coins?.full?.market}
                   bubble={derived?.coins?.full?.bubble}
                   marketNote={data?.coins?.full?.marketIsEstimate ? '≈ نیم × ۲' : null}
+                  dailyChange={ch.fullCoin ?? null}
                   border={border} muted={muted} text={text}
                 />
                 <CoinRow
-                  label="نیم سکه" weight={derived?.coins?.half?.weight ?? 4.066}
-                  fair={derived?.coins?.half?.fair}
-                  market={derived?.coins?.half?.market}
+                  label="نیم سکه"         weight={derived?.coins?.half?.weight    ?? 4.066}
+                  fair={derived?.coins?.half?.fair}    market={derived?.coins?.half?.market}
                   bubble={derived?.coins?.half?.bubble}
-                  marketChange={derived?.coins?.half?.changePct}
+                  dailyChange={ch.halfCoin ?? null}
                   border={border} muted={muted} text={text}
                 />
                 <CoinRow
-                  label="ربع سکه" weight={derived?.coins?.quarter?.weight ?? 2.033}
-                  fair={derived?.coins?.quarter?.fair}
-                  market={derived?.coins?.quarter?.market}
+                  label="ربع سکه"         weight={derived?.coins?.quarter?.weight ?? 2.033}
+                  fair={derived?.coins?.quarter?.fair} market={derived?.coins?.quarter?.market}
                   bubble={derived?.coins?.quarter?.bubble}
-                  marketChange={derived?.coins?.quarter?.changePct}
+                  dailyChange={ch.quarterCoin ?? null}
                   border={border} muted={muted} text={text}
                 />
               </tbody>
@@ -354,17 +302,13 @@ export default function GoldAnalysisPage() {
         {/* ── Row 5: Constants — Admin only ── */}
         {isAdmin && (
           <AdminConstants
-            constants={constants}
-            onChange={setConstants}
-            border={border}
-            muted={muted}
-            text={text}
-            accent={accent}
+            constants={constants} onChange={setConstants}
+            border={border} muted={muted} text={text} accent={accent}
           />
         )}
 
         <div style={{ textAlign: 'center', fontSize: 10, color: muted, paddingBottom: 24 }}>
-          داده از TGJU · بروزرسانی خودکار هر ۱ دقیقه · تمام قیمت‌ها به تومان
+          داده از BrsAPI · بروزرسانی خودکار هر ۱ دقیقه · تمام قیمت‌ها به تومان
           {isAdmin && <span style={{ marginRight: 8, color: accent }}>· حالت ادمین فعال</span>}
         </div>
       </div>
@@ -380,17 +324,26 @@ export default function GoldAnalysisPage() {
 
 // ──────────────── Sub-components ────────────────
 
+function DailyChangeBadge({ pct }: { pct: number | null }) {
+  if (pct == null) return <span style={{ color: '#5A7088', fontSize: 11 }}>—</span>
+  if (Math.abs(pct) < 0.005) {
+    return <span style={{ color: '#5A7088', fontSize: 11, fontFamily: 'system-ui' }}>۰.۰۰٪</span>
+  }
+  const color = pct > 0 ? '#00E5A0' : '#FF4D6A'
+  const arrow = pct > 0 ? '▲' : '▼'
+  const sign  = pct > 0 ? '+' : ''
+  return (
+    <span style={{ color, fontSize: 11, fontFamily: 'system-ui', fontWeight: 600 }}>
+      {arrow} {sign}{Math.abs(pct).toFixed(2)}٪
+    </span>
+  )
+}
+
 function Section({ title, subtitle, badge, badgeColor, children }: any) {
   const border = 'rgba(0,200,255,0.12)'
   return (
-    <div style={{
-      background: 'rgba(10,18,30,0.6)', border: `0.5px solid ${border}`,
-      borderRadius: 16, overflow: 'hidden',
-    }}>
-      <div style={{
-        padding: '14px 18px', borderBottom: `0.5px solid ${border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
+    <div style={{ background: 'rgba(10,18,30,0.6)', border: `0.5px solid ${border}`, borderRadius: 16, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: `0.5px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#E8F4FF' }}>{title}</span>
@@ -411,6 +364,7 @@ function Section({ title, subtitle, badge, badgeColor, children }: any) {
 }
 
 function InputCard({ icon, label, unit, value, change, note, accent }: any) {
+  const changeColor = change == null ? '#5A7088' : change > 0 ? '#00E5A0' : change < 0 ? '#FF4D6A' : '#5A7088'
   return (
     <div style={{
       background: 'rgba(0,200,255,0.03)', border: '0.5px solid rgba(0,200,255,0.1)',
@@ -423,14 +377,19 @@ function InputCard({ icon, label, unit, value, change, note, accent }: any) {
       <div style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: 'system-ui', lineHeight: 1.2 }}>
         {value}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
         <span style={{ fontSize: 10, color: '#5A7088' }}>{unit}</span>
-        {change != null && (
-          <span style={{ fontSize: 10, color: changeColor(change), fontFamily: 'system-ui' }}>
-            {change > 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}٪
-          </span>
-        )}
-        {note && <span style={{ fontSize: 10, color: '#5A7088' }}>{note}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {note && <span style={{ fontSize: 10, color: '#5A7088' }}>{note}</span>}
+          {change != null && Math.abs(change) >= 0.005 && (
+            <span style={{ fontSize: 11, color: changeColor, fontFamily: 'system-ui', fontWeight: 600 }}>
+              {change > 0 ? '▲' : '▼'} {change > 0 ? '+' : ''}{change.toFixed(2)}٪
+            </span>
+          )}
+          {change != null && Math.abs(change) < 0.005 && (
+            <span style={{ fontSize: 11, color: '#5A7088', fontFamily: 'system-ui' }}>۰.۰۰٪</span>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -439,10 +398,7 @@ function InputCard({ icon, label, unit, value, change, note, accent }: any) {
 function DollarCard({ label, formula, value, unit, color, desc, accent }: any) {
   const c = color ?? accent ?? '#00C8FF'
   return (
-    <div style={{
-      background: 'rgba(0,200,255,0.03)', border: '0.5px solid rgba(0,200,255,0.1)',
-      borderRadius: 12, padding: '14px 16px',
-    }}>
+    <div style={{ background: 'rgba(0,200,255,0.03)', border: '0.5px solid rgba(0,200,255,0.1)', borderRadius: 12, padding: '14px 16px' }}>
       <div style={{ fontSize: 11, color: '#5A7088', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color: c, fontFamily: 'system-ui', marginBottom: 4 }}>
         {value}
@@ -454,7 +410,7 @@ function DollarCard({ label, formula, value, unit, color, desc, accent }: any) {
   )
 }
 
-function GoldRow({ label, fair, market, bubble, impliedDollar, marketChange, border, muted, text }: any) {
+function GoldRow({ label, fair, market, bubble, impliedDollar, dailyChange, border, muted, text }: any) {
   const bc = bubbleColor(bubble)
   return (
     <tr style={{ borderBottom: `0.5px solid ${border}` }}>
@@ -462,13 +418,11 @@ function GoldRow({ label, fair, market, bubble, impliedDollar, marketChange, bor
       <td style={{ padding: '10px 12px', color: '#A0B4C8', fontFamily: 'system-ui', whiteSpace: 'nowrap' }}>
         {fmt(fair)}
       </td>
+      <td style={{ padding: '10px 12px', color: text, fontFamily: 'system-ui', whiteSpace: 'nowrap' }}>
+        {fmt(market)}
+      </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <div style={{ color: text, fontFamily: 'system-ui' }}>{fmt(market)}</div>
-        {marketChange != null && (
-          <div style={{ fontSize: 10, color: changeColor(marketChange) }}>
-            {marketChange > 0 ? '▲' : '▼'} {Math.abs(marketChange).toFixed(2)}٪
-          </div>
-        )}
+        <DailyChangeBadge pct={dailyChange} />
       </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span style={{
@@ -478,9 +432,7 @@ function GoldRow({ label, fair, market, bubble, impliedDollar, marketChange, bor
           {fmtPct(bubble)}
         </span>
       </td>
-      <td style={{ padding: '10px 12px', color: bc, fontSize: 11, fontWeight: 600 }}>
-        {bubbleLabel(bubble)}
-      </td>
+      <td style={{ padding: '10px 12px', color: bc, fontSize: 11, fontWeight: 600 }}>{bubbleLabel(bubble)}</td>
       <td style={{ padding: '10px 12px', color: muted, fontFamily: 'system-ui', fontSize: 11 }}>
         {impliedDollar ? Math.round(impliedDollar).toLocaleString('fa-IR') : '—'}
       </td>
@@ -488,9 +440,8 @@ function GoldRow({ label, fair, market, bubble, impliedDollar, marketChange, bor
   )
 }
 
-function CoinRow({ label, weight, fair, market, bubble, marketChange, marketNote, border, muted, text }: any) {
+function CoinRow({ label, weight, fair, market, bubble, dailyChange, marketNote, border, muted, text }: any) {
   const bc = bubbleColor(bubble)
-  const hasEstimate = marketNote != null && market != null
   return (
     <tr style={{ borderBottom: `0.5px solid ${border}` }}>
       <td style={{ padding: '10px 12px', color: text, fontWeight: 500 }}>{label}</td>
@@ -504,18 +455,14 @@ function CoinRow({ label, weight, fair, market, bubble, marketChange, marketNote
         {market != null ? (
           <div>
             <div style={{ color: text, fontFamily: 'system-ui' }}>{fmt(market)}</div>
-            {hasEstimate && (
-              <div style={{ fontSize: 9, color: muted }}>{marketNote}</div>
-            )}
-            {marketChange != null && (
-              <div style={{ fontSize: 10, color: changeColor(marketChange) }}>
-                {marketChange > 0 ? '▲' : '▼'} {Math.abs(marketChange).toFixed(2)}٪
-              </div>
-            )}
+            {marketNote && <div style={{ fontSize: 9, color: muted }}>{marketNote}</div>}
           </div>
         ) : (
           <span style={{ color: muted, fontSize: 11 }}>—</span>
         )}
+      </td>
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+        <DailyChangeBadge pct={dailyChange} />
       </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         {bubble != null ? (
@@ -527,110 +474,61 @@ function CoinRow({ label, weight, fair, market, bubble, marketChange, marketNote
           </span>
         ) : <span style={{ color: muted }}>—</span>}
       </td>
-      <td style={{ padding: '10px 12px', color: bc, fontSize: 11, fontWeight: 600 }}>
-        {bubbleLabel(bubble)}
-      </td>
+      <td style={{ padding: '10px 12px', color: bc, fontSize: 11, fontWeight: 600 }}>{bubbleLabel(bubble)}</td>
     </tr>
   )
 }
 
 const CONST_LABELS: Record<string, string> = {
-  gramsPerOz: 'گرم در هر انس',
-  AED_PER_USD: 'نرخ درهم در برابر دلار',
-  coinPurity: 'عیار سکه',
-  mithqalW: 'وزن مثقال (گرم)',
-  fullCoinW: 'وزن تمام سکه (گرم)',
-  halfCoinW: 'وزن نیم سکه (گرم)',
+  gramsPerOz:   'گرم در هر انس',
+  AED_PER_USD:  'نرخ درهم در برابر دلار',
+  coinPurity:   'عیار سکه',
+  mithqalW:     'وزن مثقال (گرم)',
+  fullCoinW:    'وزن تمام سکه (گرم)',
+  halfCoinW:    'وزن نیم سکه (گرم)',
   quarterCoinW: 'وزن ربع سکه (گرم)',
-  mintCost: 'هزینه ضرب (تومان)',
+  mintCost:     'هزینه ضرب (تومان)',
 }
 
 function AdminConstants({ constants, onChange, border, muted, text, accent }: any) {
   const [editing, setEditing] = useState(false)
   const [local, setLocal] = useState(constants)
 
-  const handleApply = () => {
-    onChange(local)
-    setEditing(false)
-  }
-
-  const handleReset = () => {
-    setLocal(DEFAULT_CONSTANTS)
-    onChange(DEFAULT_CONSTANTS)
-  }
+  const handleApply = () => { onChange(local); setEditing(false) }
+  const handleReset = () => { setLocal(DEFAULT_CONSTANTS); onChange(DEFAULT_CONSTANTS) }
 
   return (
-    <div style={{
-      background: 'rgba(10,18,30,0.6)', border: `0.5px solid rgba(0,200,255,0.2)`,
-      borderRadius: 16, overflow: 'hidden',
-    }}>
-      <div style={{
-        padding: '14px 18px', borderBottom: `0.5px solid ${border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
+    <div style={{ background: 'rgba(10,18,30,0.6)', border: `0.5px solid rgba(0,200,255,0.2)`, borderRadius: 16, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: `0.5px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: text }}>ثوابت محاسباتی</span>
-            <span style={{
-              fontSize: 9, padding: '2px 8px', borderRadius: 4, fontWeight: 700,
-              background: 'rgba(0,200,255,0.12)', border: `0.5px solid ${accent}44`,
-              color: accent, fontFamily: 'system-ui',
-            }}>ADMIN</span>
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, fontWeight: 700, background: 'rgba(0,200,255,0.12)', border: `0.5px solid ${accent}44`, color: accent, fontFamily: 'system-ui' }}>ADMIN</span>
           </div>
-          <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>
-            تغییر ثوابت → محاسبه مجدد همه قیمت‌های واقعی
-          </div>
+          <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>تغییر ثوابت → محاسبه مجدد همه قیمت‌های واقعی</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {editing ? (
             <>
-              <button onClick={handleApply} style={{
-                fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
-                background: 'rgba(0,229,160,0.1)', border: `0.5px solid rgba(0,229,160,0.4)`,
-                color: '#00E5A0', fontFamily: 'inherit',
-              }}>اعمال</button>
-              <button onClick={handleReset} style={{
-                fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
-                background: 'rgba(255,77,106,0.08)', border: `0.5px solid rgba(255,77,106,0.3)`,
-                color: '#FF4D6A', fontFamily: 'inherit',
-              }}>بازنشانی</button>
-              <button onClick={() => { setEditing(false); setLocal(constants) }} style={{
-                fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
-                background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${border}`,
-                color: muted, fontFamily: 'inherit',
-              }}>لغو</button>
+              <button onClick={handleApply} style={{ fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer', background: 'rgba(0,229,160,0.1)', border: `0.5px solid rgba(0,229,160,0.4)`, color: '#00E5A0', fontFamily: 'inherit' }}>اعمال</button>
+              <button onClick={handleReset} style={{ fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,77,106,0.08)', border: `0.5px solid rgba(255,77,106,0.3)`, color: '#FF4D6A', fontFamily: 'inherit' }}>بازنشانی</button>
+              <button onClick={() => { setEditing(false); setLocal(constants) }} style={{ fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${border}`, color: muted, fontFamily: 'inherit' }}>لغو</button>
             </>
           ) : (
-            <button onClick={() => setEditing(true)} style={{
-              fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
-              background: `rgba(0,200,255,0.08)`, border: `0.5px solid ${accent}44`,
-              color: accent, fontFamily: 'inherit',
-            }}>ویرایش</button>
+            <button onClick={() => setEditing(true)} style={{ fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer', background: `rgba(0,200,255,0.08)`, border: `0.5px solid ${accent}44`, color: accent, fontFamily: 'inherit' }}>ویرایش</button>
           )}
         </div>
       </div>
       <div style={{ padding: '16px 18px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
           {Object.entries(editing ? local : constants).map(([key, value]) => (
-            <div key={key} style={{
-              background: 'rgba(0,200,255,0.03)', border: `0.5px solid ${editing ? 'rgba(0,200,255,0.25)' : border}`,
-              borderRadius: 8, padding: '10px 14px', display: 'flex',
-              justifyContent: 'space-between', alignItems: 'center', gap: 8,
-            }}>
-              <span style={{ fontSize: 11, color: muted, flexShrink: 0 }}>
-                {CONST_LABELS[key] ?? key}
-              </span>
+            <div key={key} style={{ background: 'rgba(0,200,255,0.03)', border: `0.5px solid ${editing ? 'rgba(0,200,255,0.25)' : border}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: muted, flexShrink: 0 }}>{CONST_LABELS[key] ?? key}</span>
               {editing ? (
                 <input
-                  type="number"
-                  value={local[key]}
+                  type="number" value={local[key]}
                   onChange={e => setLocal((prev: any) => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))}
-                  style={{
-                    width: 100, background: 'rgba(0,200,255,0.06)',
-                    border: `0.5px solid ${accent}44`, borderRadius: 6,
-                    color: text, fontSize: 12, fontFamily: 'system-ui',
-                    padding: '4px 8px', textAlign: 'left', outline: 'none',
-                  }}
+                  style={{ width: 100, background: 'rgba(0,200,255,0.06)', border: `0.5px solid ${accent}44`, borderRadius: 6, color: text, fontSize: 12, fontFamily: 'system-ui', padding: '4px 8px', textAlign: 'left', outline: 'none' }}
                 />
               ) : (
                 <span style={{ fontSize: 12, color: text, fontWeight: 600, fontFamily: 'system-ui' }}>

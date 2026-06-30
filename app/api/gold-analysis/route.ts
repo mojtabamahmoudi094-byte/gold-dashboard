@@ -6,8 +6,7 @@ export const dynamic = 'force-dynamic'
 const BRSAPI_KEY    = process.env.BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const PRO_URL       = `https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php?key=${BRSAPI_KEY}&section=gold,currency,cryptocurrency`
 const COMMODITY_URL = `https://api.brsapi.ir/Market/Commodity.php?key=${BRSAPI_KEY}`
-
-const CACHE_TTL = 60_000
+const CACHE_TTL     = 60_000
 
 let proCache:       { data: unknown; at: number } | null = null
 let commodityCache: { data: unknown; at: number } | null = null
@@ -22,21 +21,19 @@ async function fetchWithCache(
   cache: { data: unknown; at: number } | null,
   setCache: (c: { data: unknown; at: number }) => void,
   label: string
-): Promise<{ data: any; stale: boolean; age: number }> {
+): Promise<{ data: any; stale: boolean }> {
   const now = Date.now()
-  if (cache && now - cache.at < CACHE_TTL) {
-    return { data: cache.data, stale: false, age: Math.round((now - cache.at) / 1000) }
-  }
+  if (cache && now - cache.at < CACHE_TTL) return { data: cache.data, stale: false }
   try {
     const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) })
     if (!res.ok) throw new Error(`brsapi ${res.status}`)
     const json = await res.json()
     setCache({ data: json, at: now })
-    return { data: json, stale: false, age: 0 }
+    return { data: json, stale: false }
   } catch (e) {
     if (cache) {
       console.warn(`[gold-analysis] ${label} failed, serving stale:`, e)
-      return { data: cache.data, stale: true, age: Math.round((now - cache.at) / 1000) }
+      return { data: cache.data, stale: true }
     }
     throw e
   }
@@ -56,26 +53,58 @@ function rialToToman(v: unknown): number | null {
   return x ? x / 10 : null
 }
 
-function buildResponse(proData: any, commodityData: any, stale: boolean, cacheAge: number) {
-  const goldOunce  = proData?.gold?.ounce     ?? []
-  const goldTypes  = proData?.gold?.type       ?? []
-  const goldCoins  = proData?.gold?.coin       ?? []
-  const freeCurr   = proData?.currency?.free   ?? []
-  const cryptos    = proData?.cryptocurrency   ?? []
-  const metals     = commodityData?.metal_precious ?? []
+function extractPrices(proData: any, commodityData: any) {
+  const goldOunce = proData?.gold?.ounce    ?? []
+  const goldTypes = proData?.gold?.type     ?? []
+  const goldCoins = proData?.gold?.coin     ?? []
+  const freeCurr  = proData?.currency?.free ?? []
+  const cryptos   = proData?.cryptocurrency ?? []
+  const metals    = commodityData?.metal_precious ?? []
+  return {
+    goldUsd:     n(goldOunce[0]?.price),
+    silverUsd:   n(bySymbol(metals, 'XAGUSD')?.price),
+    dollarT:     rialToToman(bySymbol(freeCurr, 'USD')?.price),
+    dirhamT:     rialToToman(bySymbol(freeCurr, 'AED')?.price),
+    usdtT:       n(bySymbol(cryptos, 'USDT')?.price_toman),
+    gram24:      n(bySymbol(goldTypes, 'IR_GOLD_24K')?.price),
+    gram18:      n(bySymbol(goldTypes, 'IR_GOLD_18K')?.price),
+    mesghal:     n(bySymbol(goldTypes, 'IR_GOLD_MELTED')?.price),
+    fullCoin:    n(bySymbol(goldCoins, 'IR_COIN_BAHAR')?.price),
+    halfCoin:    n(bySymbol(goldCoins, 'IR_COIN_HALF')?.price),
+    quarterCoin: n(bySymbol(goldCoins, 'IR_COIN_QUARTER')?.price),
+  }
+}
+
+function pctChange(today: number | null, yesterday: number | null): number | null {
+  if (today == null || yesterday == null || yesterday === 0) return null
+  return ((today - yesterday) / yesterday) * 100
+}
+
+function buildResponse(
+  proData: any,
+  commodityData: any,
+  stale: boolean,
+  changes: Record<string, number | null> | null,
+  lastMarketDate: string | null,
+) {
+  const goldOunce = proData?.gold?.ounce    ?? []
+  const goldTypes = proData?.gold?.type     ?? []
+  const goldCoins = proData?.gold?.coin     ?? []
+  const freeCurr  = proData?.currency?.free ?? []
+  const cryptos   = proData?.cryptocurrency ?? []
+  const metals    = commodityData?.metal_precious ?? []
 
   const ounceEntry  = goldOunce[0]
-  const silverEntry = bySymbol(metals, 'XAGUSD')
   const dollarEntry = bySymbol(freeCurr, 'USD')
   const dirhamEntry = bySymbol(freeCurr, 'AED')
   const usdtEntry   = bySymbol(cryptos, 'USDT')
+  const silverEntry = bySymbol(metals, 'XAGUSD')
 
   const goldUsd   = n(ounceEntry?.price)
   const silverUsd = n(silverEntry?.price)
-
-  const dollarT = rialToToman(dollarEntry?.price)
-  const dirhamT = rialToToman(dirhamEntry?.price)
-  const usdtT   = n(usdtEntry?.price_toman)
+  const dollarT   = rialToToman(dollarEntry?.price)
+  const dirhamT   = rialToToman(dirhamEntry?.price)
+  const usdtT     = n(usdtEntry?.price_toman)
 
   const marketGram24  = n(bySymbol(goldTypes, 'IR_GOLD_24K')?.price)
   const marketGram18  = n(bySymbol(goldTypes, 'IR_GOLD_18K')?.price)
@@ -83,9 +112,6 @@ function buildResponse(proData: any, commodityData: any, stale: boolean, cacheAg
   const marketFull    = n(bySymbol(goldCoins, 'IR_COIN_BAHAR')?.price)
   const marketHalf    = n(bySymbol(goldCoins, 'IR_COIN_HALF')?.price)
   const marketQuarter = n(bySymbol(goldCoins, 'IR_COIN_QUARTER')?.price)
-
-  const goldUsdChange = ounceEntry?.change_percent  != null ? ounceEntry.change_percent  / 100 : null
-  const dollarChange  = dollarEntry?.change_percent != null ? dollarEntry.change_percent / 100 : null
 
   const AED_PER_USD  = 3.6732
   const gramsPerOz   = 31.103431
@@ -113,9 +139,10 @@ function buildResponse(proData: any, commodityData: any, stale: boolean, cacheAg
 
   return NextResponse.json({
     updatedAt: new Date().toISOString(),
+    lastMarketDate,
     _stale: stale,
-    _cacheAge: cacheAge,
-    inputs: { goldUsd, silverUsd, dollarT, dirhamT, usdtT, goldUsdChange, dollarChange },
+    inputs: { goldUsd, silverUsd, dollarT, dirhamT, usdtT },
+    changes: changes ?? {},
     derived: { dollarViaDirham, bubbleDollar, bubbleUsdt, AED_PER_USD },
     gram: {
       fair24: fairGram24, market24: marketGram24, bubble24: bub(marketGram24, fairGram24),
@@ -126,65 +153,101 @@ function buildResponse(proData: any, commodityData: any, stale: boolean, cacheAg
     mesghal: {
       fair: fairMesghal, market: marketMesghal, bubble: bub(marketMesghal, fairMesghal),
       impliedDollar: imp(marketMesghal, goldUsd, mithqalW * (18 / 24) / gramsPerOz),
-      changePct: null,
+      changePct: changes?.mesghal ?? null,
     },
     coins: {
       full: {
         fair: fairFull, market: marketFull, bubble: bub(marketFull, fairFull),
-        weight: fullCoinW, marketIsEstimate: false, marketSource: 'brsapi.ir',
+        weight: fullCoinW, marketIsEstimate: false, changePct: changes?.fullCoin ?? null,
       },
       half: {
         fair: fairHalf, market: marketHalf, bubble: bub(marketHalf, fairHalf),
         weight: halfCoinW,
         impliedDollar: imp(marketHalf, goldUsd, halfCoinW * (22 / 24) / gramsPerOz),
-        changePct: null,
+        changePct: changes?.halfCoin ?? null,
       },
       quarter: {
         fair: fairQuarter, market: marketQuarter, bubble: bub(marketQuarter, fairFull),
         weight: quarterCoinW,
         impliedDollar: imp(marketQuarter, goldUsd, quarterCoinW * (22 / 24) / gramsPerOz),
-        changePct: null,
+        changePct: changes?.quarterCoin ?? null,
       },
     },
     constants: {
       gramsPerOz, AED_PER_USD, coinPurity: 22, bullionPurity: 24,
       fullCoinWeight: fullCoinW, halfCoinWeight: halfCoinW, quarterCoinWeight: quarterCoinW,
-      mintCost, akhzaRate: 0.023, bankRate: 0.026, financeRate: 0.043,
+      mintCost,
     },
   })
 }
 
 export async function GET() {
+  // ── 1. Fetch last 2 Supabase cache records (today + yesterday) ──────────────
+  let sbRows: Array<{ raw_pro: any; raw_commodity: any; date: string }> = []
+  try {
+    const { data: rows } = await sbClient
+      .from('signals')
+      .select('note, signal_date_shamsi')
+      .eq('signal_type', '_gold_cache')
+      .order('signal_date_shamsi', { ascending: false })
+      .limit(2)
+
+    sbRows = (rows ?? [])
+      .filter(r => r.note)
+      .map(r => {
+        const p = JSON.parse(r.note)
+        return { raw_pro: p.raw_pro, raw_commodity: p.raw_commodity, date: r.signal_date_shamsi }
+      })
+  } catch (e) {
+    console.error('[gold-analysis] Supabase fetch failed:', e)
+  }
+
+  const lastMarketDate = sbRows[0]?.date ?? null
+
+  // ── 2. Try live BrsAPI (Iranian IP required — expected to fail on Render) ───
+  let liveProData: any      = null
+  let liveCommodityData: any = null
+  let stale = true
+
   try {
     const [pro, commodity] = await Promise.all([
       fetchWithCache(PRO_URL,       proCache,       c => { proCache       = c }, 'Gold_Currency_Pro'),
       fetchWithCache(COMMODITY_URL, commodityCache, c => { commodityCache = c }, 'Commodity'),
     ])
-    return buildResponse(pro.data, commodity.data, pro.stale || commodity.stale, Math.max(pro.age, commodity.age))
-  } catch (e) {
-    console.error('[gold-analysis] BrsAPI failed:', e)
-
-    // Fallback: read from Supabase cache (saved by admin sync from Iranian IP)
-    try {
-      const { data: rows } = await sbClient
-        .from('signals')
-        .select('note')
-        .eq('signal_type', '_gold_cache')
-        .order('id', { ascending: false })
-        .limit(1)
-
-      if (rows?.[0]?.note) {
-        const { raw_pro, raw_commodity } = JSON.parse(rows[0].note)
-        // Populate module cache so next request doesn't hit Supabase again
-        proCache       = { data: raw_pro,       at: Date.now() }
-        commodityCache = { data: raw_commodity, at: Date.now() }
-        console.log('[gold-analysis] serving from Supabase cache')
-        return buildResponse(raw_pro, raw_commodity, true, 0)
-      }
-    } catch (sbErr) {
-      console.error('[gold-analysis] Supabase fallback failed:', sbErr)
-    }
-
-    return NextResponse.json({ error: 'fetch failed' }, { status: 500 })
+    liveProData      = pro.data
+    liveCommodityData = commodity.data
+    stale            = pro.stale || commodity.stale
+  } catch {
+    // Expected on Render — fall through to Supabase cache
   }
+
+  // ── 3. Resolve today's data source ──────────────────────────────────────────
+  const todayProData       = liveProData       ?? sbRows[0]?.raw_pro
+  const todayCommodityData = liveCommodityData ?? sbRows[0]?.raw_commodity
+
+  if (!todayProData) {
+    return NextResponse.json({ error: 'no data available' }, { status: 503 })
+  }
+
+  // ── 4. Compute daily change percentages ─────────────────────────────────────
+  const todayP = extractPrices(todayProData, todayCommodityData)
+  const yestP  = sbRows[1]
+    ? extractPrices(sbRows[1].raw_pro, sbRows[1].raw_commodity)
+    : null
+
+  const changes = yestP ? {
+    goldUsd:     pctChange(todayP.goldUsd,     yestP.goldUsd),
+    silverUsd:   pctChange(todayP.silverUsd,   yestP.silverUsd),
+    dollarT:     pctChange(todayP.dollarT,     yestP.dollarT),
+    dirhamT:     pctChange(todayP.dirhamT,     yestP.dirhamT),
+    usdtT:       pctChange(todayP.usdtT,       yestP.usdtT),
+    gram24:      pctChange(todayP.gram24,      yestP.gram24),
+    gram18:      pctChange(todayP.gram18,      yestP.gram18),
+    mesghal:     pctChange(todayP.mesghal,     yestP.mesghal),
+    fullCoin:    pctChange(todayP.fullCoin,    yestP.fullCoin),
+    halfCoin:    pctChange(todayP.halfCoin,    yestP.halfCoin),
+    quarterCoin: pctChange(todayP.quarterCoin, yestP.quarterCoin),
+  } : null
+
+  return buildResponse(todayProData, todayCommodityData, stale, changes, lastMarketDate)
 }

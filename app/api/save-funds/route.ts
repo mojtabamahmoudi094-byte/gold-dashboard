@@ -45,7 +45,8 @@ export async function POST(req: Request) {
     }
 
     if (goldCache) {
-      await sb.from('signals').delete().eq('signal_type', '_gold_cache')
+      await sb.from('signals').delete()
+        .eq('signal_type', '_gold_cache').eq('signal_date_shamsi', date)
       await sb.from('signals').insert({
         signal_type: '_gold_cache',
         signal_date_shamsi: date,
