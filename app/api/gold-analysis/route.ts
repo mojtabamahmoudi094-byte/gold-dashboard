@@ -3,31 +3,35 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 const BRSAPI_KEY = process.env.BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
-const BRSAPI_URL = `https://api.brsapi.ir/Market/Gold_Currency.php?key=${BRSAPI_KEY}`
+const DOMESTIC_URL  = `https://api.brsapi.ir/Market/Gold_Currency.php?key=${BRSAPI_KEY}`
+const COMMODITY_URL = `https://api.brsapi.ir/Market/Commodity.php?key=${BRSAPI_KEY}`
 
-// 60s server-side cache → max ~1440 req/day, under 1500 limit
+// 60s server-side cache per endpoint → well under 10,000/day limit
 const CACHE_TTL = 60_000
 
-let rawCache: { data: unknown; at: number } | null = null
+let domesticCache:  { data: unknown; at: number } | null = null
+let commodityCache: { data: unknown; at: number } | null = null
 
-async function getOrFetch(): Promise<{ data: any; stale: boolean; age: number }> {
+async function fetchWithCache(
+  url: string,
+  cache: { data: unknown; at: number } | null,
+  setCache: (c: { data: unknown; at: number }) => void,
+  label: string
+): Promise<{ data: any; stale: boolean; age: number }> {
   const now = Date.now()
-  if (rawCache && now - rawCache.at < CACHE_TTL) {
-    return { data: rawCache.data, stale: false, age: Math.round((now - rawCache.at) / 1000) }
+  if (cache && now - cache.at < CACHE_TTL) {
+    return { data: cache.data, stale: false, age: Math.round((now - cache.at) / 1000) }
   }
   try {
-    const res = await fetch(BRSAPI_URL, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(8_000),
-    })
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) })
     if (!res.ok) throw new Error(`brsapi ${res.status}`)
     const json = await res.json()
-    rawCache = { data: json, at: now }
+    setCache({ data: json, at: now })
     return { data: json, stale: false, age: 0 }
   } catch (e) {
-    if (rawCache) {
-      console.warn('[gold-analysis] brsapi failed, serving stale cache:', e)
-      return { data: rawCache.data, stale: true, age: Math.round((now - rawCache.at) / 1000) }
+    if (cache) {
+      console.warn(`[gold-analysis] ${label} failed, serving stale:`, e)
+      return { data: cache.data, stale: true, age: Math.round((now - cache.at) / 1000) }
     }
     throw e
   }
@@ -37,20 +41,6 @@ function bySymbol(arr: any[], sym: string): any | null {
   return arr?.find((x: any) => x.symbol === sym) ?? null
 }
 
-async function fetchTgjuSilver(): Promise<number | null> {
-  try {
-    const res = await fetch(
-      'https://api.tgju.org/v1/market/indicator/summary-table-data/silver',
-      { cache: 'no-store', signal: AbortSignal.timeout(5_000) }
-    )
-    if (!res.ok) return null
-    const row = (await res.json())?.data?.[0]
-    return row ? parseFloat(String(row[3]).replace(/,/g, '')) || null : null
-  } catch {
-    return null
-  }
-}
-
 function n(v: unknown): number | null {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
   return isNaN(x) || x === 0 ? null : x
@@ -58,20 +48,26 @@ function n(v: unknown): number | null {
 
 export async function GET() {
   try {
-    const [{ data: raw, stale, age }, silverUsd] = await Promise.all([
-      getOrFetch(),
-      fetchTgjuSilver(),
+    const [domestic, commodity] = await Promise.all([
+      fetchWithCache(DOMESTIC_URL,  domesticCache,  c => { domesticCache  = c }, 'Gold_Currency'),
+      fetchWithCache(COMMODITY_URL, commodityCache, c => { commodityCache = c }, 'Commodity'),
     ])
 
-    const golds      = raw?.gold ?? []
-    const currencies = raw?.currency ?? []
+    const golds      = domestic.data?.gold ?? []
+    const currencies = domestic.data?.currency ?? []
+    const metals     = commodity.data?.metal_precious ?? []
 
-    const goldEntry   = bySymbol(golds, 'XAUUSD')
     const dollarEntry = bySymbol(currencies, 'USD')
     const dirhamEntry = bySymbol(currencies, 'AED')
     const usdtEntry   = bySymbol(currencies, 'USDT_IRT')
+    const goldCEntry  = bySymbol(metals, 'XAUUSD')
+    const silverEntry = bySymbol(metals, 'XAGUSD')
 
-    const goldUsd = n(goldEntry?.price)
+    // International prices from Commodity API (more accurate)
+    const goldUsd  = n(goldCEntry?.price)
+    const silverUsd = n(silverEntry?.price)
+
+    // Domestic prices from Gold_Currency API
     const dollarT = n(dollarEntry?.price)
     const dirhamT = n(dirhamEntry?.price)
     const usdtT   = n(usdtEntry?.price)
@@ -83,8 +79,8 @@ export async function GET() {
     const marketHalf    = n(bySymbol(golds, 'IR_COIN_HALF')?.price)
     const marketQuarter = n(bySymbol(golds, 'IR_COIN_QUARTER')?.price)
 
-    // brsapi change_percent is already % (e.g. -0.74); page expects decimal fraction
-    const goldUsdChange = goldEntry?.change_percent != null ? goldEntry.change_percent / 100 : null
+    // change_percent from brsapi is already % (e.g. -0.74); page expects decimal fraction
+    const goldUsdChange = goldCEntry?.change_percent != null ? goldCEntry.change_percent / 100 : null
     const dollarChange  = dollarEntry?.change_percent != null ? dollarEntry.change_percent / 100 : null
 
     const AED_PER_USD  = 3.6732
@@ -112,10 +108,12 @@ export async function GET() {
     const imp = (mT: number | null, oz: number | null, frac: number) =>
       mT && oz ? (mT / frac) / oz : null
 
+    const stale = domestic.stale || commodity.stale
+
     return NextResponse.json({
       updatedAt: new Date().toISOString(),
       _stale: stale,
-      _cacheAge: age,
+      _cacheAge: Math.max(domestic.age, commodity.age),
       inputs: {
         goldUsd,
         silverUsd,
