@@ -97,18 +97,33 @@ export default function FundDetailPage() {
   const isPositive = changePct > 0
   const isNegative = changePct < 0
 
-  // محاسبه‌ی ورود/خروج پول حقیقی
+  // قیمت: اگر ≥100000 = ریال (sync جدید)، باید ÷10 به تومان تبدیل شود
+  const priceIsRial = safe(record.price_close) >= 100_000
+  const priceToman = (v: number) => priceIsRial ? Math.round(v / 10) : v
+
+  // محاسبه‌ی ورود/خروج پول حقیقی (میلیارد تومان)
   const buyValue = safe(record.buy_i_volume) * safe(record.price_close)
   const sellValue = safe(record.sell_i_volume) * safe(record.price_close)
   const netFlow = buyValue - sellValue
-  const netFlowBillion = Math.round((netFlow / 1000000000) * 10) / 10
+  // ریال: ÷10^10 = میلیارد تومان؛ تومان: ÷10^9 = میلیارد تومان
+  const netFlowBillion = Math.round((netFlow / (priceIsRial ? 1e10 : 1e9)) * 10) / 10
 
-  // سرانه‌ی خرید و فروش حقیقی
+  // سرانه‌ی خرید و فروش حقیقی (میلیون تومان)
+  // ریال: vol×ریال / count / 10^7 = م.ت؛ تومان: vol×تومان / count / 10^6 = م.ت
+  const avgDivisor = priceIsRial ? 1e7 : 1e6
+  const buyAvgMT = safe(record.buy_count_i) > 0
+    ? Math.round(safe(record.buy_i_volume) * safe(record.price_close) / safe(record.buy_count_i) / avgDivisor)
+    : 0
+  const sellAvgMT = safe(record.sell_count_i) > 0
+    ? Math.round(safe(record.sell_i_volume) * safe(record.price_close) / safe(record.sell_count_i) / avgDivisor)
+    : 0
+
+  // سرانه‌ی بر اساس تعداد سهم (برای قدرت خریدار، واحد یکسان است)
   const buyAvg = safe(record.buy_count_i) > 0
-    ? Math.round(safe(record.buy_i_volume) / safe(record.buy_count_i))
+    ? safe(record.buy_i_volume) / safe(record.buy_count_i)
     : 0
   const sellAvg = safe(record.sell_count_i) > 0
-    ? Math.round(safe(record.sell_i_volume) / safe(record.sell_count_i))
+    ? safe(record.sell_i_volume) / safe(record.sell_count_i)
     : 0
 
   // قدرت خریدار
@@ -175,21 +190,31 @@ export default function FundDetailPage() {
 
         {/* کارت‌های اصلی */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
-          <MetricCard t={t} label="قیمت پایانی" value={`${safe(record.price_close).toLocaleString('fa-IR')} تومان`} />
-          <MetricCard t={t} label="آخرین قیمت" value={`${safe(record.price_last).toLocaleString('fa-IR')} تومان`} />
-          <MetricCard t={t} label="ارزش معاملات" value={`${fmtVal(record.trade_value)} میلیارد تومان`} />
-          <MetricCard t={t} label="ارزش بازار" value={`${fmtVal(record.market_value)} میلیارد تومان`} />
+          <MetricCard t={t} label="قیمت پایانی"
+            value={`${priceToman(safe(record.price_close)).toLocaleString('fa-IR')} تومان`}
+            tooltip={`قیمت دقیق: ${safe(record.price_close).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`} />
+          <MetricCard t={t} label="آخرین قیمت"
+            value={`${priceToman(safe(record.price_last)).toLocaleString('fa-IR')} تومان`}
+            tooltip={`قیمت دقیق: ${safe(record.price_last).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`} />
+          <MetricCard t={t} label="ارزش معاملات"
+            value={`${Math.round(safe(record.trade_value) / 1e9).toLocaleString('fa-IR')} م.ت`}
+            tooltip={`ارزش دقیق: ${safe(record.trade_value).toLocaleString('fa-IR')} ریال`} />
+          <MetricCard t={t} label="ارزش بازار"
+            value={`${Math.round(safe(record.market_value) / 1e12).toLocaleString('fa-IR')} ه.م.ت`}
+            tooltip={`ارزش دقیق: ${safe(record.market_value).toLocaleString('fa-IR')} ریال`} />
         </div>
 
         {/* ردیف دوم کارت‌ها */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
-          <MetricCard t={t} label="حجم معاملات" value={safe(record.volume).toLocaleString('fa-IR')} />
+          <MetricCard t={t} label="حجم معاملات"
+            value={`${(safe(record.volume) / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} م.سهم`}
+            tooltip={`حجم دقیق: ${safe(record.volume).toLocaleString('fa-IR')} سهم`} />
           <MetricCard t={t} label="جریان پول حقیقی"
             value={`${netFlowBillion >= 0 ? '+' : ''}${netFlowBillion.toLocaleString('fa-IR')} میلیارد`}
             color={netFlowBillion >= 0 ? '#00E5A0' : '#FF4D6A'}
             tooltip="تفاوت ارزش خرید و فروش حقیقی‌ها" />
-          <MetricCard t={t} label="سرانه خریدار" value={buyAvg.toLocaleString('fa-IR')}
-            tooltip="میانگین حجم خرید هر خریدار حقیقی" />
+          <MetricCard t={t} label="سرانه خریدار" value={`${buyAvgMT.toLocaleString('fa-IR')} م.ت`}
+            tooltip="میانگین ارزش خرید هر خریدار حقیقی — میلیون تومان" />
           <MetricCard t={t} label="قدرت خریدار" value={buyPower}
             color={Number(buyPower) > 1 ? '#00E5A0' : Number(buyPower) < 1 ? '#FF4D6A' : t.textBright}
             tooltip="نسبت سرانه خریدار به سرانه فروشنده. بالای ۱ یعنی خریداران قوی‌ترند" />
@@ -215,7 +240,7 @@ export default function FundDetailPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <StatRow label="تعداد" value={safe(record.buy_count_i).toLocaleString('fa-IR')} color="#00E5A0" />
                 <StatRow label="حجم خرید" value={safe(record.buy_i_volume).toLocaleString('fa-IR')} color="#00E5A0" />
-                <StatRow label="سرانه" value={buyAvg.toLocaleString('fa-IR')} color="#00E5A0" />
+                <StatRow label="سرانه" value={`${buyAvgMT.toLocaleString('fa-IR')} م.ت`} color="#00E5A0" />
               </div>
             </div>
             {/* فروشندگان */}
@@ -224,7 +249,7 @@ export default function FundDetailPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <StatRow label="تعداد" value={safe(record.sell_count_i).toLocaleString('fa-IR')} color="#FF4D6A" />
                 <StatRow label="حجم فروش" value={safe(record.sell_i_volume).toLocaleString('fa-IR')} color="#FF4D6A" />
-                <StatRow label="سرانه" value={sellAvg.toLocaleString('fa-IR')} color="#FF4D6A" />
+                <StatRow label="سرانه" value={`${sellAvgMT.toLocaleString('fa-IR')} م.ت`} color="#FF4D6A" />
               </div>
             </div>
           </div>
@@ -241,7 +266,8 @@ export default function FundDetailPage() {
               const flows = [...history].map(r => {
                 const buyVal = safe(r.buy_i_volume) * safe(r.price_close)
                 const sellVal = safe(r.sell_i_volume) * safe(r.price_close)
-                const net = Math.round((buyVal - sellVal) / 1000000000 * 10) / 10
+                const isRial = safe(r.price_close) >= 100_000
+                const net = Math.round((buyVal - sellVal) / (isRial ? 1e10 : 1e9) * 10) / 10
                 return { date: r.trade_date_shamsi || '', net }
               })
 
@@ -312,8 +338,10 @@ export default function FundDetailPage() {
               const caps = [...history].map(r => {
                 const bCnt = safe(r.buy_count_i)
                 const sCnt = safe(r.sell_count_i)
-                const bAvg = bCnt > 0 ? Math.round((safe(r.buy_i_volume) * safe(r.price_close)) / bCnt / 1000000) : 0
-                const sAvg = sCnt > 0 ? Math.round((safe(r.sell_i_volume) * safe(r.price_close)) / sCnt / 1000000) : 0
+                const isRial = safe(r.price_close) >= 100_000
+                const div = isRial ? 1e7 : 1e6  // میلیون تومان
+                const bAvg = bCnt > 0 ? Math.round((safe(r.buy_i_volume) * safe(r.price_close)) / bCnt / div) : 0
+                const sAvg = sCnt > 0 ? Math.round((safe(r.sell_i_volume) * safe(r.price_close)) / sCnt / div) : 0
                 const power = sAvg > 0 ? Math.round((bAvg / sAvg) * 100) / 100 : 0
                 return { date: r.trade_date_shamsi || '', bAvg, sAvg, power }
               })
@@ -364,9 +392,9 @@ export default function FundDetailPage() {
           return (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
 
-              <BarChartPanel t={t} title="ارزش معاملات ۱۰ روز" subtitle="میلیارد تومان"
+              <BarChartPanel t={t} title="ارزش معاملات ۱۰ روز" subtitle="م.ت"
                 rows={h10} colorA={t.accent} labelA="ارزش"
-                getA={r => safe(r.trade_value)} />
+                getA={r => { const tv = safe(r.trade_value); return tv > 1e6 ? Math.round(tv / 1e9) : tv }} />
 
               <BarChartPanel t={t} title="حجم معاملات ۱۰ روز" subtitle="میلیون سهم"
                 rows={h10} colorA="#A78BFA" labelA="حجم"
@@ -387,15 +415,15 @@ export default function FundDetailPage() {
                 getA={r => safe(r.buy_count_i)}
                 getB={r => safe(r.sell_count_i)} />
 
-              <BarChartPanel t={t} title="ارزش خرید و فروش حقیقی" subtitle="میلیون تومان"
+              <BarChartPanel t={t} title="ارزش خرید و فروش حقیقی" subtitle="میلیارد تومان"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
-                getA={r => Math.round(safe(r.buy_i_volume) * safe(r.price_close) / 1_000_000 * 10) / 10}
-                getB={r => Math.round(safe(r.sell_i_volume) * safe(r.price_close) / 1_000_000 * 10) / 10} />
+                getA={r => { const d = safe(r.price_close) >= 100_000 ? 1e10 : 1e9; return Math.round(safe(r.buy_i_volume) * safe(r.price_close) / d * 10) / 10 }}
+                getB={r => { const d = safe(r.price_close) >= 100_000 ? 1e10 : 1e9; return Math.round(safe(r.sell_i_volume) * safe(r.price_close) / d * 10) / 10 }} />
 
-              <BarChartPanel t={t} title="ارزش خرید و فروش حقوقی" subtitle="میلیون تومان"
+              <BarChartPanel t={t} title="ارزش خرید و فروش حقوقی" subtitle="میلیارد تومان"
                 rows={h10} colorA="#60A5FA" colorB="#F59E0B" labelA="خرید" labelB="فروش"
-                getA={r => Math.round(Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) * safe(r.price_close) / 1_000_000 * 10) / 10}
-                getB={r => Math.round(Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) * safe(r.price_close) / 1_000_000 * 10) / 10} />
+                getA={r => { const d = safe(r.price_close) >= 100_000 ? 1e10 : 1e9; return Math.round(Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) * safe(r.price_close) / d * 10) / 10 }}
+                getB={r => { const d = safe(r.price_close) >= 100_000 ? 1e10 : 1e9; return Math.round(Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) * safe(r.price_close) / d * 10) / 10 }} />
 
               <BarChartPanel t={t} title="حجم خرید و فروش حقیقی" subtitle="میلیون سهم"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
@@ -432,7 +460,7 @@ export default function FundDetailPage() {
                     return (
                       <tr key={i} style={{ borderBottom: `0.5px solid ${t.border}` }}>
                         <td style={{ padding: '8px', color: t.text }}>{r.trade_date_shamsi}</td>
-                        <td style={{ padding: '8px', color: t.text }}>{safe(r.price_close).toLocaleString('fa-IR')}</td>
+                        <td style={{ padding: '8px', color: t.text }}>{(safe(r.price_close) >= 100_000 ? Math.round(safe(r.price_close) / 10) : safe(r.price_close)).toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '8px' }}>
                           <span style={{
                             color: chg > 0 ? '#00E5A0' : chg < 0 ? '#FF4D6A' : t.muted,
@@ -441,7 +469,7 @@ export default function FundDetailPage() {
                             {chg > 0 ? '+' : ''}{chg.toFixed(2)}٪
                           </span>
                         </td>
-                        <td style={{ padding: '8px', color: t.text }}>{fmtVal(r.trade_value)} م.ت</td>
+                        <td style={{ padding: '8px', color: t.text }}>{(() => { const tv = safe(r.trade_value); return (tv > 1e6 ? Math.round(tv / 1e9) : tv).toLocaleString('fa-IR') })()}</td>
                         <td style={{ padding: '8px', color: t.text }}>{safe(r.volume).toLocaleString('fa-IR')}</td>
                       </tr>
                     )
@@ -593,7 +621,7 @@ function StatRow({ label, value, color }: any) {
 function FundPriceChart({ t, history }: { t: any, history: any[] }) {
   if (!history || history.length < 3) return null
 
-  const prices = history.map(r => safe(r.price_close))
+  const prices = history.map(r => { const pc = safe(r.price_close); return pc >= 100_000 ? Math.round(pc / 10) : pc })
   const volumes = history.map(r => safe(r.volume))
   const n = prices.length
 
