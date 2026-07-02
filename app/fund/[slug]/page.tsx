@@ -97,8 +97,8 @@ export default function FundDetailPage() {
   const isPositive = changePct > 0
   const isNegative = changePct < 0
 
-  // قیمت: اگر ≥100000 = ریال (sync جدید)، باید ÷10 به تومان تبدیل شود
-  const priceIsRial = safe(record.price_close) >= 100_000
+  // دوره ریال: trade_value > 1e6 (raw ریال). کار می‌کند برای همه صندوق‌ها از جمله نقره/زعفران
+  const priceIsRial = safe(record.trade_value) > 1e6
   const priceToman = (v: number) => priceIsRial ? Math.round(v / 10) : v
 
   // محاسبه‌ی ورود/خروج پول حقیقی (میلیارد تومان)
@@ -266,7 +266,7 @@ export default function FundDetailPage() {
               const flows = [...history].map(r => {
                 const buyVal = safe(r.buy_i_volume) * safe(r.price_close)
                 const sellVal = safe(r.sell_i_volume) * safe(r.price_close)
-                const isRial = safe(r.price_close) >= 100_000
+                const isRial = safe(r.trade_value) > 1e6
                 const net = Math.round((buyVal - sellVal) / (isRial ? 1e10 : 1e9) * 10) / 10
                 return { date: r.trade_date_shamsi || '', net }
               })
@@ -338,7 +338,7 @@ export default function FundDetailPage() {
               const caps = [...history].map(r => {
                 const bCnt = safe(r.buy_count_i)
                 const sCnt = safe(r.sell_count_i)
-                const isRial = safe(r.price_close) >= 100_000
+                const isRial = safe(r.trade_value) > 1e6
                 const div = isRial ? 1e7 : 1e6  // میلیون تومان
                 const bAvg = bCnt > 0 ? Math.round((safe(r.buy_i_volume) * safe(r.price_close)) / bCnt / div) : 0
                 const sAvg = sCnt > 0 ? Math.round((safe(r.sell_i_volume) * safe(r.price_close)) / sCnt / div) : 0
@@ -417,13 +417,13 @@ export default function FundDetailPage() {
 
               <BarChartPanel t={t} title="ارزش خرید و فروش حقیقی" subtitle="میلیارد تومان"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
-                getA={r => { const d = safe(r.price_close) >= 100_000 ? 1e10 : 1e9; return Math.round(safe(r.buy_i_volume) * safe(r.price_close) / d * 10) / 10 }}
-                getB={r => { const d = safe(r.price_close) >= 100_000 ? 1e10 : 1e9; return Math.round(safe(r.sell_i_volume) * safe(r.price_close) / d * 10) / 10 }} />
+                getA={r => { const d = safe(r.trade_value) > 1e6 ? 1e10 : 1e9; return Math.round(safe(r.buy_i_volume) * safe(r.price_close) / d * 10) / 10 }}
+                getB={r => { const d = safe(r.trade_value) > 1e6 ? 1e10 : 1e9; return Math.round(safe(r.sell_i_volume) * safe(r.price_close) / d * 10) / 10 }} />
 
               <BarChartPanel t={t} title="ارزش خرید و فروش حقوقی" subtitle="میلیارد تومان"
                 rows={h10} colorA="#60A5FA" colorB="#F59E0B" labelA="خرید" labelB="فروش"
-                getA={r => { const d = safe(r.price_close) >= 100_000 ? 1e10 : 1e9; return Math.round(Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) * safe(r.price_close) / d * 10) / 10 }}
-                getB={r => { const d = safe(r.price_close) >= 100_000 ? 1e10 : 1e9; return Math.round(Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) * safe(r.price_close) / d * 10) / 10 }} />
+                getA={r => { const d = safe(r.trade_value) > 1e6 ? 1e10 : 1e9; return Math.round(Math.max(safe(r.volume) - safe(r.buy_i_volume), 0) * safe(r.price_close) / d * 10) / 10 }}
+                getB={r => { const d = safe(r.trade_value) > 1e6 ? 1e10 : 1e9; return Math.round(Math.max(safe(r.volume) - safe(r.sell_i_volume), 0) * safe(r.price_close) / d * 10) / 10 }} />
 
               <BarChartPanel t={t} title="حجم خرید و فروش حقیقی" subtitle="میلیون سهم"
                 rows={h10} colorA="#00E5A0" colorB="#FF4D6A" labelA="خرید" labelB="فروش"
@@ -460,7 +460,7 @@ export default function FundDetailPage() {
                     return (
                       <tr key={i} style={{ borderBottom: `0.5px solid ${t.border}` }}>
                         <td style={{ padding: '8px', color: t.text }}>{r.trade_date_shamsi}</td>
-                        <td style={{ padding: '8px', color: t.text }}>{(safe(r.price_close) >= 100_000 ? Math.round(safe(r.price_close) / 10) : safe(r.price_close)).toLocaleString('fa-IR')}</td>
+                        <td style={{ padding: '8px', color: t.text }}>{(safe(r.trade_value) > 1e6 ? Math.round(safe(r.price_close) / 10) : safe(r.price_close)).toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '8px' }}>
                           <span style={{
                             color: chg > 0 ? '#00E5A0' : chg < 0 ? '#FF4D6A' : t.muted,
@@ -621,7 +621,7 @@ function StatRow({ label, value, color }: any) {
 function FundPriceChart({ t, history }: { t: any, history: any[] }) {
   if (!history || history.length < 3) return null
 
-  const prices = history.map(r => { const pc = safe(r.price_close); return pc >= 100_000 ? Math.round(pc / 10) : pc })
+  const prices = history.map(r => { const pc = safe(r.price_close); return safe(r.trade_value) > 1e6 ? Math.round(pc / 10) : pc })
   const volumes = history.map(r => safe(r.volume))
   const n = prices.length
 
