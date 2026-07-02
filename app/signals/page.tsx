@@ -240,13 +240,22 @@ export default function SignalsPage() {
 
   useEffect(() => {
     const load = async () => {
-      // ۱. سیگنال‌های معتبر (فقط با confidence)
+      // ۱. سیگنال‌های معتبر — حذف تکراری‌های همون روز (آخرین insert برای هر date+type)
       const { data: sigs } = await supabase
         .from('signals')
         .select('*')
         .not('confidence', 'is', null)
         .order('id', { ascending: false })
-      if (sigs) setSignals(sigs)
+      if (sigs) {
+        const seen = new Set<string>()
+        const deduped = sigs.filter((s: any) => {
+          const key = `${s.signal_date_shamsi}|${s.signal_type}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        setSignals(deduped)
+      }
 
       // ۲. تاریخچه قیمت عیار (asset_id=2) برای محاسبه نتیجه
       const { data: prices } = await supabase
@@ -652,7 +661,18 @@ export default function SignalsPage() {
           </div>
 
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: MUTED, fontSize: 13 }}>در حال بارگذاری...</div>
+            <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} style={{ display: 'flex', gap: 14, padding: '13px 10px', borderBottom: `0.5px solid ${BORDER}`, alignItems: 'center', opacity: 1 - i * 0.12 }}>
+                  <div className="skeleton" style={{ width: 80, height: 14 }} />
+                  <div className="skeleton" style={{ width: 52, height: 22, borderRadius: 6 }} />
+                  <div className="skeleton" style={{ width: 60, height: 14 }} />
+                  <div className="skeleton" style={{ width: 44, height: 14 }} />
+                  <div className="skeleton" style={{ width: 36, height: 14 }} />
+                  <div className="skeleton" style={{ width: 120 + (i % 3) * 30, height: 14 }} />
+                </div>
+              ))}
+            </div>
           ) : signals.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}>
               <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>📊</div>

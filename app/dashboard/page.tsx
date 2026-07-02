@@ -322,16 +322,21 @@ export default function TerminalPage() {
 
     let cancelled = false
     const saveSignal = async () => {
-      // double-check right before insert to avoid duplicate
+      // double-check right before insert — guard both type AND date
+      const lastRecord = records.at(-1)
+      const todayDate = lastRecord?.trade_date_shamsi || ''
       const { data: latest } = await supabase
         .from('signals')
-        .select('signal_type')
+        .select('signal_type, signal_date_shamsi')
         .order('id', { ascending: false })
         .limit(1)
       if (cancelled) return
-      if (latest && latest[0]?.signal_type === intel.signal.label) return
+      if (!latest || !latest[0]) { /* no history yet — proceed */ }
+      else {
+        if (latest[0].signal_type === intel.signal.label) return        // same type
+        if (todayDate && latest[0].signal_date_shamsi === todayDate) return  // same day (different dashboard visit)
+      }
 
-      const lastRecord = records.at(-1)
       const reasonParts = [intel.signal.desc]
       if (intel.regime.label !== 'نامشخص') reasonParts.push(`رژیم: ${intel.regime.label} — ${intel.regime.desc}`)
       const { error } = await supabase.from('signals').insert([{
