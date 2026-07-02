@@ -83,6 +83,19 @@ const FEATURES = [
     ),
   },
   {
+    href: '/trade-value',
+    title: 'ارزش معاملات',
+    desc: 'ارزش کل معاملات روزانه طلا، نقره و زعفران با نمودار تاریخی',
+    color: 'oklch(0.74 0.17 155)',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.74 0.17 155)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="7" height="18" rx="1" />
+        <rect x="9.5" y="8" width="5" height="13" rx="1" />
+        <rect x="17" y="5" width="5" height="16" rx="1" />
+      </svg>
+    ),
+  },
+  {
     href: '/compare',
     title: 'مقایسه صندوق‌ها',
     desc: 'مقایسه‌ی عملکرد دو تا پنج صندوق کنار هم به صورت بصری',
