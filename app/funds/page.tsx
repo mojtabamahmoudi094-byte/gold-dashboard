@@ -356,6 +356,58 @@ export default function FundsPage() {
           </div>
         )}
 
+        {/* رتبه‌بندی صندوق‌ها */}
+        {!loading && fundsWithScore.length >= 3 && (() => {
+          const top5Score   = [...fundsWithScore].sort((a, b) => b.score - a.score).slice(0, 5)
+          const top5Inflow  = [...fundsWithScore].sort((a, b) => {
+            const an = (a.buyIVolume - a.sellIVolume) * a.priceClose
+            const bn = (b.buyIVolume - b.sellIVolume) * b.priceClose
+            return bn - an
+          }).slice(0, 5)
+          const top5Worst   = [...fundsWithScore].sort((a, b) => a.changePct - b.changePct).slice(0, 5)
+
+          const medals = ['🥇', '🥈', '🥉', '④', '⑤']
+          const divFlow = (f: any) => (f.buyIVolume - f.sellIVolume) * f.priceClose / (f.priceClose >= 100_000 ? 1e10 : 1e9)
+
+          const Col = ({ title, color, rows, renderVal }: {
+            title: string; color: string;
+            rows: typeof fundsWithScore;
+            renderVal: (f: typeof fundsWithScore[0]) => string;
+          }) => (
+            <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', flex: 1, minWidth: isMobile ? '100%' : 200 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 12, letterSpacing: '0.02em' }}>{title}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {rows.map((f, i) => (
+                  <Link key={f.slug} href={`/fund/${f.slug}`} style={{ textDecoration: 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 0' }}>
+                      <span style={{ fontSize: 14, minWidth: 22, textAlign: 'center', lineHeight: 1 }}>{medals[i]}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: t.textBright, flex: 1 }}>{f.symbol}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color, fontFamily: 'system-ui, sans-serif' }}>{renderVal(f)}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )
+
+          return (
+            <div>
+              <div style={{ fontSize: 11, color: t.faint, marginBottom: 8, letterSpacing: '0.04em' }}>رتبه‌بندی</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <Col title="🏆 بهترین امتیاز" color="#F59E0B" rows={top5Score}
+                  renderVal={f => `${f.score}`} />
+                <Col title="💰 بیشترین ورود پول" color="#00E5A0" rows={top5Inflow}
+                  renderVal={f => {
+                    const v = divFlow(f)
+                    return `${v > 0 ? '+' : ''}${Math.round(v * 10) / 10} م.ت`
+                  }} />
+                <Col title="📉 بیشترین افت" color="#FF4D6A" rows={top5Worst}
+                  renderVal={f => `${f.changePct.toFixed(2)}٪`} />
+              </div>
+            </div>
+          )
+        })()}
+
         {/* تحلیل هوشمند بازار */}
         {!loading && funds.length > 0 && (
           <div style={{ background: t.panel, border: `0.5px solid ${t.accent}22`, borderRadius: 12, padding: '18px 20px', backdropFilter: 'blur(12px)' }}>
