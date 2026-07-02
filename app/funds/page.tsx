@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { darkTheme, lightTheme } from '../../lib/theme'
 
@@ -25,6 +26,7 @@ export default function FundsPage() {
   const [category, setCategory] = useState<string>('طلا')
   const [searchQuery, setSearchQuery] = useState('')
 
+  const router = useRouter()
   const t: any = isDark ? darkTheme : lightTheme
 
   const CATEGORIES = [
@@ -233,7 +235,7 @@ export default function FundsPage() {
             { label: 'بیشترین ورود', val: `${topInflow.symbol} ${inflowMT > 0 ? '+' : ''}${inflowMT} م.ت`, color: inflowMT >= 0 ? '#00E5A0' : '#FF4D6A' },
           ]
           return (
-            <div style={{
+            <div className="animate-fade-in" style={{
               background: isPositiveDay
                 ? 'linear-gradient(135deg, rgba(0,229,160,0.05), rgba(0,229,160,0.02))'
                 : 'linear-gradient(135deg, rgba(255,77,106,0.05), rgba(255,77,106,0.02))',
@@ -379,7 +381,11 @@ export default function FundsPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {rows.map((f, i) => (
                   <Link key={f.slug} href={`/fund/${f.slug}`} style={{ textDecoration: 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 0' }}>
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 8px', borderRadius: 8, margin: '0 -8px', transition: 'background 0.15s' }}
+                      onMouseEnter={e => ((e.currentTarget as HTMLDivElement).style.background = `${color}15`)}
+                      onMouseLeave={e => ((e.currentTarget as HTMLDivElement).style.background = 'transparent')}
+                    >
                       <span style={{ fontSize: 14, minWidth: 22, textAlign: 'center', lineHeight: 1 }}>{medals[i]}</span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: t.textBright, flex: 1 }}>{f.symbol}</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color, fontFamily: 'system-ui, sans-serif' }}>{renderVal(f)}</span>
@@ -391,7 +397,7 @@ export default function FundsPage() {
           )
 
           return (
-            <div>
+            <div className="animate-fade-in">
               <div style={{ fontSize: 11, color: t.faint, marginBottom: 8, letterSpacing: '0.04em' }}>رتبه‌بندی</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <Col title="🏆 بهترین امتیاز" color="#F59E0B" rows={top5Score}
@@ -481,7 +487,25 @@ export default function FundsPage() {
         <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: isMobile ? '12px' : '16px 18px', backdropFilter: 'blur(12px)' }}>
 
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: t.muted }}>در حال بارگذاری...</div>
+            <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} style={{
+                  display: 'flex', gap: 12, padding: '11px 8px',
+                  borderBottom: `0.5px solid ${t.border}`,
+                  alignItems: 'center',
+                  opacity: 1 - i * 0.07,
+                }}>
+                  <div className="skeleton" style={{ width: 32, height: 22, borderRadius: 6, flexShrink: 0 }} />
+                  <div className="skeleton" style={{ width: 52 + (i % 3) * 14, height: 14 }} />
+                  <div className="skeleton" style={{ width: 60, height: 14 }} />
+                  <div className="skeleton" style={{ width: 60, height: 14 }} />
+                  <div className="skeleton" style={{ width: 44, height: 20, borderRadius: 4 }} />
+                  <div className="skeleton" style={{ width: 50, height: 14 }} />
+                  <div className="skeleton" style={{ width: 50, height: 14 }} />
+                  <div className="skeleton" style={{ width: 40, height: 14, marginRight: 'auto' }} />
+                </div>
+              ))}
+            </div>
           ) : funds.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: t.muted }}>داده‌ای یافت نشد</div>
           ) : isMobile ? (
@@ -631,8 +655,10 @@ export default function FundsPage() {
                       <tr key={i} style={{
                         borderBottom: `0.5px solid ${t.border}`,
                         transition: 'background 0.15s',
+                        cursor: 'pointer',
                       }}
-                        onMouseEnter={e => (e.currentTarget.style.background = `${t.accent}08`)}
+                        onClick={() => router.push(`/fund/${f.slug}`)}
+                        onMouseEnter={e => (e.currentTarget.style.background = `${t.accent}0D`)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
                         <td style={{ padding: '10px 8px', textAlign: 'center' }}>
