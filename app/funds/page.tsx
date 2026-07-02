@@ -214,6 +214,48 @@ export default function FundsPage() {
           </div>
         </div>
 
+        {/* خلاصه روزانه بازار */}
+        {!loading && funds.length > 0 && (() => {
+          const topInflow = [...funds].sort((a, b) => {
+            const an = (a.buyIVolume - a.sellIVolume) * a.priceClose
+            const bn = (b.buyIVolume - b.sellIVolume) * b.priceClose
+            return bn - an
+          })[0]
+          const topGainer = [...funds].sort((a, b) => b.changePct - a.changePct)[0]
+          const topLoser = [...funds].sort((a, b) => a.changePct - b.changePct)[0]
+          const inflowMT = Math.round((topInflow.buyIVolume - topInflow.sellIVolume) * topInflow.priceClose / (topInflow.priceClose >= 100_000 ? 1e10 : 1e9) * 10) / 10
+          const isPositiveDay = avgChange >= 0
+          const items = [
+            { label: 'مثبت', val: positiveCount.toLocaleString('fa-IR'), color: '#00E5A0' },
+            { label: 'منفی', val: negativeCount.toLocaleString('fa-IR'), color: '#FF4D6A' },
+            { label: 'بیشترین رشد', val: `${topGainer.symbol} ${topGainer.changePct > 0 ? '+' : ''}${topGainer.changePct.toFixed(2)}٪`, color: '#00E5A0' },
+            { label: 'بیشترین افت', val: `${topLoser.symbol} ${topLoser.changePct.toFixed(2)}٪`, color: '#FF4D6A' },
+            { label: 'بیشترین ورود', val: `${topInflow.symbol} ${inflowMT > 0 ? '+' : ''}${inflowMT} م.ت`, color: inflowMT >= 0 ? '#00E5A0' : '#FF4D6A' },
+          ]
+          return (
+            <div style={{
+              background: isPositiveDay
+                ? 'linear-gradient(135deg, rgba(0,229,160,0.05), rgba(0,229,160,0.02))'
+                : 'linear-gradient(135deg, rgba(255,77,106,0.05), rgba(255,77,106,0.02))',
+              border: `0.5px solid ${isPositiveDay ? 'rgba(0,229,160,0.2)' : 'rgba(255,77,106,0.2)'}`,
+              borderRadius: 10,
+              padding: '10px 16px',
+              display: 'flex', flexWrap: 'wrap', gap: isMobile ? '8px 14px' : '4px 20px',
+              alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 10, color: t.faint, letterSpacing: '0.04em', marginLeft: 4 }}>
+                امروز
+              </span>
+              {items.map((item, i) => (
+                <span key={i} style={{ display: 'flex', gap: 5, alignItems: 'center', fontSize: 11 }}>
+                  <span style={{ color: t.faint }}>{item.label}:</span>
+                  <span style={{ fontWeight: 700, color: item.color, fontFamily: 'system-ui, sans-serif' }}>{item.val}</span>
+                </span>
+              ))}
+            </div>
+          )
+        })()}
+
         {/* نوار جستجو + دسته‌بندی */}
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 10 }}>
           <div style={{ display: 'flex', gap: 6, direction: 'rtl' }}>
