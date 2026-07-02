@@ -89,10 +89,81 @@ lib/
 - NEXT_PUBLIC_SUPABASE_URL=https://jtrusonoqkolckhidgch.supabase.co
 - NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_6_H9XGHkJU3EKKCG9LkVJw_1PSS00zo
 
+## ⚠️ CRITICAL: Unit System (READ THIS FIRST)
+
+**م.ت = میلیارد تومان** (NOT میلیون تومان — a common mistake)
+**ه.م.ت = هزار میلیارد تومان**
+
+### DB has TWO eras of data (backward-compat required):
+
+| Field | Old data (< ~1404) | New data (>= ~1404) | Detection |
+|---|---|---|---|
+| `price_close` | Toman (e.g. 4580) | Rial (e.g. 45800) | `>= 100_000` = Rial |
+| `price_last` | Toman | Rial | same threshold |
+| `trade_value` | میلیارد تومان (e.g. 25.8) | Raw Rial (e.g. 258,520,000,000) | `> 1e6` = Rial |
+| `market_value` | always Raw Rial | always Raw Rial | always divide |
+| `volume` | always سهم count | always سهم count | divide by 1e6 for display |
+
+### Correct conversions for display:
+```
+price_close (Rial)  → Toman: Math.round(v / 10)
+trade_value (Rial)  → م.ت: Math.round(tv / 1e9)        ← NOT /1e10 (that's for aggregate)
+market_value (Rial) → ه.م.ت: Math.round(mv / 1e12)
+volume              → م.سهم: vol / 1e6
+سرانه (Rial era)   → م.ت: vol × price / count / 1e7    ← 3 digits result
+جریان پول (Rial era)→ م.ت: (buyVol-sellVol)×price/1e10
+```
+
+### Aggregate (dashboard, slug='gold') conversions:
+```
+sync-funds.js cron: totalTval (raw Rial from BrsAPI) → ÷1e10 = میلیارد تومان stored in DB
+funds/page.tsx display: stored_value / 1e10 (was wrong ×100 before — fixed commit f294ebc)
+dashboard/page.tsx: reads stored value directly (already in میلیارد تومان)
+```
+
+### Detection pattern used in fund/[slug]/page.tsx:
+```tsx
+const priceIsRial = safe(record.price_close) >= 100_000
+const priceToman = (v: number) => priceIsRial ? Math.round(v / 10) : v
+const avgDivisor = priceIsRial ? 1e7 : 1e6   // سرانه
+const flowDivisor = priceIsRial ? 1e10 : 1e9  // جریان پول
+```
+
+## VPS Cron (sync-funds.js)
+
+- Location on VPS: copy from `scripts/sync-funds.js` in repo
+- Runs every 10 min, 12:00–17:05 Tehran time (UTC+3:30), Sun–Thu
+- Writes per-fund rows + one aggregate row (asset_id=1, slug='gold') to `gold_funds`
+- Aggregate formula: `Math.round(totalTval / 1e10 * 100) / 100` → میلیارد تومان
+- **If VPS has old sync-funds.js**: aggregate will be stored wrong (too large). Fix: copy new file to VPS.
+
+## Supabase RLS Note
+
+- Anon key: SELECT only. Cannot DELETE or INSERT without service role key.
+- To fix bad DB records: use Supabase SQL Editor (dashboard) with service role.
+- Pending SQL (run if not done yet):
+  ```sql
+  -- Fix wrong aggregate for 1405/04/09 (stored 7.27T instead of 7272)
+  DELETE FROM gold_funds WHERE id = 1213;
+  INSERT INTO gold_funds (asset_id, trade_date_shamsi, trade_value) VALUES (1, '1405/04/09', 7272.49);
+  -- Delete zero-value test records with wrong date
+  DELETE FROM gold_funds WHERE trade_date_shamsi = '3005/04/09';
+  ```
+
+## Recent Fixes (session 2025-07)
+
+- `app/funds/page.tsx`: `fmtVal(f.tradeValue / 1e10)` — was `* 100` (commit f294ebc)
+- `scripts/sync-funds.js`: aggregate formula `totalTval / 1e10` — was `/ 10 * 100` (same commit)
+- `app/fund/[slug]/page.tsx`: full unit overhaul with isRial threshold (commit 5426795)
+  - price ÷10, trade_value /1e9, market_value /1e12, volume /1e6, سرانه 3 digits, all charts
+
 ## Pending / Future
 - Connect bourssanj.ir domain (DNS propagating via Cloudflare)
 - Abnormal money flow alerts (need 5-7 days of data)
-- Improved signals (reason + confidence)
+- Improved signals (reason + confidence + historical outcome tracking)
 - Design System unification
 - Portfolio tracking (future)
 - Telegram bot integration (future)
+- نمودار قیمت در صفحه صندوق (A1 — lightweight-charts, داده موجوده)
+- جستجو + sort پیشرفته صفحه صندوق‌ها (A2 — client-side filter)
+- عملکرد تاریخی سیگنال‌ها (A3 — cross با gold_funds)
