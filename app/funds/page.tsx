@@ -203,9 +203,9 @@ export default function FundsPage() {
       href: '/funds',
       title: 'صندوق‌های طلا',
       desc: 'قیمت، حجم و ارزش معاملات صندوق‌های مبتنی بر طلا',
-      color: '#D4A847',
+      color: 'oklch(0.82 0.15 70)',
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4A847" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.82 0.15 70)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
           <polyline points="16 7 22 7 22 13" />
         </svg>
@@ -215,9 +215,9 @@ export default function FundsPage() {
       href: '/funds',
       title: 'صندوق‌های نقره',
       desc: 'دیدبان جامع صندوق‌های سرمایه‌گذاری مبتنی بر نقره',
-      color: '#00C8FF',
+      color: 'oklch(0.84 0.03 240)',
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00C8FF" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.84 0.03 240)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="3" width="7" height="18" rx="1" />
           <rect x="9.5" y="8" width="5" height="13" rx="1" />
           <rect x="17" y="5" width="5" height="16" rx="1" />
@@ -228,9 +228,9 @@ export default function FundsPage() {
       href: '/funds',
       title: 'صندوق‌های زعفران',
       desc: 'رصد صندوق‌های کالایی مبتنی بر زعفران و کالاهای کشاورزی',
-      color: '#F59E0B',
+      color: 'oklch(0.70 0.19 40)',
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.70 0.19 40)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 2a4 4 0 0 0 0 8" />
           <path d="M12 2a4 4 0 0 1 0 8" />
           <path d="M12 10v12" />
@@ -242,9 +242,9 @@ export default function FundsPage() {
       href: '/signals',
       title: 'سیگنال‌های بازار',
       desc: 'سیگنال‌های هوشمند خرید و فروش بر اساس تحلیل داده‌های بازار',
-      color: '#10B981',
+      color: 'oklch(0.74 0.17 155)',
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.74 0.17 155)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
           <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
           <line x1="6" y1="1" x2="6" y2="4" />
@@ -257,9 +257,9 @@ export default function FundsPage() {
       href: '/analysis/gold',
       title: 'تحلیل طلا',
       desc: 'قیمت لحظه‌ای طلا، سکه، دلار و محاسبه‌ی حباب سکه',
-      color: '#D4A847',
+      color: '#3b82f6',
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4A847" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="7" />
           <line x1="16.5" y1="16.5" x2="22" y2="22" />
           <line x1="11" y1="8" x2="11" y2="14" />
@@ -271,9 +271,9 @@ export default function FundsPage() {
       href: '/compare',
       title: 'مقایسه صندوق‌ها',
       desc: 'مقایسه‌ی عملکرد دو تا پنج صندوق کنار هم به صورت بصری',
-      color: '#00C8FF',
+      color: '#8b5cf6',
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00C8FF" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <line x1="12" y1="2" x2="12" y2="22" />
           <polyline points="3 7 7 3 11 7" />
           <line x1="7" y1="3" x2="7" y2="17" />
@@ -291,6 +291,52 @@ export default function FundsPage() {
       transition: 'background 0.3s, color 0.3s',
     }}>
 
+      {/* ═══════ TICKER TAPE ═══════ */}
+      <div style={{
+        background: isDark ? 'rgba(59,130,246,0.05)' : 'rgba(59,130,246,0.07)',
+        borderBottom: '1px solid rgba(59,130,246,0.12)',
+        height: 36, overflow: 'hidden', display: 'flex', alignItems: 'center',
+      }}>
+        <div style={{
+          display: 'inline-flex', gap: 0,
+          animation: 'bs-marquee 40s linear infinite',
+          willChange: 'transform',
+          whiteSpace: 'nowrap',
+        }}>
+          {[
+            { name: 'طلای لوتوس', price: '۴۵,۲۳۰', change: '+۱.۲٪', pos: true },
+            { name: 'گوهر', price: '۴۴,۸۱۵', change: '+۰.۸٪', pos: true },
+            { name: 'زر', price: '۴۴,۱۲۰', change: '-۰.۳٪', pos: false },
+            { name: 'کیان', price: '۴۵,۹۸۰', change: '+۱.۵٪', pos: true },
+            { name: 'مثقال', price: '۴۳,۶۴۰', change: '-۰.۵٪', pos: false },
+            { name: 'عیار', price: '۴۵,۵۱۰', change: '+۲.۱٪', pos: true },
+            { name: 'نقره‌ی ایران', price: '۸,۲۳۰', change: '+۰.۴٪', pos: true },
+            { name: 'زعفران پارسیان', price: '۱۲,۴۵۰', change: '-۱.۱٪', pos: false },
+            { name: 'طلای لوتوس', price: '۴۵,۲۳۰', change: '+۱.۲٪', pos: true },
+            { name: 'گوهر', price: '۴۴,۸۱۵', change: '+۰.۸٪', pos: true },
+            { name: 'زر', price: '۴۴,۱۲۰', change: '-۰.۳٪', pos: false },
+            { name: 'کیان', price: '۴۵,۹۸۰', change: '+۱.۵٪', pos: true },
+            { name: 'مثقال', price: '۴۳,۶۴۰', change: '-۰.۵٪', pos: false },
+            { name: 'عیار', price: '۴۵,۵۱۰', change: '+۲.۱٪', pos: true },
+            { name: 'نقره‌ی ایران', price: '۸,۲۳۰', change: '+۰.۴٪', pos: true },
+            { name: 'زعفران پارسیان', price: '۱۲,۴۵۰', change: '-۱.۱٪', pos: false },
+          ].map((item, i) => (
+            <span key={i} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '0 24px', fontSize: 11.5, fontFamily: 'system-ui, sans-serif',
+              borderLeft: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <span style={{ color: '#a9b0c2', fontWeight: 500 }}>{item.name}</span>
+              <span style={{ color: '#eef1f8', fontWeight: 700 }}>{item.price}</span>
+              <span style={{
+                fontWeight: 700,
+                color: item.pos ? 'oklch(0.74 0.17 155)' : 'oklch(0.68 0.2 25)',
+              }}>{item.change}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* ═══════ HERO ═══════ */}
       <section style={{
         position: 'relative', overflow: 'hidden',
@@ -298,14 +344,15 @@ export default function FundsPage() {
         textAlign: 'center', direction: 'rtl',
       }}>
         {/* Glows */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 900px 420px at 50% 0%, rgba(212,168,71,0.07) 0%, transparent 70%)' }} />
-        <div style={{ position: 'absolute', top: 60, right: isMobile ? '5%' : '18%', width: 220, height: 220, background: 'radial-gradient(circle, rgba(0,200,255,0.045) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 900px 420px at 50% 0%, rgba(59,130,246,0.08) 0%, transparent 70%)' }} />
+        <div style={{ position: 'absolute', top: 60, right: isMobile ? '5%' : '18%', width: 280, height: 280, background: 'radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 80, left: isMobile ? '5%' : '20%', width: 200, height: 200, background: 'radial-gradient(circle, rgba(59,130,246,0.05) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative' }}>
           {/* Eyebrow badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: isDark ? 'rgba(212,168,71,0.08)' : 'rgba(184,150,42,0.1)', border: `1px solid ${isDark ? 'rgba(212,168,71,0.2)' : 'rgba(184,150,42,0.25)'}`, borderRadius: 20, padding: '5px 16px', marginBottom: 28 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#D4A847', boxShadow: '0 0 8px rgba(212,168,71,0.8)', display: 'inline-block', flexShrink: 0 }} />
-            <span style={{ fontSize: 11.5, color: isDark ? 'rgba(212,168,71,0.9)' : '#B8962A', fontWeight: 600, letterSpacing: '0.06em' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 20, padding: '5px 16px', marginBottom: 28 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 8px rgba(59,130,246,0.8)', display: 'inline-block', flexShrink: 0, animation: 'bs-glow 2s ease infinite' }} />
+            <span style={{ fontSize: 11.5, color: 'rgba(59,130,246,0.9)', fontWeight: 600, letterSpacing: '0.06em' }}>
               ترمینال هوشمند بورس ایران
             </span>
           </div>
@@ -313,7 +360,12 @@ export default function FundsPage() {
           {/* H1 */}
           <h1 style={{ fontSize: isMobile ? 30 : 48, fontWeight: 900, color: t.textBright, margin: '0 0 18px', lineHeight: 1.25, letterSpacing: '-0.025em' }}>
             رصد هوشمند{' '}
-            <span style={{ color: '#D4A847' }}>طلا، نقره و زعفران</span>
+            <span style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>طلا، نقره و زعفران</span>
           </h1>
 
           {/* Subtitle */}
@@ -324,27 +376,27 @@ export default function FundsPage() {
           {/* CTA buttons */}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a href="#fund-list" style={{
-              fontSize: 14, padding: '12px 28px', borderRadius: 10, cursor: 'pointer',
-              background: isDark ? 'linear-gradient(135deg, rgba(212,168,71,0.18), rgba(212,168,71,0.09))' : 'linear-gradient(135deg, rgba(212,168,71,0.22), rgba(212,168,71,0.12))',
-              border: `1px solid ${isDark ? 'rgba(212,168,71,0.38)' : 'rgba(184,150,42,0.45)'}`,
-              color: '#D4A847', textDecoration: 'none', fontWeight: 700,
+              fontSize: 14, padding: '12px 32px', borderRadius: 10, cursor: 'pointer',
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              border: 'none',
+              color: '#fff', textDecoration: 'none', fontWeight: 700,
               fontFamily: 'Vazirmatn, inherit',
-              boxShadow: '0 0 20px rgba(212,168,71,0.09)',
+              boxShadow: '0 4px 20px rgba(59,130,246,0.35)',
               transition: 'all 0.2s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 32px rgba(212,168,71,0.2)'; e.currentTarget.style.borderColor = 'rgba(212,168,71,0.65)' }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 20px rgba(212,168,71,0.09)'; e.currentTarget.style.borderColor = isDark ? 'rgba(212,168,71,0.38)' : 'rgba(184,150,42,0.45)' }}>
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 28px rgba(59,130,246,0.5)'; e.currentTarget.style.opacity = '0.92' }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(59,130,246,0.35)'; e.currentTarget.style.opacity = '1' }}>
               مشاهده صندوق‌ها
             </a>
             <Link href="/signals" style={{
               fontSize: 14, padding: '12px 28px', borderRadius: 10, cursor: 'pointer',
-              background: 'rgba(0,200,255,0.07)',
-              border: '1px solid rgba(0,200,255,0.22)',
-              color: '#00C8FF', textDecoration: 'none', fontWeight: 600,
+              background: 'rgba(139,92,246,0.1)',
+              border: '1px solid rgba(139,92,246,0.3)',
+              color: '#8b5cf6', textDecoration: 'none', fontWeight: 600,
               fontFamily: 'inherit', transition: 'all 0.2s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,200,255,0.13)'; e.currentTarget.style.borderColor = 'rgba(0,200,255,0.4)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,200,255,0.07)'; e.currentTarget.style.borderColor = 'rgba(0,200,255,0.22)' }}>
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.18)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.1)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)' }}>
               سیگنال‌های بازار
             </Link>
           </div>
@@ -352,7 +404,7 @@ export default function FundsPage() {
       </section>
 
       {/* ═══════ FEATURES ═══════ */}
-      <section style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 16px 40px' : '0 24px 56px', direction: 'rtl' }}>
+      <section style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '0 16px 40px' : '0 24px 56px', direction: 'rtl' }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
@@ -369,9 +421,9 @@ export default function FundsPage() {
               cursor: 'pointer',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.borderColor = `${feat.color}44`
-              e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px ${feat.color}22`
-              e.currentTarget.style.background = isDark ? 'rgba(10,24,46,0.95)' : 'rgba(255,252,244,0.98)'
+              e.currentTarget.style.borderColor = `rgba(59,130,246,0.3)`
+              e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(59,130,246,0.1)`
+              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,252,244,0.98)'
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = t.border
@@ -398,11 +450,11 @@ export default function FundsPage() {
       </section>
 
       {/* Separator */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', marginBottom: 24 }}>
-        <div style={{ height: 1, background: isDark ? 'linear-gradient(90deg, transparent, rgba(212,168,71,0.12) 40%, rgba(0,200,255,0.08) 70%, transparent)' : 'linear-gradient(90deg, transparent, rgba(180,140,40,0.18) 50%, transparent)' }} />
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 24px', marginBottom: 24 }}>
+        <div style={{ height: 1, background: isDark ? 'linear-gradient(90deg, transparent, rgba(59,130,246,0.14) 40%, rgba(139,92,246,0.10) 70%, transparent)' : 'linear-gradient(90deg, transparent, rgba(59,130,246,0.18) 50%, transparent)' }} />
       </div>
 
-      <div id="fund-list" style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div id="fund-list" style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* نوار ابزار */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -754,8 +806,8 @@ export default function FundsPage() {
                       transition: 'background 0.15s, border-color 0.15s',
                     }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = isDark ? 'rgba(0,200,255,0.05)' : 'rgba(0,120,170,0.05)'
-                      e.currentTarget.style.borderColor = `${t.accent}40`
+                      e.currentTarget.style.background = isDark ? 'rgba(59,130,246,0.06)' : 'rgba(59,130,246,0.04)'
+                      e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'
                     }}
                     onMouseLeave={e => {
                       e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'

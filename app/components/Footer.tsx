@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
 
 const TelegramIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -17,17 +16,17 @@ const GlobeIcon = () => (
   </svg>
 )
 
-const ChartIcon = () => (
-  <svg width="13" height="11" viewBox="0 0 26 22" fill="none">
+const LogoMark = () => (
+  <svg width="20" height="16" viewBox="0 0 30 24" fill="none">
     <defs>
-      <linearGradient id="ftLg" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stopColor="#D4A847"/>
-        <stop offset="100%" stopColor="#00C8FF"/>
+      <linearGradient id="ftLg2" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#3b82f6"/>
+        <stop offset="100%" stopColor="#8b5cf6"/>
       </linearGradient>
     </defs>
-    <polyline points="2,20 8,12 14,15 22,5"
-      stroke="url(#ftLg)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-    <circle cx="22" cy="5" r="2.2" fill="#D4A847"/>
+    <polyline points="2,22 8,13 14,16 25,4"
+      stroke="url(#ftLg2)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    <circle cx="25" cy="4" r="2" fill="#3b82f6"/>
   </svg>
 )
 
@@ -39,45 +38,32 @@ const LINKS = [
   { label: 'مقایسه',           href: '/compare' },
 ]
 
+const BRAND   = '#3b82f6'
+const BORDER  = 'rgba(255,255,255,0.07)'
+const TEXT    = '#eef1f8'
+const MUTED   = '#5a6272'
+const LINK_C  = '#6b7280'
+
 export default function Footer() {
-  const [isDark, setIsDark] = useState(true)
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
-    const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
-    window.addEventListener('themechange', handler)
-    return () => window.removeEventListener('themechange', handler)
-  }, [])
-
-  const BG       = isDark ? '#030A16' : '#F0EDE4'
-  const BORDER   = isDark ? 'rgba(212,168,71,0.08)' : 'rgba(180,140,40,0.12)'
-  const TEXT      = isDark ? '#E0E8F0' : '#2A1E0A'
-  const TEXT_MUTED = isDark ? '#4B6278' : '#8A7A60'
-  const TEXT_LINK  = isDark ? '#6B829A' : '#7A6A50'
-  const TEXT_LINK_HOVER = '#D4A847'
-
   return (
     <footer style={{
-      background: BG,
+      background: '#080a10',
       borderTop: `1px solid ${BORDER}`,
       fontFamily: 'Vazirmatn, Arial, sans-serif',
       direction: 'rtl',
-      marginTop: 56,
+      marginTop: 64,
     }}>
 
       {/* Top gradient line */}
       <div style={{
         height: 1,
-        background: isDark
-          ? 'linear-gradient(90deg, transparent 0%, rgba(212,168,71,0.2) 30%, rgba(0,200,255,0.15) 70%, transparent 100%)'
-          : 'linear-gradient(90deg, transparent 0%, rgba(180,140,40,0.25) 50%, transparent 100%)',
+        background: 'linear-gradient(90deg, transparent 0%, rgba(59,130,246,0.3) 30%, rgba(139,92,246,0.25) 70%, transparent 100%)',
       }} />
 
       <div style={{
-        maxWidth: 1200,
+        maxWidth: 1400,
         margin: '0 auto',
-        padding: '40px 24px 24px',
+        padding: '48px 24px 28px',
       }}>
 
         <div style={{
@@ -89,32 +75,38 @@ export default function Footer() {
           {/* Brand */}
           <div style={{ maxWidth: 280 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <ChartIcon />
-              <span style={{ fontSize: 17, fontWeight: 700, color: TEXT, letterSpacing: '-0.02em' }}>
+              <LogoMark />
+              <span style={{
+                fontSize: 17, fontWeight: 700,
+                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                letterSpacing: '-0.02em',
+              }}>
                 بورسنج
               </span>
               <span style={{
                 fontSize: 9, fontWeight: 600, letterSpacing: '0.08em',
-                background: 'rgba(212,168,71,0.12)',
-                border: '1px solid rgba(212,168,71,0.22)',
-                color: isDark ? 'rgba(212,168,71,0.8)' : '#B8962A',
+                background: 'rgba(59,130,246,0.12)',
+                border: '1px solid rgba(59,130,246,0.22)',
+                color: 'rgba(59,130,246,0.8)',
                 borderRadius: 5, padding: '2px 7px',
               }}>BETA</span>
             </div>
             <p style={{
               fontSize: 12.5,
-              color: TEXT_MUTED,
+              color: MUTED,
               lineHeight: 1.9,
               margin: '0 0 20px',
             }}>
               پلتفرم تحلیل هوشمند صندوق‌های کالایی بورس ایران.
               ارزش معاملات، ورود پول حقیقی، تحلیل طلا و سیگنال بازار.
             </p>
-            {/* Disclaimer */}
             <div style={{
-              fontSize: 10.5, color: TEXT_MUTED, lineHeight: 1.7,
+              fontSize: 10.5, color: MUTED, lineHeight: 1.7,
               padding: '8px 12px',
-              background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)',
+              background: 'rgba(255,255,255,0.02)',
               border: `1px solid ${BORDER}`,
               borderRadius: 8,
             }}>
@@ -126,7 +118,7 @@ export default function Footer() {
           <div>
             <div style={{
               fontSize: 11, fontWeight: 700,
-              color: isDark ? '#D4A847' : '#B8962A',
+              color: BRAND,
               marginBottom: 18,
               letterSpacing: '0.06em',
             }}>
@@ -138,17 +130,17 @@ export default function Footer() {
                   key={link.href}
                   href={link.href}
                   style={{
-                    fontSize: 13, color: TEXT_LINK,
+                    fontSize: 13, color: LINK_C,
                     textDecoration: 'none',
                     transition: 'color 0.18s',
                     display: 'flex', alignItems: 'center', gap: 8,
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.color = TEXT_LINK_HOVER)}
-                  onMouseLeave={e => (e.currentTarget.style.color = TEXT_LINK)}
+                  onMouseEnter={e => (e.currentTarget.style.color = BRAND)}
+                  onMouseLeave={e => (e.currentTarget.style.color = LINK_C)}
                 >
                   <span style={{
                     width: 4, height: 4, borderRadius: '50%',
-                    background: 'rgba(212,168,71,0.4)',
+                    background: 'rgba(59,130,246,0.4)',
                     display: 'inline-block', flexShrink: 0,
                   }} />
                   {link.label}
@@ -161,7 +153,7 @@ export default function Footer() {
           <div>
             <div style={{
               fontSize: 11, fontWeight: 700,
-              color: isDark ? '#D4A847' : '#B8962A',
+              color: BRAND,
               marginBottom: 18,
               letterSpacing: '0.06em',
             }}>
@@ -173,22 +165,22 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  fontSize: 13, color: TEXT_LINK,
+                  fontSize: 13, color: LINK_C,
                   textDecoration: 'none',
                   display: 'flex', alignItems: 'center', gap: 10,
                   transition: 'color 0.18s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#2AABEE')}
-                onMouseLeave={e => (e.currentTarget.style.color = TEXT_LINK)}
+                onMouseLeave={e => (e.currentTarget.style.color = LINK_C)}
               >
                 <span style={{ color: '#2AABEE' }}><TelegramIcon /></span>
                 کانال تلگرام
               </a>
               <span style={{
-                fontSize: 13, color: TEXT_MUTED,
+                fontSize: 13, color: MUTED,
                 display: 'flex', alignItems: 'center', gap: 10,
               }}>
-                <span style={{ color: isDark ? '#4B6278' : '#A09070' }}><GlobeIcon /></span>
+                <span style={{ color: '#5a6272' }}><GlobeIcon /></span>
                 bourssanj.ir
               </span>
             </div>
@@ -199,9 +191,7 @@ export default function Footer() {
         {/* Divider */}
         <div style={{
           height: 1,
-          background: isDark
-            ? 'linear-gradient(90deg, transparent, rgba(212,168,71,0.1) 50%, transparent)'
-            : 'linear-gradient(90deg, transparent, rgba(180,140,40,0.15) 50%, transparent)',
+          background: 'linear-gradient(90deg, transparent, rgba(59,130,246,0.12) 50%, transparent)',
           margin: '32px 0 20px',
         }} />
 
@@ -210,17 +200,18 @@ export default function Footer() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           flexWrap: 'wrap', gap: 8,
         }}>
-          <span style={{ fontSize: 11.5, color: TEXT_MUTED }}>
+          <span style={{ fontSize: 11.5, color: MUTED }}>
             © بورسنج ۱۴۰۵ · تمامی حقوق محفوظ است
           </span>
           <span style={{
-            fontSize: 11, color: TEXT_MUTED,
+            fontSize: 11, color: MUTED,
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <span style={{
               width: 6, height: 6, borderRadius: '50%',
-              background: '#D4A847', display: 'inline-block',
-              boxShadow: '0 0 6px rgba(212,168,71,0.6)',
+              background: '#3b82f6', display: 'inline-block',
+              boxShadow: '0 0 6px rgba(59,130,246,0.6)',
+              animation: 'bs-glow 2s ease infinite',
             }} />
             بازار طلا — داده‌های لحظه‌ای
           </span>
