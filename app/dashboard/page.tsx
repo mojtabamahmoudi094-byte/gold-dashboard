@@ -331,10 +331,9 @@ export default function TerminalPage() {
         .order('id', { ascending: false })
         .limit(1)
       if (cancelled) return
-      if (!latest || !latest[0]) { /* no history yet — proceed */ }
-      else {
-        if (latest[0].signal_type === intel.signal.label) return        // same type
-        if (todayDate && latest[0].signal_date_shamsi === todayDate) return  // same day (different dashboard visit)
+      if (latest && latest[0]) {
+        // block only when BOTH type AND date match — allows intraday type change
+        if (latest[0].signal_type === intel.signal.label && (!todayDate || latest[0].signal_date_shamsi === todayDate)) return
       }
 
       const reasonParts = [intel.signal.desc]

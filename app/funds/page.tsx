@@ -225,7 +225,7 @@ export default function FundsPage() {
           })[0]
           const topGainer = [...funds].sort((a, b) => b.changePct - a.changePct)[0]
           const topLoser = [...funds].sort((a, b) => a.changePct - b.changePct)[0]
-          const inflowMT = Math.round((topInflow.buyIVolume - topInflow.sellIVolume) * topInflow.priceClose / (topInflow.priceClose >= 100_000 ? 1e10 : 1e9) * 10) / 10
+          const inflowMT = Math.round((topInflow.buyIVolume - topInflow.sellIVolume) * topInflow.priceClose / (topInflow.tradeValue > 1e6 ? 1e10 : 1e9) * 10) / 10
           const isPositiveDay = avgChange >= 0
           const items = [
             { label: 'مثبت', val: positiveCount.toLocaleString('fa-IR'), color: '#00E5A0' },
@@ -362,14 +362,14 @@ export default function FundsPage() {
         {!loading && fundsWithScore.length >= 3 && (() => {
           const top5Score   = [...fundsWithScore].sort((a, b) => b.score - a.score).slice(0, 5)
           const top5Inflow  = [...fundsWithScore].sort((a, b) => {
-            const an = (a.buyIVolume - a.sellIVolume) * a.priceClose
-            const bn = (b.buyIVolume - b.sellIVolume) * b.priceClose
+            const an = (a.buyIVolume - a.sellIVolume) * a.priceClose / (a.tradeValue > 1e6 ? 1e10 : 1e9)
+            const bn = (b.buyIVolume - b.sellIVolume) * b.priceClose / (b.tradeValue > 1e6 ? 1e10 : 1e9)
             return bn - an
           }).slice(0, 5)
           const top5Worst   = [...fundsWithScore].sort((a, b) => a.changePct - b.changePct).slice(0, 5)
 
           const medals = ['🥇', '🥈', '🥉', '④', '⑤']
-          const divFlow = (f: any) => (f.buyIVolume - f.sellIVolume) * f.priceClose / (f.priceClose >= 100_000 ? 1e10 : 1e9)
+          const divFlow = (f: any) => (f.buyIVolume - f.sellIVolume) * f.priceClose / (f.tradeValue > 1e6 ? 1e10 : 1e9)
 
           const Col = ({ title, color, rows, renderVal }: {
             title: string; color: string;
@@ -440,8 +440,8 @@ export default function FundsPage() {
                   return aNet - bNet
                 })[0]
 
-                const topInflowVal = Math.round(((topInflow.buyIVolume * topInflow.priceClose) - (topInflow.sellIVolume * topInflow.priceClose)) / 1000000000 * 10) / 10
-                const topOutflowVal = Math.round(((topOutflow.buyIVolume * topOutflow.priceClose) - (topOutflow.sellIVolume * topOutflow.priceClose)) / 1000000000 * 10) / 10
+                const topInflowVal = Math.round(((topInflow.buyIVolume * topInflow.priceClose) - (topInflow.sellIVolume * topInflow.priceClose)) / (topInflow.tradeValue > 1e6 ? 1e10 : 1e9) * 10) / 10
+                const topOutflowVal = Math.round(((topOutflow.buyIVolume * topOutflow.priceClose) - (topOutflow.sellIVolume * topOutflow.priceClose)) / (topOutflow.tradeValue > 1e6 ? 1e10 : 1e9) * 10) / 10
 
                 // تشخیص روند
                 const trend = avgChange > 0.5 ? 'صعودی قوی' : avgChange > 0 ? 'صعودی ملایم' : avgChange > -0.5 ? 'نزولی ملایم' : 'نزولی قوی'
