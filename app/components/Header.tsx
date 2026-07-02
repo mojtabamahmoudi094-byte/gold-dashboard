@@ -6,11 +6,12 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const NAV = [
-  { label: 'خانه',      href: '/' },
-  { label: 'صندوق‌ها',  href: '/funds' },
-  { label: 'تحلیل',     href: '/analysis' },
-  { label: 'مقایسه',    href: '/compare' },
-  { label: 'سیگنال‌ها', href: '/signals' },
+  { label: 'خانه',          href: '/' },
+  { label: 'صندوق‌ها',      href: '/funds' },
+  { label: 'تحلیل',         href: '/analysis' },
+  { label: 'ارزش معاملات',  href: '/trade-value' },
+  { label: 'مقایسه',        href: '/compare' },
+  { label: 'سیگنال‌ها',     href: '/signals' },
 ]
 
 const pn = { style: { pointerEvents: 'none' as const } }
