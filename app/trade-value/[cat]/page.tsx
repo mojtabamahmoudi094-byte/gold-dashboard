@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation'
 import DateObject from 'react-date-object'
 import persian from 'react-date-object/calendars/persian'
 import gregorian from 'react-date-object/calendars/gregorian'
+import { supabase } from '../../../lib/supabase'
 
 const TerminalChart = dynamic(() => import('../../dashboard/TerminalChart'), { ssr: false })
 
@@ -36,7 +37,8 @@ function stdDev(arr: number[]): number {
 }
 
 const CAT_MAP: Record<string, {
-  key: string
+  category: string
+  aggregateSlug: string | null   // null = aggregate from individual fund rows
   label: string
   color: string
   iconBg: string
@@ -44,7 +46,8 @@ const CAT_MAP: Record<string, {
   icon: React.ReactNode
 }> = {
   gold: {
-    key: 'طلا',
+    category: 'طلا',
+    aggregateSlug: 'gold',          // pre-aggregated by sync-funds.js
     label: 'ارزش کل معاملات طلا',
     color: 'oklch(0.82 0.15 70)',
     iconBg: 'oklch(0.78 0.15 70 / 0.18)',
@@ -57,7 +60,8 @@ const CAT_MAP: Record<string, {
     ),
   },
   silver: {
-    key: 'نقره',
+    category: 'نقره',
+    aggregateSlug: null,
     label: 'ارزش کل معاملات نقره',
     color: 'oklch(0.84 0.03 240)',
     iconBg: 'oklch(0.8 0.03 240 / 0.24)',
@@ -71,7 +75,8 @@ const CAT_MAP: Record<string, {
     ),
   },
   saffron: {
-    key: 'زعفران',
+    category: 'زعفران',
+    aggregateSlug: null,
     label: 'ارزش کل معاملات زعفران',
     color: 'oklch(0.74 0.19 40)',
     iconBg: 'oklch(0.68 0.19 40 / 0.22)',
@@ -94,8 +99,8 @@ export default function TradeValueDetailPage() {
 
   const [isDark, setIsDark] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
-  const [allAssets, setAllAssets] = useState<any[]>([])
-  const [allRecords, setAllRecords] = useState<any[]>([])
+  // raw rows: { trade_date_shamsi, trade_value }
+  const [rawRows, setRawRows] = useState<{ trade_date_shamsi: string; trade_value: number }[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -113,43 +118,88 @@ export default function TradeValueDetailPage() {
   }, [])
 
   useEffect(() => {
+    setLoading(true)
+    setRawRows([])
     const load = async () => {
       try {
-        const res = await fetch('/api/funds', { cache: 'no-store' })
-        if (!res.ok) { setLoading(false); return }
-        const { assets, records } = await res.json()
-        setAllAssets(assets || [])
-        setAllRecords(records || [])
-      } catch {}
+        if (cat.aggregateSlug) {
+          // Gold: use pre-aggregated asset (stored in billion Tomans by sync-funds.js)
+          const { data: assetRow } = await supabase
+            .from('assets')
+            .select('id')
+            .eq('slug', cat.aggregateSlug)
+            .single()
+
+          if (!assetRow) { setLoading(false); return }
+
+          const { data: rows } = await supabase
+            .from('gold_funds')
+            .select('trade_date_shamsi, trade_value')
+            .eq('asset_id', assetRow.id)
+            .order('id', { ascending: true })
+
+          setRawRows(rows ?? [])
+        } else {
+          // Silver / Saffron: aggregate individual fund rows
+          const { data: catAssets } = await supabase
+            .from('assets')
+            .select('id')
+            .eq('category', cat.category)
+            .neq('slug', 'gold')
+
+          if (!catAssets?.length) { setLoading(false); return }
+          const ids = catAssets.map((a: any) => a.id)
+
+          const { data: rows } = await supabase
+            .from('gold_funds')
+            .select('trade_date_shamsi, trade_value')
+            .in('asset_id', ids)
+            .order('trade_date_shamsi', { ascending: true })
+
+          setRawRows(rows ?? [])
+        }
+      } catch (e) {
+        console.error('[trade-value] load error:', e)
+      }
       setLoading(false)
     }
     load()
-  }, [])
+  }, [slug])
 
-  const data = useMemo(() => {
-    if (!allAssets.length || !allRecords.length) return null
+  const chartState = useMemo(() => {
+    if (!rawRows.length) return null
 
-    const catAssetIds = allAssets.filter((a: any) => a.category === cat.key).map((a: any) => a.id)
-    const catRecords = allRecords.filter((r: any) => catAssetIds.includes(r.asset_id))
+    let dateMap: Record<string, number> = {}
 
-    const dateMap: Record<string, number> = {}
-    for (const r of catRecords) {
-      const d = r.trade_date_shamsi
-      if (!d) continue
-      dateMap[d] = (dateMap[d] || 0) + safe(r.trade_value)
+    if (cat.aggregateSlug) {
+      // Gold aggregate rows: trade_value already in billion Tomans
+      for (const r of rawRows) {
+        if (!r.trade_date_shamsi) continue
+        // last write wins (sync upserts same date)
+        dateMap[r.trade_date_shamsi] = safe(r.trade_value)
+      }
+    } else {
+      // Individual fund rows: trade_value in Rial → ÷1e10 → billion Tomans
+      for (const r of rawRows) {
+        if (!r.trade_date_shamsi) continue
+        dateMap[r.trade_date_shamsi] = (dateMap[r.trade_date_shamsi] || 0) + safe(r.trade_value)
+      }
+      for (const k of Object.keys(dateMap)) {
+        dateMap[k] = dateMap[k] / 1e10
+      }
     }
 
     const dateKeys = Object.keys(dateMap).sort()
-    const vals = dateKeys.map(d => dateMap[d] / 1e10)
+    const vals = dateKeys.map(d => dateMap[d])
 
-    const ma5arr = calcMA(vals, 5)
+    const ma5arr  = calcMA(vals, 5)
     const ma10arr = calcMA(vals, 10)
 
     const anomalyFlags = vals.map((v, i) => {
-      const window = vals.slice(Math.max(0, i - 6), i)
-      if (window.length < 3) return false
-      const sd = stdDev(window)
-      const avg = window.reduce((a, b) => a + b, 0) / window.length
+      const win = vals.slice(Math.max(0, i - 6), i)
+      if (win.length < 3) return false
+      const sd  = stdDev(win)
+      const avg = win.reduce((a, b) => a + b, 0) / win.length
       return sd > 0 && Math.abs(v - avg) > 2 * sd
     })
 
@@ -175,21 +225,21 @@ export default function TradeValueDetailPage() {
       .map((d, i) => anomalyFlags[i] ? { time: shamsiToGregorian(d), value: vals[i] } : null)
       .filter(Boolean) as { time: string; value: number }[]
 
-    const last = vals.at(-1) || 0
-    const prev = vals.at(-2) || 0
+    const last   = vals.at(-1) || 0
+    const prev   = vals.at(-2) || 0
     const change = prev ? ((last - prev) / prev) * 100 : 0
 
     return {
       chartData, ma5Data, ma10Data, anomalyData,
       stats: { last, change, n: vals.length, latestDate: dateKeys.at(-1) || '' },
     }
-  }, [allAssets, allRecords, cat.key])
+  }, [rawRows, slug])
 
   const t = isDark
     ? { bg: '#060B14', text: '#E8F4FF', card: 'rgba(10,18,30,0.88)', border: `0.5px solid ${cat.borderColor}`, muted: '#5A7088', cardInner: 'rgba(255,255,255,0.025)' }
     : { bg: '#F4F7FB', text: '#0F1E2E', card: 'rgba(255,255,255,0.9)', border: `0.5px solid ${cat.borderColor}`, muted: '#6B7F90', cardInner: 'rgba(0,0,0,0.02)' }
 
-  const isUp = (data?.stats.change ?? 0) >= 0
+  const isUp = (chartState?.stats.change ?? 0) >= 0
 
   return (
     <main style={{
@@ -219,13 +269,17 @@ export default function TradeValueDetailPage() {
           <div>
             <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 900, margin: '0 0 4px', color: t.text }}>{cat.label}</h1>
             <p style={{ color: t.muted, fontSize: 13, margin: 0 }}>
-              {data ? `${data.stats.n} روز معاملاتی · آخرین: ${data.stats.latestDate}` : 'در حال بارگذاری...'}
+              {loading
+                ? 'در حال بارگذاری...'
+                : chartState
+                  ? `${chartState.stats.n} روز معاملاتی · آخرین: ${chartState.stats.latestDate}`
+                  : 'داده‌ای یافت نشد'}
             </p>
           </div>
         </div>
 
         {/* Stat chips */}
-        {data && (
+        {chartState && (
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
             <div style={{
               padding: '12px 20px', borderRadius: 12,
@@ -233,8 +287,8 @@ export default function TradeValueDetailPage() {
             }}>
               <div style={{ fontSize: 11, color: t.muted, marginBottom: 3 }}>آخرین روز</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: cat.color, fontFamily: 'system-ui, sans-serif' }}>
-                {data.stats.last > 0
-                  ? `${data.stats.last.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت`
+                {chartState.stats.last > 0
+                  ? `${chartState.stats.last.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت`
                   : '—'}
               </div>
             </div>
@@ -245,7 +299,7 @@ export default function TradeValueDetailPage() {
             }}>
               <div style={{ fontSize: 11, color: t.muted, marginBottom: 3 }}>تغییر روز</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: isUp ? '#00E5A0' : '#FF4D6A', fontFamily: 'system-ui, sans-serif' }}>
-                {data.stats.n >= 2 ? `${isUp ? '+' : ''}${data.stats.change.toFixed(2)}٪` : '—'}
+                {chartState.stats.n >= 2 ? `${isUp ? '+' : ''}${chartState.stats.change.toFixed(2)}٪` : '—'}
               </div>
             </div>
           </div>
@@ -261,12 +315,12 @@ export default function TradeValueDetailPage() {
         }}>
           {loading ? (
             <div style={{ height: isMobile ? 260 : 400, background: t.cardInner, borderRadius: 12, animation: 'bs-pulse 1.8s ease-in-out infinite' }} />
-          ) : data && data.chartData.length > 0 ? (
+          ) : chartState && chartState.chartData.length > 0 ? (
             <TerminalChart
-              data={data.chartData}
-              ma5={data.ma5Data}
-              ma10={data.ma10Data}
-              anomalies={data.anomalyData}
+              data={chartState.chartData}
+              ma5={chartState.ma5Data}
+              ma10={chartState.ma10Data}
+              anomalies={chartState.anomalyData}
               height={isMobile ? 260 : 400}
               isDark={isDark}
             />
