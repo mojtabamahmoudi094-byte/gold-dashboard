@@ -342,7 +342,19 @@ export default function TerminalPage() {
         reason: reasonParts.join(' · '),
         confidence: intel.continuation,
       }])
-      if (!error && !cancelled) loadSignalHistory()
+      if (!error && !cancelled) {
+        loadSignalHistory()
+        fetch('/api/telegram-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            signal_type: intel.signal.label,
+            date: lastRecord?.trade_date_shamsi,
+            confidence: intel.continuation,
+            note: intel.signal.desc,
+          }),
+        }).catch(() => {/* fire-and-forget */})
+      }
     }
     saveSignal()
 
