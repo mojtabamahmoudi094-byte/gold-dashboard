@@ -299,7 +299,10 @@ export default function GoldAnalysisPage() {
           </div>
         </Section>
 
-        {/* ── Row 5: Constants — Admin only ── */}
+        {/* ── Row 5: Gold Funds Matrix ── */}
+        <GoldFundsMatrix border={border} muted={muted} text={text} accent={accent} bg={bg} />
+
+        {/* ── Row 6: Constants — Admin only ── */}
         {isAdmin && (
           <AdminConstants
             constants={constants} onChange={setConstants}
@@ -535,6 +538,136 @@ function AdminConstants({ constants, onChange, border, muted, text, accent }: an
                   {Number(value).toLocaleString('fa-IR', { maximumFractionDigits: 6 })}
                 </span>
               )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ──────────────── Gold Funds Matrix ────────────────
+
+const GOLD_FUNDS = [
+  'عیار', 'طلا', 'مثقال', 'کهربا', 'جام طلا', 'گنج', 'ریتون', 'زمرد',
+  'امرالد', 'گوهر', 'درخشان', 'جواهر', 'زر', 'آلتون', 'گلدا', 'زروان',
+  'رز ترنج', 'آتش', 'زرفام', 'لیان', 'ناب', 'میراث', 'رزگلد', 'تابش',
+  'زرگر', 'نفیس', 'نگین فارس', 'قیراط', 'درنا', 'گلدیس', 'همیان',
+]
+
+const SHEETS = [
+  { key: 'names',        label: 'صندوق‌های طلا' },
+  { key: 'marketToman',  label: 'ارزش بازار (تومان)' },
+  { key: 'marketUsd',    label: 'ارزش بازار (دلار)' },
+  { key: 'bubbleZati',   label: 'حباب ذاتی' },
+  { key: 'bubbleAsmi',   label: 'حباب اسمی' },
+  { key: 'bubbleVaqei',  label: 'حباب واقعی' },
+  { key: 'dollarRate',   label: 'نرخ دلار' },
+  { key: 'coinWeight',   label: 'وزن سکه' },
+  { key: 'goldBarWeight', label: 'وزن شمش طلا' },
+  { key: 'silverBarWeight', label: 'وزن شمش نقره' },
+]
+
+function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
+  const [activeSheet, setActiveSheet] = useState(0)
+
+  const tabBorder = 'rgba(0,200,255,0.12)'
+  const tabBg     = 'rgba(10,18,30,0.6)'
+
+  return (
+    <div style={{ background: tabBg, border: `0.5px solid ${tabBorder}`, borderRadius: 16, overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ padding: '14px 18px', borderBottom: `0.5px solid ${tabBorder}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: text }}>ماتریس صندوق‌های طلا</div>
+        <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>داده‌های صندوق‌های سرمایه‌گذاری طلا — هر تب یک شاخص</div>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ overflowX: 'auto', borderBottom: `0.5px solid ${tabBorder}` }}>
+        <div style={{ display: 'flex', padding: '0 18px', minWidth: 'max-content', gap: 2 }}>
+          {SHEETS.map((s, i) => (
+            <button
+              key={s.key}
+              onClick={() => setActiveSheet(i)}
+              style={{
+                padding: '10px 16px',
+                fontSize: 11,
+                fontFamily: 'Vazirmatn, Arial, sans-serif',
+                fontWeight: activeSheet === i ? 700 : 400,
+                color: activeSheet === i ? accent : muted,
+                background: 'none',
+                border: 'none',
+                borderBottom: activeSheet === i ? `2px solid ${accent}` : '2px solid transparent',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'color 0.15s',
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right', borderBottom: `0.5px solid ${tabBorder}`, whiteSpace: 'nowrap' }}>
+                ردیف
+              </th>
+              <th style={{ padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right', borderBottom: `0.5px solid ${tabBorder}`, whiteSpace: 'nowrap' }}>
+                نام صندوق
+              </th>
+              {activeSheet > 0 && (
+                <th style={{ padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right', borderBottom: `0.5px solid ${tabBorder}`, whiteSpace: 'nowrap' }}>
+                  {SHEETS[activeSheet].label}
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {GOLD_FUNDS.map((name, idx) => (
+              <tr
+                key={name}
+                style={{ borderBottom: `0.5px solid ${tabBorder}` }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(0,200,255,0.03)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+              >
+                <td style={{ padding: '9px 16px', color: muted, fontFamily: 'system-ui', fontSize: 11 }}>
+                  {(idx + 1).toLocaleString('fa-IR')}
+                </td>
+                <td style={{ padding: '9px 16px', color: text, fontWeight: 500 }}>{name}</td>
+                {activeSheet > 0 && (
+                  <td style={{ padding: '9px 16px', color: muted, fontFamily: 'system-ui' }}>—</td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Summary averages */}
+      <div style={{ borderTop: `0.5px solid ${tabBorder}`, padding: '16px 18px' }}>
+        <div style={{ fontSize: 11, color: muted, marginBottom: 10 }}>میانگین شاخص‌های حبابی صندوق‌ها</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {[
+            { label: 'میانگین حباب ذاتی صندوق‌ها', value: '—' },
+            { label: 'میانگین حباب اسمی صندوق‌ها',  value: '—' },
+            { label: 'میانگین حباب واقعی صندوق‌ها', value: '—' },
+          ].map(item => (
+            <div key={item.label} style={{
+              background: 'rgba(0,200,255,0.03)',
+              border: `0.5px solid ${tabBorder}`,
+              borderRadius: 10,
+              padding: '14px 16px',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: muted, fontFamily: 'system-ui', marginBottom: 6 }}>
+                {item.value}
+              </div>
+              <div style={{ fontSize: 10, color: muted }}>{item.label}</div>
             </div>
           ))}
         </div>
