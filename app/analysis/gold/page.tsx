@@ -608,7 +608,12 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     <div style={{ background: tabBg, border: `0.5px solid ${tabBorder}`, borderRadius: 16, overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '14px 18px', borderBottom: `0.5px solid ${tabBorder}` }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: text }}>ماتریس صندوق‌های طلا</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: text }}>ماتریس صندوق‌های طلا</div>
+          <div style={{ fontSize: 10, color: fundsLoading ? muted : accent }}>
+            {fundsLoading ? 'در حال بارگذاری...' : `${Object.values(fundsData).filter(v => v != null).length} صندوق با داده`}
+          </div>
+        </div>
         <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>داده‌های صندوق‌های سرمایه‌گذاری طلا — هر تب یک شاخص</div>
       </div>
 
