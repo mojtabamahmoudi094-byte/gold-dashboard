@@ -555,25 +555,23 @@ const GOLD_FUNDS = [
   'زرگر', 'نفیس', 'نگین فارس', 'قیراط', 'درنا', 'گلدیس', 'همیان', 'دفینه',
 ]
 
-const SHEETS = [
-  { key: 'names',        label: 'صندوق‌های طلا' },
-  { key: 'marketToman',  label: 'ارزش بازار (تومان)' },
-  { key: 'marketUsd',    label: 'ارزش بازار (دلار)' },
-  { key: 'bubbleZati',   label: 'حباب ذاتی' },
-  { key: 'bubbleAsmi',   label: 'حباب اسمی' },
-  { key: 'bubbleVaqei',  label: 'حباب واقعی' },
-  { key: 'dollarRate',   label: 'نرخ دلار' },
-  { key: 'coinWeight',   label: 'وزن سکه' },
-  { key: 'goldBarWeight', label: 'وزن شمش طلا' },
+const DATA_COLS = [
+  { key: 'marketToman',     label: 'ارزش بازار (تومان)' },
+  { key: 'marketUsd',       label: 'ارزش بازار (دلار)' },
+  { key: 'bubbleZati',      label: 'حباب ذاتی' },
+  { key: 'bubbleAsmi',      label: 'حباب اسمی' },
+  { key: 'bubbleVaqei',     label: 'حباب واقعی' },
+  { key: 'dollarRate',      label: 'نرخ دلار' },
+  { key: 'coinWeight',      label: 'وزن سکه' },
+  { key: 'goldBarWeight',   label: 'وزن شمش طلا' },
   { key: 'silverBarWeight', label: 'وزن شمش نقره' },
 ]
 
 function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
-  const [activeSheet, setActiveSheet] = useState(0)
   const [fundsData, setFundsData] = useState<Record<string, number | null>>({})
   const [fundsLoading, setFundsLoading] = useState(true)
 
-  useEffect(() => {
+  const loadData = () => {
     fetch('/api/funds')
       .then(r => r.json())
       .then(d => {
@@ -586,19 +584,33 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
           const rec = recById[a.id]
           map[a.name] = rec?.market_value ?? null
         }
-        console.log('[GoldMatrix] assets:', assets.length, 'records:', records.length, 'map sample:', Object.entries(map).slice(0, 3))
         setFundsData(map)
       })
       .catch(e => console.error('[GoldFundsMatrix] fetch failed:', e))
       .finally(() => setFundsLoading(false))
+  }
+
+  useEffect(() => {
+    loadData()
+    const t = setInterval(loadData, 5 * 60 * 1000)
+    return () => clearInterval(t)
   }, [])
 
-  const getMv = (name: string): string => {
+  const getMv = (name: string): { display: string; full: string } => {
     const mv = fundsData[name]
-    if (fundsLoading) return '...'
-    if (mv == null) return '—'
-    const billionToman = mv / 10_000_000_000
-    return billionToman.toLocaleString('fa-IR', { maximumFractionDigits: 4 }) + ' م.ت'
+    if (fundsLoading) return { display: '...', full: '' }
+    if (mv == null) return { display: '—', full: '' }
+    const bt = mv / 10_000_000_000
+    const full = bt.toLocaleString('fa-IR', { maximumFractionDigits: 1 }) + ' میلیارد تومان'
+    const display = bt >= 1000
+      ? Math.round(bt / 1000).toLocaleString('fa-IR') + ' ه.م.ت'
+      : Math.round(bt).toLocaleString('fa-IR') + ' م.ت'
+    return { display, full }
+  }
+
+  const getCellValue = (colKey: string, name: string): { display: string; full: string } => {
+    if (colKey === 'marketToman') return getMv(name)
+    return { display: '—', full: '' }
   }
 
   const tabBorder = 'rgba(0,200,255,0.12)'
@@ -614,34 +626,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
             {fundsLoading ? 'در حال بارگذاری...' : `${Object.values(fundsData).filter(v => v != null).length} صندوق با داده`}
           </div>
         </div>
-        <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>داده‌های صندوق‌های سرمایه‌گذاری طلا — هر تب یک شاخص</div>
-      </div>
-
-      {/* Tab bar */}
-      <div style={{ overflowX: 'auto', borderBottom: `0.5px solid ${tabBorder}` }}>
-        <div style={{ display: 'flex', padding: '0 18px', minWidth: 'max-content', gap: 2 }}>
-          {SHEETS.map((s, i) => (
-            <button
-              key={s.key}
-              onClick={() => setActiveSheet(i)}
-              style={{
-                padding: '10px 16px',
-                fontSize: 11,
-                fontFamily: 'Vazirmatn, Arial, sans-serif',
-                fontWeight: activeSheet === i ? 700 : 400,
-                color: activeSheet === i ? accent : muted,
-                background: 'none',
-                border: 'none',
-                borderBottom: activeSheet === i ? `2px solid ${accent}` : '2px solid transparent',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'color 0.15s',
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+        <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>داده‌های صندوق‌های سرمایه‌گذاری طلا — هاور روی عدد برای جزئیات</div>
       </div>
 
       {/* Table */}
@@ -649,36 +634,45 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr>
-              <th style={{ padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right', borderBottom: `0.5px solid ${tabBorder}`, whiteSpace: 'nowrap' }}>
-                ردیف
-              </th>
-              <th style={{ padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right', borderBottom: `0.5px solid ${tabBorder}`, whiteSpace: 'nowrap' }}>
+              <th style={{ padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right', borderBottom: `0.5px solid ${tabBorder}`, whiteSpace: 'nowrap', position: 'sticky', right: 0, background: tabBg, zIndex: 1 }}>
                 نام صندوق
               </th>
-              {activeSheet > 0 && (
-                <th style={{ padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right', borderBottom: `0.5px solid ${tabBorder}`, whiteSpace: 'nowrap' }}>
-                  {SHEETS[activeSheet].label}
+              {DATA_COLS.map(col => (
+                <th key={col.key} style={{ padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right', borderBottom: `0.5px solid ${tabBorder}`, whiteSpace: 'nowrap' }}>
+                  {col.label}
                 </th>
-              )}
+              ))}
             </tr>
           </thead>
           <tbody>
-            {GOLD_FUNDS.map((name, idx) => (
+            {GOLD_FUNDS.map(name => (
               <tr
                 key={name}
                 style={{ borderBottom: `0.5px solid ${tabBorder}` }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(0,200,255,0.03)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
               >
-                <td style={{ padding: '9px 16px', color: muted, fontFamily: 'system-ui', fontSize: 11 }}>
-                  {(idx + 1).toLocaleString('fa-IR')}
+                <td style={{ padding: '9px 16px', color: text, fontWeight: 500, whiteSpace: 'nowrap', position: 'sticky', right: 0, background: 'inherit' }}>
+                  {name}
                 </td>
-                <td style={{ padding: '9px 16px', color: text, fontWeight: 500 }}>{name}</td>
-                {activeSheet > 0 && (
-                  <td style={{ padding: '9px 16px', color: SHEETS[activeSheet].key === 'marketToman' ? text : muted, fontFamily: 'system-ui' }}>
-                    {SHEETS[activeSheet].key === 'marketToman' ? getMv(name) : '—'}
-                  </td>
-                )}
+                {DATA_COLS.map(col => {
+                  const v = getCellValue(col.key, name)
+                  return (
+                    <td
+                      key={col.key}
+                      title={v.full || undefined}
+                      style={{
+                        padding: '9px 16px',
+                        color: col.key === 'marketToman' && v.display !== '—' && v.display !== '...' ? text : muted,
+                        fontFamily: 'system-ui',
+                        whiteSpace: 'nowrap',
+                        cursor: v.full ? 'help' : 'default',
+                      }}
+                    >
+                      {v.display}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
           </tbody>
