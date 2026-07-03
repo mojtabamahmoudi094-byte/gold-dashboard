@@ -569,24 +569,26 @@ const DATA_COLS = [
 
 function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   const [fundsData, setFundsData] = useState<Record<string, number | null>>({})
+  const [dollarRate, setDollarRate] = useState<number | null>(null)
   const [fundsLoading, setFundsLoading] = useState(true)
 
   const loadData = () => {
-    fetch('/api/funds')
-      .then(r => r.json())
-      .then(d => {
-        const assets: any[] = d.assets ?? []
-        const records: any[] = d.records ?? []
-        const recById: Record<number, any> = {}
-        for (const rec of records) recById[rec.asset_id] = rec
-        const map: Record<string, number | null> = {}
-        for (const a of assets) {
-          const rec = recById[a.id]
-          map[a.name] = rec?.market_value ?? null
-        }
-        setFundsData(map)
-      })
-      .catch(e => console.error('[GoldFundsMatrix] fetch failed:', e))
+    Promise.all([
+      fetch('/api/funds').then(r => r.json()),
+      fetch('/api/gold-analysis').then(r => r.json()),
+    ]).then(([fd, gd]) => {
+      const assets: any[] = fd.assets ?? []
+      const records: any[] = fd.records ?? []
+      const recById: Record<number, any> = {}
+      for (const rec of records) recById[rec.asset_id] = rec
+      const map: Record<string, number | null> = {}
+      for (const a of assets) {
+        const rec = recById[a.id]
+        map[a.name] = rec?.market_value ?? null
+      }
+      setFundsData(map)
+      setDollarRate(gd?.inputs?.dollarT ?? null)
+    }).catch(e => console.error('[GoldFundsMatrix] fetch failed:', e))
       .finally(() => setFundsLoading(false))
   }
 
@@ -608,8 +610,23 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     return { display, full }
   }
 
+  const getUsd = (name: string): { display: string; full: string } => {
+    const mv = fundsData[name]
+    if (fundsLoading) return { display: '...', full: '' }
+    if (mv == null || dollarRate == null) return { display: '—', full: '' }
+    const toman = mv / 10
+    const dollars = toman / dollarRate
+    const mil = dollars / 1_000_000
+    const full = mil.toLocaleString('fa-IR', { maximumFractionDigits: 1 }) + ' میلیون دلار'
+    const display = mil >= 1000
+      ? Math.round(mil / 1000).toLocaleString('fa-IR') + ' م.م.د'
+      : Math.round(mil).toLocaleString('fa-IR') + ' م.د'
+    return { display, full }
+  }
+
   const getCellValue = (colKey: string, name: string): { display: string; full: string } => {
     if (colKey === 'marketToman') return getMv(name)
+    if (colKey === 'marketUsd') return getUsd(name)
     return { display: '—', full: '' }
   }
 
