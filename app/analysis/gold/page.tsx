@@ -588,7 +588,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
         }
         setFundsData(map)
       })
-      .catch(() => {})
+      .catch(e => console.error('[GoldFundsMatrix] fetch failed:', e))
       .finally(() => setFundsLoading(false))
   }, [])
 
