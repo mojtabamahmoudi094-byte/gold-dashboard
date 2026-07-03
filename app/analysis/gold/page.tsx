@@ -586,6 +586,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
           const rec = recById[a.id]
           map[a.name] = rec?.market_value ?? null
         }
+        console.log('[GoldMatrix] assets:', assets.length, 'records:', records.length, 'map sample:', Object.entries(map).slice(0, 3))
         setFundsData(map)
       })
       .catch(e => console.error('[GoldFundsMatrix] fetch failed:', e))
