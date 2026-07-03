@@ -564,7 +564,7 @@ const DATA_COLS = [
   { key: 'dollarRate',      label: 'نرخ دلار' },
   { key: 'coinWeight',      label: 'وزن سکه' },
   { key: 'goldBarWeight',   label: 'وزن شمش طلا' },
-  { key: 'silverBarWeight', label: 'وزن شمش نقره' },
+  { key: 'liquidity', label: 'نقدینگی' },
 ]
 
 function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
