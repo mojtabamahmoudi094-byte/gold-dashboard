@@ -570,6 +570,35 @@ const SHEETS = [
 
 function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   const [activeSheet, setActiveSheet] = useState(0)
+  const [fundsData, setFundsData] = useState<Record<string, number | null>>({})
+  const [fundsLoading, setFundsLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/funds')
+      .then(r => r.json())
+      .then(d => {
+        const assets: any[] = d.assets ?? []
+        const records: any[] = d.records ?? []
+        const recById: Record<number, any> = {}
+        for (const rec of records) recById[rec.asset_id] = rec
+        const map: Record<string, number | null> = {}
+        for (const a of assets) {
+          const rec = recById[a.id]
+          map[a.name] = rec?.market_value ?? null
+        }
+        setFundsData(map)
+      })
+      .catch(() => {})
+      .finally(() => setFundsLoading(false))
+  }, [])
+
+  const getMv = (name: string): string => {
+    const mv = fundsData[name]
+    if (fundsLoading) return '...'
+    if (mv == null) return '—'
+    const billionToman = mv / 10_000_000_000
+    return billionToman.toLocaleString('fa-IR', { maximumFractionDigits: 4 }) + ' م.ت'
+  }
 
   const tabBorder = 'rgba(0,200,255,0.12)'
   const tabBg     = 'rgba(10,18,30,0.6)'
@@ -640,7 +669,9 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
                 </td>
                 <td style={{ padding: '9px 16px', color: text, fontWeight: 500 }}>{name}</td>
                 {activeSheet > 0 && (
-                  <td style={{ padding: '9px 16px', color: muted, fontFamily: 'system-ui' }}>—</td>
+                  <td style={{ padding: '9px 16px', color: SHEETS[activeSheet].key === 'marketToman' ? text : muted, fontFamily: 'system-ui' }}>
+                    {SHEETS[activeSheet].key === 'marketToman' ? getMv(name) : '—'}
+                  </td>
                 )}
               </tr>
             ))}
