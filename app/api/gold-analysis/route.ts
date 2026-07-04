@@ -86,7 +86,7 @@ function buildResponse(
   stale: boolean,
   changes: Record<string, number | null> | null,
   lastMarketDate: string | null,
-  imeData: { goldBarRial: number | null; goldCoinRial: number | null },
+  imeData: { goldBarRial: number | null; goldCoinRial: number | null; silverBarRial: number | null },
 ) {
   const goldOunce = proData?.gold?.ounce    ?? []
   const goldTypes = proData?.gold?.type     ?? []
@@ -140,6 +140,9 @@ function buildResponse(
     ? (bullionW / gramsPerOz) * bullionPurity * goldUsd * dollarViaDirham : null
   const fairCoinCert   = goldUsd && dollarViaDirham
     ? (fullCoinW / gramsPerOz) * (22 / 24) * goldUsd * dollarViaDirham : null
+  // قیمت واقعی هر گرم نقره ۹۹۹ (تومان) — همان فرمول شمش طلا با انس نقره
+  const fairSilverGram = silverUsd && dollarViaDirham
+    ? (silverUsd * dollarViaDirham) / gramsPerOz : null
 
   const bub = (m: number | null, f: number | null) => m && f ? (m - f) / f : null
   const imp = (mT: number | null, oz: number | null, frac: number) =>
@@ -189,8 +192,10 @@ function buildResponse(
     ime: {
       goldBarT:    imeData.goldBarRial  != null ? imeData.goldBarRial  / 10 : null,
       goldCoinT:   imeData.goldCoinRial != null ? imeData.goldCoinRial / 10 : null,
+      silverBarT:  imeData.silverBarRial != null ? imeData.silverBarRial / 10 : null, // تومان هر گرم
       fairBullion,
       fairCoinCert,
+      fairSilverGram,
     },
   })
 }
@@ -218,9 +223,10 @@ export async function GET() {
 
   const lastMarketDate = sbRows[0]?.date ?? null
 
-  // ── 1b. Read latest IME cache (GoldBar + GoldCoin pf in Rial) ───────────────
-  let imeGoldBarRial:  number | null = null
-  let imeGoldCoinRial: number | null = null
+  // ── 1b. Read latest IME cache (GoldBar + GoldCoin + SilverBar pf in Rial) ───
+  let imeGoldBarRial:   number | null = null
+  let imeGoldCoinRial:  number | null = null
+  let imeSilverBarRial: number | null = null
   try {
     const { data: imeRows } = await sbClient
       .from('signals')
@@ -230,10 +236,12 @@ export async function GET() {
       .limit(1)
     if (imeRows?.[0]?.note) {
       const arr: any[] = JSON.parse(imeRows[0].note)?.raw?.data ?? []
-      const goldBar  = arr.find((x: any) => x.contract_code === 'GoldBar')
-      const goldCoin = arr.find((x: any) => x.contract_code === 'GoldCoin')
-      imeGoldBarRial  = goldBar?.pf  != null ? Number(goldBar.pf)  : null
-      imeGoldCoinRial = goldCoin?.pf != null ? Number(goldCoin.pf) : null
+      const goldBar   = arr.find((x: any) => x.contract_code === 'GoldBar')
+      const goldCoin  = arr.find((x: any) => x.contract_code === 'GoldCoin')
+      const silverBar = arr.find((x: any) => x.contract_code === 'SilverBar')
+      imeGoldBarRial   = goldBar?.pf   != null ? Number(goldBar.pf)   : null
+      imeGoldCoinRial  = goldCoin?.pf  != null ? Number(goldCoin.pf)  : null
+      imeSilverBarRial = silverBar?.pf != null ? Number(silverBar.pf) : null
     }
   } catch (e) {
     console.warn('[gold-analysis] IME cache read failed:', e)
@@ -285,7 +293,8 @@ export async function GET() {
   } : null
 
   return buildResponse(todayProData, todayCommodityData, stale, changes, lastMarketDate, {
-    goldBarRial:  imeGoldBarRial,
-    goldCoinRial: imeGoldCoinRial,
+    goldBarRial:   imeGoldBarRial,
+    goldCoinRial:  imeGoldCoinRial,
+    silverBarRial: imeSilverBarRial,
   })
 }

@@ -110,8 +110,20 @@ export default function SilverAnalysisPage() {
   const fairGramDirham = silverUsd && dollarViaDirham ? (silverUsd * dollarViaDirham) / GRAMS_PER_OZ : null
   const goldSilverRatio = goldUsd && silverUsd ? goldUsd / silverUsd : null
 
+  // بورس کالا: قیمت تابلو نقدی شمش نقره (تومان هر گرم) + حباب نسبت به قیمت واقعی
+  const silverBarT = api?.ime?.silverBarT ?? null
+  const fairSilverGram = api?.ime?.fairSilverGram ?? fairGramDirham
+  const silverBubble = silverBarT != null && fairSilverGram
+    ? ((silverBarT - fairSilverGram) / fairSilverGram) * 100 : null
+
+  // حباب واقعی صندوق = حباب اسمی + حباب شمش نقره (فرض: دارایی صندوق تماماً شمش نقره)
+  const bubbleVaqei = (f: SilverFund): number | null =>
+    f.bubbleAsmi != null && silverBubble != null ? f.bubbleAsmi + silverBubble : null
+
   const bubbles = funds.map(f => f.bubbleAsmi).filter((b): b is number => b != null)
   const avgBubble = bubbles.length ? bubbles.reduce((s, b) => s + b, 0) / bubbles.length : null
+  const vaqeis = funds.map(bubbleVaqei).filter((b): b is number => b != null)
+  const avgVaqei = vaqeis.length ? vaqeis.reduce((s, b) => s + b, 0) / vaqeis.length : null
   const totalMarketBT = funds.reduce((s, f) => s + (f.market_value || 0), 0) / 10_000_000_000
   const totalNetFlow = funds.reduce((s, f) => s + ((f.buy_i_volume || 0) - (f.sell_i_volume || 0)), 0)
 
@@ -194,13 +206,20 @@ export default function SilverAnalysisPage() {
           </div>
         </Section>
 
-        {/* Row 2: قیمت واقعی گرم نقره */}
-        <Section title="قیمت واقعی نقره" subtitle="هر گرم نقره خالص ۹۹۹ بر اساس انس جهانی" border={border} text={text} muted={muted}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        {/* Row 2: قیمت واقعی گرم نقره + بورس کالا */}
+        <Section title="قیمت واقعی نقره و بورس کالا" subtitle="هر گرم نقره خالص ۹۹۹ — انس جهانی vs تابلو نقدی شمش نقره (BrsAPI — بورس کالا)" border={border} text={text} muted={muted}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <StatCard label="قیمت واقعی گرم نقره" value={fmt(fairSilverGram)} unit="تومان"
+              note="انس ÷ انس‌گرم × (درهم × ۳.۶۷۳۲)" accent={accent} border={border} muted={muted} />
+            <StatCard label="قیمت تابلو نقدی شمش نقره" value={fmt(silverBarT)} unit="تومان هر گرم"
+              note="قیمت پایانی SilverBar — بورس کالا" accent={accent} border={border} muted={muted} />
+            <StatCard label="حباب شمش نقره"
+              value={silverBubble != null ? fmtPct(silverBubble) : '—'} unit="تابلو نسبت به واقعی"
+              note="(تابلو − واقعی) ÷ واقعی × ۱۰۰"
+              accent={silverBubble == null ? muted : silverBubble > 0 ? red : green}
+              border={border} muted={muted} />
             <StatCard label="گرم نقره با دلار بازار" value={fmt(fairGramMarket)} unit="تومان"
               note={`انس ÷ ${GRAMS_PER_OZ} × دلار بازار`} accent={accent} border={border} muted={muted} />
-            <StatCard label="گرم نقره با دلار درهم" value={fmt(fairGramDirham)} unit="تومان"
-              note="انس ÷ انس‌گرم × (درهم × ۳.۶۷۳۲)" accent={accent} border={border} muted={muted} />
             <StatCard label="ارزش کل صندوق‌های نقره" value={fmt(totalMarketBT)} unit="میلیارد تومان"
               note={`${funds.length.toLocaleString('fa-IR')} صندوق فعال`} accent={green} border={border} muted={muted} />
           </div>
@@ -227,7 +246,7 @@ export default function SilverAnalysisPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
-                  {['نام صندوق', 'ارزش بازار', 'قیمت پایانی', 'NAV ابطال', 'حباب اسمی', 'تغییر روزانه', 'جریان پول حقیقی', 'ارزش معاملات'].map(h => (
+                  {['نام صندوق', 'ارزش بازار', 'قیمت پایانی', 'NAV ابطال', 'حباب اسمی', 'حباب واقعی', 'تغییر روزانه', 'جریان پول حقیقی', 'ارزش معاملات'].map(h => (
                     <th key={h} style={{
                       padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right',
                       borderBottom: `0.5px solid ${border}`, whiteSpace: 'nowrap',
@@ -242,6 +261,8 @@ export default function SilverAnalysisPage() {
                   const mvBT = f.market_value != null ? f.market_value / 10_000_000_000 : null
                   const tvBT = f.trade_value != null ? f.trade_value / 10_000_000_000 : null
                   const bc = f.bubbleAsmi == null ? muted : f.bubbleAsmi > 2 ? red : f.bubbleAsmi < 0 ? green : '#F59E0B'
+                  const bv = bubbleVaqei(f)
+                  const bvc = bv == null ? muted : bv > 0 ? red : green
                   return (
                     <tr key={f.asset_id} className="srow" style={{ borderBottom: `0.5px solid ${border}` }}>
                       <td style={{ padding: '10px 16px', color: text, fontWeight: 600, whiteSpace: 'nowrap' }}>{f.name}</td>
@@ -263,6 +284,16 @@ export default function SilverAnalysisPage() {
                           }}>{fmtPct(f.bubbleAsmi)}</span>
                         ) : <span style={{ color: muted }}>—</span>}
                       </td>
+                      <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}
+                        title={bv != null ? `حباب اسمی ${f.bubbleAsmi!.toFixed(1)}٪ + حباب شمش نقره ${silverBubble!.toFixed(1)}٪` : undefined}>
+                        {bv != null ? (
+                          <span style={{
+                            display: 'inline-block', fontSize: 11, fontWeight: 700, color: bvc,
+                            background: `${bvc}18`, border: `0.5px solid ${bvc}30`,
+                            borderRadius: 6, padding: '2px 10px', fontFamily: 'system-ui', cursor: 'help',
+                          }}>{fmtPct(bv)}</span>
+                        ) : <span style={{ color: muted }}>—</span>}
+                      </td>
                       <td style={{ padding: '10px 16px', fontFamily: 'system-ui', whiteSpace: 'nowrap',
                         color: (f.price_change_pct ?? 0) >= 0 ? green : red, fontWeight: 600 }}>
                         {f.price_change_pct != null ? `${f.price_change_pct >= 0 ? '+' : ''}${f.price_change_pct.toFixed(2)}٪` : '—'}
@@ -278,7 +309,7 @@ export default function SilverAnalysisPage() {
                   )
                 })}
                 {!loading && funds.length === 0 && (
-                  <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center', color: muted, fontSize: 12 }}>
+                  <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: muted, fontSize: 12 }}>
                     داده صندوق نقره موجود نیست
                   </td></tr>
                 )}
@@ -295,6 +326,11 @@ export default function SilverAnalysisPage() {
                   label: 'میانگین حباب اسمی صندوق‌ها',
                   value: avgBubble != null ? fmtPct(avgBubble) : '—',
                   color: avgBubble == null ? muted : avgBubble > 0 ? red : green,
+                },
+                {
+                  label: 'میانگین حباب واقعی صندوق‌ها',
+                  value: avgVaqei != null ? fmtPct(avgVaqei) : '—',
+                  color: avgVaqei == null ? muted : avgVaqei > 0 ? red : green,
                 },
                 {
                   label: 'مجموع ارزش بازار',
