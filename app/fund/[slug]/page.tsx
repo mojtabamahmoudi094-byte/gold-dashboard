@@ -797,6 +797,7 @@ function LineChartPanel({ t, title, subtitle, rows, getValue, colorAbove, colorB
       borderTop: `2px solid ${above}55`, borderRadius: 14,
       padding: '14px 16px', backdropFilter: 'blur(12px)',
       boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
+      minWidth: 0, // grid item — سرریز موبایل
     }}>
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: t.muted }}>{title}</div>
@@ -894,6 +895,7 @@ function BarChartPanel({ t, title, subtitle, rows, getA, getB, labelA, labelB, c
       padding: '14px 16px',
       backdropFilter: 'blur(12px)',
       boxShadow: `0 4px 24px rgba(0,0,0,0.14)`,
+      minWidth: 0, // grid item — لیبل‌های nowrap نباید ستون 1fr را باز کنند (سرریز موبایل)
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 6 }}>
         <div>
