@@ -302,7 +302,34 @@ export default function GoldAnalysisPage() {
         {/* ── Row 5: Gold Funds Matrix ── */}
         <GoldFundsMatrix border={border} muted={muted} text={text} accent={accent} bg={bg} />
 
-        {/* ── Row 6: Constants — Admin only ── */}
+        {/* ── Row 6: بورس کالا ── */}
+        <Section title="بورس کالا" subtitle="قیمت‌های نقدی بازار فیزیکی">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `0.5px solid ${border}` }}>
+                  <th style={{ textAlign: 'right', padding: '8px 12px', color: muted, fontWeight: 500 }}>شاخص</th>
+                  <th style={{ textAlign: 'center', padding: '8px 12px', color: muted, fontWeight: 500 }}>قیمت (تومان)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  'قیمت واقعی شمش طلا',
+                  'قیمت تابلو نقدی شمش طلا',
+                  'قیمت واقعی گواهی سکه',
+                  'قیمت تابلو نقدی گواهی سکه',
+                ].map((label, i) => (
+                  <tr key={label} style={{ borderBottom: i < 3 ? `0.5px solid ${border}` : 'none' }}>
+                    <td style={{ padding: '10px 12px', color: text }}>{label}</td>
+                    <td style={{ padding: '10px 12px', color: muted, textAlign: 'center' }}>—</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+
+        {/* ── Row 7: Constants — Admin only ── */}
         {isAdmin && (
           <AdminConstants
             constants={constants} onChange={setConstants}
