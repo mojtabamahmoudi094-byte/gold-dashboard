@@ -47,7 +47,7 @@ export default function Footer() {
                 <path d="M15 6 L20 6 L20 11"/>
               </svg>
             </div>
-            <div style={{ fontWeight: 800, fontSize: 18, color: '#eef1f8' }}>بورس‌سنج</div>
+            <div style={{ fontWeight: 800, fontSize: 18, color: '#eef1f8' }}>بورس سنج</div>
           </div>
           <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.8, maxWidth: 300, margin: 0 }}>
             سامانه هوشمند رصد، تحلیل و پایش بازار سرمایه ایران. سریع، خصوصی و حرفه‌ای.
@@ -87,7 +87,7 @@ export default function Footer() {
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: '#eef1f8' }}>ما را دنبال کنید</div>
           <div style={{ display: 'flex', gap: 10 }}>
             {/* X / Twitter */}
-            <a href="#" aria-label="بورس‌سنج در توییتر" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
+            <a href="#" aria-label="بورس سنج در توییتر" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
               onMouseLeave={e => (e.currentTarget.style.background = ICON_BG)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ICON_C} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -95,7 +95,7 @@ export default function Footer() {
               </svg>
             </a>
             {/* Instagram */}
-            <a href="#" aria-label="بورس‌سنج در اینستاگرام" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
+            <a href="#" aria-label="بورس سنج در اینستاگرام" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
               onMouseLeave={e => (e.currentTarget.style.background = ICON_BG)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ICON_C} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -105,7 +105,7 @@ export default function Footer() {
               </svg>
             </a>
             {/* Telegram */}
-            <a href="https://t.me/shagerdebazar" aria-label="کانال تلگرام بورس‌سنج" target="_blank" rel="noopener noreferrer" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
+            <a href="https://t.me/shagerdebazar" aria-label="کانال تلگرام بورس سنج" target="_blank" rel="noopener noreferrer" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(42,171,238,0.15)')}
               onMouseLeave={e => (e.currentTarget.style.background = ICON_BG)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill={ICON_C}>

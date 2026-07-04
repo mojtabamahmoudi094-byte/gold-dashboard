@@ -449,7 +449,7 @@ export default function HomePage() {
       {/* ═══════ FEATURES ═══════ */}
       <section style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '48px 20px' : '60px 6vw', direction: 'rtl' }}>
         <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto 50px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6', marginBottom: 12, letterSpacing: '0.04em' }}>امکانات بورس‌سنج</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6', marginBottom: 12, letterSpacing: '0.04em' }}>امکانات بورس سنج</div>
           <h2 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4vw,46px)', fontWeight: 900, letterSpacing: '-0.5px', margin: '0 0 16px', color: '#eef1f8' }}>هرآنچه یک معامله‌گر حرفه‌ای نیاز دارد</h2>
           <p style={{ color: '#a9b0c2', fontSize: 18 }}>ابزارهای قدرتمند برای تصمیم‌گیری سریع‌تر و دقیق‌تر در بازار سرمایه.</p>
         </div>
@@ -496,7 +496,7 @@ export default function HomePage() {
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: isMobile ? '60px 20px 70px' : '80px 6vw 90px', textAlign: 'center', direction: 'rtl' }}>
         <h2 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4.4vw,52px)', fontWeight: 900, letterSpacing: '-0.6px', margin: '0 0 18px', color: '#eef1f8' }}>
           همین حالا رایگان با{' '}
-          <span style={{ background: 'linear-gradient(120deg, #3b82f6, oklch(0.74 0.17 155))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>بورس‌سنج</span>
+          <span style={{ background: 'linear-gradient(120deg, #3b82f6, oklch(0.74 0.17 155))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>بورس سنج</span>
           {' '}شروع کنید
         </h2>
         <p style={{ color: '#a9b0c2', fontSize: 19, maxWidth: 560, margin: '0 auto 38px', lineHeight: 1.7 }}>
