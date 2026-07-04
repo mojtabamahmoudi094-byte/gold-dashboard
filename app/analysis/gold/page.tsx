@@ -137,25 +137,63 @@ export default function GoldAnalysisPage() {
 
   return (
     <main style={{
-      minHeight: '100vh', background: bg, color: text,
+      minHeight: '100vh', color: text,
+      background: `
+        radial-gradient(ellipse 60% 40% at 85% -5%, rgba(255,201,74,0.06), transparent 60%),
+        radial-gradient(ellipse 55% 35% at 10% 0%, rgba(0,200,255,0.07), transparent 60%),
+        ${bg}`,
       fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
     }}>
+      <style>{`
+        .gsec { transition: border-color .2s ease, box-shadow .2s ease; }
+        .gsec:hover { border-color: rgba(0,200,255,.28) !important; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
+        .gcard { transition: transform .2s ease, border-color .2s ease, background .2s ease; }
+        .gcard:hover { border-color: rgba(0,200,255,.35) !important; background: rgba(0,200,255,.07) !important; transform: translateY(-2px); }
+        .gbtn { transition: background .2s ease, box-shadow .2s ease; }
+        .gbtn:hover:not(:disabled) { background: rgba(0,200,255,.2) !important; box-shadow: 0 0 16px rgba(0,200,255,.25); }
+        .gbtn:focus-visible { outline: 2px solid #00C8FF; outline-offset: 2px; }
+        tr.grow { transition: background .15s ease; }
+        tr.grow:hover { background: rgba(0,200,255,.045); }
+        tbody tr.grow:nth-child(even) { background: rgba(255,255,255,.017); }
+        tbody tr.grow:nth-child(even):hover { background: rgba(0,200,255,.045); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+          .gsec, .gcard, .gbtn, tr.grow { transition: none !important; }
+          .gcard:hover { transform: none !important; }
+          .gbtn svg { animation: none !important; }
+        }
+      `}</style>
 
       {/* Page header */}
       <div style={{
         borderBottom: `1px solid ${border}`,
-        background: 'rgba(10,18,30,0.6)',
+        background: 'rgba(6,11,20,0.75)',
         backdropFilter: 'blur(12px)',
         padding: '16px 24px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        position: 'sticky', top: 0, zIndex: 30,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <a href="/analysis" style={{ color: muted, textDecoration: 'none', fontSize: 12 }}>تحلیل</a>
           <span style={{ color: muted, fontSize: 10 }}>›</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 18 }}>🥇</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              width: 34, height: 34, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(255,201,74,0.18), rgba(255,201,74,0.05))',
+              border: '0.5px solid rgba(255,201,74,0.35)',
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFC94A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M6 15h12l2 5H4l2-5Z" />
+                <path d="M8 9h8l2 5H6l2-5Z" />
+                <path d="M10 3h4l2 5H8l2-5Z" />
+              </svg>
+            </span>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: text }}>تحلیل طلا</div>
+              <div style={{
+                fontSize: 16, fontWeight: 800,
+                background: 'linear-gradient(90deg, #FFC94A, #E8F4FF 70%)',
+                WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+              }}>تحلیل طلا</div>
               <div style={{ fontSize: 10, color: muted }}>
                 {data?.lastMarketDate ? `آخرین روز بازار: ${data.lastMarketDate}` : 'در حال بارگذاری...'}
               </div>
@@ -169,14 +207,20 @@ export default function GoldAnalysisPage() {
             </span>
           )}
           <button
+            className="gbtn"
             onClick={load} disabled={loading}
             style={{
-              fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: loading ? 'wait' : 'pointer',
+              fontSize: 11, padding: '7px 16px', borderRadius: 8, cursor: loading ? 'wait' : 'pointer',
               background: 'rgba(0,200,255,0.08)', border: `0.5px solid ${accent}44`,
-              color: accent, fontFamily: 'inherit',
+              color: accent, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
             }}
           >
-            {loading ? '...' : '↻ بروزرسانی'}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+              style={loading ? { animation: 'spin 1s linear infinite' } : undefined}>
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
+            {loading ? 'در حال بروزرسانی' : 'بروزرسانی'}
           </button>
         </div>
       </div>
@@ -340,17 +384,23 @@ export default function GoldAnalysisPage() {
                     { label: 'قیمت واقعی دلار گواهی سکه', value: dollarCoin, note: 'تابلو ÷ (۸.۱۳گرم ÷ انس‌گرم × عیار ۲۲÷۲۴ × انس دلاری)', isToman: true },
                   ]
                   return rows.map((row, i, arr) => (
-                    <tr key={row.label} style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${border}` : 'none' }}>
-                      <td style={{ padding: '10px 12px', color: text }}>{row.label}</td>
+                    <tr key={row.label} className="grow" style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${border}` : 'none' }}>
+                      <td style={{ padding: '10px 12px', color: row.isToman ? '#FFC94A' : text, fontWeight: row.isBubble || row.isToman ? 600 : 400 }}>{row.label}</td>
                       <td style={{ padding: '10px 12px', fontFamily: 'system-ui', textAlign: 'left' }}>
                         {row.value != null ? (
                           row.isBubble ? (
-                            <span style={{ color: row.value > 0 ? '#F87171' : '#4ADE80', fontWeight: 700 }}>
+                            <span style={{
+                              display: 'inline-block', fontWeight: 700, fontSize: 12,
+                              color: row.value > 0 ? '#FF4D6A' : '#00E5A0',
+                              background: row.value > 0 ? 'rgba(255,77,106,0.1)' : 'rgba(0,229,160,0.1)',
+                              border: `0.5px solid ${row.value > 0 ? 'rgba(255,77,106,0.3)' : 'rgba(0,229,160,0.3)'}`,
+                              borderRadius: 6, padding: '2px 10px',
+                            }}>
                               {row.value.toLocaleString('fa-IR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}٪
                             </span>
                           ) : (
                             <span>
-                              <span style={{ color: accent, fontWeight: 700 }}>
+                              <span style={{ color: row.isToman ? '#FFC94A' : accent, fontWeight: 700 }}>
                                 {Math.round(row.value).toLocaleString('fa-IR')}
                               </span>
                               <span style={{ color: muted, fontSize: 10, marginRight: 6 }}>{row.isToman ? 'تومان' : 'هزار تومان'}</span>
@@ -412,10 +462,17 @@ function DailyChangeBadge({ pct }: { pct: number | null }) {
 function Section({ title, subtitle, badge, badgeColor, children }: any) {
   const border = 'rgba(0,200,255,0.12)'
   return (
-    <div style={{ background: 'rgba(10,18,30,0.6)', border: `0.5px solid ${border}`, borderRadius: 16, overflow: 'hidden' }}>
+    <div className="gsec" style={{
+      background: 'linear-gradient(180deg, rgba(13,22,38,0.75), rgba(8,14,24,0.6))',
+      border: `0.5px solid ${border}`, borderRadius: 16, overflow: 'hidden',
+    }}>
       <div style={{ padding: '14px 18px', borderBottom: `0.5px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span aria-hidden="true" style={{
+              width: 3, height: 14, borderRadius: 2,
+              background: 'linear-gradient(180deg, #FFC94A, #00C8FF)',
+            }} />
             <span style={{ fontSize: 13, fontWeight: 700, color: '#E8F4FF' }}>{title}</span>
             {badge && (
               <span style={{
@@ -436,7 +493,7 @@ function Section({ title, subtitle, badge, badgeColor, children }: any) {
 function InputCard({ icon, label, unit, value, change, note, accent }: any) {
   const changeColor = change == null ? '#5A7088' : change > 0 ? '#00E5A0' : change < 0 ? '#FF4D6A' : '#5A7088'
   return (
-    <div style={{
+    <div className="gcard" style={{
       background: 'rgba(0,200,255,0.03)', border: '0.5px solid rgba(0,200,255,0.1)',
       borderRadius: 12, padding: '14px 16px',
     }}>
@@ -444,7 +501,7 @@ function InputCard({ icon, label, unit, value, change, note, accent }: any) {
         <span style={{ fontSize: 14 }}>{icon}</span>
         <span style={{ fontSize: 11, color: '#5A7088' }}>{label}</span>
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: 'system-ui', lineHeight: 1.2 }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: 'system-ui', lineHeight: 1.2, textShadow: `0 0 14px ${accent}33` }}>
         {value}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
@@ -468,9 +525,9 @@ function InputCard({ icon, label, unit, value, change, note, accent }: any) {
 function DollarCard({ label, formula, value, unit, color, desc, accent }: any) {
   const c = color ?? accent ?? '#00C8FF'
   return (
-    <div style={{ background: 'rgba(0,200,255,0.03)', border: '0.5px solid rgba(0,200,255,0.1)', borderRadius: 12, padding: '14px 16px' }}>
+    <div className="gcard" style={{ background: 'rgba(0,200,255,0.03)', border: '0.5px solid rgba(0,200,255,0.1)', borderRadius: 12, padding: '14px 16px' }}>
       <div style={{ fontSize: 11, color: '#5A7088', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: c, fontFamily: 'system-ui', marginBottom: 4 }}>
+      <div style={{ fontSize: 20, fontWeight: 700, color: c, fontFamily: 'system-ui', marginBottom: 4, textShadow: `0 0 14px ${c}33` }}>
         {value}
         {unit && <span style={{ fontSize: 11, color: '#5A7088', marginRight: 4 }}>{unit}</span>}
       </div>
@@ -483,7 +540,7 @@ function DollarCard({ label, formula, value, unit, color, desc, accent }: any) {
 function GoldRow({ label, fair, market, bubble, impliedDollar, dailyChange, border, muted, text }: any) {
   const bc = bubbleColor(bubble)
   return (
-    <tr style={{ borderBottom: `0.5px solid ${border}` }}>
+    <tr className="grow" style={{ borderBottom: `0.5px solid ${border}` }}>
       <td style={{ padding: '10px 12px', color: text, fontWeight: 500 }}>{label}</td>
       <td style={{ padding: '10px 12px', color: '#A0B4C8', fontFamily: 'system-ui', whiteSpace: 'nowrap' }}>
         {fmt(fair)}
@@ -513,7 +570,7 @@ function GoldRow({ label, fair, market, bubble, impliedDollar, dailyChange, bord
 function CoinRow({ label, weight, fair, market, bubble, dailyChange, marketNote, border, muted, text }: any) {
   const bc = bubbleColor(bubble)
   return (
-    <tr style={{ borderBottom: `0.5px solid ${border}` }}>
+    <tr className="grow" style={{ borderBottom: `0.5px solid ${border}` }}>
       <td style={{ padding: '10px 12px', color: text, fontWeight: 500 }}>{label}</td>
       <td style={{ padding: '10px 12px', color: muted, fontFamily: 'system-ui' }}>
         {weight.toLocaleString('fa-IR', { maximumFractionDigits: 3 })}
@@ -839,11 +896,14 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   const tabBg     = 'rgba(10,18,30,0.6)'
 
   return (
-    <div style={{ background: tabBg, border: `0.5px solid ${tabBorder}`, borderRadius: 16, overflow: 'hidden' }}>
+    <div className="gsec" style={{ background: 'linear-gradient(180deg, rgba(13,22,38,0.75), rgba(8,14,24,0.6))', border: `0.5px solid ${tabBorder}`, borderRadius: 16, overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '14px 18px', borderBottom: `0.5px solid ${tabBorder}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: text }}>ماتریس صندوق‌های طلا</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span aria-hidden="true" style={{ width: 3, height: 14, borderRadius: 2, background: 'linear-gradient(180deg, #FFC94A, #00C8FF)' }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: text }}>ماتریس صندوق‌های طلا</span>
+          </div>
           <div style={{ fontSize: 10, color: fundsLoading ? muted : accent }}>
             {fundsLoading ? 'در حال بارگذاری...' : `${Object.values(fundsData).filter(v => v != null).length} صندوق با داده`}
           </div>
@@ -933,20 +993,23 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
                 return (avg >= 0 ? '+' : '') + avg.toFixed(1) + '٪'
               })(),
             },
-          ].map(item => (
-            <div key={item.label} style={{
-              background: 'rgba(0,200,255,0.03)',
-              border: `0.5px solid ${tabBorder}`,
-              borderRadius: 10,
-              padding: '14px 16px',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: muted, fontFamily: 'system-ui', marginBottom: 6 }}>
-                {item.value}
+          ].map(item => {
+            const vColor = item.value === '—' ? muted : item.value.startsWith('+') ? '#FF4D6A' : '#00E5A0'
+            return (
+              <div key={item.label} className="gcard" style={{
+                background: 'rgba(0,200,255,0.03)',
+                border: `0.5px solid ${tabBorder}`,
+                borderRadius: 10,
+                padding: '14px 16px',
+                textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: vColor, fontFamily: 'system-ui', marginBottom: 6, textShadow: item.value === '—' ? 'none' : `0 0 16px ${vColor}33` }}>
+                  {item.value}
+                </div>
+                <div style={{ fontSize: 10, color: muted }}>{item.label}</div>
               </div>
-              <div style={{ fontSize: 10, color: muted }}>{item.label}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
