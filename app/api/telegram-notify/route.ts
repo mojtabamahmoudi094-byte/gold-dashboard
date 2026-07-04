@@ -7,31 +7,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Telegram env vars not set' }, { status: 500 })
   }
 
-  let body: { signal_type?: string; date?: string; confidence?: number; note?: string }
+  let body: {
+    signal_type?: string; date?: string; confidence?: number; note?: string
+    gold_funds?: string[]
+    silver_signal?: string | null; silver_confidence?: number | null; silver_funds?: string[]
+  }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { signal_type, date, confidence, note } = body
+  const { signal_type, date, confidence, note, gold_funds, silver_signal, silver_confidence, silver_funds } = body
   if (!signal_type) {
     return NextResponse.json({ ok: false, error: 'signal_type required' }, { status: 400 })
   }
 
-  const emoji = signal_type === 'خرید' ? '🟢' : signal_type === 'فروش' ? '🔴' : '🔵'
+  const sigEmoji = (t: string) => t === 'خرید' || t === 'تمایل خرید' ? '🟢' : t === 'فروش' || t === 'احتیاط' ? '🔴' : '🔵'
   const confPct = confidence !== undefined ? `${Math.round(confidence)}٪` : '—'
 
-  const text = [
-    `${emoji} سیگنال جدید — بورس سنج`,
+  const lines: (string | null)[] = [
+    `${sigEmoji(signal_type)} سیگنال جدید — بورس سنج`,
     '',
-    `📊 نوع: ${signal_type}`,
+    `🥇 بازار طلا: ${signal_type} (اطمینان ${confPct})`,
     date ? `📅 تاریخ: ${date}` : null,
-    `💯 اطمینان: ${confPct}`,
     note ? `📝 دلیل: ${note}` : null,
-    '',
-    'bourssanj.ir',
-  ].filter(Boolean).join('\n')
+  ]
+
+  if (gold_funds?.length) {
+    lines.push('', '🏆 صندوق‌های طلای پیشنهادی:')
+    gold_funds.forEach((f, i) => lines.push(`  ${i + 1}. ${f}`))
+  }
+
+  if (silver_signal) {
+    lines.push('', `${sigEmoji(silver_signal)} 🥈 بازار نقره: ${silver_signal}${silver_confidence != null ? ` (اطمینان ${Math.round(silver_confidence)}٪)` : ''}`)
+    if (silver_funds?.length) {
+      lines.push('🏆 صندوق‌های نقره پیشنهادی:')
+      silver_funds.forEach((f, i) => lines.push(`  ${i + 1}. ${f}`))
+    }
+  }
+
+  lines.push('', 'bourssanj.ir')
+  const text = lines.filter(l => l !== null).join('\n')
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

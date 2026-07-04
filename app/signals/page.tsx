@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
-import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, type MarketBubbles } from '../../lib/goldBubbles'
+import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, computeSilverBubble, silverFundBubbleZati, type MarketBubbles } from '../../lib/goldBubbles'
 
 const safe = (v: any) => Number(v || 0)
 const pct = (v: number | null, d = 1) =>
@@ -181,11 +181,11 @@ interface FundRow {
 function getRankedFunds(
   signalType: string,
   funds: FundRow[],
-  mb: MarketBubbles | null,
   navMap: Record<string, number>,
+  category: string,
+  zatiFor: (name: string) => number | null,
 ): FundRow[] {
-  // gold-only for gold signals
-  const pool = funds.filter(f => f.category === 'طلا')
+  const pool = funds.filter(f => f.category === category)
   if (pool.length === 0) return []
 
   const scored = pool.map(f => {
@@ -194,9 +194,9 @@ function getRankedFunds(
     const inflowScore = total > 0 ? net / total : 0   // [-1, 1]
     const chg = f.price_change_pct ?? 0
 
-    // حباب واقعی = حباب اسمی (قیمت vs NAV) + حباب ذاتی (ترکیب شمش/سکه × حباب بورس کالا)
+    // حباب واقعی = حباب اسمی (قیمت vs NAV) + حباب ذاتی (ترکیب دارایی × حباب بورس کالا)
     const asmi = fundBubbleAsmi(f.price_close, navMap[f.name])
-    const zati = mb ? fundBubbleZati(f.name, mb) : null
+    const zati = zatiFor(f.name)
     const bubbleVaqei = asmi != null && zati != null ? asmi + zati : null
 
     // ارزندگی: حباب واقعی منفی‌تر = ارزان‌تر = جذاب‌تر برای خرید
@@ -253,6 +253,57 @@ function fundReason(f: FundRow, signalType: string): string {
   }
 
   return parts.join(' · ')
+}
+
+// ── Silver signal engine ───────────────────────────────────────────────────
+function computeSilverSignal(silverBubble: number | null, api: any) {
+  if (silverBubble == null) return null
+  let score = 0
+  const reasons: { text: string; dir: 'pos' | 'neg' | 'neu' }[] = []
+
+  if (silverBubble < -3) {
+    score += 3
+    reasons.push({ text: `شمش نقره بورس کالا ${Math.abs(silverBubble).toFixed(1)}٪ زیر قیمت واقعی — فرصت خرید`, dir: 'pos' })
+  } else if (silverBubble < -1.5) {
+    score += 1.5
+    reasons.push({ text: `شمش نقره ${Math.abs(silverBubble).toFixed(1)}٪ زیر قیمت واقعی`, dir: 'pos' })
+  } else if (silverBubble > 3) {
+    score -= 3
+    reasons.push({ text: `حباب شمش نقره ${silverBubble.toFixed(1)}٪ — گران معامله می‌شود`, dir: 'neg' })
+  } else if (silverBubble > 1.5) {
+    score -= 1.5
+    reasons.push({ text: `حباب شمش نقره ${silverBubble.toFixed(1)}٪`, dir: 'neg' })
+  } else {
+    score += 0.3
+    reasons.push({ text: `قیمت شمش نقره نزدیک ارزش واقعی (${silverBubble >= 0 ? '+' : ''}${silverBubble.toFixed(1)}٪)`, dir: 'neu' })
+  }
+
+  const goldUsd = api?.inputs?.goldUsd, silverUsd = api?.inputs?.silverUsd
+  const ratio = goldUsd && silverUsd ? goldUsd / silverUsd : null
+  if (ratio != null) {
+    if (ratio > 85) {
+      score += 1
+      reasons.push({ text: `نسبت طلا/نقره ${ratio.toFixed(0)} — نقره نسبت به طلا ارزان`, dir: 'pos' })
+    } else if (ratio < 55) {
+      score -= 1
+      reasons.push({ text: `نسبت طلا/نقره ${ratio.toFixed(0)} — نقره نسبت به طلا گران`, dir: 'neg' })
+    }
+  }
+
+  const chg = api?.inputs?.silverUsdChange
+  if (chg != null) {
+    if (chg > 0.015) { score += 1; reasons.push({ text: `انس نقره امروز ${pct(chg, 2)}`, dir: 'pos' }) }
+    else if (chg < -0.015) { score -= 1; reasons.push({ text: `انس نقره امروز ${pct(chg, 2)}`, dir: 'neg' }) }
+  }
+
+  let type: string, color: string, confidence: number
+  if (score >= 2.5) { type = 'خرید'; color = '#10B981'; confidence = Math.min(90, Math.round(50 + score * 8)) }
+  else if (score <= -2.5) { type = 'فروش'; color = '#EF4444'; confidence = Math.min(90, Math.round(50 + Math.abs(score) * 8)) }
+  else if (score >= 1) { type = 'تمایل خرید'; color = '#3BB07A'; confidence = Math.round(40 + score * 6) }
+  else if (score <= -1) { type = 'احتیاط'; color = '#F59E0B'; confidence = Math.round(40 + Math.abs(score) * 6) }
+  else { type = 'نگه‌داری'; color = '#00C8FF'; confidence = Math.round(45 + Math.abs(score) * 4) }
+
+  return { type, color, confidence, score, reasons }
 }
 
 // ── Outcome calculation ────────────────────────────────────────────────────
@@ -401,8 +452,15 @@ export default function SignalsPage() {
   }, [])
 
   const marketBubbles = apiData?.ime ? computeMarketBubbles(apiData.ime) : null
+  const silverBubble = apiData?.ime ? computeSilverBubble(apiData.ime) : null
   const autoSignal = computeAutoSignal(apiData, marketBubbles)
-  const rankedFunds = autoSignal ? getRankedFunds(autoSignal.type, fundData, marketBubbles, navMap) : []
+  const silverSignal = computeSilverSignal(silverBubble, apiData)
+  const rankedFunds = autoSignal
+    ? getRankedFunds(autoSignal.type, fundData, navMap, 'طلا', n => marketBubbles ? fundBubbleZati(n, marketBubbles) : null)
+    : []
+  const rankedSilverFunds = silverSignal
+    ? getRankedFunds(silverSignal.type, fundData, navMap, 'نقره', n => silverFundBubbleZati(n, silverBubble))
+    : []
 
   // ثبت خودکار سیگنال موتور جدید در تاریخچه (فقط ادمین، یک بار برای هر روز+نوع)
   useEffect(() => {
@@ -422,6 +480,8 @@ export default function SignalsPage() {
       }]).select()
       if (error || cancelled || !data?.[0]) return
       setSignals(prev => [data[0], ...prev])
+      const fundLine = (f: FundRow) =>
+        f.bubbleVaqei != null ? `${f.name} (حباب واقعی ${f.bubbleVaqei >= 0 ? '+' : ''}${f.bubbleVaqei.toFixed(1)}٪)` : f.name
       fetch('/api/telegram-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -430,6 +490,10 @@ export default function SignalsPage() {
           date,
           confidence: autoSignal.confidence,
           note: reason,
+          gold_funds: rankedFunds.map(fundLine),
+          silver_signal: silverSignal?.type ?? null,
+          silver_confidence: silverSignal?.confidence ?? null,
+          silver_funds: rankedSilverFunds.map(fundLine),
         }),
       }).catch(() => {/* fire-and-forget */})
     }
@@ -438,8 +502,6 @@ export default function SignalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, loading, autoSignal?.type, apiData?.lastMarketDate])
 
-  const isBuySignal = autoSignal?.type === 'خرید' || autoSignal?.type === 'تمایل خرید'
-  const isSellSignal = autoSignal?.type === 'فروش' || autoSignal?.type === 'احتیاط'
 
   // stats — only valid signals
   const buys   = signals.filter(s => s.signal_type === 'خرید')
@@ -585,11 +647,19 @@ export default function SignalsPage() {
           </div>
         ) : null}
 
-        {/* ── Fund recommendations ── */}
-        {autoSignal && rankedFunds.length > 0 && (
-          <div style={{
+        {/* ── Fund recommendations (طلا + نقره) ── */}
+        {([
+          { key: 'gold', label: 'طلا', sig: autoSignal, funds: rankedFunds },
+          { key: 'silver', label: 'نقره', sig: silverSignal, funds: rankedSilverFunds },
+        ] as { key: string; label: string; sig: any; funds: FundRow[] }[])
+          .filter(sec => sec.sig && sec.funds.length > 0)
+          .map(sec => {
+          const secBuy = sec.sig.type === 'خرید' || sec.sig.type === 'تمایل خرید'
+          const secSell = sec.sig.type === 'فروش' || sec.sig.type === 'احتیاط'
+          return (
+          <div key={sec.key} style={{
             background: PANEL,
-            border: `1px solid ${isBuySignal ? '#10B98122' : isSellSignal ? '#EF444422' : BORDER}`,
+            border: `1px solid ${secBuy ? '#10B98122' : secSell ? '#EF444422' : BORDER}`,
             borderRadius: 14,
             padding: isMobile ? '18px 16px' : '20px 24px',
             backdropFilter: 'blur(12px)',
@@ -598,10 +668,17 @@ export default function SignalsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <div style={{
                 width: 3, height: 20, borderRadius: 2,
-                background: isBuySignal ? GREEN : isSellSignal ? RED : t.accent,
+                background: secBuy ? GREEN : secSell ? RED : t.accent,
               }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
-                {isBuySignal ? 'این صندوق‌ها رو بخر' : isSellSignal ? 'این صندوق‌ها رو بفروش' : 'با این صندوق‌ها بمان'}
+                {secBuy ? `این صندوق‌های ${sec.label} رو بخر` : secSell ? `این صندوق‌های ${sec.label} رو بفروش` : `با این صندوق‌های ${sec.label} بمان`}
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, color: sec.sig.color,
+                background: `${sec.sig.color}16`, border: `1px solid ${sec.sig.color}30`,
+                padding: '2px 10px', borderRadius: 5,
+              }}>
+                {sec.sig.type} · {sec.sig.confidence}٪
               </span>
               <span style={{
                 fontSize: 10, color: MUTED,
@@ -609,7 +686,7 @@ export default function SignalsPage() {
                 background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
                 padding: '2px 8px', borderRadius: 5,
               }}>
-                {isBuySignal ? 'بر اساس حباب واقعی + ورود پول حقیقی + مومنتوم' : isSellSignal ? 'بر اساس حباب واقعی + خروج پول حقیقی' : 'بر اساس کمترین حباب بین نقدشونده‌ها'}
+                {secBuy ? 'بر اساس حباب واقعی + ورود پول حقیقی + مومنتوم' : secSell ? 'بر اساس حباب واقعی + خروج پول حقیقی' : 'بر اساس کمترین حباب بین نقدشونده‌ها'}
               </span>
             </div>
 
@@ -619,12 +696,12 @@ export default function SignalsPage() {
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
               gap: 12,
             }}>
-              {rankedFunds.map((f, idx) => {
+              {sec.funds.map((f, idx) => {
                 const netM = Math.round(f.net / 1e6)
                 const isPositiveFlow = f.net > 0
                 const chg = f.price_change_pct ?? 0
                 const rankColor = idx === 0
-                  ? (isBuySignal ? GREEN : isSellSignal ? RED : GOLD)
+                  ? (secBuy ? GREEN : secSell ? RED : GOLD)
                   : MUTED
 
                 return (
@@ -635,7 +712,7 @@ export default function SignalsPage() {
                   >
                     <div style={{
                       background: isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)',
-                      border: `1px solid ${idx === 0 ? (isBuySignal ? '#10B98130' : isSellSignal ? '#EF444430' : 'rgba(212,168,71,0.3)') : BORDER}`,
+                      border: `1px solid ${idx === 0 ? (secBuy ? '#10B98130' : secSell ? '#EF444430' : 'rgba(212,168,71,0.3)') : BORDER}`,
                       borderRadius: 12,
                       padding: '14px 16px',
                       cursor: 'pointer',
@@ -653,12 +730,12 @@ export default function SignalsPage() {
                         <div style={{
                           position: 'absolute', top: 8, left: 8,
                           fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
-                          color: isBuySignal ? GREEN : isSellSignal ? RED : GOLD,
-                          background: isBuySignal ? 'rgba(16,185,129,0.12)' : isSellSignal ? 'rgba(239,68,68,0.12)' : 'rgba(212,168,71,0.12)',
-                          border: `1px solid ${isBuySignal ? 'rgba(16,185,129,0.25)' : isSellSignal ? 'rgba(239,68,68,0.25)' : 'rgba(212,168,71,0.25)'}`,
+                          color: secBuy ? GREEN : secSell ? RED : GOLD,
+                          background: secBuy ? 'rgba(16,185,129,0.12)' : secSell ? 'rgba(239,68,68,0.12)' : 'rgba(212,168,71,0.12)',
+                          border: `1px solid ${secBuy ? 'rgba(16,185,129,0.25)' : secSell ? 'rgba(239,68,68,0.25)' : 'rgba(212,168,71,0.25)'}`,
                           borderRadius: 4, padding: '1px 6px',
                         }}>
-                          {isBuySignal ? '★ اول' : isSellSignal ? '★ اول' : '★ اول'}
+                          ★ اول
                         </div>
                       )}
 
@@ -727,7 +804,7 @@ export default function SignalsPage() {
 
                       {/* reason */}
                       <p style={{ margin: 0, fontSize: 10.5, color: MUTED, lineHeight: 1.6 }}>
-                        {fundReason(f, autoSignal.type)}
+                        {fundReason(f, sec.sig.type)}
                       </p>
                     </div>
                   </Link>
@@ -739,7 +816,8 @@ export default function SignalsPage() {
               ⓘ  رنک‌بندی بر اساس داده‌های همان روز محاسبه می‌شود و جنبه اطلاع‌رسانی دارد — توصیه سرمایه‌گذاری نیست.
             </p>
           </div>
-        )}
+          )
+        })}
 
         {/* ── Summary stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>

@@ -83,3 +83,16 @@ export function fundBubbleVaqei(name: string, priceRial: number | null | undefin
   if (asmi == null || zati == null) return null
   return asmi + zati
 }
+
+// حباب شمش نقره بورس کالا (٪) — تابلو نقدی vs قیمت واقعی گرم نقره
+export function computeSilverBubble(ime: any): number | null {
+  if (ime?.silverBarT == null || !ime?.fairSilverGram) return null
+  return ((ime.silverBarT - ime.fairSilverGram) / ime.fairSilverGram) * 100
+}
+
+// حباب ذاتی صندوق نقره = وزن گواهی نقره × حباب شمش نقره (٪)
+export function silverFundBubbleZati(name: string, silverBubble: number | null): number | null {
+  const w = SILVER_FUND_WEIGHTS[name]
+  if (!w || silverBubble == null) return null
+  return (w.silver / 100) * silverBubble
+}
