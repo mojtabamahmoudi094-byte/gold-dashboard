@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
+import { useIsMobile } from '../../lib/useIsMobile'
+import { safe } from '../../lib/format'
 import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, computeSilverBubble, silverFundBubbleZati, type MarketBubbles } from '../../lib/goldBubbles'
 
-const safe = (v: any) => Number(v || 0)
 const pct = (v: number | null, d = 1) =>
   v == null ? null : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(d)}٪`
 const fmt = (v: number) => v.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
@@ -334,7 +335,7 @@ export default function SignalsPage() {
   const [isDark, setIsDark]       = useState(true)
   const [isAdmin, setIsAdmin]     = useState(false)
   const [loading, setLoading]     = useState(true)
-  const [isMobile, setIsMobile]   = useState(false)
+  const isMobile = useIsMobile()
   const [showDays, setShowDays]   = useState<5 | 10 | 20>(10)
 
   const t: any = isDark ? darkTheme : lightTheme
@@ -344,12 +345,8 @@ export default function SignalsPage() {
     if (saved === 'light') setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
     return () => {
       window.removeEventListener('themechange', handler)
-      window.removeEventListener('resize', checkMobile)
     }
   }, [])
 

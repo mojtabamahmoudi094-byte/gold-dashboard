@@ -4,16 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { darkTheme, lightTheme } from '../../../lib/theme'
-
-const safe = (v: any) => Number(v || 0)
-const fmtVal = (v: any) => {
-  const n = safe(v)
-  if (n === 0) return '—'
-  const len = String(Math.floor(n)).length
-  if (len <= 5) return n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
-  const div = Math.pow(10, len - 5)
-  return Math.round(n / div).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
-}
+import { useIsMobile } from '../../../lib/useIsMobile'
+import { safe, fmtCompact as fmtVal } from '../../../lib/format'
 
 const CAT_MAP: Record<string, { label: string; category: string; color: string }> = {
   gold:    { label: 'طلا',    category: 'طلا',    color: 'oklch(0.82 0.15 70)' },
@@ -32,7 +24,7 @@ export default function FundsCatPage() {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<string>('trade_value')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   const [searchQuery, setSearchQuery] = useState('')
 
   const router = useRouter()
@@ -44,13 +36,8 @@ export default function FundsCatPage() {
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
 
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-
     return () => {
       window.removeEventListener('themechange', handler)
-      window.removeEventListener('resize', checkMobile)
     }
   }, [])
 

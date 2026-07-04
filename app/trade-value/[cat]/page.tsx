@@ -9,10 +9,11 @@ import persian from 'react-date-object/calendars/persian'
 import gregorian from 'react-date-object/calendars/gregorian'
 import { supabase } from '../../../lib/supabase'
 import { Skeleton } from '../../components/ui/Skeleton'
+import { useIsMobile } from '../../../lib/useIsMobile'
+import { safe } from '../../../lib/format'
 
 const TerminalChart = dynamic(() => import('../../dashboard/TerminalChart'), { ssr: false })
 
-const safe = (v: any) => Number(v || 0)
 
 function shamsiToGregorian(shamsi: string): string {
   try {
@@ -99,7 +100,7 @@ export default function TradeValueDetailPage() {
   const cat = CAT_MAP[slug] || CAT_MAP.gold
 
   const [isDark, setIsDark] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   // raw rows: { trade_date_shamsi, trade_value }
   const [rawRows, setRawRows] = useState<{ trade_date_shamsi: string; trade_value: number }[]>([])
   const [loading, setLoading] = useState(true)
@@ -109,12 +110,8 @@ export default function TradeValueDetailPage() {
     if (saved === 'light') setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
     return () => {
       window.removeEventListener('themechange', handler)
-      window.removeEventListener('resize', checkMobile)
     }
   }, [])
 

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
+import { useIsMobile } from '../../lib/useIsMobile'
+import { safe, fmtNum as fmtVal } from '../../lib/format'
 import dynamic from 'next/dynamic'
 import persian from 'react-date-object/calendars/persian'
 import persian_fa from 'react-date-object/locales/persian_fa'
@@ -15,9 +17,8 @@ import * as XLSX from 'xlsx'
 const DatePicker = dynamic(() => import('react-multi-date-picker'), { ssr: false })
 const TerminalChart = dynamic(() => import('./TerminalChart'), { ssr: false })
 
-const safe = (v: any) => Number(v || 0)
+// safe/fmtVal از lib/format مشترک
 // نمایش ارزش به میلیارد تومان
-const fmtVal = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
 const UNIT = 'میلیارد تومان'
 
 function shamsiToGregorian(shamsi: string): string {
@@ -53,7 +54,7 @@ export default function TerminalPage() {
   const [editValue, setEditValue] = useState('')
   const [editDate, setEditDate] = useState('')
   const [isDark, setIsDark] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
 
   // خواندن قالب از حافظه و گوش دادن به تغییرات هدر
   useEffect(() => {
@@ -65,13 +66,8 @@ export default function TerminalPage() {
     }
     window.addEventListener('themechange', handler)
 
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-
     return () => {
       window.removeEventListener('themechange', handler)
-      window.removeEventListener('resize', checkMobile)
     }
   }, [])
   const [isLoggedIn, setIsLoggedIn] = useState(false)

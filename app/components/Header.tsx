@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useIsMobile } from '../../lib/useIsMobile'
 
 const NAV = [
   { label: 'خانه',          href: '/' },
@@ -86,17 +87,13 @@ export default function Header() {
   const router   = useRouter()
   const [isDark, setIsDark]     = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   const [user, setUser]         = useState<any>(null)
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
     if (saved === 'light') setIsDark(false)
-
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
 
     const onScroll = () => setScrolled(window.scrollY > 6)
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -107,7 +104,6 @@ export default function Header() {
     })
 
     return () => {
-      window.removeEventListener('resize', checkMobile)
       window.removeEventListener('scroll', onScroll)
       subscription.unsubscribe()
     }

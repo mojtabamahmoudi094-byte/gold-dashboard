@@ -6,9 +6,9 @@ import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { darkTheme, lightTheme } from '../../../lib/theme'
 import { Skeleton, SkeletonBlock, SkeletonRows } from '../../components/ui/Skeleton'
+import { useIsMobile } from '../../../lib/useIsMobile'
+import { safe, fmtNum as fmtVal } from '../../../lib/format'
 
-const safe = (v: any) => Number(v || 0)
-const fmtVal = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
 
 export default function FundDetailPage() {
   const params = useParams()
@@ -19,7 +19,7 @@ export default function FundDetailPage() {
   const [record, setRecord] = useState<any>(null)
   const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   const [historyPage, setHistoryPage] = useState(1)
   const historyPerPage = 10
   const [user, setUser] = useState<any>(null)
@@ -33,10 +33,6 @@ export default function FundDetailPage() {
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
 
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null)
@@ -44,7 +40,6 @@ export default function FundDetailPage() {
 
     return () => {
       window.removeEventListener('themechange', handler)
-      window.removeEventListener('resize', checkMobile)
       subscription.unsubscribe()
     }
   }, [])

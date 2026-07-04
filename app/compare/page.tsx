@@ -4,14 +4,14 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
+import { useIsMobile } from '../../lib/useIsMobile'
+import { safe, fmtNum as fmtVal } from '../../lib/format'
 import { darkTheme, lightTheme } from '../../lib/theme'
 
-const safe = (v: any) => Number(v || 0)
-const fmtVal = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
 
 export default function ComparePage() {
   const [isDark, setIsDark] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   const [assets, setAssets] = useState<any[]>([])
   const [records, setRecords] = useState<any[]>([])
   const [fund1, setFund1] = useState<string>('')
@@ -25,12 +25,8 @@ export default function ComparePage() {
     if (saved === 'light') setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
     return () => {
       window.removeEventListener('themechange', handler)
-      window.removeEventListener('resize', checkMobile)
     }
   }, [])
 

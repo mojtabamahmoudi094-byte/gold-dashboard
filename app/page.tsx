@@ -2,16 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-
-const safe = (v: any) => Number(v || 0)
-const fmtVal = (v: any) => {
-  const n = safe(v)
-  if (n === 0) return '—'
-  const len = String(Math.floor(n)).length
-  if (len <= 5) return n.toLocaleString('fa-IR', { maximumFractionDigits: 0 })
-  const div = Math.pow(10, len - 5)
-  return Math.round(n / div).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
-}
+import { useIsMobile } from '../lib/useIsMobile'
+import { safe, fmtCompact as fmtVal } from '../lib/format'
 
 type TickerItem = { name: string; slug: string; price: number; changePct: number }
 
@@ -137,16 +129,9 @@ const FEATURES = [
 ]
 
 export default function HomePage() {
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   const [stats, setStats] = useState<{ totalTV: number; fundCount: number; avgChange: number; positiveCount: number } | null>(null)
   const [ticker, setTicker] = useState<TickerItem[]>([])
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
 
   useEffect(() => {
     const load = async () => {
