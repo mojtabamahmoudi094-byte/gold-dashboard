@@ -675,6 +675,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   const [navData, setNavData] = useState<Record<string, number | null>>({})
   const [priceCloseMap, setPriceCloseMap] = useState<Record<string, { price: number; isRial: boolean }>>({})
   const [marketBubbles, setMarketBubbles] = useState<{ bullion: number | null; coin: number | null }>({ bullion: null, coin: null })
+  const [marketDollars, setMarketDollars] = useState<{ bullion: number | null; coin: number | null }>({ bullion: null, coin: null })
   const [fundsLoading, setFundsLoading] = useState(true)
 
   const loadData = () => {
@@ -711,6 +712,14 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
           ? ((tabloBullionK - fairBullionK) / fairBullionK) * 100 : null,
         coin: ime?.fairCoinCert != null && ime?.goldCoinT != null
           ? ((ime.goldCoinT - ime.fairCoinCert) / ime.fairCoinCert) * 100 : null,
+      })
+      const goldUsd = gd?.inputs?.goldUsd ?? null
+      const c = DEFAULT_CONSTANTS
+      setMarketDollars({
+        bullion: tabloBullionK != null && goldUsd
+          ? (tabloBullionK * 1000) / ((1000 / c.gramsPerOz) * (995 / 999.9) * goldUsd) : null,
+        coin: ime?.goldCoinT != null && goldUsd
+          ? ime.goldCoinT / ((c.fullCoinW / c.gramsPerOz) * (c.coinPurity / 24) * goldUsd) : null,
       })
     }).catch(e => console.error('[GoldFundsMatrix] fetch failed:', e))
       .finally(() => setFundsLoading(false))
@@ -802,12 +811,23 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     return { display, full }
   }
 
+  const getDollarRate = (name: string): { display: string; full: string } => {
+    if (fundsLoading) return { display: '...', full: '' }
+    const w = FUND_WEIGHTS[name]
+    if (!w || marketDollars.bullion == null || marketDollars.coin == null) return { display: '—', full: '' }
+    const rate = (w.bar / 100) * marketDollars.bullion + (w.coin / 100) * marketDollars.coin
+    const display = Math.round(rate).toLocaleString('fa-IR')
+    const full = `شمش ${w.bar.toFixed(1)}٪ × ${Math.round(marketDollars.bullion).toLocaleString('fa-IR')} + سکه ${w.coin.toFixed(1)}٪ × ${Math.round(marketDollars.coin).toLocaleString('fa-IR')} تومان`
+    return { display, full }
+  }
+
   const getCellValue = (colKey: string, name: string): { display: string; full: string } => {
     if (colKey === 'marketToman') return getMv(name)
     if (colKey === 'marketUsd') return getUsd(name)
     if (colKey === 'bubbleAsmi') return getBubbleAsmi(name)
     if (colKey === 'bubbleZati') return getBubbleZati(name)
     if (colKey === 'bubbleVaqei') return getBubbleVaqei(name)
+    if (colKey === 'dollarRate') return getDollarRate(name)
     const w = FUND_WEIGHTS[name]
     if (colKey === 'coinWeight')    return w ? { display: w.coin.toFixed(1) + '٪', full: '' } : { display: '—', full: '' }
     if (colKey === 'goldBarWeight') return w ? { display: w.bar.toFixed(1)  + '٪', full: '' } : { display: '—', full: '' }
