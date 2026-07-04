@@ -12,8 +12,8 @@
  *      node sync-funds.js --probe
  *   4. crontab -e  و خط زیر را اضافه کنید:
  *      TZ=Asia/Tehran
- *      * /10 12-17 * * 0-4 /usr/bin/node /path/to/sync-funds.js >> /var/log/sync-funds.log 2>&1
- *      (روزهای 0-4 = شنبه تا چهارشنبه در TZ ایران)
+ *      * /10 12-17 * * 6,0-3 /usr/bin/node /path/to/sync-funds.js >> /var/log/sync-funds.log 2>&1
+ *      (روزهای 6,0-3 = شنبه تا چهارشنبه؛ در cron عدد 0 یعنی یکشنبه و 6 یعنی شنبه)
  *
  * متغیرهای لازم (.env.sync):
  *   BRSAPI_KEY=BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj
@@ -99,13 +99,13 @@ function isMarketOpen() {
   const now = new Date()
   // تبدیل به وقت تهران (UTC+3:30)
   const tehran = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
-  const day  = tehran.getDay()   // 0=Sun=شنبه, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  const day  = tehran.getDay()   // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat=شنبه
   const hour = tehran.getHours()
   const min  = tehran.getMinutes()
   const timeMin = hour * 60 + min  // دقیقه از ۰۰:۰۰
 
-  // شنبه(0) تا چهارشنبه(4) در تقویم ایرانی = Sun(0) تا Thu(4) در JS weekday با TZ تهران
-  const isWorkday = day >= 0 && day <= 4
+  // شنبه تا چهارشنبه ایرانی = Sat(6) و Sun(0) تا Wed(3) در JS weekday
+  const isWorkday = day === 6 || day <= 3
   const inWindow  = timeMin >= 12 * 60 && timeMin <= 17 * 60 + 5   // 12:00 تا 17:05
 
   return isWorkday && inWindow

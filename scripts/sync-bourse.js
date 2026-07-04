@@ -52,12 +52,13 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY,
 
 const ALL_NAMES = Object.values(BOURSE_SYMBOLS).flat()
 
-// ── ساعت بازار بورس تهران: شنبه–چهارشنبه ۹:۰۰–۱۵:۰۵ ─────────────────────────
+// ── ساعت بازار بورس تهران: شنبه–چهارشنبه ۹:۰۰–۱۲:۳۵ ─────────────────────────
+// getDay(): 0=یکشنبه ... 6=شنبه → شنبه تا چهارشنبه یعنی 6 یا 0..3
 function isMarketOpen() {
   const tehran = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
   const day = tehran.getDay()
   const timeMin = tehran.getHours() * 60 + tehran.getMinutes()
-  return day >= 0 && day <= 4 && timeMin >= 9 * 60 && timeMin <= 15 * 60 + 5
+  return (day === 6 || day <= 3) && timeMin >= 9 * 60 && timeMin <= 12 * 60 + 35
 }
 
 // ── تاریخ شمسی ───────────────────────────────────────────────────────────────
