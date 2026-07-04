@@ -188,6 +188,51 @@ function mapFundRow(item, assetId, shamsiDate) {
   }
 }
 
+// ── NAV sync (حباب اسمی) ─────────────────────────────────────────────────────
+async function syncNavPrices(date) {
+  console.log('[sync-nav] دریافت NAV صندوق‌های طلا از BrsAPI...')
+  try {
+    const { data: fundAssets } = await sb()
+      .from('assets')
+      .select('name')
+      .eq('category', 'gold')
+      .neq('slug', 'gold')
+
+    const names = (fundAssets ?? []).map(a => a.name)
+    if (names.length === 0) { console.warn('[sync-nav] هیچ صندوقی پیدا نشد'); return }
+
+    const results = await Promise.all(names.map(async name => {
+      try {
+        const url = `https://Api.BrsApi.ir/Tsetmc/Nav.php?key=${BRSAPI_KEY}&l18=${encodeURIComponent(name)}`
+        const data = await fetchJson(url, 2)
+        const val = parseFloat(String(data?.predtran ?? '').replace(/,/g, ''))
+        return { name, nav: isNaN(val) || val === 0 ? null : val }
+      } catch {
+        return { name, nav: null }
+      }
+    }))
+
+    const navs = {}
+    for (const { name, nav } of results) navs[name] = nav
+    const gotCount = results.filter(r => r.nav !== null).length
+    console.log(`[sync-nav] ${gotCount}/${names.length} صندوق NAV دریافت شد`)
+
+    // upsert به signals
+    await sb().from('signals').delete()
+      .eq('signal_type', '_nav_cache').eq('signal_date_shamsi', date)
+    const { error } = await sb().from('signals').insert({
+      signal_type:        '_nav_cache',
+      signal_date_shamsi: date,
+      market_value:       0,
+      note:               JSON.stringify({ navs }),
+    })
+    if (error) console.error('[sync-nav] خطا در ذخیره:', error.message)
+    else       console.log('[sync-nav] ✅ NAV صندوق‌ها ذخیره شد')
+  } catch (e) {
+    console.warn('[sync-nav] ⚠️ ناموفق:', e.message)
+  }
+}
+
 // ── gold price sync ───────────────────────────────────────────────────────────
 async function syncGoldPrices(date) {
   console.log('[sync-gold] دریافت قیمت طلا، ارز و کامودیتی...')
@@ -366,8 +411,11 @@ async function main() {
     else        console.log(`[sync-funds] ✅ مجموع طلا: ${totalBT} میلیارد تومان → dashboard`)
   }
 
-  // ── قیمت طلا و ارز ────────────────────────────────────────────────────────
-  await syncGoldPrices(date)
+  // ── قیمت طلا، ارز و NAV صندوق‌ها ─────────────────────────────────────────
+  await Promise.all([
+    syncGoldPrices(date),
+    syncNavPrices(date),
+  ])
 }
 
 main().catch(e => {
