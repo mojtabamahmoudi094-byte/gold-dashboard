@@ -86,6 +86,7 @@ function buildResponse(
   stale: boolean,
   changes: Record<string, number | null> | null,
   lastMarketDate: string | null,
+  imeData: { goldBarRial: number | null; goldCoinRial: number | null },
 ) {
   const goldOunce = proData?.gold?.ounce    ?? []
   const goldTypes = proData?.gold?.type     ?? []
@@ -133,6 +134,13 @@ function buildResponse(
   const fairHalf    = fairGram22 ? fairGram22 * halfCoinW + mintCost : null
   const fairQuarter = fairGram22 ? fairGram22 * quarterCoinW + mintCost : null
 
+  const bullionW       = 1000
+  const bullionPurity  = 995 / 999.9
+  const fairBullion    = goldUsd && dollarViaDirham
+    ? (bullionW / gramsPerOz) * bullionPurity * goldUsd * dollarViaDirham : null
+  const fairCoinCert   = goldUsd && dollarViaDirham
+    ? (fullCoinW / gramsPerOz) * (22 / 24) * goldUsd * dollarViaDirham : null
+
   const bub = (m: number | null, f: number | null) => m && f ? (m - f) / f : null
   const imp = (mT: number | null, oz: number | null, frac: number) =>
     mT && oz ? (mT / frac) / oz : null
@@ -178,6 +186,12 @@ function buildResponse(
       fullCoinWeight: fullCoinW, halfCoinWeight: halfCoinW, quarterCoinWeight: quarterCoinW,
       mintCost,
     },
+    ime: {
+      goldBarT:    imeData.goldBarRial  != null ? imeData.goldBarRial  / 10 : null,
+      goldCoinT:   imeData.goldCoinRial != null ? imeData.goldCoinRial / 10 : null,
+      fairBullion,
+      fairCoinCert,
+    },
   })
 }
 
@@ -203,6 +217,27 @@ export async function GET() {
   }
 
   const lastMarketDate = sbRows[0]?.date ?? null
+
+  // ── 1b. Read latest IME cache (GoldBar + GoldCoin pf in Rial) ───────────────
+  let imeGoldBarRial:  number | null = null
+  let imeGoldCoinRial: number | null = null
+  try {
+    const { data: imeRows } = await sbClient
+      .from('signals')
+      .select('note')
+      .eq('signal_type', '_ime_cache')
+      .order('signal_date_shamsi', { ascending: false })
+      .limit(1)
+    if (imeRows?.[0]?.note) {
+      const arr: any[] = JSON.parse(imeRows[0].note)?.raw?.data ?? []
+      const goldBar  = arr.find((x: any) => x.contract_code === 'GoldBar')
+      const goldCoin = arr.find((x: any) => x.contract_code === 'GoldCoin')
+      imeGoldBarRial  = goldBar?.pf  != null ? Number(goldBar.pf)  : null
+      imeGoldCoinRial = goldCoin?.pf != null ? Number(goldCoin.pf) : null
+    }
+  } catch (e) {
+    console.warn('[gold-analysis] IME cache read failed:', e)
+  }
 
   // ── 2. Try live BrsAPI (Iranian IP required — expected to fail on Render) ───
   let liveProData: any      = null
@@ -249,5 +284,8 @@ export async function GET() {
     quarterCoin: pctChange(todayP.quarterCoin, yestP.quarterCoin),
   } : null
 
-  return buildResponse(todayProData, todayCommodityData, stale, changes, lastMarketDate)
+  return buildResponse(todayProData, todayCommodityData, stale, changes, lastMarketDate, {
+    goldBarRial:  imeGoldBarRial,
+    goldCoinRial: imeGoldCoinRial,
+  })
 }

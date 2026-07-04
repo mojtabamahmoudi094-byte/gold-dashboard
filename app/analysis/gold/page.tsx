@@ -303,25 +303,48 @@ export default function GoldAnalysisPage() {
         <GoldFundsMatrix border={border} muted={muted} text={text} accent={accent} bg={bg} />
 
         {/* ── Row 6: بورس کالا ── */}
-        <Section title="بورس کالا" subtitle="قیمت‌های نقدی بازار فیزیکی">
+        <Section title="بورس کالا" subtitle="قیمت‌های نقدی بازار فیزیکی (BrsAPI — بورس کالا)">
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: `0.5px solid ${border}` }}>
                   <th style={{ textAlign: 'right', padding: '8px 12px', color: muted, fontWeight: 500 }}>شاخص</th>
-                  <th style={{ textAlign: 'center', padding: '8px 12px', color: muted, fontWeight: 500 }}>قیمت (تومان)</th>
+                  <th style={{ textAlign: 'left', padding: '8px 12px', color: muted, fontWeight: 500, fontFamily: 'system-ui' }}>قیمت (تومان)</th>
+                  <th style={{ textAlign: 'right', padding: '8px 12px', color: muted, fontWeight: 500, fontSize: 10 }}>توضیح</th>
                 </tr>
               </thead>
               <tbody>
-                {[
-                  'قیمت واقعی شمش طلا',
-                  'قیمت تابلو نقدی شمش طلا',
-                  'قیمت واقعی گواهی سکه',
-                  'قیمت تابلو نقدی گواهی سکه',
-                ].map((label, i) => (
-                  <tr key={label} style={{ borderBottom: i < 3 ? `0.5px solid ${border}` : 'none' }}>
-                    <td style={{ padding: '10px 12px', color: text }}>{label}</td>
-                    <td style={{ padding: '10px 12px', color: muted, textAlign: 'center' }}>—</td>
+                {([
+                  {
+                    label: 'قیمت واقعی شمش طلا',
+                    value: data?.ime?.fairBullion ?? null,
+                    note: 'انس × دلار درهم × ۱۰۰۰گرم × عیار ۹۹۵',
+                  },
+                  {
+                    label: 'قیمت تابلو نقدی شمش طلا',
+                    value: data?.ime?.goldBarT ?? null,
+                    note: 'قیمت پایانی GoldBar — بورس کالا',
+                  },
+                  {
+                    label: 'قیمت واقعی گواهی سکه',
+                    value: data?.ime?.fairCoinCert ?? null,
+                    note: 'انس × دلار درهم × ۸.۱۳گرم × عیار ۲۲',
+                  },
+                  {
+                    label: 'قیمت تابلو نقدی گواهی سکه',
+                    value: data?.ime?.goldCoinT ?? null,
+                    note: 'قیمت پایانی GoldCoin — بورس کالا',
+                  },
+                ] as { label: string; value: number | null; note: string }[]).map((row, i, arr) => (
+                  <tr key={row.label} style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${border}` : 'none' }}>
+                    <td style={{ padding: '10px 12px', color: text }}>{row.label}</td>
+                    <td style={{ padding: '10px 12px', fontFamily: 'system-ui', textAlign: 'left' }}>
+                      {row.value != null
+                        ? <span style={{ color: accent, fontWeight: 700 }}>{Math.round(row.value).toLocaleString('fa-IR')}</span>
+                        : <span style={{ color: muted }}>—</span>
+                      }
+                    </td>
+                    <td style={{ padding: '10px 12px', color: muted, fontSize: 10 }}>{row.note}</td>
                   </tr>
                 ))}
               </tbody>
