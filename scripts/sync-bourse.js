@@ -2,12 +2,13 @@
 /**
  * sync-bourse.js
  *
- * بورس سنج — بروزرسانی صندوق‌های بورسی (اهرمی/بخشی/سهامی) از BrsAPI Nav.php
+ * بورس سنج — بروزرسانی صندوق‌های بورسی (اهرمی/بخشی/سهامی) از BrsAPI Symbol.php
+ * (دیتای جامع نماد Tsetmc: قیمت، حجم، ارزش، حقیقی/حقوقی)
  * روی سرور ایرانی اجرا شود (نیاز به IP ایران)
  *
  * راه‌اندازی:
  *   1. اول یک بار seed-bourse-assets.js را اجرا کنید تا نمادها در assets ثبت شوند
- *   2. با --probe اجرا کنید تا فرمت پاسخ Nav.php را ببینید:
+ *   2. با --probe اجرا کنید تا فرمت پاسخ Symbol.php را ببینید:
  *      node scripts/sync-bourse.js --probe
  *   3. crontab -e و مشابه sync-funds.js زمان‌بندی کنید (بازار بورس: ۹:۰۰–۱۵:۰۵)
  *
@@ -97,14 +98,16 @@ async function fetchJson(url, retries = 2) {
   }
 }
 
-function navUrl(name) {
-  return `https://Api.BrsApi.ir/Tsetmc/Nav.php?key=${BRSAPI_KEY}&l18=${encodeURIComponent(name)}`
+function symbolUrl(name) {
+  return `https://Api.BrsApi.ir/Tsetmc/Symbol.php?key=${BRSAPI_KEY}&l18=${encodeURIComponent(name)}`
 }
 
 // ── Field mapper ─────────────────────────────────────────────────────────────
-// Nav.php فقط NAV می‌دهد: psubtran=NAV صدور، predtran=NAV ابطال + date/time
-// موقت: NAV در ستون‌های قیمت ذخیره می‌شود تا endpoint قیمت لحظه‌ای اضافه شود
-//   price_close ← predtran (NAV ابطال)   price_last ← psubtran (NAV صدور)
+// کلیدها طبق جدول راهنمای «دیتای جامع نماد بورس Tsetmc» (BrsAPI Symbol.php):
+//   قیمت:    pl=آخرین، pc=پایانی، pcp=درصد تغییر پایانی
+//   معاملات: tvol=حجم، tval=ارزش، mv=ارزش بازار
+//   حقیقی:   Buy_I_Volume، Sell_I_Volume، Buy_CountI، Sell_CountI
+//   date=تاریخ آخرین اطلاعات قیمت (شمسی با خط تیره)
 function num(v) {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
   return isNaN(x) ? null : x
@@ -120,9 +123,16 @@ function mapRow(item, assetId, shamsiDate) {
   return {
     asset_id:          assetId,
     trade_date_shamsi: itemDate(item, shamsiDate),
-    price_close:       num(item.predtran),
-    price_last:        num(item.psubtran),
-    trade_value:       0, // NOT NULL column — Nav.php ارزش معاملات ندارد
+    price_close:       num(item.pc),
+    price_last:        num(item.pl),
+    price_change_pct:  num(item.pcp),
+    trade_value:       num(item.tval) ?? 0, // NOT NULL column
+    volume:            num(item.tvol),
+    market_value:      num(item.mv),
+    buy_i_volume:      num(item.Buy_I_Volume),
+    sell_i_volume:     num(item.Sell_I_Volume),
+    buy_count_i:       num(item.Buy_CountI),
+    sell_count_i:      num(item.Sell_CountI),
   }
 }
 
@@ -143,8 +153,8 @@ async function mapLimit(items, limit, fn) {
 async function main() {
   if (PROBE) {
     const name = ALL_NAMES[0]
-    console.log(`═══ RAW Nav.php RESPONSE برای «${name}» ═══`)
-    const data = await fetchJson(navUrl(name))
+    console.log(`═══ RAW Symbol.php RESPONSE برای «${name}» ═══`)
+    const data = await fetchJson(symbolUrl(name))
     console.log(JSON.stringify(data, null, 2))
     console.log('\n═══ کلیدها ═══')
     console.log(Object.keys(data || {}).join(', '))
@@ -176,7 +186,7 @@ async function main() {
 
   const results = await mapLimit(assets, 4, async a => {
     try {
-      const data = await fetchJson(navUrl(a.name))
+      const data = await fetchJson(symbolUrl(a.name))
       const item = Array.isArray(data) ? data[0] : (data?.data?.[0] ?? data)
       if (!item || typeof item !== 'object') return { name: a.name, row: null }
       const row = mapRow(item, a.id, date)
