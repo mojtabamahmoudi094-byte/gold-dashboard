@@ -666,6 +666,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   const [dollarRate, setDollarRate] = useState<number | null>(null)
   const [navData, setNavData] = useState<Record<string, number | null>>({})
   const [priceCloseMap, setPriceCloseMap] = useState<Record<string, { price: number; isRial: boolean }>>({})
+  const [marketBubbles, setMarketBubbles] = useState<{ bullion: number | null; coin: number | null }>({ bullion: null, coin: null })
   const [fundsLoading, setFundsLoading] = useState(true)
 
   const loadData = () => {
@@ -694,6 +695,15 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
       setPriceCloseMap(pcMap)
       setDollarRate(gd?.inputs?.dollarT ?? null)
       setNavData(nd?.navs ?? {})
+      const ime = gd?.ime
+      const fairBullionK = ime?.fairBullion != null ? ime.fairBullion / 1000 : null
+      const tabloBullionK = ime?.goldBarT != null ? ime.goldBarT * 10 : null
+      setMarketBubbles({
+        bullion: fairBullionK != null && tabloBullionK != null
+          ? ((tabloBullionK - fairBullionK) / fairBullionK) * 100 : null,
+        coin: ime?.fairCoinCert != null && ime?.goldCoinT != null
+          ? ((ime.goldCoinT - ime.fairCoinCert) / ime.fairCoinCert) * 100 : null,
+      })
     }).catch(e => console.error('[GoldFundsMatrix] fetch failed:', e))
       .finally(() => setFundsLoading(false))
   }
@@ -743,10 +753,28 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     return { display, full }
   }
 
+  const getBubbleZatiValue = (name: string): number | null => {
+    const w = FUND_WEIGHTS[name]
+    if (!w || marketBubbles.bullion == null || marketBubbles.coin == null) return null
+    return (w.coin / 100) * marketBubbles.coin + (w.bar / 100) * marketBubbles.bullion
+  }
+
+  const getBubbleZati = (name: string): { display: string; full: string } => {
+    if (fundsLoading) return { display: '...', full: '' }
+    const bubble = getBubbleZatiValue(name)
+    if (bubble == null) return { display: '—', full: '' }
+    const w = FUND_WEIGHTS[name]!
+    const sign = bubble >= 0 ? '+' : ''
+    const display = sign + bubble.toFixed(1) + '٪'
+    const full = `سکه ${w.coin.toFixed(1)}٪ × حباب سکه ${marketBubbles.coin!.toFixed(2)}٪ + شمش ${w.bar.toFixed(1)}٪ × حباب شمش ${marketBubbles.bullion!.toFixed(2)}٪`
+    return { display, full }
+  }
+
   const getCellValue = (colKey: string, name: string): { display: string; full: string } => {
     if (colKey === 'marketToman') return getMv(name)
     if (colKey === 'marketUsd') return getUsd(name)
     if (colKey === 'bubbleAsmi') return getBubbleAsmi(name)
+    if (colKey === 'bubbleZati') return getBubbleZati(name)
     const w = FUND_WEIGHTS[name]
     if (colKey === 'coinWeight')    return w ? { display: w.coin.toFixed(1) + '٪', full: '' } : { display: '—', full: '' }
     if (colKey === 'goldBarWeight') return w ? { display: w.bar.toFixed(1)  + '٪', full: '' } : { display: '—', full: '' }
@@ -825,7 +853,15 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
         <div style={{ fontSize: 11, color: muted, marginBottom: 10 }}>میانگین شاخص‌های حبابی صندوق‌ها</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {[
-            { label: 'میانگین حباب ذاتی صندوق‌ها', value: '—' },
+            {
+              label: 'میانگین حباب ذاتی صندوق‌ها',
+              value: (() => {
+                const vals = GOLD_FUNDS.map(getBubbleZatiValue).filter((v): v is number => v != null)
+                if (!vals.length) return '—'
+                const avg = vals.reduce((s, v) => s + v, 0) / vals.length
+                return (avg >= 0 ? '+' : '') + avg.toFixed(1) + '٪'
+              })(),
+            },
             { label: 'میانگین حباب اسمی صندوق‌ها',  value: '—' },
             { label: 'میانگین حباب واقعی صندوق‌ها', value: '—' },
           ].map(item => (
