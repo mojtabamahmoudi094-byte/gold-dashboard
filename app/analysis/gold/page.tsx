@@ -677,7 +677,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     const pc = priceCloseMap[name]
     if (!nav || !pc || !pc.price) return { display: '—', full: '' }
     const priceToman = pc.isRial ? pc.price / 10 : pc.price
-    const bubble = (nav - priceToman) / nav * 100
+    const bubble = (priceToman - nav) / nav * 100
     const sign = bubble >= 0 ? '+' : ''
     const display = sign + bubble.toFixed(1) + '٪'
     const full = `NAV ابطال: ${nav.toLocaleString('fa-IR')} | قیمت پایانی: ${Math.round(priceToman).toLocaleString('fa-IR')} تومان`
