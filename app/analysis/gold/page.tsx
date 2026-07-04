@@ -336,8 +336,8 @@ export default function GoldAnalysisPage() {
                     { label: 'قیمت واقعی گواهی سکه', value: fairCoinK, note: 'انس × دلار درهم × ۸.۱۳گرم × عیار ۲۲' },
                     { label: 'قیمت تابلو نقدی گواهی سکه', value: tabloCoinK, note: 'قیمت پایانی GoldCoin — بورس کالا' },
                     { label: 'حباب گواهی سکه', value: bubbleCoin, note: '(تابلو − واقعی) ÷ واقعی × ۱۰۰', isBubble: true },
-                    { label: 'نرخ دلار گواهی شمش طلا', value: dollarBullion, note: 'تابلو ÷ (۱۰۰۰گرم ÷ انس‌گرم × عیار ۹۹۵ × انس دلاری)', isToman: true },
-                    { label: 'نرخ دلار گواهی سکه', value: dollarCoin, note: 'تابلو ÷ (۸.۱۳گرم ÷ انس‌گرم × عیار ۲۲÷۲۴ × انس دلاری)', isToman: true },
+                    { label: 'قیمت واقعی دلار گواهی شمش طلا', value: dollarBullion, note: 'تابلو ÷ (۱۰۰۰گرم ÷ انس‌گرم × عیار ۹۹۵ × انس دلاری)', isToman: true },
+                    { label: 'قیمت واقعی دلار گواهی سکه', value: dollarCoin, note: 'تابلو ÷ (۸.۱۳گرم ÷ انس‌گرم × عیار ۲۲÷۲۴ × انس دلاری)', isToman: true },
                   ]
                   return rows.map((row, i, arr) => (
                     <tr key={row.label} style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${border}` : 'none' }}>
