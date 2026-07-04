@@ -11,6 +11,9 @@ const CAT_MAP: Record<string, { label: string; category: string; color: string }
   gold:    { label: 'طلا',    category: 'طلا',    color: 'oklch(0.82 0.15 70)' },
   silver:  { label: 'نقره',   category: 'نقره',   color: 'oklch(0.84 0.03 240)' },
   saffron: { label: 'زعفران', category: 'زعفران', color: 'oklch(0.74 0.19 40)' },
+  leveraged: { label: 'اهرمی', category: 'اهرمی', color: 'oklch(0.72 0.19 25)' },
+  sector:    { label: 'بخشی',  category: 'بخشی',  color: 'oklch(0.76 0.14 210)' },
+  equity:    { label: 'سهامی', category: 'سهامی', color: 'oklch(0.78 0.13 300)' },
 }
 
 export default function FundsCatPage() {
