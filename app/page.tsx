@@ -13,6 +13,30 @@ const fmtVal = (v: any) => {
   return Math.round(n / div).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 }
 
+type TickerItem = { name: string; slug: string; price: number; changePct: number }
+
+/* شمارنده‌ی نرم اعداد — با احترام به prefers-reduced-motion */
+function CountUp({ value, format, duration = 900 }: { value: number; format: (n: number) => string; duration?: number }) {
+  const [display, setDisplay] = useState(0)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDisplay(value)
+      return
+    }
+    let raf = 0
+    const start = performance.now()
+    const tick = (t: number) => {
+      const p = Math.min((t - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - p, 3)
+      setDisplay(value * eased)
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value, duration])
+  return <>{format(display)}</>
+}
+
 const FEATURES = [
   {
     href: '/funds',
@@ -115,6 +139,7 @@ const FEATURES = [
 export default function HomePage() {
   const [isMobile, setIsMobile] = useState(false)
   const [stats, setStats] = useState<{ totalTV: number; fundCount: number; avgChange: number; positiveCount: number } | null>(null)
+  const [ticker, setTicker] = useState<TickerItem[]>([])
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -134,10 +159,20 @@ export default function HomePage() {
         const combined = assets.map((asset: any) => {
           const rec = recordsDesc.find((r: any) => r.asset_id === asset.id)
           return {
+            name: String(asset.name || ''),
+            slug: String(asset.slug || ''),
+            price: safe(rec?.price_close),
             tradeValue: safe(rec?.trade_value),
             changePct: safe(rec?.price_change_pct),
           }
         }).filter((f: any) => f.tradeValue > 0)
+        setTicker(
+          [...combined]
+            .filter((f: any) => f.price > 0 && f.name)
+            .sort((a: any, b: any) => b.tradeValue - a.tradeValue)
+            .slice(0, 12)
+            .map((f: any) => ({ name: f.name, slug: f.slug, price: f.price, changePct: f.changePct }))
+        )
         const totalTV = combined.reduce((s: number, f: any) => s + f.tradeValue, 0)
         const avgChange = combined.length > 0 ? combined.reduce((s: number, f: any) => s + f.changePct, 0) / combined.length : 0
         const positiveCount = combined.filter((f: any) => f.changePct > 0).length
@@ -156,47 +191,44 @@ export default function HomePage() {
       direction: 'rtl',
     }}>
 
-      {/* ═══════ TICKER TAPE ═══════ */}
+      {/* ═══════ TICKER TAPE (داده‌ی زنده) ═══════ */}
       <div style={{
         background: 'rgba(59,130,246,0.05)',
         borderBottom: '1px solid rgba(59,130,246,0.12)',
         height: 36, overflow: 'hidden', display: 'flex', alignItems: 'center',
       }}>
-        <div style={{
-          display: 'inline-flex', gap: 0,
-          animation: 'bs-marquee 40s linear infinite',
-          willChange: 'transform',
-          whiteSpace: 'nowrap',
-        }}>
-          {[
-            { name: 'طلای لوتوس', price: '۴۵,۲۳۰', change: '+۱.۲٪', pos: true },
-            { name: 'گوهر', price: '۴۴,۸۱۵', change: '+۰.۸٪', pos: true },
-            { name: 'زر', price: '۴۴,۱۲۰', change: '-۰.۳٪', pos: false },
-            { name: 'کیان', price: '۴۵,۹۸۰', change: '+۱.۵٪', pos: true },
-            { name: 'مثقال', price: '۴۳,۶۴۰', change: '-۰.۵٪', pos: false },
-            { name: 'عیار', price: '۴۵,۵۱۰', change: '+۲.۱٪', pos: true },
-            { name: 'نقره‌ی ایران', price: '۸,۲۳۰', change: '+۰.۴٪', pos: true },
-            { name: 'زعفران پارسیان', price: '۱۲,۴۵۰', change: '-۱.۱٪', pos: false },
-            { name: 'طلای لوتوس', price: '۴۵,۲۳۰', change: '+۱.۲٪', pos: true },
-            { name: 'گوهر', price: '۴۴,۸۱۵', change: '+۰.۸٪', pos: true },
-            { name: 'زر', price: '۴۴,۱۲۰', change: '-۰.۳٪', pos: false },
-            { name: 'کیان', price: '۴۵,۹۸۰', change: '+۱.۵٪', pos: true },
-            { name: 'مثقال', price: '۴۳,۶۴۰', change: '-۰.۵٪', pos: false },
-            { name: 'عیار', price: '۴۵,۵۱۰', change: '+۲.۱٪', pos: true },
-            { name: 'نقره‌ی ایران', price: '۸,۲۳۰', change: '+۰.۴٪', pos: true },
-            { name: 'زعفران پارسیان', price: '۱۲,۴۵۰', change: '-۱.۱٪', pos: false },
-          ].map((item, i) => (
-            <span key={i} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '0 24px', fontSize: 11.5, fontFamily: 'system-ui, sans-serif',
-              borderLeft: '1px solid rgba(255,255,255,0.06)',
-            }}>
-              <span style={{ color: '#a9b0c2', fontWeight: 500 }}>{item.name}</span>
-              <span style={{ color: '#eef1f8', fontWeight: 700 }}>{item.price}</span>
-              <span style={{ fontWeight: 700, color: item.pos ? 'oklch(0.74 0.17 155)' : 'oklch(0.68 0.2 25)' }}>{item.change}</span>
-            </span>
-          ))}
-        </div>
+        {ticker.length === 0 ? (
+          <div style={{ display: 'flex', gap: 28, padding: '0 24px', width: '100%', overflow: 'hidden' }}>
+            {Array.from({ length: 10 }).map((_, i) => (
+              <span key={i} className="skeleton" style={{ width: 120, height: 12, flexShrink: 0 }} />
+            ))}
+          </div>
+        ) : (
+          <div style={{
+            display: 'inline-flex', gap: 0,
+            animation: 'bs-marquee 40s linear infinite',
+            willChange: 'transform',
+            whiteSpace: 'nowrap',
+          }}>
+            {[...ticker, ...ticker].map((item, i) => {
+              const pos = item.changePct >= 0
+              return (
+                <Link key={i} href={item.slug ? `/fund/${item.slug}` : '/funds'} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '0 24px', fontSize: 11.5, fontFamily: 'system-ui, sans-serif',
+                  borderLeft: '1px solid rgba(255,255,255,0.06)',
+                  textDecoration: 'none', lineHeight: '36px',
+                }}>
+                  <span style={{ color: '#a9b0c2', fontWeight: 500, fontFamily: 'Vazirmatn, inherit' }}>{item.name}</span>
+                  <span style={{ color: '#eef1f8', fontWeight: 700 }}>{item.price.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}</span>
+                  <span style={{ fontWeight: 700, color: pos ? 'oklch(0.74 0.17 155)' : 'oklch(0.68 0.2 25)' }}>
+                    {pos ? '▲' : '▼'} {Math.abs(item.changePct).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* ═══════ HERO ═══════ */}
@@ -351,7 +383,7 @@ export default function HomePage() {
           {[
             {
               label: 'ارزش کل معاملات',
-              value: stats ? `${fmtVal(stats.totalTV / 1e10)} م.ت` : '—',
+              render: stats ? () => <><CountUp value={stats.totalTV / 1e10} format={fmtVal} /> م.ت</> : null,
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/>
@@ -361,7 +393,7 @@ export default function HomePage() {
             },
             {
               label: 'صندوق‌های فعال',
-              value: stats ? stats.fundCount.toLocaleString('fa-IR') : '—',
+              render: stats ? () => <CountUp value={stats.fundCount} format={n => Math.round(n).toLocaleString('fa-IR')} /> : null,
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
@@ -371,7 +403,7 @@ export default function HomePage() {
             },
             {
               label: 'میانگین تغییر روز',
-              value: stats ? `${stats.avgChange >= 0 ? '+' : ''}${stats.avgChange.toFixed(2)}٪` : '—',
+              render: stats ? () => <CountUp value={stats.avgChange} format={n => `${stats.avgChange >= 0 ? '+' : ''}${n.toFixed(2)}٪`} /> : null,
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={stats && stats.avgChange >= 0 ? 'oklch(0.74 0.17 155)' : 'oklch(0.68 0.2 25)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
@@ -381,7 +413,7 @@ export default function HomePage() {
             },
             {
               label: 'صندوق‌های مثبت',
-              value: stats ? `${stats.positiveCount} از ${stats.fundCount}` : '—',
+              render: stats ? () => <><CountUp value={stats.positiveCount} format={n => String(Math.round(n))} /> از {stats.fundCount}</> : null,
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.82 0.15 70)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
@@ -402,9 +434,13 @@ export default function HomePage() {
                 </div>
                 <span style={{ fontSize: 12, color: '#8b93a7', fontWeight: 500 }}>{item.label}</span>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: item.value === '—' ? '#3d4255' : item.color, fontFamily: 'system-ui, sans-serif' }}>
-                {item.value}
-              </div>
+              {item.render ? (
+                <div className="animate-fade-in" style={{ fontSize: 22, fontWeight: 800, color: item.color, fontFamily: 'system-ui, sans-serif' }}>
+                  {item.render()}
+                </div>
+              ) : (
+                <div className="skeleton" style={{ width: '60%', height: 24 }} />
+              )}
             </div>
           ))}
         </div>
@@ -424,13 +460,14 @@ export default function HomePage() {
           gap: isMobile ? 12 : 20,
         }}>
           {FEATURES.map((feat, i) => (
-            <Link key={i} href={feat.href} style={{
+            <Link key={i} href={feat.href} className="animate-rise" style={{
               textDecoration: 'none', display: 'flex', flexDirection: 'column', gap: 0,
               background: 'linear-gradient(165deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 22, padding: isMobile ? '22px 18px' : '30px',
               transition: 'transform 0.3s, border-color 0.3s',
               cursor: 'pointer',
+              animationDelay: `${i * 70}ms`,
             }}
             onMouseEnter={e => {
               e.currentTarget.style.transform = 'translateY(-6px)'
