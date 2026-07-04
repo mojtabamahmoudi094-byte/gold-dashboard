@@ -100,29 +100,12 @@ function navUrl(name) {
   return `https://Api.BrsApi.ir/Tsetmc/Nav.php?key=${BRSAPI_KEY}&l18=${encodeURIComponent(name)}`
 }
 
-// ── Field mapper (مثل sync-funds.js — نام‌های محتمل کلیدهای Nav.php) ─────────
-function pick(...keys) {
-  return function (obj) {
-    for (const k of keys) {
-      if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k]
-    }
-    return null
-  }
-}
-
-const FIELD = {
-  price_close:  pick('pf', 'pc', 'close_price', 'final_price', 'price_close', 'close'),
-  price_last:   pick('pl', 'last_price', 'price_last', 'last'),
-  change_pct:   pick('pcp', 'plp', 'change_percent', 'price_change_pct', 'change_pct'),
-  trade_value:  pick('tval', 'trade_value', 'value', 'turnover'),
-  volume:       pick('tvol', 'volume', 'trade_volume'),
-  market_value: pick('mv', 'market_cap', 'market_value', 'bvol'),
-  buy_i_vol:    pick('Buy_I_Volume', 'buy_i_volume', 'i_buy_vol'),
-  sell_i_vol:   pick('Sell_I_Volume', 'sell_i_volume', 'i_sell_vol'),
-  buy_i_count:  pick('Buy_CountI', 'buy_count_i', 'i_buy_count'),
-  sell_i_count: pick('Sell_CountI', 'sell_count_i', 'i_sell_count'),
-}
-
+// ── Field mapper ─────────────────────────────────────────────────────────────
+// کلیدها طبق راهنمای رسمی وب‌سرویس بورس Tsetmc (BrsAPI):
+//   قیمت:    pl=آخرین، pc=پایانی، pcp=درصد تغییر پایانی، pf=اولین، py=دیروز
+//   معاملات: tno=تعداد، tvol=حجم، tval=ارزش، mv=ارزش بازار، bvol=حجم مبنا
+//   حقیقی/حقوقی: Buy_I_Volume، Sell_I_Volume، Buy_CountI، Sell_CountI
+//   NAV صندوق: psubtran=NAV صدور، predtran=NAV ابطال
 function num(v) {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
   return isNaN(x) ? null : x
@@ -132,16 +115,16 @@ function mapRow(item, assetId, shamsiDate) {
   return {
     asset_id:          assetId,
     trade_date_shamsi: shamsiDate,
-    price_close:       num(FIELD.price_close(item)),
-    price_last:        num(FIELD.price_last(item)),
-    price_change_pct:  num(FIELD.change_pct(item)),
-    trade_value:       num(FIELD.trade_value(item)) ?? 0, // NOT NULL column
-    volume:            num(FIELD.volume(item)),
-    market_value:      num(FIELD.market_value(item)),
-    buy_i_volume:      num(FIELD.buy_i_vol(item)),
-    sell_i_volume:     num(FIELD.sell_i_vol(item)),
-    buy_count_i:       num(FIELD.buy_i_count(item)),
-    sell_count_i:      num(FIELD.sell_i_count(item)),
+    price_close:       num(item.pc),
+    price_last:        num(item.pl),
+    price_change_pct:  num(item.pcp),
+    trade_value:       num(item.tval) ?? 0, // NOT NULL column
+    volume:            num(item.tvol),
+    market_value:      num(item.mv),
+    buy_i_volume:      num(item.Buy_I_Volume),
+    sell_i_volume:     num(item.Sell_I_Volume),
+    buy_count_i:       num(item.Buy_CountI),
+    sell_count_i:      num(item.Sell_CountI),
   }
 }
 
