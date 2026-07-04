@@ -310,60 +310,8 @@ export default function TerminalPage() {
 
   const isUp = intel.change >= 0
 
-  // auto-save signal to history when it changes (admin only)
-  useEffect(() => {
-    if (!isLoggedIn) return
-    if (!historyLoaded) return          // wait until previous history is fully loaded
-    if (intel.n < 10) return
-    if (intel.signal.label === 'منتظر') return
-
-    const lastSaved = signalHistory[0]?.signal_type
-    if (lastSaved === intel.signal.label) return   // same as last → skip
-
-    let cancelled = false
-    const saveSignal = async () => {
-      // double-check right before insert — guard both type AND date
-      const lastRecord = records.at(-1)
-      const todayDate = lastRecord?.trade_date_shamsi || ''
-      const { data: latest } = await supabase
-        .from('signals')
-        .select('signal_type, signal_date_shamsi')
-        .order('id', { ascending: false })
-        .limit(1)
-      if (cancelled) return
-      if (latest && latest[0]) {
-        // block only when BOTH type AND date match — allows intraday type change
-        if (latest[0].signal_type === intel.signal.label && (!todayDate || latest[0].signal_date_shamsi === todayDate)) return
-      }
-
-      const reasonParts = [intel.signal.desc]
-      if (intel.regime.label !== 'نامشخص') reasonParts.push(`رژیم: ${intel.regime.label} — ${intel.regime.desc}`)
-      const { error } = await supabase.from('signals').insert([{
-        signal_date_shamsi: lastRecord?.trade_date_shamsi || '',
-        signal_type: intel.signal.label,
-        market_value: intel.last,
-        note: intel.signal.desc,
-        reason: reasonParts.join(' · '),
-        confidence: intel.continuation,
-      }])
-      if (!error && !cancelled) {
-        loadSignalHistory()
-        fetch('/api/telegram-notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            signal_type: intel.signal.label,
-            date: lastRecord?.trade_date_shamsi,
-            confidence: intel.continuation,
-            note: intel.signal.desc,
-          }),
-        }).catch(() => {/* fire-and-forget */})
-      }
-    }
-    saveSignal()
-
-    return () => { cancelled = true }
-  }, [intel.signal.label, isLoggedIn, historyLoaded])
+  // ثبت خودکار سیگنال به صفحه /signals منتقل شد (موتور v2 — حباب واقعی بورس کالا).
+  // سیگنال MA این صفحه فقط نمایشی است و دیگر در تاریخچه ذخیره نمی‌شود.
 
   return (
     <main style={{

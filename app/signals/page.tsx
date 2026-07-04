@@ -281,6 +281,7 @@ export default function SignalsPage() {
   const [navMap, setNavMap]       = useState<Record<string, number>>({})
   const [apiData, setApiData]     = useState<any>(null)
   const [isDark, setIsDark]       = useState(true)
+  const [isAdmin, setIsAdmin]     = useState(false)
   const [loading, setLoading]     = useState(true)
   const [isMobile, setIsMobile]   = useState(false)
   const [showDays, setShowDays]   = useState<5 | 10 | 20>(10)
@@ -303,21 +304,34 @@ export default function SignalsPage() {
 
   useEffect(() => {
     const load = async () => {
-      // ۱. سیگنال‌های معتبر — حذف تکراری‌های همون روز (آخرین insert برای هر date+type)
+      // ۰. وضعیت ادمین (برای ثبت خودکار سیگنال و پاکسازی)
+      const { data: sess } = await supabase.auth.getSession()
+      const admin = !!sess?.session
+      setIsAdmin(admin)
+
+      // ۱. سیگنال‌های معتبر موتور جدید ([v2]) — حذف تکراری‌های همون روز
       const { data: sigs } = await supabase
         .from('signals')
         .select('*')
         .not('confidence', 'is', null)
         .order('id', { ascending: false })
       if (sigs) {
+        // سیگنال‌های موتور قدیمی (MA) با آپدیت جدید سازگار نیستند — فقط [v2] نمایش داده می‌شود
+        const v2 = sigs.filter((s: any) => typeof s.note === 'string' && s.note.startsWith('[v2]'))
         const seen = new Set<string>()
-        const deduped = sigs.filter((s: any) => {
+        const deduped = v2.filter((s: any) => {
           const key = `${s.signal_date_shamsi}|${s.signal_type}`
           if (seen.has(key)) return false
           seen.add(key)
           return true
         })
         setSignals(deduped)
+
+        // پاکسازی رکوردهای موتور قدیمی (فقط ادمین — RLS برای مهمان اجازه نمی‌دهد)
+        if (admin) {
+          const oldIds = sigs.filter((s: any) => !(typeof s.note === 'string' && s.note.startsWith('[v2]'))).map((s: any) => s.id)
+          if (oldIds.length) await supabase.from('signals').delete().in('id', oldIds)
+        }
       }
 
       // ۲. تاریخچه قیمت عیار (asset_id=2) برای محاسبه نتیجه
@@ -389,6 +403,40 @@ export default function SignalsPage() {
   const marketBubbles = apiData?.ime ? computeMarketBubbles(apiData.ime) : null
   const autoSignal = computeAutoSignal(apiData, marketBubbles)
   const rankedFunds = autoSignal ? getRankedFunds(autoSignal.type, fundData, marketBubbles, navMap) : []
+
+  // ثبت خودکار سیگنال موتور جدید در تاریخچه (فقط ادمین، یک بار برای هر روز+نوع)
+  useEffect(() => {
+    if (!isAdmin || loading || !autoSignal || !apiData?.lastMarketDate) return
+    const date = apiData.lastMarketDate as string
+    if (signals.some(s => s.signal_date_shamsi === date && s.signal_type === autoSignal.type)) return
+
+    let cancelled = false
+    const save = async () => {
+      const reason = autoSignal.reasons.map((r: any) => r.text).join(' · ')
+      const { data, error } = await supabase.from('signals').insert([{
+        signal_date_shamsi: date,
+        signal_type: autoSignal.type,
+        confidence: autoSignal.confidence,
+        note: '[v2] موتور حباب واقعی بورس کالا',
+        reason,
+      }]).select()
+      if (error || cancelled || !data?.[0]) return
+      setSignals(prev => [data[0], ...prev])
+      fetch('/api/telegram-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signal_type: autoSignal.type,
+          date,
+          confidence: autoSignal.confidence,
+          note: reason,
+        }),
+      }).catch(() => {/* fire-and-forget */})
+    }
+    save()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, loading, autoSignal?.type, apiData?.lastMarketDate])
 
   const isBuySignal = autoSignal?.type === 'خرید' || autoSignal?.type === 'تمایل خرید'
   const isSellSignal = autoSignal?.type === 'فروش' || autoSignal?.type === 'احتیاط'
