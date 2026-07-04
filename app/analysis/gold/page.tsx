@@ -740,13 +740,20 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     return { display, full }
   }
 
+  const getBubbleAsmiValue = (name: string): number | null => {
+    const nav = navData[name]
+    const pc = priceCloseMap[name]
+    if (!nav || !pc || !pc.price) return null
+    return (pc.price - nav) / nav * 100
+  }
+
   const getBubbleAsmi = (name: string): { display: string; full: string } => {
     if (fundsLoading) return { display: '...', full: '' }
     const nav = navData[name]
     const pc = priceCloseMap[name]
-    if (!nav || !pc || !pc.price) return { display: '—', full: '' }
+    const bubble = getBubbleAsmiValue(name)
+    if (bubble == null || !nav || !pc) return { display: '—', full: '' }
     const priceRial = pc.price
-    const bubble = (priceRial - nav) / nav * 100
     const sign = bubble >= 0 ? '+' : ''
     const display = sign + bubble.toFixed(1) + '٪'
     const full = `NAV ابطال: ${Math.round(nav / 10).toLocaleString('fa-IR')} تومان | قیمت پایانی: ${Math.round(priceRial / 10).toLocaleString('fa-IR')} تومان`
@@ -770,11 +777,29 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     return { display, full }
   }
 
+  const getBubbleVaqeiValue = (name: string): number | null => {
+    const asmi = getBubbleAsmiValue(name)
+    const zati = getBubbleZatiValue(name)
+    if (asmi == null || zati == null) return null
+    return asmi + zati
+  }
+
+  const getBubbleVaqei = (name: string): { display: string; full: string } => {
+    if (fundsLoading) return { display: '...', full: '' }
+    const bubble = getBubbleVaqeiValue(name)
+    if (bubble == null) return { display: '—', full: '' }
+    const sign = bubble >= 0 ? '+' : ''
+    const display = sign + bubble.toFixed(1) + '٪'
+    const full = `حباب اسمی ${getBubbleAsmiValue(name)!.toFixed(1)}٪ + حباب ذاتی ${getBubbleZatiValue(name)!.toFixed(1)}٪`
+    return { display, full }
+  }
+
   const getCellValue = (colKey: string, name: string): { display: string; full: string } => {
     if (colKey === 'marketToman') return getMv(name)
     if (colKey === 'marketUsd') return getUsd(name)
     if (colKey === 'bubbleAsmi') return getBubbleAsmi(name)
     if (colKey === 'bubbleZati') return getBubbleZati(name)
+    if (colKey === 'bubbleVaqei') return getBubbleVaqei(name)
     const w = FUND_WEIGHTS[name]
     if (colKey === 'coinWeight')    return w ? { display: w.coin.toFixed(1) + '٪', full: '' } : { display: '—', full: '' }
     if (colKey === 'goldBarWeight') return w ? { display: w.bar.toFixed(1)  + '٪', full: '' } : { display: '—', full: '' }
@@ -862,8 +887,24 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
                 return (avg >= 0 ? '+' : '') + avg.toFixed(1) + '٪'
               })(),
             },
-            { label: 'میانگین حباب اسمی صندوق‌ها',  value: '—' },
-            { label: 'میانگین حباب واقعی صندوق‌ها', value: '—' },
+            {
+              label: 'میانگین حباب اسمی صندوق‌ها',
+              value: (() => {
+                const vals = GOLD_FUNDS.map(getBubbleAsmiValue).filter((v): v is number => v != null)
+                if (!vals.length) return '—'
+                const avg = vals.reduce((s, v) => s + v, 0) / vals.length
+                return (avg >= 0 ? '+' : '') + avg.toFixed(1) + '٪'
+              })(),
+            },
+            {
+              label: 'میانگین حباب واقعی صندوق‌ها',
+              value: (() => {
+                const vals = GOLD_FUNDS.map(getBubbleVaqeiValue).filter((v): v is number => v != null)
+                if (!vals.length) return '—'
+                const avg = vals.reduce((s, v) => s + v, 0) / vals.length
+                return (avg >= 0 ? '+' : '') + avg.toFixed(1) + '٪'
+              })(),
+            },
           ].map(item => (
             <div key={item.label} style={{
               background: 'rgba(0,200,255,0.03)',
