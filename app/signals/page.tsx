@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
+import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, type MarketBubbles } from '../../lib/goldBubbles'
 
 const safe = (v: any) => Number(v || 0)
 const pct = (v: number | null, d = 1) =>
@@ -15,7 +16,7 @@ const fmtM = (v: number) => {
 }
 
 // ── Auto-signal engine ─────────────────────────────────────────────────────
-function computeAutoSignal(api: any) {
+function computeAutoSignal(api: any, mb: MarketBubbles | null) {
   if (!api) return null
 
   const bubble     = api.coins?.full?.bubble
@@ -29,25 +30,58 @@ function computeAutoSignal(api: any) {
   let score = 0
   const reasons: { text: string; dir: 'pos' | 'neg' | 'neu' }[] = []
 
+  // حباب شمش بورس کالا — مهم‌ترین عامل: صندوق‌های طلا عمدتاً شمش نگه می‌دارند
+  const bBar = mb?.bullion ?? null
+  if (bBar != null) {
+    if (bBar < -4) {
+      score += 3.5
+      reasons.push({ text: `شمش بورس کالا ${Math.abs(bBar).toFixed(1)}٪ زیر قیمت واقعی — دارایی اصلی صندوق‌ها ارزان است`, dir: 'pos' })
+    } else if (bBar < -2) {
+      score += 2
+      reasons.push({ text: `شمش بورس کالا ${Math.abs(bBar).toFixed(1)}٪ زیر قیمت واقعی`, dir: 'pos' })
+    } else if (bBar > 4) {
+      score -= 3.5
+      reasons.push({ text: `حباب شمش بورس کالا ${bBar.toFixed(1)}٪ — دارایی صندوق‌ها گران معامله می‌شود`, dir: 'neg' })
+    } else if (bBar > 2) {
+      score -= 2
+      reasons.push({ text: `حباب شمش بورس کالا ${bBar.toFixed(1)}٪`, dir: 'neg' })
+    } else {
+      score += 0.3
+      reasons.push({ text: `قیمت شمش بورس کالا نزدیک ارزش واقعی (${bBar >= 0 ? '+' : ''}${bBar.toFixed(1)}٪)`, dir: 'neu' })
+    }
+  }
+
+  // حباب گواهی سکه بورس کالا — وزن کمتر (سهم سکه در صندوق‌ها کم است)
+  const bCoin = mb?.coin ?? null
+  if (bCoin != null) {
+    if (bCoin < -3) {
+      score += 1.2
+      reasons.push({ text: `گواهی سکه ${Math.abs(bCoin).toFixed(1)}٪ زیر قیمت واقعی`, dir: 'pos' })
+    } else if (bCoin > 3) {
+      score -= 1.2
+      reasons.push({ text: `حباب گواهی سکه ${bCoin.toFixed(1)}٪`, dir: 'neg' })
+    }
+  }
+
   if (b != null) {
     if (b > 0.08) {
-      score -= 3.5
-      reasons.push({ text: `حباب سکه ${(b*100).toFixed(1)}٪ بالای ارزش ذاتی`, dir: 'neg' })
+      score -= 2.5
+      reasons.push({ text: `حباب سکه بازار آزاد ${(b*100).toFixed(1)}٪ بالای ارزش ذاتی`, dir: 'neg' })
     } else if (b > 0.05) {
-      score -= 2
-      reasons.push({ text: `حباب متوسط سکه ${(b*100).toFixed(1)}٪`, dir: 'neg' })
+      score -= 1.5
+      reasons.push({ text: `حباب متوسط سکه بازار ${(b*100).toFixed(1)}٪`, dir: 'neg' })
     } else if (b > 0.02) {
-      score -= 0.8
-      reasons.push({ text: `حباب خفیف سکه ${(b*100).toFixed(1)}٪`, dir: 'neg' })
+      score -= 0.6
+      reasons.push({ text: `حباب خفیف سکه بازار ${(b*100).toFixed(1)}٪`, dir: 'neg' })
     } else if (b < -0.04) {
-      score += 3
-      reasons.push({ text: `سکه ${Math.abs(b*100).toFixed(1)}٪ زیر ارزش ذاتی — فرصت خرید`, dir: 'pos' })
+      score += 2
+      reasons.push({ text: `سکه بازار ${Math.abs(b*100).toFixed(1)}٪ زیر ارزش ذاتی — فرصت خرید`, dir: 'pos' })
     } else if (b < -0.02) {
-      score += 1.5
-      reasons.push({ text: `سکه کمی زیر ارزش ذاتی (${(b*100).toFixed(1)}٪)`, dir: 'pos' })
+      score += 1
+      reasons.push({ text: `سکه بازار کمی زیر ارزش ذاتی (${(b*100).toFixed(1)}٪)`, dir: 'pos' })
     } else if (b < 0.01) {
-      score += 0.5
-      reasons.push({ text: `قیمت سکه منطقی (حباب ${(b*100).toFixed(1)}٪)`, dir: 'neu' })
+      score += 0.4
+      reasons.push({ text: `قیمت سکه بازار منطقی (حباب ${(b*100).toFixed(1)}٪)`, dir: 'neu' })
     }
   }
 
@@ -141,9 +175,15 @@ interface FundRow {
   net: number
   inflowScore: number
   combinedScore: number
+  bubbleVaqei: number | null
 }
 
-function getRankedFunds(signalType: string, funds: FundRow[]): FundRow[] {
+function getRankedFunds(
+  signalType: string,
+  funds: FundRow[],
+  mb: MarketBubbles | null,
+  navMap: Record<string, number>,
+): FundRow[] {
   // gold-only for gold signals
   const pool = funds.filter(f => f.category === 'طلا')
   if (pool.length === 0) return []
@@ -153,8 +193,19 @@ function getRankedFunds(signalType: string, funds: FundRow[]): FundRow[] {
     const total = safe(f.buy_i_volume) + safe(f.sell_i_volume)
     const inflowScore = total > 0 ? net / total : 0   // [-1, 1]
     const chg = f.price_change_pct ?? 0
-    const combinedScore = 0.65 * inflowScore + 0.35 * (chg / 5)
-    return { ...f, net, inflowScore, combinedScore }
+
+    // حباب واقعی = حباب اسمی (قیمت vs NAV) + حباب ذاتی (ترکیب شمش/سکه × حباب بورس کالا)
+    const asmi = fundBubbleAsmi(f.price_close, navMap[f.name])
+    const zati = mb ? fundBubbleZati(f.name, mb) : null
+    const bubbleVaqei = asmi != null && zati != null ? asmi + zati : null
+
+    // ارزندگی: حباب واقعی منفی‌تر = ارزان‌تر = جذاب‌تر برای خرید
+    const valueScore = bubbleVaqei != null ? Math.max(-1, Math.min(1, -bubbleVaqei / 5)) : 0
+    const combinedScore = bubbleVaqei != null
+      ? 0.5 * valueScore + 0.35 * inflowScore + 0.15 * (chg / 5)
+      : 0.65 * inflowScore + 0.35 * (chg / 5)
+
+    return { ...f, net, inflowScore, combinedScore, bubbleVaqei }
   })
 
   const isBuy = signalType === 'خرید' || signalType === 'تمایل خرید'
@@ -165,8 +216,12 @@ function getRankedFunds(signalType: string, funds: FundRow[]): FundRow[] {
   } else if (isSell) {
     return scored.sort((a, b) => a.combinedScore - b.combinedScore).slice(0, 3)
   } else {
-    // نگه‌داری: most liquid
-    return scored.sort((a, b) => (b.trade_value || 0) - (a.trade_value || 0)).slice(0, 3)
+    // نگه‌داری: کم‌حباب‌ترین‌ها بین نقدشونده‌ها
+    return scored
+      .sort((a, b) => (b.trade_value || 0) - (a.trade_value || 0))
+      .slice(0, 8)
+      .sort((a, b) => (a.bubbleVaqei ?? 99) - (b.bubbleVaqei ?? 99))
+      .slice(0, 3)
   }
 }
 
@@ -176,6 +231,13 @@ function fundReason(f: FundRow, signalType: string): string {
   const isSell = signalType === 'فروش' || signalType === 'احتیاط'
 
   const parts: string[] = []
+
+  if (f.bubbleVaqei != null) {
+    const bv = f.bubbleVaqei
+    if (bv < -1) parts.push(`حباب واقعی ${bv.toFixed(1)}٪ — زیر ارزش`)
+    else if (bv > 3) parts.push(`حباب واقعی +${bv.toFixed(1)}٪ — گران`)
+    else parts.push(`حباب واقعی ${bv >= 0 ? '+' : ''}${bv.toFixed(1)}٪`)
+  }
 
   if (isBuy) {
     if (netM > 0) parts.push(`ورود ${netM.toLocaleString('fa-IR')}M واحد حقیقی`)
@@ -216,6 +278,7 @@ export default function SignalsPage() {
   const [priceMap, setPriceMap]   = useState<Record<string, number>>({})
   const [flowMap, setFlowMap]     = useState<Record<string, number>>({})
   const [fundData, setFundData]   = useState<FundRow[]>([])
+  const [navMap, setNavMap]       = useState<Record<string, number>>({})
   const [apiData, setApiData]     = useState<any>(null)
   const [isDark, setIsDark]       = useState(true)
   const [loading, setLoading]     = useState(true)
@@ -305,10 +368,17 @@ export default function SignalsPage() {
         }
       } catch { /* ignore */ }
 
-      // ۴. API طلا برای سیگنال لحظه‌ای
+      // ۴. API طلا برای سیگنال لحظه‌ای + NAV برای حباب اسمی صندوق‌ها
       try {
-        const res = await fetch('/api/gold-analysis')
+        const [res, navRes] = await Promise.all([
+          fetch('/api/gold-analysis'),
+          fetch('/api/gold-nav'),
+        ])
         if (res.ok) setApiData(await res.json())
+        if (navRes.ok) {
+          const nd = await navRes.json()
+          setNavMap(nd?.navs ?? {})
+        }
       } catch { /* ignore */ }
 
       setLoading(false)
@@ -316,8 +386,9 @@ export default function SignalsPage() {
     load()
   }, [])
 
-  const autoSignal = computeAutoSignal(apiData)
-  const rankedFunds = autoSignal ? getRankedFunds(autoSignal.type, fundData) : []
+  const marketBubbles = apiData?.ime ? computeMarketBubbles(apiData.ime) : null
+  const autoSignal = computeAutoSignal(apiData, marketBubbles)
+  const rankedFunds = autoSignal ? getRankedFunds(autoSignal.type, fundData, marketBubbles, navMap) : []
 
   const isBuySignal = autoSignal?.type === 'خرید' || autoSignal?.type === 'تمایل خرید'
   const isSellSignal = autoSignal?.type === 'فروش' || autoSignal?.type === 'احتیاط'
@@ -360,7 +431,7 @@ export default function SignalsPage() {
               سیگنال‌های بازار
             </h1>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: MUTED }}>
-              بر پایه حباب سکه، انس طلا، نرخ دلار و جریان پول حقیقی
+              بر پایه حباب شمش و گواهی سکه بورس کالا، حباب واقعی صندوق‌ها، انس جهانی و جریان پول حقیقی
             </p>
           </div>
           {apiData?.updatedAt && (
@@ -441,7 +512,9 @@ export default function SignalsPage() {
                   {[
                     { label: 'انس طلا', val: `$${fmt(apiData.inputs?.goldUsd)}`, chg: apiData.inputs?.goldUsdChange },
                     { label: 'دلار', val: `${fmt(apiData.inputs?.dollarT)} ت`, chg: apiData.inputs?.dollarChange },
-                    { label: 'حباب سکه', val: apiData.coins?.full?.bubble != null ? `${(apiData.coins.full.bubble*100).toFixed(1)}٪` : '—', chg: null },
+                    { label: 'حباب شمش بورس کالا', val: marketBubbles?.bullion != null ? `${marketBubbles.bullion >= 0 ? '+' : ''}${marketBubbles.bullion.toFixed(1)}٪` : '—', chg: null },
+                    { label: 'حباب گواهی سکه', val: marketBubbles?.coin != null ? `${marketBubbles.coin >= 0 ? '+' : ''}${marketBubbles.coin.toFixed(1)}٪` : '—', chg: null },
+                    { label: 'حباب سکه بازار', val: apiData.coins?.full?.bubble != null ? `${(apiData.coins.full.bubble*100).toFixed(1)}٪` : '—', chg: null },
                     { label: 'USDT', val: `${fmt(apiData.inputs?.usdtT)} ت`, chg: null },
                   ].map(row => (
                     <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
@@ -488,7 +561,7 @@ export default function SignalsPage() {
                 background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
                 padding: '2px 8px', borderRadius: 5,
               }}>
-                {isBuySignal ? 'بر اساس ورود پول حقیقی + مومنتوم' : isSellSignal ? 'بر اساس خروج پول حقیقی + افت قیمت' : 'بر اساس نقدشوندگی'}
+                {isBuySignal ? 'بر اساس حباب واقعی + ورود پول حقیقی + مومنتوم' : isSellSignal ? 'بر اساس حباب واقعی + خروج پول حقیقی' : 'بر اساس کمترین حباب بین نقدشونده‌ها'}
               </span>
             </div>
 
@@ -563,6 +636,22 @@ export default function SignalsPage() {
                           {chg >= 0 ? '+' : ''}{chg?.toFixed(2)}٪
                         </span>
                       </div>
+
+                      {/* حباب واقعی chip */}
+                      {f.bubbleVaqei != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <span style={{ fontSize: 10, color: MUTED }}>حباب واقعی</span>
+                          <span style={{
+                            fontSize: 10.5, fontWeight: 700, fontFamily: 'system-ui',
+                            color: f.bubbleVaqei > 0 ? RED : GREEN,
+                            background: f.bubbleVaqei > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
+                            border: `1px solid ${f.bubbleVaqei > 0 ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`,
+                            borderRadius: 5, padding: '1px 8px',
+                          }}>
+                            {f.bubbleVaqei >= 0 ? '+' : ''}{f.bubbleVaqei.toFixed(1)}٪
+                          </span>
+                        </div>
+                      )}
 
                       {/* net flow bar */}
                       <div style={{ marginBottom: 8 }}>
