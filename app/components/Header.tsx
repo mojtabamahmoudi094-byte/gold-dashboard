@@ -220,6 +220,7 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive(item.href) ? 'page' : undefined}
                   style={navLink(isActive(item.href))}
                   onMouseEnter={e => {
                     if (!isActive(item.href)) {
@@ -249,6 +250,7 @@ export default function Header() {
             <button
               onClick={toggleTheme}
               title={isDark ? 'حالت روز' : 'حالت شب'}
+              aria-label={isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب'}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 34, height: 34, borderRadius: 8, cursor: 'pointer',
@@ -333,6 +335,7 @@ export default function Header() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               onClick={toggleTheme}
+              aria-label={isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب'}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
@@ -345,6 +348,8 @@ export default function Header() {
             </button>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
+              aria-label={menuOpen ? 'بستن منو' : 'باز کردن منو'}
+              aria-expanded={menuOpen}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
@@ -375,10 +380,11 @@ export default function Header() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }}
         >
+          <nav aria-label="منوی اصلی موبایل">
           {NAV.map((item) => {
             const active = isActive(item.href)
             return (
-              <Link key={item.href} href={item.href} style={{
+              <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} style={{
                 display: 'flex', alignItems: 'center',
                 textDecoration: 'none', fontSize: 14,
                 fontWeight: active ? 600 : 400,
@@ -393,6 +399,7 @@ export default function Header() {
               </Link>
             )
           })}
+          </nav>
 
           <div style={{ height: 1, background: BORDER, margin: '10px 0' }} />
 

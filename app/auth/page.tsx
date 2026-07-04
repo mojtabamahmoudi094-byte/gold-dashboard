@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
@@ -278,7 +278,7 @@ export default function AuthPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="نام">
                 <input
-                  type="text" required
+                  type="text" required autoComplete="given-name"
                   value={firstName} onChange={e => setFirstName(e.target.value)}
                   placeholder="نام"
                   style={inputBase}
@@ -286,7 +286,7 @@ export default function AuthPage() {
               </Field>
               <Field label="نام خانوادگی">
                 <input
-                  type="text" required
+                  type="text" required autoComplete="family-name"
                   value={lastName} onChange={e => setLastName(e.target.value)}
                   placeholder="نام خانوادگی"
                   style={inputBase}
@@ -314,7 +314,7 @@ export default function AuthPage() {
 
             <Field label="شماره تماس">
               <input
-                type="tel" required
+                type="tel" required autoComplete="tel"
                 value={phone} onChange={e => setPhone(e.target.value)}
                 placeholder="09xxxxxxxxx"
                 style={{ ...inputBase, direction: 'ltr', textAlign: 'right' }}
@@ -383,10 +383,14 @@ export default function AuthPage() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const id = React.useId()
+  const child = React.isValidElement(children)
+    ? React.cloneElement(children as React.ReactElement<{ id?: string }>, { id })
+    : children
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: 11, color: '#5A7088', fontWeight: 500 }}>{label}</label>
-      {children}
+      <label htmlFor={id} style={{ fontSize: 11, color: '#5A7088', fontWeight: 500 }}>{label}</label>
+      {child}
     </div>
   )
 }
