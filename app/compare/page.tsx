@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
+import { Skeleton } from '../components/ui/Skeleton'
 import { darkTheme, lightTheme } from '../../lib/theme'
 
 const safe = (v: any) => Number(v || 0)
@@ -15,6 +16,7 @@ export default function ComparePage() {
   const [records, setRecords] = useState<any[]>([])
   const [fund1, setFund1] = useState<string>('')
   const [fund2, setFund2] = useState<string>('')
+  const [loading, setLoading] = useState(true)
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -34,21 +36,25 @@ export default function ComparePage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: assetData } = await supabase
-        .from('assets').select('id, name, slug, category')
-        .neq('slug', 'gold').order('id', { ascending: true })
-      if (!assetData) return
-      setAssets(assetData)
+      try {
+        const { data: assetData } = await supabase
+          .from('assets').select('id, name, slug, category')
+          .neq('slug', 'gold').order('id', { ascending: true })
+        if (!assetData) return
+        setAssets(assetData)
 
-      const { data: latest } = await supabase
-        .from('gold_funds').select('trade_date_shamsi')
-        .order('id', { ascending: false }).limit(1)
-      if (!latest?.[0]) return
+        const { data: latest } = await supabase
+          .from('gold_funds').select('trade_date_shamsi')
+          .order('id', { ascending: false }).limit(1)
+        if (!latest?.[0]) return
 
-      const { data: recs } = await supabase
-        .from('gold_funds').select('*')
-        .eq('trade_date_shamsi', latest[0].trade_date_shamsi)
-      if (recs) setRecords(recs)
+        const { data: recs } = await supabase
+          .from('gold_funds').select('*')
+          .eq('trade_date_shamsi', latest[0].trade_date_shamsi)
+        if (recs) setRecords(recs)
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -102,17 +108,25 @@ export default function ComparePage() {
         </div>
 
         {/* انتخاب دو صندوق */}
+        {loading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto 1fr', gap: 12, alignItems: 'center' }}>
+            <Skeleton height={42} radius={10} />
+            <div style={{ fontSize: 20, color: t.accent, textAlign: 'center', fontWeight: 700 }}>⚡</div>
+            <Skeleton height={42} radius={10} />
+          </div>
+        ) : (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto 1fr', gap: 12, alignItems: 'center' }}>
-          <select value={fund1} onChange={e => setFund1(e.target.value)} style={selectStyle}>
+          <select value={fund1} onChange={e => setFund1(e.target.value)} aria-label="انتخاب صندوق اول" style={selectStyle}>
             <option value="">صندوق اول را انتخاب کنید</option>
             {assets.map(a => <option key={a.slug} value={a.slug}>{a.name} ({a.category})</option>)}
           </select>
           <div style={{ fontSize: 20, color: t.accent, textAlign: 'center', fontWeight: 700 }}>⚡</div>
-          <select value={fund2} onChange={e => setFund2(e.target.value)} style={selectStyle}>
+          <select value={fund2} onChange={e => setFund2(e.target.value)} aria-label="انتخاب صندوق دوم" style={selectStyle}>
             <option value="">صندوق دوم را انتخاب کنید</option>
             {assets.map(a => <option key={a.slug} value={a.slug}>{a.name} ({a.category})</option>)}
           </select>
         </div>
+        )}
 
         {/* نتیجه‌ی مقایسه */}
         {d1 && d2 && (

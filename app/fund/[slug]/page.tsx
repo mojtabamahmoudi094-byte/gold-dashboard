@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { darkTheme, lightTheme } from '../../../lib/theme'
+import { Skeleton, SkeletonBlock, SkeletonRows } from '../../components/ui/Skeleton'
 
 const safe = (v: any) => Number(v || 0)
 const fmtVal = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
@@ -78,8 +79,16 @@ export default function FundDetailPage() {
 
   if (loading) {
     return (
-      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: t.muted }}>در حال بارگذاری...</div>
+      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Skeleton width={180} height={12} />
+          <Skeleton width={260} height={30} radius={10} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonBlock key={i} height={88} />)}
+          </div>
+          <SkeletonBlock height={280} />
+          <SkeletonRows rows={6} height={44} />
+        </div>
       </main>
     )
   }

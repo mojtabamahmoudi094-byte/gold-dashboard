@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
+import { Skeleton } from '../../components/ui/Skeleton'
 
 const GRAMS_PER_OZ = 31.103431
 
@@ -191,7 +192,7 @@ export default function SilverAnalysisPage() {
                 WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
               }}>تحلیل نقره</div>
               <div style={{ fontSize: 10, color: muted }}>
-                {lastDate ? `آخرین روز بازار: ${lastDate}` : 'در حال بارگذاری...'}
+                {lastDate ? `آخرین روز بازار: ${lastDate}` : <Skeleton width={110} height={10} radius={5} />}
               </div>
             </div>
           </div>
@@ -247,9 +248,13 @@ export default function SilverAnalysisPage() {
                 <span aria-hidden="true" style={{ width: 3, height: 14, borderRadius: 2, background: 'linear-gradient(180deg, #C0C8D8, #00C8FF)' }} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: text }}>ماتریس صندوق‌های نقره</span>
               </div>
-              <span style={{ fontSize: 10, color: loading ? muted : accent }}>
-                {loading ? 'در حال بارگذاری...' : `${funds.length.toLocaleString('fa-IR')} صندوق با داده`}
-              </span>
+              {loading ? (
+                <Skeleton width={100} height={10} radius={5} />
+              ) : (
+                <span style={{ fontSize: 10, color: accent }}>
+                  {`${funds.length.toLocaleString('fa-IR')} صندوق با داده`}
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>حباب اسمی (قیمت vs NAV) + حباب ذاتی (وزن گواهی نقره × حباب شمش) = حباب واقعی</div>
           </div>

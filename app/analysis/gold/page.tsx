@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { FUND_WEIGHTS } from '../../../lib/goldBubbles'
+import { Skeleton } from '../../components/ui/Skeleton'
 
 const fmt = (n: number | null, decimals = 0) =>
   n == null ? '—' : Math.round(n).toLocaleString('fa-IR', { maximumFractionDigits: decimals })
@@ -196,7 +197,7 @@ export default function GoldAnalysisPage() {
                 WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
               }}>تحلیل طلا</div>
               <div style={{ fontSize: 10, color: muted }}>
-                {data?.lastMarketDate ? `آخرین روز بازار: ${data.lastMarketDate}` : 'در حال بارگذاری...'}
+                {data?.lastMarketDate ? `آخرین روز بازار: ${data.lastMarketDate}` : <Skeleton width={110} height={10} radius={5} />}
               </div>
             </div>
           </div>
@@ -871,7 +872,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
             <span style={{ fontSize: 13, fontWeight: 700, color: text }}>ماتریس صندوق‌های طلا</span>
           </div>
           <div style={{ fontSize: 10, color: fundsLoading ? muted : accent }}>
-            {fundsLoading ? 'در حال بارگذاری...' : `${Object.values(fundsData).filter(v => v != null).length} صندوق با داده`}
+            {fundsLoading ? <Skeleton width={100} height={10} radius={5} /> : `${Object.values(fundsData).filter(v => v != null).length} صندوق با داده`}
           </div>
         </div>
         <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>داده‌های صندوق‌های سرمایه‌گذاری طلا — هاور روی عدد برای جزئیات</div>

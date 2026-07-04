@@ -8,6 +8,7 @@ import DateObject from 'react-date-object'
 import persian from 'react-date-object/calendars/persian'
 import gregorian from 'react-date-object/calendars/gregorian'
 import { supabase } from '../../../lib/supabase'
+import { Skeleton } from '../../components/ui/Skeleton'
 
 const TerminalChart = dynamic(() => import('../../dashboard/TerminalChart'), { ssr: false })
 
@@ -268,13 +269,15 @@ export default function TradeValueDetailPage() {
           </div>
           <div>
             <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 900, margin: '0 0 4px', color: t.text }}>{cat.label}</h1>
-            <p style={{ color: t.muted, fontSize: 13, margin: 0 }}>
-              {loading
-                ? 'در حال بارگذاری...'
-                : chartState
+            {loading ? (
+              <Skeleton width={170} height={13} style={{ marginTop: 2 }} />
+            ) : (
+              <p style={{ color: t.muted, fontSize: 13, margin: 0 }}>
+                {chartState
                   ? `${chartState.stats.n} روز معاملاتی · آخرین: ${chartState.stats.latestDate}`
                   : 'داده‌ای یافت نشد'}
-            </p>
+              </p>
+            )}
           </div>
         </div>
 
