@@ -194,9 +194,9 @@ async function syncNavPrices(date) {
   try {
     const { data: fundAssets } = await sb()
       .from('assets')
-      .select('name')
-      .eq('category', 'gold')
+      .select('name, slug')
       .neq('slug', 'gold')
+      .like('slug', 'IRTK%')
 
     const names = (fundAssets ?? []).map(a => a.name)
     if (names.length === 0) { console.warn('[sync-nav] هیچ صندوقی پیدا نشد'); return }
