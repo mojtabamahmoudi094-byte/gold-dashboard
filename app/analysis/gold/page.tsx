@@ -323,13 +323,21 @@ export default function GoldAnalysisPage() {
                     ? ((tabloBullionK - fairBullionK) / fairBullionK) * 100 : null
                   const bubbleCoin = fairCoinK != null && tabloCoinK != null
                     ? ((tabloCoinK - fairCoinK) / fairCoinK) * 100 : null
-                  const rows: { label: string; value: number | null; note: string; isBubble?: boolean }[] = [
+                  const goldUsd = data?.inputs?.goldUsd ?? null
+                  const c = constants
+                  const dollarBullion = tabloBullionK != null && goldUsd
+                    ? (tabloBullionK * 1000) / ((1000 / c.gramsPerOz) * (995 / 999.9) * goldUsd) : null
+                  const dollarCoin = data?.ime?.goldCoinT != null && goldUsd
+                    ? data.ime.goldCoinT / ((c.fullCoinW / c.gramsPerOz) * (c.coinPurity / 24) * goldUsd) : null
+                  const rows: { label: string; value: number | null; note: string; isBubble?: boolean; isToman?: boolean }[] = [
                     { label: 'قیمت واقعی شمش طلا', value: fairBullionK, note: 'انس × دلار درهم × ۱۰۰۰گرم × عیار ۹۹۵' },
                     { label: 'قیمت تابلو نقدی شمش طلا', value: tabloBullionK, note: 'قیمت پایانی GoldBar — بورس کالا' },
                     { label: 'حباب شمش طلا', value: bubbleBullion, note: '(تابلو − واقعی) ÷ واقعی × ۱۰۰', isBubble: true },
                     { label: 'قیمت واقعی گواهی سکه', value: fairCoinK, note: 'انس × دلار درهم × ۸.۱۳گرم × عیار ۲۲' },
                     { label: 'قیمت تابلو نقدی گواهی سکه', value: tabloCoinK, note: 'قیمت پایانی GoldCoin — بورس کالا' },
                     { label: 'حباب گواهی سکه', value: bubbleCoin, note: '(تابلو − واقعی) ÷ واقعی × ۱۰۰', isBubble: true },
+                    { label: 'نرخ دلار گواهی شمش طلا', value: dollarBullion, note: 'تابلو ÷ (۱۰۰۰گرم ÷ انس‌گرم × عیار ۹۹۵ × انس دلاری)', isToman: true },
+                    { label: 'نرخ دلار گواهی سکه', value: dollarCoin, note: 'تابلو ÷ (۸.۱۳گرم ÷ انس‌گرم × عیار ۲۲÷۲۴ × انس دلاری)', isToman: true },
                   ]
                   return rows.map((row, i, arr) => (
                     <tr key={row.label} style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${border}` : 'none' }}>
@@ -345,7 +353,7 @@ export default function GoldAnalysisPage() {
                               <span style={{ color: accent, fontWeight: 700 }}>
                                 {Math.round(row.value).toLocaleString('fa-IR')}
                               </span>
-                              <span style={{ color: muted, fontSize: 10, marginRight: 6 }}>هزار تومان</span>
+                              <span style={{ color: muted, fontSize: 10, marginRight: 6 }}>{row.isToman ? 'تومان' : 'هزار تومان'}</span>
                             </span>
                           )
                         ) : (
