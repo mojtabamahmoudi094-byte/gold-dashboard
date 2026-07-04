@@ -43,7 +43,12 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const { createClient } = require('@supabase/supabase-js')
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+// Node.js < 22 lacks native WebSocket — pass ws package explicitly
+let wsTransport
+try { wsTransport = require('ws') } catch { /* Node 22+ fine without it */ }
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY,
+  wsTransport ? { realtime: { transport: wsTransport } } : {})
 
 const ALL_NAMES = Object.values(BOURSE_SYMBOLS).flat()
 
