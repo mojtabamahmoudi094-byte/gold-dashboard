@@ -50,8 +50,10 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 const FUND_URL      = `https://api.brsapi.ir/IME/Fund.php?key=${BRSAPI_KEY}`
 const GOLD_PRO_URL  = `https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php?key=${BRSAPI_KEY}&section=gold,currency,cryptocurrency`
 const COMMODITY_URL = `https://api.brsapi.ir/Market/Commodity.php?key=${BRSAPI_KEY}`
-const PROBE    = process.argv.includes('--probe')
-const FORCE    = process.argv.includes('--force')   // اجرا خارج از ساعت بازار
+const IME_CERT_URL  = `https://Api.BrsApi.ir/IME/Certificate.php?key=${BRSAPI_KEY}`
+const PROBE     = process.argv.includes('--probe')
+const PROBE_IME = process.argv.includes('--probe-ime')
+const FORCE     = process.argv.includes('--force')   // اجرا خارج از ساعت بازار
 
 // ── Supabase client (lazy require for compatibility) ────────────────────────
 let _sb = null
@@ -233,6 +235,37 @@ async function syncNavPrices(date) {
   }
 }
 
+// ── IME Certificate (بورس کالا) sync ─────────────────────────────────────────
+async function syncImePrices(date) {
+  console.log('[sync-ime] دریافت قیمت بورس کالا از BrsAPI...')
+  try {
+    const raw = await fetchJson(IME_CERT_URL, 2)
+
+    // log structure so we can map fields
+    if (Array.isArray(raw)) {
+      console.log(`[sync-ime] آرایه با ${raw.length} رکورد`)
+      if (raw[0]) console.log('[sync-ime] کلیدها:', Object.keys(raw[0]).join(', '))
+      if (raw[0]) console.log('[sync-ime] نمونه اول:', JSON.stringify(raw[0]).slice(0, 400))
+    } else if (raw && typeof raw === 'object') {
+      console.log('[sync-ime] کلیدهای اصلی:', Object.keys(raw).join(', '))
+      console.log('[sync-ime] داده خام:', JSON.stringify(raw).slice(0, 400))
+    }
+
+    await sb().from('signals').delete()
+      .eq('signal_type', '_ime_cache').eq('signal_date_shamsi', date)
+    const { error } = await sb().from('signals').insert({
+      signal_type:        '_ime_cache',
+      signal_date_shamsi: date,
+      market_value:       0,
+      note:               JSON.stringify({ raw }),
+    })
+    if (error) console.error('[sync-ime] خطا در ذخیره:', error.message)
+    else       console.log('[sync-ime] ✅ قیمت بورس کالا ذخیره شد')
+  } catch (e) {
+    console.warn('[sync-ime] ⚠️ ناموفق:', e.message)
+  }
+}
+
 // ── gold price sync ───────────────────────────────────────────────────────────
 async function syncGoldPrices(date) {
   console.log('[sync-gold] دریافت قیمت طلا، ارز و کامودیتی...')
@@ -286,6 +319,14 @@ async function fetchJson(url, retries = 3) {
 async function main() {
   const ts = new Date().toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })
   console.log(`\n[${ts}] sync-funds شروع شد`)
+
+  // حالت probe-ime — فقط ساختار Certificate API نمایش داده می‌شود
+  if (PROBE_IME) {
+    console.log('\n═══ IME Certificate API (probe-ime mode) ═══')
+    const raw = await fetchJson(IME_CERT_URL, 2)
+    console.log(JSON.stringify(Array.isArray(raw) ? raw.slice(0, 3) : raw, null, 2))
+    return
+  }
 
   // بررسی ساعت بازار
   if (!FORCE && !PROBE && !isMarketOpen()) {
@@ -411,10 +452,11 @@ async function main() {
     else        console.log(`[sync-funds] ✅ مجموع طلا: ${totalBT} میلیارد تومان → dashboard`)
   }
 
-  // ── قیمت طلا، ارز و NAV صندوق‌ها ─────────────────────────────────────────
+  // ── قیمت طلا، ارز، NAV صندوق‌ها و بورس کالا ─────────────────────────────
   await Promise.all([
     syncGoldPrices(date),
     syncNavPrices(date),
+    syncImePrices(date),
   ])
 }
 
