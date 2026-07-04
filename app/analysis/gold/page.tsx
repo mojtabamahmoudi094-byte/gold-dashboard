@@ -309,7 +309,7 @@ export default function GoldAnalysisPage() {
               <thead>
                 <tr style={{ borderBottom: `0.5px solid ${border}` }}>
                   <th style={{ textAlign: 'right', padding: '8px 12px', color: muted, fontWeight: 500 }}>شاخص</th>
-                  <th style={{ textAlign: 'left', padding: '8px 12px', color: muted, fontWeight: 500, fontFamily: 'system-ui' }}>قیمت (تومان)</th>
+                  <th style={{ textAlign: 'left', padding: '8px 12px', color: muted, fontWeight: 500, fontFamily: 'system-ui' }}>قیمت (میلیون تومان)</th>
                   <th style={{ textAlign: 'right', padding: '8px 12px', color: muted, fontWeight: 500, fontSize: 10 }}>توضیح</th>
                 </tr>
               </thead>
@@ -340,7 +340,7 @@ export default function GoldAnalysisPage() {
                     <td style={{ padding: '10px 12px', color: text }}>{row.label}</td>
                     <td style={{ padding: '10px 12px', fontFamily: 'system-ui', textAlign: 'left' }}>
                       {row.value != null
-                        ? <span style={{ color: accent, fontWeight: 700 }}>{Math.round(row.value).toLocaleString('fa-IR')}</span>
+                        ? <span style={{ color: accent, fontWeight: 700 }}>{(row.value / 1_000_000).toLocaleString('fa-IR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
                         : <span style={{ color: muted }}>—</span>
                       }
                     </td>
