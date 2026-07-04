@@ -605,24 +605,36 @@ const FUND_WEIGHTS: Record<string, { coin: number; bar: number; liq: number }> =
 function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   const [fundsData, setFundsData] = useState<Record<string, number | null>>({})
   const [dollarRate, setDollarRate] = useState<number | null>(null)
+  const [navData, setNavData] = useState<Record<string, number | null>>({})
+  const [priceCloseMap, setPriceCloseMap] = useState<Record<string, { price: number; isRial: boolean }>>({})
   const [fundsLoading, setFundsLoading] = useState(true)
 
   const loadData = () => {
     Promise.all([
       fetch('/api/funds').then(r => r.json()),
       fetch('/api/gold-analysis').then(r => r.json()),
-    ]).then(([fd, gd]) => {
+      fetch('/api/gold-nav').then(r => r.json()),
+    ]).then(([fd, gd, nd]) => {
       const assets: any[] = fd.assets ?? []
       const records: any[] = fd.records ?? []
       const recById: Record<number, any> = {}
       for (const rec of records) recById[rec.asset_id] = rec
       const map: Record<string, number | null> = {}
+      const pcMap: Record<string, { price: number; isRial: boolean }> = {}
       for (const a of assets) {
         const rec = recById[a.id]
         map[a.name] = rec?.market_value ?? null
+        if (rec) {
+          pcMap[a.name] = {
+            price: rec.price_close ?? 0,
+            isRial: (rec.trade_value ?? 0) > 1e6,
+          }
+        }
       }
       setFundsData(map)
+      setPriceCloseMap(pcMap)
       setDollarRate(gd?.inputs?.dollarT ?? null)
+      setNavData(nd?.navs ?? {})
     }).catch(e => console.error('[GoldFundsMatrix] fetch failed:', e))
       .finally(() => setFundsLoading(false))
   }
@@ -659,9 +671,23 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     return { display, full }
   }
 
+  const getBubbleAsmi = (name: string): { display: string; full: string } => {
+    if (fundsLoading) return { display: '...', full: '' }
+    const nav = navData[name]
+    const pc = priceCloseMap[name]
+    if (!nav || !pc || !pc.price) return { display: '—', full: '' }
+    const priceToman = pc.isRial ? pc.price / 10 : pc.price
+    const bubble = (nav - priceToman) / nav * 100
+    const sign = bubble >= 0 ? '+' : ''
+    const display = sign + bubble.toFixed(1) + '٪'
+    const full = `NAV ابطال: ${nav.toLocaleString('fa-IR')} | قیمت پایانی: ${Math.round(priceToman).toLocaleString('fa-IR')} تومان`
+    return { display, full }
+  }
+
   const getCellValue = (colKey: string, name: string): { display: string; full: string } => {
     if (colKey === 'marketToman') return getMv(name)
     if (colKey === 'marketUsd') return getUsd(name)
+    if (colKey === 'bubbleAsmi') return getBubbleAsmi(name)
     const w = FUND_WEIGHTS[name]
     if (colKey === 'coinWeight')    return w ? { display: w.coin.toFixed(1) + '٪', full: '' } : { display: '—', full: '' }
     if (colKey === 'goldBarWeight') return w ? { display: w.bar.toFixed(1)  + '٪', full: '' } : { display: '—', full: '' }
