@@ -72,7 +72,8 @@ export default function FundsCatPage() {
           sellIVolume: safe(rec?.sell_i_volume),
           date: rec?.trade_date_shamsi || '',
         }
-      }).filter((f: any) => f.tradeValue > 0)
+      // صندوق‌های بورسی فعلاً فقط NAV دارند (trade_value=0) — با قیمت هم قبول
+      }).filter((f: any) => f.tradeValue > 0 || f.priceClose > 0 || f.priceLast > 0)
 
       setAllFunds(combined)
 

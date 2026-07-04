@@ -219,7 +219,7 @@ async function main() {
     if (insErr) console.error(`[sync-bourse] خطا در batch ${i / BATCH + 1}:`, insErr.message)
     else inserted += batch.length
   }
-  console.log(`[sync-bourse] ✅ ${inserted}/${rows.length} رکورد ذخیره شد (تاریخ: ${date})`)
+  console.log(`[sync-bourse] ✅ ${inserted}/${rows.length} رکورد ذخیره شد (تاریخ داده: ${dates.join(', ')})`)
 }
 
 main().catch(e => { console.error(e); process.exit(1) })

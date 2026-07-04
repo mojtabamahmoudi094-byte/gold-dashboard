@@ -9,31 +9,36 @@ const sb = createClient(
 )
 
 export async function GET() {
-  const [assetsRes, latestRes] = await Promise.all([
+  const [assetsRes, recentRes] = await Promise.all([
     sb.from('assets').select('id, name, slug, category').neq('slug', 'gold').order('id', { ascending: true }),
-    sb.from('gold_funds').select('trade_date_shamsi').order('id', { ascending: false }).limit(1),
+    sb.from('gold_funds').select('*').order('id', { ascending: false }).limit(1500),
   ])
 
   const assets = assetsRes.data ?? []
-  const latestDate = latestRes.data?.[0]?.trade_date_shamsi ?? null
+  const recent = recentRes.data ?? []
 
-  if (!latestDate) {
+  if (recent.length === 0) {
     return NextResponse.json({ assets, records: [], histRows: [], latestDate: null })
   }
 
-  const [recordsRes, histRes] = await Promise.all([
-    sb.from('gold_funds').select('*').eq('trade_date_shamsi', latestDate),
-    sb.from('gold_funds')
-      .select('trade_date_shamsi, asset_id, buy_i_volume, sell_i_volume, price_close')
-      .neq('trade_date_shamsi', latestDate)
-      .order('id', { ascending: false })
-      .limit(300),
-  ])
+  // آخرین رکورد هر دارایی — تاریخ صندوق‌های بورسی (NAV) با کالایی یکی نیست،
+  // پس «آخرین تاریخ سراسری» همه را نمی‌پوشاند
+  const seen = new Set<number>()
+  const records: typeof recent = []
+  const histRows: typeof recent = []
+  for (const r of recent) {
+    if (seen.has(r.asset_id)) {
+      histRows.push(r)
+    } else {
+      seen.add(r.asset_id)
+      records.push(r)
+    }
+  }
 
-  return NextResponse.json({
-    assets,
-    records: recordsRes.data ?? [],
-    histRows:  histRes.data  ?? [],
-    latestDate,
-  })
+  const latestDate = records.reduce(
+    (max, r) => (r.trade_date_shamsi > max ? r.trade_date_shamsi : max),
+    records[0].trade_date_shamsi
+  )
+
+  return NextResponse.json({ assets, records, histRows, latestDate })
 }
