@@ -314,53 +314,48 @@ export default function GoldAnalysisPage() {
                 </tr>
               </thead>
               <tbody>
-                {([
-                  {
-                    label: 'قیمت واقعی شمش طلا',
-                    value: data?.ime?.fairBullion ?? null,
-                    note: 'انس × دلار درهم × ۱۰۰۰گرم × عیار ۹۹۵',
-                    divisor: 1_000_000_000,
-                    unit: 'میلیارد تومان',
-                  },
-                  {
-                    label: 'قیمت تابلو نقدی شمش طلا',
-                    value: data?.ime?.goldBarT ?? null,
-                    note: 'قیمت پایانی GoldBar — بورس کالا',
-                    divisor: 1_000_000_000,
-                    unit: 'میلیارد تومان',
-                  },
-                  {
-                    label: 'قیمت واقعی گواهی سکه',
-                    value: data?.ime?.fairCoinCert ?? null,
-                    note: 'انس × دلار درهم × ۸.۱۳گرم × عیار ۲۲',
-                    divisor: 1_000_000,
-                    unit: 'میلیون تومان',
-                  },
-                  {
-                    label: 'قیمت تابلو نقدی گواهی سکه',
-                    value: data?.ime?.goldCoinT ?? null,
-                    note: 'قیمت پایانی GoldCoin — بورس کالا',
-                    divisor: 1_000_000,
-                    unit: 'میلیون تومان',
-                  },
-                ] as { label: string; value: number | null; note: string; divisor: number; unit: string }[]).map((row, i, arr) => (
-                  <tr key={row.label} style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${border}` : 'none' }}>
-                    <td style={{ padding: '10px 12px', color: text }}>{row.label}</td>
-                    <td style={{ padding: '10px 12px', fontFamily: 'system-ui', textAlign: 'left' }}>
-                      {row.value != null ? (
-                        <span>
-                          <span style={{ color: accent, fontWeight: 700 }}>
-                            {(row.value / row.divisor).toLocaleString('fa-IR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                          <span style={{ color: muted, fontSize: 10, marginRight: 6 }}>{row.unit}</span>
-                        </span>
-                      ) : (
-                        <span style={{ color: muted }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: muted, fontSize: 10 }}>{row.note}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const fairBullionK = data?.ime?.fairBullion != null ? data.ime.fairBullion / 1000 : null
+                  const tabloBullionK = data?.ime?.goldBarT != null ? data.ime.goldBarT * 10 : null
+                  const fairCoinK = data?.ime?.fairCoinCert != null ? data.ime.fairCoinCert / 1000 : null
+                  const tabloCoinK = data?.ime?.goldCoinT != null ? data.ime.goldCoinT / 1000 : null
+                  const bubbleBullion = fairBullionK != null && tabloBullionK != null
+                    ? ((tabloBullionK - fairBullionK) / fairBullionK) * 100 : null
+                  const bubbleCoin = fairCoinK != null && tabloCoinK != null
+                    ? ((tabloCoinK - fairCoinK) / fairCoinK) * 100 : null
+                  const rows: { label: string; value: number | null; note: string; isBubble?: boolean }[] = [
+                    { label: 'قیمت واقعی شمش طلا', value: fairBullionK, note: 'انس × دلار درهم × ۱۰۰۰گرم × عیار ۹۹۵' },
+                    { label: 'قیمت تابلو نقدی شمش طلا', value: tabloBullionK, note: 'قیمت پایانی GoldBar — بورس کالا' },
+                    { label: 'حباب شمش طلا', value: bubbleBullion, note: '(تابلو − واقعی) ÷ واقعی × ۱۰۰', isBubble: true },
+                    { label: 'قیمت واقعی گواهی سکه', value: fairCoinK, note: 'انس × دلار درهم × ۸.۱۳گرم × عیار ۲۲' },
+                    { label: 'قیمت تابلو نقدی گواهی سکه', value: tabloCoinK, note: 'قیمت پایانی GoldCoin — بورس کالا' },
+                    { label: 'حباب گواهی سکه', value: bubbleCoin, note: '(تابلو − واقعی) ÷ واقعی × ۱۰۰', isBubble: true },
+                  ]
+                  return rows.map((row, i, arr) => (
+                    <tr key={row.label} style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${border}` : 'none' }}>
+                      <td style={{ padding: '10px 12px', color: text }}>{row.label}</td>
+                      <td style={{ padding: '10px 12px', fontFamily: 'system-ui', textAlign: 'left' }}>
+                        {row.value != null ? (
+                          row.isBubble ? (
+                            <span style={{ color: row.value > 0 ? '#F87171' : '#4ADE80', fontWeight: 700 }}>
+                              {row.value.toLocaleString('fa-IR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}٪
+                            </span>
+                          ) : (
+                            <span>
+                              <span style={{ color: accent, fontWeight: 700 }}>
+                                {Math.round(row.value).toLocaleString('fa-IR')}
+                              </span>
+                              <span style={{ color: muted, fontSize: 10, marginRight: 6 }}>هزار تومان</span>
+                            </span>
+                          )
+                        ) : (
+                          <span style={{ color: muted }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: muted, fontSize: 10 }}>{row.note}</td>
+                    </tr>
+                  ))
+                })()}
               </tbody>
             </table>
           </div>
