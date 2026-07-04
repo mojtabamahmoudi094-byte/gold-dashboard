@@ -12,7 +12,8 @@ import { safe, fmtNum as fmtVal } from '../../../lib/format'
 
 export default function FundDetailPage() {
   const params = useParams()
-  const slug = params?.slug as string
+  // slug فارسی (صندوق‌های بورسی) در URL انکد می‌شود — بدون decode در DB پیدا نمی‌شود
+  const slug = decodeURIComponent((params?.slug as string) || '')
 
   const [isDark, setIsDark] = useState(true)
   const [asset, setAsset] = useState<any>(null)
@@ -57,10 +58,12 @@ export default function FundDetailPage() {
       setAsset(assetData)
 
       // گرفتن تاریخچه‌ی داده‌ها
+      // مرتب‌سازی بر اساس تاریخ نه id — رکوردهای backfill تاریخی id بزرگ‌تری دارند
       const { data: records } = await supabase
         .from('gold_funds')
         .select('*')
         .eq('asset_id', assetData.id)
+        .order('trade_date_shamsi', { ascending: false })
         .order('id', { ascending: false })
         .limit(30)
       if (records && records.length > 0) {
