@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
 
 const GRAMS_PER_OZ = 31.103431
 
@@ -116,14 +117,24 @@ export default function SilverAnalysisPage() {
   const silverBubble = silverBarT != null && fairSilverGram
     ? ((silverBarT - fairSilverGram) / fairSilverGram) * 100 : null
 
-  // حباب واقعی صندوق = حباب اسمی + حباب شمش نقره (فرض: دارایی صندوق تماماً شمش نقره)
-  const bubbleVaqei = (f: SilverFund): number | null =>
-    f.bubbleAsmi != null && silverBubble != null ? f.bubbleAsmi + silverBubble : null
+  // حباب ذاتی صندوق = وزن گواهی نقره × حباب شمش نقره
+  const bubbleZati = (f: SilverFund): number | null => {
+    const w = SILVER_FUND_WEIGHTS[f.name]
+    if (!w || silverBubble == null) return null
+    return (w.silver / 100) * silverBubble
+  }
+  // حباب واقعی = حباب اسمی + حباب ذاتی
+  const bubbleVaqei = (f: SilverFund): number | null => {
+    const zati = bubbleZati(f)
+    return f.bubbleAsmi != null && zati != null ? f.bubbleAsmi + zati : null
+  }
 
   const bubbles = funds.map(f => f.bubbleAsmi).filter((b): b is number => b != null)
   const avgBubble = bubbles.length ? bubbles.reduce((s, b) => s + b, 0) / bubbles.length : null
   const vaqeis = funds.map(bubbleVaqei).filter((b): b is number => b != null)
   const avgVaqei = vaqeis.length ? vaqeis.reduce((s, b) => s + b, 0) / vaqeis.length : null
+  const zatis = funds.map(bubbleZati).filter((b): b is number => b != null)
+  const avgZati = zatis.length ? zatis.reduce((s, b) => s + b, 0) / zatis.length : null
   const totalMarketBT = funds.reduce((s, f) => s + (f.market_value || 0), 0) / 10_000_000_000
   const totalNetFlow = funds.reduce((s, f) => s + ((f.buy_i_volume || 0) - (f.sell_i_volume || 0)), 0)
 
@@ -240,13 +251,13 @@ export default function SilverAnalysisPage() {
                 {loading ? 'در حال بارگذاری...' : `${funds.length.toLocaleString('fa-IR')} صندوق با داده`}
               </span>
             </div>
-            <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>قیمت پایانی vs NAV ابطال — حباب اسمی هر صندوق</div>
+            <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>حباب اسمی (قیمت vs NAV) + حباب ذاتی (وزن گواهی نقره × حباب شمش) = حباب واقعی</div>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
-                  {['نام صندوق', 'ارزش بازار', 'قیمت پایانی', 'NAV ابطال', 'حباب اسمی', 'حباب واقعی', 'تغییر روزانه', 'جریان پول حقیقی', 'ارزش معاملات'].map(h => (
+                  {['نام صندوق', 'ارزش بازار', 'قیمت پایانی', 'NAV ابطال', 'حباب اسمی', 'حباب ذاتی', 'حباب واقعی', 'وزن گواهی نقره', 'تغییر روزانه', 'جریان پول حقیقی', 'ارزش معاملات'].map(h => (
                     <th key={h} style={{
                       padding: '10px 16px', color: muted, fontWeight: 500, textAlign: 'right',
                       borderBottom: `0.5px solid ${border}`, whiteSpace: 'nowrap',
@@ -261,8 +272,11 @@ export default function SilverAnalysisPage() {
                   const mvBT = f.market_value != null ? f.market_value / 10_000_000_000 : null
                   const tvBT = f.trade_value != null ? f.trade_value / 10_000_000_000 : null
                   const bc = f.bubbleAsmi == null ? muted : f.bubbleAsmi > 2 ? red : f.bubbleAsmi < 0 ? green : '#F59E0B'
+                  const bz = bubbleZati(f)
+                  const bzc = bz == null ? muted : bz > 0 ? red : green
                   const bv = bubbleVaqei(f)
                   const bvc = bv == null ? muted : bv > 0 ? red : green
+                  const w = SILVER_FUND_WEIGHTS[f.name]
                   return (
                     <tr key={f.asset_id} className="srow" style={{ borderBottom: `0.5px solid ${border}` }}>
                       <td style={{ padding: '10px 16px', color: text, fontWeight: 600, whiteSpace: 'nowrap' }}>{f.name}</td>
@@ -285,7 +299,15 @@ export default function SilverAnalysisPage() {
                         ) : <span style={{ color: muted }}>—</span>}
                       </td>
                       <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}
-                        title={bv != null ? `حباب اسمی ${f.bubbleAsmi!.toFixed(1)}٪ + حباب شمش نقره ${silverBubble!.toFixed(1)}٪` : undefined}>
+                        title={bz != null ? `گواهی نقره ${w!.silver}٪ × حباب شمش نقره ${silverBubble!.toFixed(1)}٪` : undefined}>
+                        {bz != null ? (
+                          <span style={{ color: bzc, fontWeight: 600, fontFamily: 'system-ui', fontSize: 11, cursor: 'help' }}>
+                            {fmtPct(bz)}
+                          </span>
+                        ) : <span style={{ color: muted }}>—</span>}
+                      </td>
+                      <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}
+                        title={bv != null ? `حباب اسمی ${f.bubbleAsmi!.toFixed(1)}٪ + حباب ذاتی ${bz!.toFixed(1)}٪` : undefined}>
                         {bv != null ? (
                           <span style={{
                             display: 'inline-block', fontSize: 11, fontWeight: 700, color: bvc,
@@ -293,6 +315,9 @@ export default function SilverAnalysisPage() {
                             borderRadius: 6, padding: '2px 10px', fontFamily: 'system-ui', cursor: 'help',
                           }}>{fmtPct(bv)}</span>
                         ) : <span style={{ color: muted }}>—</span>}
+                      </td>
+                      <td style={{ padding: '10px 16px', color: muted, fontFamily: 'system-ui', whiteSpace: 'nowrap' }}>
+                        {w ? `${w.silver.toLocaleString('fa-IR')}٪` : '—'}
                       </td>
                       <td style={{ padding: '10px 16px', fontFamily: 'system-ui', whiteSpace: 'nowrap',
                         color: (f.price_change_pct ?? 0) >= 0 ? green : red, fontWeight: 600 }}>
@@ -309,7 +334,7 @@ export default function SilverAnalysisPage() {
                   )
                 })}
                 {!loading && funds.length === 0 && (
-                  <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: muted, fontSize: 12 }}>
+                  <tr><td colSpan={11} style={{ padding: 24, textAlign: 'center', color: muted, fontSize: 12 }}>
                     داده صندوق نقره موجود نیست
                   </td></tr>
                 )}
@@ -326,6 +351,11 @@ export default function SilverAnalysisPage() {
                   label: 'میانگین حباب اسمی صندوق‌ها',
                   value: avgBubble != null ? fmtPct(avgBubble) : '—',
                   color: avgBubble == null ? muted : avgBubble > 0 ? red : green,
+                },
+                {
+                  label: 'میانگین حباب ذاتی صندوق‌ها',
+                  value: avgZati != null ? fmtPct(avgZati) : '—',
+                  color: avgZati == null ? muted : avgZati > 0 ? red : green,
                 },
                 {
                   label: 'میانگین حباب واقعی صندوق‌ها',

@@ -35,6 +35,17 @@ export const FUND_WEIGHTS: Record<string, { coin: number; bar: number; liq: numb
   'قیراط':     { coin: 0.0,  bar: 97.0,  liq: 3.0  },
 }
 
+// وزن گواهی نقره در ترکیب دارایی صندوق‌های نقره (٪) — مابقی: سایر دارایی‌ها
+export const SILVER_FUND_WEIGHTS: Record<string, { silver: number; other: number }> = {
+  'نقرسا':  { silver: 0,   other: 100 },
+  'نقرین':  { silver: 25,  other: 75  },
+  'نقرفام': { silver: 99,  other: 1   },
+  'نقران':  { silver: 99,  other: 1   },
+  'سیمین':  { silver: 100, other: 0   },
+  'نقرابی': { silver: 100, other: 0   },
+  'سیلور':  { silver: 99,  other: 1   },
+}
+
 export interface MarketBubbles {
   bullion: number | null // حباب شمش بورس کالا (٪)
   coin: number | null    // حباب گواهی سکه بورس کالا (٪)
