@@ -102,30 +102,27 @@ function navUrl(name) {
 }
 
 // ── Field mapper ─────────────────────────────────────────────────────────────
-// کلیدها طبق راهنمای رسمی وب‌سرویس بورس Tsetmc (BrsAPI):
-//   قیمت:    pl=آخرین، pc=پایانی، pcp=درصد تغییر پایانی، pf=اولین، py=دیروز
-//   معاملات: tno=تعداد، tvol=حجم، tval=ارزش، mv=ارزش بازار، bvol=حجم مبنا
-//   حقیقی/حقوقی: Buy_I_Volume، Sell_I_Volume، Buy_CountI، Sell_CountI
-//   NAV صندوق: psubtran=NAV صدور، predtran=NAV ابطال
+// Nav.php فقط NAV می‌دهد: psubtran=NAV صدور، predtran=NAV ابطال + date/time
+// موقت: NAV در ستون‌های قیمت ذخیره می‌شود تا endpoint قیمت لحظه‌ای اضافه شود
+//   price_close ← predtran (NAV ابطال)   price_last ← psubtran (NAV صدور)
 function num(v) {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
   return isNaN(x) ? null : x
 }
 
+// تاریخ پاسخ API به شکل «1405-04-10» → «1405/04/10» (فرمت جدول)
+function itemDate(item, fallback) {
+  const m = String(item.date ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  return m ? `${m[1]}/${m[2]}/${m[3]}` : fallback
+}
+
 function mapRow(item, assetId, shamsiDate) {
   return {
     asset_id:          assetId,
-    trade_date_shamsi: shamsiDate,
-    price_close:       num(item.pc),
-    price_last:        num(item.pl),
-    price_change_pct:  num(item.pcp),
-    trade_value:       num(item.tval) ?? 0, // NOT NULL column
-    volume:            num(item.tvol),
-    market_value:      num(item.mv),
-    buy_i_volume:      num(item.Buy_I_Volume),
-    sell_i_volume:     num(item.Sell_I_Volume),
-    buy_count_i:       num(item.Buy_CountI),
-    sell_count_i:      num(item.Sell_CountI),
+    trade_date_shamsi: itemDate(item, shamsiDate),
+    price_close:       num(item.predtran),
+    price_last:        num(item.psubtran),
+    trade_value:       0, // NOT NULL column — Nav.php ارزش معاملات ندارد
   }
 }
 
@@ -201,14 +198,18 @@ async function main() {
     process.exit(1)
   }
 
-  // حذف رکوردهای امروزِ همین صندوق‌ها و درج دوباره
-  const assetIds = rows.map(r => r.asset_id)
-  const { error: delErr } = await sb
-    .from('gold_funds')
-    .delete()
-    .eq('trade_date_shamsi', date)
-    .in('asset_id', assetIds)
-  if (delErr) console.warn('[sync-bourse] خطا در حذف رکوردهای قبلی:', delErr.message)
+  // حذف رکوردهای همان تاریخ برای همین صندوق‌ها و درج دوباره
+  // (تاریخ از پاسخ API می‌آید و ممکن است بین صندوق‌ها متفاوت باشد)
+  const dates = [...new Set(rows.map(r => r.trade_date_shamsi))]
+  for (const d of dates) {
+    const ids = rows.filter(r => r.trade_date_shamsi === d).map(r => r.asset_id)
+    const { error: delErr } = await sb
+      .from('gold_funds')
+      .delete()
+      .eq('trade_date_shamsi', d)
+      .in('asset_id', ids)
+    if (delErr) console.warn(`[sync-bourse] خطا در حذف رکوردهای قبلی (${d}):`, delErr.message)
+  }
 
   const BATCH = 50
   let inserted = 0
