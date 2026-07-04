@@ -309,7 +309,7 @@ export default function GoldAnalysisPage() {
               <thead>
                 <tr style={{ borderBottom: `0.5px solid ${border}` }}>
                   <th style={{ textAlign: 'right', padding: '8px 12px', color: muted, fontWeight: 500 }}>شاخص</th>
-                  <th style={{ textAlign: 'left', padding: '8px 12px', color: muted, fontWeight: 500, fontFamily: 'system-ui' }}>قیمت (میلیون تومان)</th>
+                  <th style={{ textAlign: 'left', padding: '8px 12px', color: muted, fontWeight: 500, fontFamily: 'system-ui' }}>قیمت</th>
                   <th style={{ textAlign: 'right', padding: '8px 12px', color: muted, fontWeight: 500, fontSize: 10 }}>توضیح</th>
                 </tr>
               </thead>
@@ -319,30 +319,44 @@ export default function GoldAnalysisPage() {
                     label: 'قیمت واقعی شمش طلا',
                     value: data?.ime?.fairBullion ?? null,
                     note: 'انس × دلار درهم × ۱۰۰۰گرم × عیار ۹۹۵',
+                    divisor: 1_000_000_000,
+                    unit: 'میلیارد تومان',
                   },
                   {
                     label: 'قیمت تابلو نقدی شمش طلا',
                     value: data?.ime?.goldBarT ?? null,
                     note: 'قیمت پایانی GoldBar — بورس کالا',
+                    divisor: 1_000_000_000,
+                    unit: 'میلیارد تومان',
                   },
                   {
                     label: 'قیمت واقعی گواهی سکه',
                     value: data?.ime?.fairCoinCert ?? null,
                     note: 'انس × دلار درهم × ۸.۱۳گرم × عیار ۲۲',
+                    divisor: 1_000_000,
+                    unit: 'میلیون تومان',
                   },
                   {
                     label: 'قیمت تابلو نقدی گواهی سکه',
                     value: data?.ime?.goldCoinT ?? null,
                     note: 'قیمت پایانی GoldCoin — بورس کالا',
+                    divisor: 1_000_000,
+                    unit: 'میلیون تومان',
                   },
-                ] as { label: string; value: number | null; note: string }[]).map((row, i, arr) => (
+                ] as { label: string; value: number | null; note: string; divisor: number; unit: string }[]).map((row, i, arr) => (
                   <tr key={row.label} style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${border}` : 'none' }}>
                     <td style={{ padding: '10px 12px', color: text }}>{row.label}</td>
                     <td style={{ padding: '10px 12px', fontFamily: 'system-ui', textAlign: 'left' }}>
-                      {row.value != null
-                        ? <span style={{ color: accent, fontWeight: 700 }}>{(row.value / 1_000_000).toLocaleString('fa-IR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
-                        : <span style={{ color: muted }}>—</span>
-                      }
+                      {row.value != null ? (
+                        <span>
+                          <span style={{ color: accent, fontWeight: 700 }}>
+                            {(row.value / row.divisor).toLocaleString('fa-IR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span style={{ color: muted, fontSize: 10, marginRight: 6 }}>{row.unit}</span>
+                        </span>
+                      ) : (
+                        <span style={{ color: muted }}>—</span>
+                      )}
                     </td>
                     <td style={{ padding: '10px 12px', color: muted, fontSize: 10 }}>{row.note}</td>
                   </tr>
