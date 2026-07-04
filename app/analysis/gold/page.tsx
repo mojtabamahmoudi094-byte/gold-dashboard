@@ -676,11 +676,11 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     const nav = navData[name]
     const pc = priceCloseMap[name]
     if (!nav || !pc || !pc.price) return { display: '—', full: '' }
-    const priceToman = pc.isRial ? pc.price / 10 : pc.price
-    const bubble = (priceToman - nav) / nav * 100
+    const priceRial = pc.price
+    const bubble = (priceRial - nav) / nav * 100
     const sign = bubble >= 0 ? '+' : ''
     const display = sign + bubble.toFixed(1) + '٪'
-    const full = `NAV ابطال: ${nav.toLocaleString('fa-IR')} | قیمت پایانی: ${Math.round(priceToman).toLocaleString('fa-IR')} تومان`
+    const full = `NAV ابطال: ${Math.round(nav / 10).toLocaleString('fa-IR')} تومان | قیمت پایانی: ${Math.round(priceRial / 10).toLocaleString('fa-IR')} تومان`
     return { display, full }
   }
 
