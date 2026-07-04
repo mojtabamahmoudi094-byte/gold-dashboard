@@ -2,13 +2,13 @@
 /**
  * sync-bourse.js
  *
- * بورس سنج — بروزرسانی صندوق‌های بورسی (اهرمی/بخشی/سهامی) از BrsAPI Symbol.php
- * (دیتای جامع نماد Tsetmc: قیمت، حجم، ارزش، حقیقی/حقوقی)
+ * بورس سنج — بروزرسانی صندوق‌های بورسی (اهرمی/بخشی/سهامی) از BrsAPI AllSymbols.php
+ * (دیتای جامع همه نمادها در یک درخواست: قیمت، حجم، ارزش، حقیقی/حقوقی)
  * روی سرور ایرانی اجرا شود (نیاز به IP ایران)
  *
  * راه‌اندازی:
  *   1. اول یک بار seed-bourse-assets.js را اجرا کنید تا نمادها در assets ثبت شوند
- *   2. با --probe اجرا کنید تا فرمت پاسخ Symbol.php را ببینید:
+ *   2. با --probe اجرا کنید تا فرمت پاسخ AllSymbols.php را ببینید:
  *      node scripts/sync-bourse.js --probe
  *   3. crontab -e و مشابه sync-funds.js زمان‌بندی کنید (بازار بورس: ۹:۰۰–۱۵:۰۵)
  *
@@ -98,8 +98,16 @@ async function fetchJson(url, retries = 2) {
   }
 }
 
-function symbolUrl(name) {
-  return `https://Api.BrsApi.ir/Tsetmc/Symbol.php?key=${BRSAPI_KEY}&l18=${encodeURIComponent(name)}`
+// همه نمادها در یک درخواست — به‌جای ۱۴۲ درخواست جداگانه Symbol.php
+const ALL_SYMBOLS_URL = `https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${BRSAPI_KEY}`
+
+// نرمال‌سازی نام نماد برای تطبیق (ي/ك عربی → ی/ک فارسی، فاصله‌های تکراری)
+function normName(s) {
+  return String(s ?? '')
+    .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
+    .replace(/‌/g, ' ')   // نیم‌فاصله → فاصله
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 // ── Field mapper ─────────────────────────────────────────────────────────────
@@ -136,29 +144,27 @@ function mapRow(item, assetId, shamsiDate) {
   }
 }
 
-// ── اجرای موازی محدود (رعایت rate limit) ─────────────────────────────────────
-async function mapLimit(items, limit, fn) {
-  const out = []
-  let idx = 0
-  async function worker() {
-    while (idx < items.length) {
-      const i = idx++
-      out[i] = await fn(items[i])
-    }
+// دریافت همه نمادها و ساخت نگاشت نام نرمال‌شده → آیتم
+async function fetchAllSymbols() {
+  const data = await fetchJson(ALL_SYMBOLS_URL)
+  const arr = Array.isArray(data) ? data : (data?.data ?? data?.symbols ?? [])
+  if (!Array.isArray(arr)) throw new Error('فرمت پاسخ AllSymbols آرایه نیست')
+  const byName = new Map()
+  for (const it of arr) {
+    const key = normName(it?.l18)
+    if (key && !byName.has(key)) byName.set(key, it)
   }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
-  return out
+  return { arr, byName }
 }
 
 async function main() {
   if (PROBE) {
-    const name = ALL_NAMES[0]
-    console.log(`═══ RAW Symbol.php RESPONSE برای «${name}» ═══`)
-    const data = await fetchJson(symbolUrl(name))
-    console.log(JSON.stringify(data, null, 2))
-    console.log('\n═══ کلیدها ═══')
-    console.log(Object.keys(data || {}).join(', '))
-    console.log('\n✅ اگر نام کلیدها با FIELD نمی‌خواند، pick()ها را تنظیم کنید')
+    console.log('═══ RAW AllSymbols.php RESPONSE (آیتم اول + نمونه صندوق) ═══')
+    const { arr, byName } = await fetchAllSymbols()
+    console.log(`تعداد کل نمادها: ${arr.length}`)
+    console.log('کلیدهای آیتم اول:', Object.keys(arr[0] || {}).join(', '))
+    const sample = byName.get(normName('اهرم'))
+    console.log('نمونه «اهرم»:', JSON.stringify(sample, null, 2))
     return
   }
 
@@ -178,28 +184,22 @@ async function main() {
     process.exit(1)
   }
 
-  const idMap = {}
-  assets.forEach(a => { idMap[a.name] = a.id })
-
   const date = todayShamsi()
   console.log(`[sync-bourse] ${assets.length} صندوق، تاریخ: ${date}`)
 
-  const results = await mapLimit(assets, 4, async a => {
-    try {
-      const data = await fetchJson(symbolUrl(a.name))
-      const item = Array.isArray(data) ? data[0] : (data?.data?.[0] ?? data)
-      if (!item || typeof item !== 'object') return { name: a.name, row: null }
-      const row = mapRow(item, a.id, date)
-      // رکورد بدون هیچ قیمتی بی‌ارزش است
-      if (row.price_close === null && row.price_last === null) return { name: a.name, row: null }
-      return { name: a.name, row }
-    } catch (e) {
-      return { name: a.name, row: null, err: e.message }
-    }
-  })
+  const { byName } = await fetchAllSymbols()
+  console.log(`[sync-bourse] ${byName.size} نماد از AllSymbols دریافت شد`)
 
-  const rows = results.filter(r => r.row).map(r => r.row)
-  const failed = results.filter(r => !r.row).map(r => r.name)
+  const rows = []
+  const failed = []
+  for (const a of assets) {
+    const item = byName.get(normName(a.name))
+    if (!item) { failed.push(a.name); continue }
+    const row = mapRow(item, a.id, date)
+    // رکورد بدون هیچ قیمتی بی‌ارزش است
+    if (row.price_close === null && row.price_last === null) { failed.push(a.name); continue }
+    rows.push(row)
+  }
   if (failed.length > 0) {
     console.warn(`[sync-bourse] ${failed.length} نماد بدون داده:`, failed.slice(0, 10).join(', '))
   }
