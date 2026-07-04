@@ -92,6 +92,49 @@ const CAT_MAP: Record<string, {
       </svg>
     ),
   },
+  leveraged: {
+    category: 'اهرمی',
+    aggregateSlug: null,
+    label: 'ارزش کل معاملات صندوق‌های اهرمی',
+    color: 'oklch(0.72 0.19 25)',
+    iconBg: 'oklch(0.72 0.19 25 / 0.18)',
+    borderColor: 'oklch(0.72 0.19 25 / 0.3)',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="oklch(0.72 0.19 25)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
+      </svg>
+    ),
+  },
+  sector: {
+    category: 'بخشی',
+    aggregateSlug: null,
+    label: 'ارزش کل معاملات صندوق‌های بخشی',
+    color: 'oklch(0.76 0.14 210)',
+    iconBg: 'oklch(0.76 0.14 210 / 0.18)',
+    borderColor: 'oklch(0.76 0.14 210 / 0.3)',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="oklch(0.76 0.14 210)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 3v9l6.5 6.2" />
+        <path d="M12 12 4 8" />
+      </svg>
+    ),
+  },
+  equity: {
+    category: 'سهامی',
+    aggregateSlug: null,
+    label: 'ارزش کل معاملات صندوق‌های سهامی',
+    color: 'oklch(0.78 0.13 300)',
+    iconBg: 'oklch(0.78 0.13 300 / 0.18)',
+    borderColor: 'oklch(0.78 0.13 300 / 0.3)',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="oklch(0.78 0.13 300)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="12" width="4" height="9" rx="1" />
+        <rect x="10" y="7" width="4" height="14" rx="1" />
+        <rect x="17" y="3" width="4" height="18" rx="1" />
+      </svg>
+    ),
+  },
 }
 
 export default function TradeValueDetailPage() {
@@ -148,13 +191,22 @@ export default function TradeValueDetailPage() {
           if (!catAssets?.length) { setLoading(false); return }
           const ids = catAssets.map((a: any) => a.id)
 
-          const { data: rows } = await supabase
-            .from('gold_funds')
-            .select('trade_date_shamsi, trade_value')
-            .in('asset_id', ids)
-            .order('trade_date_shamsi', { ascending: true })
+          // صفحه‌بندی — Supabase هر درخواست را به ۱۰۰۰ ردیف محدود می‌کند
+          // (مثلاً سهامی: ۷۸ صندوق × ۴۴ روز تاریخچه)
+          const all: { trade_date_shamsi: string; trade_value: number }[] = []
+          for (let from = 0; from < 20000; from += 1000) {
+            const { data: page } = await supabase
+              .from('gold_funds')
+              .select('trade_date_shamsi, trade_value')
+              .in('asset_id', ids)
+              .order('trade_date_shamsi', { ascending: true })
+              .range(from, from + 999)
+            if (!page || page.length === 0) break
+            all.push(...page)
+            if (page.length < 1000) break
+          }
 
-          setRawRows(rows ?? [])
+          setRawRows(all)
         }
       } catch (e) {
         console.error('[trade-value] load error:', e)
@@ -252,6 +304,12 @@ export default function TradeValueDetailPage() {
           <span>/</span>
           <Link href="/trade-value" style={{ color: '#3b82f6', textDecoration: 'none' }}>ارزش معاملات</Link>
           <span>/</span>
+          {['leveraged', 'sector', 'equity'].includes(slug) && (
+            <>
+              <Link href="/trade-value/bourse" style={{ color: '#3b82f6', textDecoration: 'none' }}>صندوق‌های بورسی</Link>
+              <span>/</span>
+            </>
+          )}
           <span style={{ color: t.text }}>{cat.label}</span>
         </div>
 

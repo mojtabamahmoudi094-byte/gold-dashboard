@@ -52,6 +52,20 @@ const CATS = [
       </svg>
     ),
   },
+  {
+    slug: 'bourse',
+    title: 'ارزش معاملات صندوق‌های بورسی',
+    desc: 'ارزش کل معاملات روزانه صندوق‌های اهرمی، بخشی و سهامی به میلیارد تومان',
+    color: 'oklch(0.72 0.19 25)',
+    borderColor: 'oklch(0.72 0.19 25 / 0.3)',
+    bgColor: 'oklch(0.72 0.19 25 / 0.07)',
+    tags: ['اهرمی', 'بخشی', 'سهامی', 'میانگین متحرک'],
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.72 0.19 25)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
+      </svg>
+    ),
+  },
 ]
 
 export default function TradeValuePage() {
