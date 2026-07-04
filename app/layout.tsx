@@ -4,7 +4,7 @@ import Header from './components/Header'
 import Footer from './components/Footer'
 
 export const metadata: Metadata = {
-  title: 'بورسنج | ترمینال هوشمند بازار',
+  title: 'بورس سنج | ترمینال هوشمند بازار',
   description: 'پلتفرم تحلیل و رصد صندوق‌های کالایی بورس ایران',
 }
 

@@ -192,7 +192,7 @@ export default function AuthPage() {
             boxShadow: '0 0 14px rgba(0,200,255,0.7)',
           }} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 17, fontWeight: 700, color: '#fff' }}>بورسنج</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: '#fff' }}>بورس سنج</div>
             <div style={{ fontSize: 9, color: '#3A5068', marginTop: -1 }}>bourssanj.ir · شاگرد تنبل بازار</div>
           </div>
           <Link href="/funds" style={{

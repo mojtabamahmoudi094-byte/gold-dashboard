@@ -163,7 +163,7 @@ export default function FundDetailPage() {
                 score += buyR * 20
                 const s = Math.round(score)
                 return (
-                  <span title="امتیاز هوشمند بورسنج: تغییر قیمت (۲۰٪) + جریان پول (۲۵٪) + قدرت خریدار (۲۰٪) + ارزش معاملات (۱۵٪) + نسبت خریدار/فروشنده (۲۰٪)" style={{
+                  <span title="امتیاز هوشمند بورس سنج: تغییر قیمت (۲۰٪) + جریان پول (۲۵٪) + قدرت خریدار (۲۰٪) + ارزش معاملات (۱۵٪) + نسبت خریدار/فروشنده (۲۰٪)" style={{
                     padding: '4px 12px', borderRadius: 8, fontSize: 14, fontWeight: 800, cursor: 'help',
                     fontFamily: 'system-ui, sans-serif',
                     background: s >= 60 ? 'rgba(0,229,160,0.15)' : s >= 40 ? 'rgba(245,158,11,0.15)' : 'rgba(255,77,106,0.15)',
@@ -543,7 +543,7 @@ export default function FundDetailPage() {
                   نمودارها قفل است
                 </div>
                 <div style={{ fontSize: 12, color: '#5A7088', lineHeight: 1.9 }}>
-                  تحلیل کامل صندوق فقط برای اعضای بورسنج<br />
+                  تحلیل کامل صندوق فقط برای اعضای بورس سنج<br />
                   در دسترس است. ثبت‌نام رایگان است.
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>

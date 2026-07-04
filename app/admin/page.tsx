@@ -276,7 +276,7 @@ export default function AdminPage() {
       <div className="max-w-2xl mx-auto">
 
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-xl font-bold text-white">پنل مدیریت بورسنج</h1>
+          <h1 className="text-xl font-bold text-white">پنل مدیریت بورس سنج</h1>
           <button type="button" onClick={logout} className="text-slate-500 hover:text-white text-sm transition-colors">
             خروج
           </button>

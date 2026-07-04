@@ -198,7 +198,7 @@ export default function Header() {
               letterSpacing: '-0.025em',
               lineHeight: 1.1,
             }}>
-              بورسنج
+              بورس سنج
             </div>
             <div style={{
               fontSize: 9,

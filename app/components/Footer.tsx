@@ -120,7 +120,7 @@ export default function Footer() {
       {/* Bottom bar */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', maxWidth: 1400, margin: '0 auto', padding: '20px 6vw', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 13, color: MUTED }}>ساخته‌شده برای فعالان بازار سرمایه ایران</span>
-        <span style={{ fontSize: 13, color: MUTED }}>© بورسنج ۱۴۰۵ — تمامی حقوق محفوظ است</span>
+        <span style={{ fontSize: 13, color: MUTED }}>© بورس سنج ۱۴۰۵ — تمامی حقوق محفوظ است</span>
       </div>
     </footer>
   )

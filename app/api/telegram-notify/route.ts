@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const confPct = confidence !== undefined ? `${Math.round(confidence)}٪` : '—'
 
   const text = [
-    `${emoji} سیگنال جدید — بورسنج`,
+    `${emoji} سیگنال جدید — بورس سنج`,
     '',
     `📊 نوع: ${signal_type}`,
     date ? `📅 تاریخ: ${date}` : null,

@@ -1,4 +1,4 @@
-# Bourssanj (بورسنج) - Project Guide
+# Bourssanj (بورس سنج) - Project Guide
 
 ## Overview
 Persian-language gold/silver/saffron fund market intelligence platform.
