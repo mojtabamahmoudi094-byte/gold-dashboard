@@ -101,6 +101,16 @@ async function fetchJson(url, retries = 2) {
 // همه نمادها در یک درخواست — به‌جای ۱۴۲ درخواست جداگانه Symbol.php
 const ALL_SYMBOLS_URL = `https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${BRSAPI_KEY}`
 
+// AllSymbols فیلد date ندارد — تاریخ واقعی داده از Symbol.php یک نماد مرجع
+async function fetchDataDate(fallback) {
+  try {
+    const d = await fetchJson(`https://Api.BrsApi.ir/Tsetmc/Symbol.php?key=${BRSAPI_KEY}&l18=${encodeURIComponent('اهرم')}`)
+    const m = String(d?.date ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (m) return `${m[1]}/${m[2]}/${m[3]}`
+  } catch { /* fallback پایین */ }
+  return fallback
+}
+
 // نرمال‌سازی نام نماد برای تطبیق (ي/ك عربی → ی/ک فارسی، فاصله‌های تکراری)
 function normName(s) {
   return String(s ?? '')
@@ -184,8 +194,8 @@ async function main() {
     process.exit(1)
   }
 
-  const date = todayShamsi()
-  console.log(`[sync-bourse] ${assets.length} صندوق، تاریخ: ${date}`)
+  const date = await fetchDataDate(todayShamsi())
+  console.log(`[sync-bourse] ${assets.length} صندوق، تاریخ داده: ${date}`)
 
   const { byName } = await fetchAllSymbols()
   console.log(`[sync-bourse] ${byName.size} نماد از AllSymbols دریافت شد`)
