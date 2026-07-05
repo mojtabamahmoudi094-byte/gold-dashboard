@@ -227,6 +227,9 @@ export default function FundDetailPage() {
             tooltip="نسبت سرانه خریدار به سرانه فروشنده. بالای ۱ یعنی خریداران قوی‌ترند" />
         </div>
 
+        {/* پورتفوی کدال (در صورت وجود JSON در public/portfolio) */}
+        <PortfolioSection t={t} slug={slug} isMobile={isMobile} />
+
         {/* ─── بخش گیت‌شده: فقط برای اعضا ─── */}
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -601,6 +604,155 @@ export default function FundDetailPage() {
         }
       `}</style>
     </main>
+  )
+}
+
+// ── پورتفوی ماهانه کدال: نمودار دایره‌ای + تغییرات مهم ماه ──────────────────
+// داده از public/portfolio/<slug>.json (خروجی scripts/codal-portfolio.js)
+const PIE_COLORS = [
+  'oklch(0.72 0.19 25)', 'oklch(0.76 0.14 210)', 'oklch(0.78 0.13 300)',
+  'oklch(0.82 0.15 70)', 'oklch(0.75 0.17 150)', 'oklch(0.84 0.03 240)',
+  'oklch(0.74 0.19 40)', 'oklch(0.7 0.12 190)', 'oklch(0.8 0.1 330)',
+]
+
+function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobile: boolean }) {
+  const [data, setData] = useState<any>(null)
+
+  useEffect(() => {
+    if (!slug) return
+    fetch(`/portfolio/${encodeURIComponent(slug)}.json`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(setData)
+      .catch(() => setData(null))
+  }, [slug])
+
+  if (!data?.months?.length) return null
+
+  const cur = data.months[data.months.length - 1]
+  const prev = data.months.length > 1 ? data.months[data.months.length - 2] : null
+
+  // ── سهم‌های بزرگ برای نمودار دایره‌ای — بقیه در «سایر دارایی‌ها» ──
+  const totalNav = cur.holdings.reduce((s: number, h: any) => s + (h.n1 || 0), 0)
+  if (totalNav <= 0) return null
+  const sorted = [...cur.holdings].filter((h: any) => h.n1 > 0).sort((a: any, b: any) => b.n1 - a.n1)
+  const TOP_N = 8
+  const top = sorted.slice(0, TOP_N)
+  const otherNav = sorted.slice(TOP_N).reduce((s: any, h: any) => s + h.n1, 0)
+  const slices = [
+    ...top.map((h: any, i: number) => ({ name: h.name, value: h.n1, color: PIE_COLORS[i % PIE_COLORS.length] })),
+    ...(otherNav > 0 ? [{ name: 'سایر دارایی‌ها', value: otherNav, color: t.muted }] : []),
+  ]
+
+  // ── مسیرهای SVG دونات ──
+  const R = 80, r = 46, CX = 100, CY = 100
+  let angle = -Math.PI / 2
+  const paths = slices.map(s => {
+    const frac = s.value / totalNav
+    const a0 = angle
+    const a1 = angle + frac * Math.PI * 2
+    angle = a1
+    const large = a1 - a0 > Math.PI ? 1 : 0
+    const p = (a: number, rad: number) => `${(CX + rad * Math.cos(a)).toFixed(2)},${(CY + rad * Math.sin(a)).toFixed(2)}`
+    return {
+      ...s, frac,
+      d: `M${p(a0, R)} A${R},${R} 0 ${large} 1 ${p(a1, R)} L${p(a1, r)} A${r},${r} 0 ${large} 0 ${p(a0, r)} Z`,
+    }
+  })
+
+  // ── تغییرات مهم ماه (از ستون‌های خرید/فروش طی دوره) ──
+  const bt = (v: number) => Math.round(v / 1e10).toLocaleString('fa-IR')   // ریال → میلیارد تومان
+  const buys  = [...cur.holdings].filter((h: any) => h.bc > 0).sort((a: any, b: any) => b.bc - a.bc).slice(0, 5)
+  const sells = [...cur.holdings].filter((h: any) => h.sa > 0).sort((a: any, b: any) => b.sa - a.sa).slice(0, 5)
+  const fresh = cur.holdings.filter((h: any) => h.q0 === 0 && h.q1 > 0 && h.bc > 0)
+    .sort((a: any, b: any) => b.n1 - a.n1).slice(0, 5)
+  const exited = cur.holdings.filter((h: any) => h.q0 > 0 && h.q1 === 0)
+    .sort((a: any, b: any) => b.sa - a.sa).slice(0, 5)
+
+  const monthName = (d: string) => {
+    const m = Number((d || '').split('/')[1])
+    return ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'][m] || d
+  }
+
+  return (
+    <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em' }}>
+          ترکیب پورتفوی سهام — گزارش کدال {cur.date}
+        </div>
+        <span style={{ fontSize: 10, color: t.faint }}>
+          ارزش کل سهام: {bt(totalNav)} میلیارد تومان
+        </span>
+      </div>
+
+      {/* دونات + راهنما */}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 12 : 24 }}>
+        <svg viewBox="0 0 200 200" style={{ width: isMobile ? 200 : 230, flexShrink: 0 }}>
+          {paths.map((s, i) => (
+            <path key={i} d={s.d} fill={s.color} opacity={0.85}>
+              <title>{`${s.name}: ${(s.frac * 100).toFixed(1)}٪`}</title>
+            </path>
+          ))}
+          <text x={CX} y={CY - 4} textAnchor="middle" fontSize="13" fontWeight="800" fill={t.textBright} fontFamily="Vazirmatn, Arial, sans-serif">
+            {sorted.length.toLocaleString('fa-IR')}
+          </text>
+          <text x={CX} y={CY + 12} textAnchor="middle" fontSize="8" fill={t.muted} fontFamily="Vazirmatn, Arial, sans-serif">
+            سهم در پورتفوی
+          </text>
+        </svg>
+
+        <div style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {paths.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+              <span style={{ color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.name}</span>
+              <span style={{ color: t.textBright, fontWeight: 700, fontFamily: 'system-ui, sans-serif' }}>
+                {(s.frac * 100).toFixed(1)}٪
+              </span>
+              <span style={{ color: t.faint, fontSize: 10, minWidth: 64, textAlign: 'left' }}>{bt(s.value)} م.ت</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* تغییرات مهم نسبت به ماه قبل */}
+      <div style={{ marginTop: 18, borderTop: `0.5px solid ${t.border}`, paddingTop: 14 }}>
+        <div style={{ fontSize: 11, color: t.muted, marginBottom: 10 }}>
+          تغییرات مهم {monthName(cur.date)}{prev ? ` نسبت به ${monthName(prev.date)}` : ''}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+          <div style={{ background: 'rgba(0,229,160,0.04)', borderRadius: 10, padding: 12, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#00E5A0', marginBottom: 8 }}>خریدهای مهم ماه</div>
+            {buys.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>خرید قابل‌توجهی ثبت نشده</div>}
+            {buys.map((h: any, i: number) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
+                <span style={{ color: t.text }}>
+                  {h.name}
+                  {fresh.some((f: any) => f.name === h.name) && (
+                    <span style={{ fontSize: 9, color: '#00E5A0', marginRight: 6 }}>(موقعیت جدید)</span>
+                  )}
+                </span>
+                <span style={{ color: '#00E5A0', fontWeight: 700, fontFamily: 'system-ui, sans-serif' }}>{bt(h.bc)}+ م.ت</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: 'rgba(255,77,106,0.04)', borderRadius: 10, padding: 12, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF4D6A', marginBottom: 8 }}>فروش‌های مهم ماه</div>
+            {sells.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>فروش قابل‌توجهی ثبت نشده</div>}
+            {sells.map((h: any, i: number) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
+                <span style={{ color: t.text }}>
+                  {h.name}
+                  {exited.some((x: any) => x.name === h.name) && (
+                    <span style={{ fontSize: 9, color: '#FF4D6A', marginRight: 6 }}>(خروج کامل)</span>
+                  )}
+                </span>
+                <span style={{ color: '#FF4D6A', fontWeight: 700, fontFamily: 'system-ui, sans-serif' }}>{bt(h.sa)}- م.ت</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
