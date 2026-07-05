@@ -69,12 +69,15 @@ async function main() {
     if (!attUrl) { console.log('  لینک پیوست ندارد'); continue }
 
     // صفحه پیوست کدال: HTML با لینک‌های DownloadFile.aspx
-    let html
+    let html, cookies = ''
     try {
       const res = await fetch(attUrl, {
         signal: AbortSignal.timeout(60_000),
         headers: { 'User-Agent': 'Mozilla/5.0' },
       })
+      // کوکی‌های session — دانلود برخی فایل‌ها بدون آن «خطای سیستمی» می‌دهد
+      cookies = (res.headers.getSetCookie?.() || [])
+        .map(c => c.split(';')[0]).join('; ')
       html = await res.text()
     } catch (e) { console.log('  خطا در صفحه پیوست:', e.message); continue }
 
@@ -90,15 +93,32 @@ async function main() {
     console.log(`  ${hrefs.length} فایل پیوست:`, hrefs)
 
     for (const [fi, href] of hrefs.entries()) {
-      // لینک نسبی به صفحه Attachment است → مسیر /Reports/
-      const fileUrl = 'https://codal.ir/Reports/' + href
+      // چند مسیر ممکن — اولی که فایل واقعی داد برنده است
+      const candidates = [
+        'https://codal.ir/Reports/' + href,
+        'https://codal.ir/' + href,
+        'https://www.codal.ir/Reports/' + href,
+      ]
+      let buf = null, sig = ''
+      for (const fileUrl of candidates) {
+        try {
+          const res = await fetch(fileUrl, {
+            signal: AbortSignal.timeout(120_000),
+            headers: {
+              'User-Agent': 'Mozilla/5.0',
+              Referer: attUrl,
+              ...(cookies ? { Cookie: cookies } : {}),
+            },
+          })
+          const b = Buffer.from(await res.arrayBuffer())
+          const s = b.slice(0, 4).toString('hex')
+          const isErrorPage = b.length < 100000 && b.toString('utf8', 0, 2000).includes('خطای سیستمی')
+          console.log(`  تلاش ${fileUrl.slice(0, 60)}… → ${b.length} bytes | sig ${s}${isErrorPage ? ' (صفحه خطا)' : ''}`)
+          if (!isErrorPage && b.length > 200) { buf = b; sig = s; break }
+        } catch (e) { console.log('  خطا:', e.message) }
+      }
+      if (!buf) { console.log('  ❌ هیچ مسیری فایل نداد'); continue }
       try {
-        const res = await fetch(fileUrl, {
-          signal: AbortSignal.timeout(120_000),
-          headers: { 'User-Agent': 'Mozilla/5.0', Referer: attUrl },
-        })
-        const buf = Buffer.from(await res.arrayBuffer())
-        const sig = buf.slice(0, 4).toString('hex')
         console.log(`\n  فایل ${fi}: ${buf.length} bytes | sig: ${sig}`)
 
         if (sig.startsWith('504b') || sig.startsWith('d0cf')) {
