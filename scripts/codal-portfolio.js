@@ -6,8 +6,9 @@
  * خروجی: JSON دو ماه اخیر برای نمایش نمودار دایره‌ای و تغییرات در سایت
  *
  * روی سرور ایرانی:
- *   node codal-portfolio.js اهرم
- *   → /opt/portfolio-اهرم.json  (بعداً scp به public/portfolio/ در repo)
+ *   node codal-portfolio.js اهرم     → یک نماد (خروجی: portfolio-اهرم.json)
+ *   node codal-portfolio.js --all    → همه صندوق‌های bourse-symbols
+ *   → پوشه portfolio-out/<slug>.json  (بعداً scp به public/portfolio/ در repo)
  *
  * نکات فنی (کشف‌شده در probe):
  *   - BrsAPI کاراکترهای base64 را ماسک می‌کند: QQQaQQQ = / و OOObOOO = +
@@ -101,10 +102,11 @@ function parseStockSheet(wb) {
   return holdings
 }
 
-async function main() {
-  console.log(`[portfolio] «${SYMBOL}» — دریافت اطلاعیه‌های کدال`)
+// یک نماد: دریافت اطلاعیه‌ها → دانلود اکسل دو ماه اخیر → پارس → آبجکت خروجی
+async function buildSymbol(symbol, { verbose = true } = {}) {
+  const log = (...a) => { if (verbose) console.log(...a) }
   const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
-    + `&l18=${encodeURIComponent(SYMBOL)}&date_start=1405-01-15`
+    + `&l18=${encodeURIComponent(symbol)}&date_start=1405-01-15`
   const data = await fetchJson(url)
   const list = data?.announcement ?? []
 
@@ -119,31 +121,68 @@ async function main() {
     reports.push({ ...a, dateNorm: date })
     if (reports.length >= MONTHS_WANTED) break
   }
-  if (reports.length === 0) { console.error('هیچ گزارش پورتفوی یافت نشد'); process.exit(1) }
-  console.log('[portfolio] گزارش‌ها:', reports.map(r => r.dateNorm).join(' ، '))
+  if (reports.length === 0) throw new Error('هیچ گزارش پورتفوی یافت نشد')
+  log('[portfolio] گزارش‌ها:', reports.map(r => r.dateNorm).join(' ، '))
 
   const months = []
   for (const rep of reports) {
-    console.log(`[portfolio] دانلود اکسل ${rep.dateNorm} …`)
+    log(`[portfolio] دانلود اکسل ${rep.dateNorm} …`)
     const buf = await downloadPortfolioExcel(rep)
-    if (!buf) { console.error(`  ❌ اکسل ${rep.dateNorm} دانلود نشد`); continue }
+    if (!buf) { console.error(`  ❌ ${symbol}: اکسل ${rep.dateNorm} دانلود نشد`); continue }
     const wb = XLSX.read(buf, { type: 'buffer' })
     const holdings = parseStockSheet(wb)
-    console.log(`  ✅ ${holdings.length} سهم پارس شد`)
+    log(`  ✅ ${holdings.length} سهم پارس شد`)
     months.push({ date: rep.dateNorm, title: rep.title, holdings })
   }
-  if (months.length === 0) process.exit(1)
+  if (months.length === 0) throw new Error('هیچ اکسلی دانلود/پارس نشد')
 
   // قدیمی → جدید
   months.sort((a, b) => a.date.localeCompare(b.date))
+  return { symbol, updated: new Date().toISOString(), months }
+}
 
-  const out = { symbol: SYMBOL, updated: new Date().toISOString(), months }
+// slug فایل خروجی = قرارداد جدول assets (فاصله → خط تیره)
+const toSlug = (name) => name.trim().replace(/\s+/g, '-')
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
+async function runAll() {
+  const { BOURSE_SYMBOLS } = require('./bourse-symbols')
+  const names = Object.values(BOURSE_SYMBOLS).flat()
+  const outDir = path.join(__dirname, 'portfolio-out')
+  fs.mkdirSync(outDir, { recursive: true })
+
+  const ok = [], failed = []
+  for (const [i, name] of names.entries()) {
+    process.stdout.write(`[${i + 1}/${names.length}] ${name} … `)
+    try {
+      const out = await buildSymbol(name, { verbose: false })
+      fs.writeFileSync(path.join(outDir, `${toSlug(name)}.json`), JSON.stringify(out))
+      const last = out.months[out.months.length - 1]
+      console.log(`✅ ${out.months.length} ماه، ${last.holdings.length} سهم (${last.date})`)
+      ok.push(name)
+    } catch (e) {
+      console.log(`❌ ${e.message}`)
+      failed.push(`${name}: ${e.message}`)
+    }
+    await sleep(1200)   // رعایت rate limit کدال/BrsAPI
+  }
+
+  console.log(`\n═══ نتیجه: ${ok.length} موفق، ${failed.length} ناموفق ═══`)
+  failed.forEach(f => console.log('  -', f))
+  console.log(`\nخروجی: ${outDir}`)
+  console.log('انتقال به مک:')
+  console.log('  scp -r root@SERVER:/opt/portfolio-out/ ./public/portfolio/')
+}
+
+async function runOne() {
+  console.log(`[portfolio] «${SYMBOL}» — دریافت اطلاعیه‌های کدال`)
+  const out = await buildSymbol(SYMBOL)
   const fname = path.join(__dirname, `portfolio-${SYMBOL}.json`)
   fs.writeFileSync(fname, JSON.stringify(out))
   console.log(`\n[portfolio] ✅ ذخیره شد: ${fname}`)
 
   // خلاصه برای بررسی چشمی
-  const last = months[months.length - 1]
+  const last = out.months[out.months.length - 1]
   const totalNav = last.holdings.reduce((s, h) => s + (h.n1 || 0), 0)
   const top = [...last.holdings].sort((a, b) => (b.n1 || 0) - (a.n1 || 0)).slice(0, 10)
   console.log(`\n═══ ${last.date} — ${last.holdings.length} سهم | ارزش کل سهام: ${Math.round(totalNav / 1e10).toLocaleString()} میلیارد تومان ═══`)
@@ -156,4 +195,4 @@ async function main() {
   sells.forEach(h => console.log(`  - ${h.name}: ${Math.round(h.sa / 1e10).toLocaleString()} م.ت`))
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+;(SYMBOL === '--all' ? runAll() : runOne()).catch(e => { console.error(e); process.exit(1) })
