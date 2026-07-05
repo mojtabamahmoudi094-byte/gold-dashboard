@@ -44,11 +44,24 @@ const XLSX = require('xlsx')
 const unmask = (s) => String(s).replace(/QQQaQQQ/g, '%2f').replace(/OOObOOO/g, '%2b')
 // ارقام فارسی → لاتین
 const faDigits = (s) => String(s).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+// نرمال‌سازی متن فارسی: ي/ك عربی، نیم‌فاصله، فاصله تکراری
+const normTxt = (s) => String(s ?? '')
+  .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
+  .replace(/‌/g, ' ').replace(/\s+/g, ' ').trim()
+// عنوان گزارش پورتفوی: هم «پورتفوی» هم «پرتفوی»
+const isPortfolioTitle = (t) => /پر?ورتفو|پرتفو/.test(normTxt(t))
 
-async function fetchJson(url) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+async function fetchJson(url, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.json()
+    } catch (e) {
+      if (i === retries) throw e
+      await new Promise(r => setTimeout(r, 2500 * (i + 1)))
+    }
+  }
 }
 
 async function fetchBuf(url, headers = {}) {
@@ -77,18 +90,14 @@ async function downloadPortfolioExcel(announcement) {
   return null
 }
 
-// پارس شیت «سهام» — هر ردیف ۱۲ عدد بعد از نام
-function parseStockSheet(wb) {
-  const sheet = wb.Sheets['سهام']
-  if (!sheet) throw new Error('شیت «سهام» یافت نشد')
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-
-  const headerIdx = rows.findIndex(r => r.some(c => String(c).includes('نام شرکت')))
-  if (headerIdx < 0) throw new Error('سطر عنوان (نام شرکت) یافت نشد')
+// پارس یک شیت با ساختار «نام شرکت + ۱۲ عدد» — null اگر ساختار نخواند
+function parseHoldingRows(rows) {
+  const headerIdx = rows.findIndex(r => r.some(c => /نام (شرکت|سهام)/.test(normTxt(c))))
+  if (headerIdx < 0) return null
 
   const holdings = []
   for (const row of rows.slice(headerIdx + 1)) {
-    const name = String(row[0] ?? '').trim()
+    const name = normTxt(row[0])
     if (!name) continue
     if (name === 'جمع') break
     const nums = row.slice(1)
@@ -100,6 +109,32 @@ function parseStockSheet(wb) {
     holdings.push({ name, q0, c0, n0, bq, bc, sq, sa, q1, p1, c1, n1, pct })
   }
   return holdings
+}
+
+// پیدا کردن شیت سهام با محتوا، نه اسم — اسم شیت‌ها بین صندوق‌ها یکدست نیست
+// (ي/ك عربی، «سهام و حق تقدم» و ...). شیت با بیشترین ردیف معتبر برنده است.
+function parseStockSheet(wb) {
+  // اول شیت‌هایی که اسمشان «سهام» دارد (بدون مشتقه/درآمد)، بعد بقیه
+  const names = [...wb.SheetNames].sort((a, b) => {
+    const score = (n) => {
+      const t = normTxt(n)
+      if (/مشتقه|درآمد|صندوق|اوراق|سپرده|تعدیل|نخست/.test(t)) return 2
+      return t.includes('سهام') ? 0 : 1
+    }
+    return score(a) - score(b)
+  })
+
+  let best = null
+  for (const sn of names) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
+    const holdings = parseHoldingRows(rows)
+    if (holdings && holdings.length > (best?.holdings.length ?? 0)) best = { sn, holdings }
+    if (best && best.holdings.length >= 5 && normTxt(sn).includes('سهام')) break
+  }
+  if (!best || best.holdings.length === 0) {
+    throw new Error(`شیت سهام قابل پارس نیست (شیت‌ها: ${wb.SheetNames.slice(0, 6).join('،')})`)
+  }
+  return best.holdings
 }
 
 // یک نماد: دریافت اطلاعیه‌ها → دانلود اکسل دو ماه اخیر → پارس → آبجکت خروجی
@@ -114,7 +149,7 @@ async function buildSymbol(symbol, { verbose = true } = {}) {
   const seen = new Set()
   const reports = []
   for (const a of list) {
-    if (!String(a.title || '').includes('پورتفوی')) continue
+    if (!isPortfolioTitle(a.title)) continue
     const date = faDigits(a.date_title || '')          // 1405/03/31
     if (!date || seen.has(date)) continue
     seen.add(date)
@@ -151,9 +186,15 @@ async function runAll() {
   const outDir = path.join(__dirname, 'portfolio-out')
   fs.mkdirSync(outDir, { recursive: true })
 
+  const FORCE_ALL = process.argv.includes('--force')
   const ok = [], failed = []
   for (const [i, name] of names.entries()) {
     process.stdout.write(`[${i + 1}/${names.length}] ${name} … `)
+    if (!FORCE_ALL && fs.existsSync(path.join(outDir, `${toSlug(name)}.json`))) {
+      console.log('⏭  از قبل موجود')
+      ok.push(name)
+      continue
+    }
     try {
       const out = await buildSymbol(name, { verbose: false })
       fs.writeFileSync(path.join(outDir, `${toSlug(name)}.json`), JSON.stringify(out))
