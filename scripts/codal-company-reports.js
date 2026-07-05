@@ -90,7 +90,7 @@ async function fetchWorkbookOnce(a) {
   if (!a.link_excel) return null
   const url = unmask(a.link_excel)
   const res = await fetch(url, {
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(40_000),
     headers: { 'User-Agent': 'Mozilla/5.0' },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -98,16 +98,17 @@ async function fetchWorkbookOnce(a) {
   const sig = buf.slice(0, 4).toString('hex')
   if (sig.startsWith('504b') || sig.startsWith('d0cf')) return XLSX.read(buf, { type: 'buffer' })
   const text = buf.toString('utf8')
-  if (!/<table/i.test(text)) throw new Error('بدون جدول')   // احتمالاً صفحه خطای throttle — retry
+  if (!/<table/i.test(text)) throw new Error('بدون جدول')
   return XLSX.read(text, { type: 'string' })
 }
 
 async function fetchWorkbook(a) {
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  if (!a.link_excel) return null
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try { return await fetchWorkbookOnce(a) }
     catch (e) {
-      if (attempt === 3) return null
-      await sleep(8000 * attempt)   // ۸ثانیه، ۱۶ثانیه — عبور از throttle
+      if (attempt === 2) return null
+      await sleep(3000)
     }
   }
   return null
