@@ -236,4 +236,32 @@ async function runOne() {
   sells.forEach(h => console.log(`  - ${h.name}: ${Math.round(h.sa / 1e10).toLocaleString()} م.ت`))
 }
 
-;(SYMBOL === '--all' ? runAll() : runOne()).catch(e => { console.error(e); process.exit(1) })
+// چاپ ساختار خام اکسل یک نماد — برای طراحی parser قالب‌های متفاوت
+async function runDump() {
+  const symbol = process.argv[3]
+  if (!symbol) { console.error('استفاده: node codal-portfolio.js --dump <نماد>'); process.exit(1) }
+  const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
+    + `&l18=${encodeURIComponent(symbol)}&date_start=1405-01-15`
+  const data = await fetchJson(url)
+  const list = data?.announcement ?? []
+  console.log(`═══ همه عنوان‌های «${symbol}» (${list.length}) ═══`)
+  list.forEach(a => console.log(`- [${a.date_publish}] ${a.title}`))
+
+  const rep = list.find(a => isPortfolioTitle(a.title))
+  if (!rep) { console.log('\n(گزارش پورتفوی ندارد)'); return }
+  console.log(`\n═══ دانلود: ${rep.title} ═══`)
+  const buf = await downloadPortfolioExcel(rep)
+  if (!buf) { console.log('❌ اکسل دانلود نشد'); return }
+  const wb = XLSX.read(buf, { type: 'buffer' })
+  for (const sn of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
+    console.log(`\n─── شیت «${sn}» — ${rows.length} ردیف ───`)
+    rows.slice(0, 14).forEach((r, i) => {
+      const line = r.map(c => String(c).slice(0, 20)).join(' ⁞ ').slice(0, 220)
+      if (line.replace(/[⁞\s]/g, '')) console.log(`${i}: ${line}`)
+    })
+  }
+}
+
+;(SYMBOL === '--all' ? runAll() : SYMBOL === '--dump' ? runDump() : runOne())
+  .catch(e => { console.error(e); process.exit(1) })
