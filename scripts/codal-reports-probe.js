@@ -74,12 +74,29 @@ async function dumpExcel(a, tag, XLSX) {
       const isErr = buf.length < 100000 && buf.toString('utf8', 0, 2000).includes('خطای سیستمی')
       console.log(`  ${url.slice(0, 80)}… → ${buf.length} bytes | sig ${sig}${isErr ? ' (صفحه خطا)' : ''}`)
       if (isErr || buf.length < 500) continue
-      if (!(sig.startsWith('504b') || sig.startsWith('d0cf'))) {
-        console.log('  (اکسل نیست — ۳۰۰ کاراکتر اول:)', buf.toString('utf8', 0, 300).replace(/\s+/g, ' '))
-        continue
+
+      let wb = null
+      if (sig.startsWith('504b') || sig.startsWith('d0cf')) {
+        wb = XLSX.read(buf, { type: 'buffer' })
+      } else {
+        const text = buf.toString('utf8')
+        if (/<html|<table/i.test(text)) {
+          // اکسل-HTML قدیمی کدال (Excel Workbook Frameset) — xlsx می‌تواند جدول‌های HTML را بخواند
+          const frames = [...new Set((text.match(/<frame[^>]*src="([^"]+)"/gi) || []).map(m => m.match(/src="([^"]+)"/i)[1]))]
+          if (frames.length) console.log('  فریم‌ها:', frames.join(' | '))
+          try { wb = XLSX.read(text, { type: 'string' }) }
+          catch (e) { console.log('  XLSX از HTML شکست خورد:', e.message) }
+          if (!wb || wb.SheetNames.every(sn => XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 }).length === 0)) {
+            console.log('  (HTML بدون جدول قابل پارس — ۱۰۰۰ کاراکتر بعد از head:)')
+            console.log('  ' + text.slice(500, 1500).replace(/\s+/g, ' '))
+            continue
+          }
+        } else {
+          console.log('  (نه اکسل نه HTML — رد شد)')
+          continue
+        }
       }
       count++
-      const wb = XLSX.read(buf, { type: 'buffer' })
       console.log('  ✅ اکسل — شیت‌ها:', wb.SheetNames.map(s => `«${s}»`).join(' | '))
       for (const sn of wb.SheetNames) {
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
@@ -108,8 +125,13 @@ async function main() {
     ['1405-01-01', '1405-02-31'], ['1405-03-01', '1405-04-15'],
   ]
   console.log(`═══ اطلاعیه‌های کدال «${SYMBOL}» (1404-01-01 تا 1405-04-15، پنجره‌ای) ═══`)
+  const cacheFile = path.join(__dirname, `codal-list-${SYMBOL}.json`)
   const list = []
-  for (const [ds, de] of windows) {
+  if (fs.existsSync(cacheFile)) {
+    list.push(...JSON.parse(fs.readFileSync(cacheFile, 'utf8')))
+    console.log(`(از کش: ${list.length} اطلاعیه — برای دریافت تازه فایل ${cacheFile} را پاک کنید)`)
+  }
+  for (const [ds, de] of (list.length ? [] : windows)) {
     const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
       + `&l18=${encodeURIComponent(SYMBOL)}`
       + `&date_start=${ds}&date_end=${de}`
@@ -122,6 +144,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 4000)) // throttle کدال
   }
   console.log('تعداد کل:', list.length)
+  if (!fs.existsSync(cacheFile)) fs.writeFileSync(cacheFile, JSON.stringify(list))
 
   console.log('\n═══ همه عنوان‌ها ═══')
   list.forEach((a, i) => console.log(`${i}) [${a.date_publish ?? a.date_send}] ${a.title}`))
