@@ -617,6 +617,7 @@ const PIE_COLORS = [
 
 function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobile: boolean }) {
   const [data, setData] = useState<any>(null)
+  const [hi, setHi] = useState<number | null>(null)   // ایندکس قاچ hover شده
 
   useEffect(() => {
     if (!slug) return
@@ -644,7 +645,7 @@ function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobil
   ]
 
   // ── مسیرهای SVG دونات ──
-  const R = 80, r = 46, CX = 100, CY = 100
+  const R = 80, r = 48, CX = 100, CY = 100
   let angle = -Math.PI / 2
   const paths = slices.map(s => {
     const frac = s.value / totalNav
@@ -652,12 +653,14 @@ function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobil
     const a1 = angle + frac * Math.PI * 2
     angle = a1
     const large = a1 - a0 > Math.PI ? 1 : 0
+    const mid = (a0 + a1) / 2
     const p = (a: number, rad: number) => `${(CX + rad * Math.cos(a)).toFixed(2)},${(CY + rad * Math.sin(a)).toFixed(2)}`
     return {
-      ...s, frac,
+      ...s, frac, mid,
       d: `M${p(a0, R)} A${R},${R} 0 ${large} 1 ${p(a1, R)} L${p(a1, r)} A${r},${r} 0 ${large} 0 ${p(a0, r)} Z`,
     }
   })
+  const hovered = hi !== null ? paths[hi] : null
 
   // ── تغییرات مهم ماه (از ستون‌های خرید/فروش طی دوره) ──
   const bt = (v: number) => Math.round(v / 1e10).toLocaleString('fa-IR')   // ریال → میلیارد تومان
@@ -673,42 +676,101 @@ function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobil
     return ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'][m] || d
   }
 
+  const maxFrac = Math.max(...paths.map(s => s.frac), 0.0001)
+  const pctFa = (f: number) => (f * 100).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
+
   return (
-    <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0 }}>
+    <div style={{
+      background: t.panel, border: `0.5px solid ${t.border}`,
+      borderTop: `2px solid ${t.accent}55`, borderRadius: 14,
+      padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em' }}>
-          ترکیب پورتفوی سهام — گزارش کدال {cur.date}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright }}>ترکیب پورتفوی سهام</div>
+          <div style={{ fontSize: 10, color: t.faint, marginTop: 3 }}>گزارش ماهانه کدال · {cur.date}</div>
         </div>
-        <span style={{ fontSize: 10, color: t.faint }}>
-          ارزش کل سهام: {bt(totalNav)} میلیارد تومان
+        <span style={{
+          fontSize: 11, fontWeight: 700, color: t.accent,
+          background: `${t.accent}14`, border: `0.5px solid ${t.accent}40`,
+          borderRadius: 8, padding: '5px 10px', fontFamily: 'system-ui, sans-serif',
+        }}>
+          {bt(totalNav)} میلیارد تومان
         </span>
       </div>
 
       {/* دونات + راهنما */}
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 12 : 24 }}>
-        <svg viewBox="0 0 200 200" style={{ width: isMobile ? 200 : 230, flexShrink: 0 }}>
-          {paths.map((s, i) => (
-            <path key={i} d={s.d} fill={s.color} opacity={0.85}>
-              <title>{`${s.name}: ${(s.frac * 100).toFixed(1)}٪`}</title>
-            </path>
-          ))}
-          <text x={CX} y={CY - 4} textAnchor="middle" fontSize="13" fontWeight="800" fill={t.textBright} fontFamily="Vazirmatn, Arial, sans-serif">
-            {sorted.length.toLocaleString('fa-IR')}
-          </text>
-          <text x={CX} y={CY + 12} textAnchor="middle" fontSize="8" fill={t.muted} fontFamily="Vazirmatn, Arial, sans-serif">
-            سهم در پورتفوی
-          </text>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 14 : 28 }}>
+        <svg viewBox="0 0 200 200" style={{ width: isMobile ? 210 : 240, flexShrink: 0, overflow: 'visible' }}
+          onMouseLeave={() => setHi(null)}>
+          {paths.map((s, i) => {
+            const active = hi === i
+            const dx = active ? Math.cos(s.mid) * 4 : 0
+            const dy = active ? Math.sin(s.mid) * 4 : 0
+            return (
+              <path key={i} d={s.d} fill={s.color}
+                opacity={hi === null ? 0.9 : active ? 1 : 0.35}
+                stroke={t.bg} strokeWidth={1.5}
+                transform={`translate(${dx} ${dy})`}
+                style={{ transition: 'opacity 0.2s, transform 0.2s', cursor: 'pointer' }}
+                onMouseEnter={() => setHi(i)}>
+                <title>{`${s.name}: ${pctFa(s.frac)}٪`}</title>
+              </path>
+            )
+          })}
+          {/* درصد روی قاچ‌های بزرگ */}
+          {paths.map((s, i) => s.frac >= 0.055 ? (
+            <text key={`l${i}`}
+              x={CX + Math.cos(s.mid) * (R + r) / 2} y={CY + Math.sin(s.mid) * (R + r) / 2 + 3}
+              textAnchor="middle" fontSize="9" fontWeight="800" fill="#fff"
+              style={{ pointerEvents: 'none', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}
+              fontFamily="system-ui, sans-serif">
+              {pctFa(s.frac)}٪
+            </text>
+          ) : null)}
+          {/* مرکز دونات: پیش‌فرض تعداد سهم‌ها، هنگام hover نام و درصد قاچ */}
+          {hovered ? (
+            <>
+              <text x={CX} y={CY - 6} textAnchor="middle" fontSize="9.5" fontWeight="700" fill={t.textBright} fontFamily="Vazirmatn, Arial, sans-serif">
+                {hovered.name.length > 14 ? hovered.name.slice(0, 13) + '…' : hovered.name}
+              </text>
+              <text x={CX} y={CY + 12} textAnchor="middle" fontSize="13" fontWeight="800" fill={hovered.color} fontFamily="system-ui, sans-serif">
+                {pctFa(hovered.frac)}٪
+              </text>
+            </>
+          ) : (
+            <>
+              <text x={CX} y={CY - 4} textAnchor="middle" fontSize="14" fontWeight="800" fill={t.textBright} fontFamily="Vazirmatn, Arial, sans-serif">
+                {sorted.length.toLocaleString('fa-IR')}
+              </text>
+              <text x={CX} y={CY + 13} textAnchor="middle" fontSize="8" fill={t.muted} fontFamily="Vazirmatn, Arial, sans-serif">
+                سهم در پورتفوی
+              </text>
+            </>
+          )}
         </svg>
 
-        <div style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
           {paths.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+            <div key={i}
+              onMouseEnter={() => setHi(i)} onMouseLeave={() => setHi(null)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
+                padding: '5px 8px', borderRadius: 8, cursor: 'pointer',
+                background: hi === i ? `${String(s.color).startsWith('oklch') ? s.color.replace(')', ' / 0.1)') : 'rgba(255,255,255,0.05)'}` : 'transparent',
+                transition: 'background 0.2s',
+              }}>
               <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
-              <span style={{ color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.name}</span>
-              <span style={{ color: t.textBright, fontWeight: 700, fontFamily: 'system-ui, sans-serif' }}>
-                {(s.frac * 100).toFixed(1)}٪
+              <span style={{ color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{s.name}</span>
+              {/* نوار نسبی سهم از پورتفوی */}
+              <span style={{ flex: 1, minWidth: 24, height: 4, borderRadius: 2, background: `${t.muted}22`, overflow: 'hidden' }}>
+                <span style={{ display: 'block', width: `${(s.frac / maxFrac) * 100}%`, height: '100%', borderRadius: 2, background: s.color, opacity: 0.75, transition: 'width 0.4s' }} />
               </span>
-              <span style={{ color: t.faint, fontSize: 10, minWidth: 64, textAlign: 'left' }}>{bt(s.value)} م.ت</span>
+              <span style={{ color: t.textBright, fontWeight: 700, fontFamily: 'system-ui, sans-serif', minWidth: 44, textAlign: 'left' }}>
+                {pctFa(s.frac)}٪
+              </span>
+              <span style={{ color: t.faint, fontSize: 10, minWidth: 60, textAlign: 'left', fontFamily: 'system-ui, sans-serif' }}>{bt(s.value)} م.ت</span>
             </div>
           ))}
         </div>
@@ -716,40 +778,53 @@ function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobil
 
       {/* تغییرات مهم نسبت به ماه قبل */}
       <div style={{ marginTop: 18, borderTop: `0.5px solid ${t.border}`, paddingTop: 14 }}>
-        <div style={{ fontSize: 11, color: t.muted, marginBottom: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 10 }}>
           تغییرات مهم {monthName(cur.date)}{prev ? ` نسبت به ${monthName(prev.date)}` : ''}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
-          <div style={{ background: 'rgba(0,229,160,0.04)', borderRadius: 10, padding: 12, minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#00E5A0', marginBottom: 8 }}>خریدهای مهم ماه</div>
-            {buys.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>خرید قابل‌توجهی ثبت نشده</div>}
-            {buys.map((h: any, i: number) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
-                <span style={{ color: t.text }}>
-                  {h.name}
-                  {fresh.some((f: any) => f.name === h.name) && (
-                    <span style={{ fontSize: 9, color: '#00E5A0', marginRight: 6 }}>(موقعیت جدید)</span>
-                  )}
-                </span>
-                <span style={{ color: '#00E5A0', fontWeight: 700, fontFamily: 'system-ui, sans-serif' }}>{bt(h.bc)}+ م.ت</span>
+          {[
+            {
+              title: 'خریدهای مهم ماه', color: '#00E5A0', rows: buys, val: (h: any) => `${bt(h.bc)}+`,
+              badge: (h: any) => fresh.some((f: any) => f.name === h.name) ? 'موقعیت جدید' : null,
+              empty: 'خرید قابل‌توجهی ثبت نشده',
+              icon: <path d="M12 19V5M5 12l7-7 7 7" />,
+            },
+            {
+              title: 'فروش‌های مهم ماه', color: '#FF4D6A', rows: sells, val: (h: any) => `${bt(h.sa)}-`,
+              badge: (h: any) => exited.some((x: any) => x.name === h.name) ? 'خروج کامل' : null,
+              empty: 'فروش قابل‌توجهی ثبت نشده',
+              icon: <path d="M12 5v14M5 12l7 7 7-7" />,
+            },
+          ].map((sec, si) => (
+            <div key={si} style={{
+              background: `${sec.color}08`, border: `0.5px solid ${sec.color}26`,
+              borderRadius: 10, padding: 12, minWidth: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={sec.color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  {sec.icon}
+                </svg>
+                <span style={{ fontSize: 11, fontWeight: 700, color: sec.color }}>{sec.title}</span>
               </div>
-            ))}
-          </div>
-          <div style={{ background: 'rgba(255,77,106,0.04)', borderRadius: 10, padding: 12, minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF4D6A', marginBottom: 8 }}>فروش‌های مهم ماه</div>
-            {sells.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>فروش قابل‌توجهی ثبت نشده</div>}
-            {sells.map((h: any, i: number) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
-                <span style={{ color: t.text }}>
-                  {h.name}
-                  {exited.some((x: any) => x.name === h.name) && (
-                    <span style={{ fontSize: 9, color: '#FF4D6A', marginRight: 6 }}>(خروج کامل)</span>
+              {sec.rows.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>{sec.empty}</div>}
+              {sec.rows.map((h: any, i: number) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, marginBottom: 6, minWidth: 0 }}>
+                  <span style={{ color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{h.name}</span>
+                  {sec.badge(h) && (
+                    <span style={{
+                      fontSize: 8.5, fontWeight: 700, color: sec.color, flexShrink: 0,
+                      background: `${sec.color}1a`, border: `0.5px solid ${sec.color}40`,
+                      borderRadius: 20, padding: '1.5px 7px',
+                    }}>{sec.badge(h)}</span>
                   )}
-                </span>
-                <span style={{ color: '#FF4D6A', fontWeight: 700, fontFamily: 'system-ui, sans-serif' }}>{bt(h.sa)}- م.ت</span>
-              </div>
-            ))}
-          </div>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ color: sec.color, fontWeight: 700, fontFamily: 'system-ui, sans-serif', flexShrink: 0 }}>
+                    {sec.val(h)} م.ت
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       </div>
     </div>
