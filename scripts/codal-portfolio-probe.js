@@ -64,7 +64,8 @@ async function main() {
 
   for (const a of ports) {
     console.log(`\n═══════ ${a.title} ═══════`)
-    const attUrl = a.link_attachment || a.link
+    const unmask0 = (s) => String(s).replace(/QQQaQQQ/g, '%2b').replace(/OOObOOO/g, '%2f')
+    const attUrl = unmask0(a.link_attachment || a.link || '')
     if (!attUrl) { console.log('  لینک پیوست ندارد'); continue }
 
     // صفحه پیوست کدال: HTML با لینک‌های DownloadFile.aspx
@@ -77,8 +78,11 @@ async function main() {
       html = await res.text()
     } catch (e) { console.log('  خطا در صفحه پیوست:', e.message); continue }
 
+    // BrsAPI کاراکترهای base64 را ماسک می‌کند: + → QQQaQQQ و / → OOObOOO
+    const unmask = (s) => String(s).replace(/QQQaQQQ/g, '%2b').replace(/OOObOOO/g, '%2f')
+
     // ── DEBUG: تمام لینک‌ها و ساختار صفحه پیوست ──
-    const serial = (attUrl.match(/LetterSerial=([^&]+)/) || [])[1] || ''
+    const serial = unmask((attUrl.match(/LetterSerial=([^&]+)/) || [])[1] || '')
     console.log('  LetterSerial:', serial)
     console.log('  طول HTML:', html.length)
     const allA = html.match(/<a[^>]*href="[^"]*"[^>]*>[\s\S]*?<\/a>/g) || []
@@ -115,12 +119,15 @@ async function main() {
     }
 
     const hrefs = [...new Set(
-      (html.match(/DownloadFile\.aspx[^"'<>\s]*/g) || []).map(h => h.replace(/&amp;/g, '&'))
+      (html.match(/DownloadFile\.aspx[^"'<>\s]*/g) || [])
+        .map(h => h.replace(/&amp;/g, '&').replace(/&#39.*$/, '').replace(/['");]+$/, ''))
+        .map(unmask)
     )]
-    console.log(`  ${hrefs.length} فایل پیوست پیدا شد`)
+    console.log(`  ${hrefs.length} فایل پیوست پیدا شد:`, hrefs)
 
     for (const [fi, href] of hrefs.entries()) {
-      const fileUrl = 'https://codal.ir/' + href
+      // لینک نسبی به صفحه Attachment است → مسیر /Reports/
+      const fileUrl = 'https://codal.ir/Reports/' + href
       try {
         const res = await fetch(fileUrl, {
           signal: AbortSignal.timeout(120_000),
