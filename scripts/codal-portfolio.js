@@ -90,19 +90,36 @@ async function downloadPortfolioExcel(announcement) {
   return null
 }
 
-// پارس یک شیت با ساختار «نام شرکت + ۱۲ عدد» — null اگر ساختار نخواند
+// پارس یک شیت با ساختار «نام + ۱۲ عدد» — null اگر ساختار نخواند
+// قالب هر شرکت صندوق فرق دارد: ستون نام جابه‌جا، هدر «شرکت» یا «نام شرکت»،
+// ستون‌های کنترلی اضافه در انتها. ترتیب ۱۲ عدد اول در همه یکی است.
+const isNum = (v) => v !== '' && v !== null && v !== undefined && isFinite(Number(String(v).replace(/,/g, '')))
+
 function parseHoldingRows(rows) {
-  const headerIdx = rows.findIndex(r => r.some(c => /نام (شرکت|سهام)/.test(normTxt(c))))
+  // سطر عنوان: هم «بهای تمام شده» دارد هم یکی از ستون‌های ارزش/فروش
+  const headerIdx = rows.findIndex(r =>
+    r.some(c => normTxt(c).includes('بهای تمام شده')) &&
+    r.some(c => /خالص ارزش|مبلغ فروش|قیمت بازار/.test(normTxt(c)))
+  )
   if (headerIdx < 0) return null
 
   const holdings = []
   for (const row of rows.slice(headerIdx + 1)) {
-    const name = normTxt(row[0])
-    if (!name) continue
-    if (name === 'جمع') break
-    const nums = row.slice(1)
-      .filter(c => c !== '' && c !== null && c !== undefined)
-      .map(Number)
+    // نام = اولین سلول متنی غیرعددی؛ اعداد پس از آن = داده‌ها
+    let nameIdx = -1
+    for (let j = 0; j < row.length; j++) {
+      const v = row[j]
+      if (v === '' || v === null || v === undefined || !String(v).trim()) continue
+      if (isNum(v)) continue
+      nameIdx = j
+      break
+    }
+    if (nameIdx < 0) continue
+    const name = normTxt(row[nameIdx])
+    if (name.startsWith('جمع')) break
+    const nums = row.slice(nameIdx + 1)
+      .filter(c => c !== '' && c !== null && c !== undefined && String(c).trim() !== '')
+      .map(c => Number(String(c).replace(/,/g, '')))
       .filter(n => isFinite(n))
     if (nums.length < 12) continue
     const [q0, c0, n0, bq, bc, sq, sa, q1, p1, c1, n1, pct] = nums
