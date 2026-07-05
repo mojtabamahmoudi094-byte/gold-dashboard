@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 
@@ -33,6 +33,7 @@ const pctColor = (v: number | null, muted: string) =>
 export default function IndustryPage() {
   const params = useParams()
   const rawId = decodeURIComponent((params?.id as string) || '')
+  const router = useRouter()
   const [data, setData] = useState<Payload | null>(null)
   const [failed, setFailed] = useState(false)
   const [isDark, setIsDark] = useState(true)
@@ -127,7 +128,16 @@ export default function IndustryPage() {
                   </thead>
                   <tbody>
                     {ind.symbols.map((s, i) => (
-                      <tr key={s.l18} style={{ background: i % 2 ? (isDark ? 'rgba(255,255,255,0.015)' : 'rgba(15,30,46,0.02)') : 'transparent' }}>
+                      <tr
+                        key={s.l18}
+                        onClick={() => router.push(`/stock/${encodeURIComponent(s.l18)}`)}
+                        style={{
+                          background: i % 2 ? (isDark ? 'rgba(255,255,255,0.015)' : 'rgba(15,30,46,0.02)') : 'transparent',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(59,130,246,0.07)' : 'rgba(59,130,246,0.06)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = i % 2 ? (isDark ? 'rgba(255,255,255,0.015)' : 'rgba(15,30,46,0.02)') : 'transparent' }}
+                      >
                         <td style={{ padding: '10px 14px', borderBottom: `1px solid ${line}` }}>
                           <div style={{ fontWeight: 700, color: text }}>{s.l18}</div>
                           {!isMobile && <div style={{ fontSize: 10, color: muted, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.l30}</div>}
