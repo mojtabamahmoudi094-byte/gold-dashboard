@@ -44,10 +44,11 @@ const XLSX = require('xlsx')
 const unmask = (s) => String(s).replace(/QQQaQQQ/g, '%2f').replace(/OOObOOO/g, '%2b')
 // ارقام فارسی → لاتین
 const faDigits = (s) => String(s).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
-// نرمال‌سازی متن فارسی: ي/ك عربی، نیم‌فاصله، فاصله تکراری
+// نرمال‌سازی متن فارسی: ي/ك عربی، نیم‌فاصله، نویسه‌های نامرئی RTL، فاصله تکراری
 const normTxt = (s) => String(s ?? '')
   .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
-  .replace(/‌/g, ' ').replace(/\s+/g, ' ').trim()
+  .replace(/[‌‎‏‪-‮]/g, ' ')
+  .replace(/\s+/g, ' ').trim()
 // عنوان گزارش پورتفوی: هم «پورتفوی» هم «پرتفوی»
 const isPortfolioTitle = (t) => /پر?ورتفو|پرتفو/.test(normTxt(t))
 
@@ -176,17 +177,24 @@ async function buildSymbol(symbol, { verbose = true } = {}) {
   if (reports.length === 0) throw new Error('هیچ گزارش پورتفوی یافت نشد')
   log('[portfolio] گزارش‌ها:', reports.map(r => r.dateNorm).join(' ، '))
 
+  // هر ماه مستقل — خطای یک ماه، ماه دیگر را از بین نبرد
   const months = []
+  let lastErr = null
   for (const rep of reports) {
     log(`[portfolio] دانلود اکسل ${rep.dateNorm} …`)
-    const buf = await downloadPortfolioExcel(rep)
-    if (!buf) { console.error(`  ❌ ${symbol}: اکسل ${rep.dateNorm} دانلود نشد`); continue }
-    const wb = XLSX.read(buf, { type: 'buffer' })
-    const holdings = parseStockSheet(wb)
-    log(`  ✅ ${holdings.length} سهم پارس شد`)
-    months.push({ date: rep.dateNorm, title: rep.title, holdings })
+    try {
+      const buf = await downloadPortfolioExcel(rep)
+      if (!buf) throw new Error('اکسل دانلود نشد')
+      const wb = XLSX.read(buf, { type: 'buffer' })
+      const holdings = parseStockSheet(wb)
+      log(`  ✅ ${holdings.length} سهم پارس شد`)
+      months.push({ date: rep.dateNorm, title: rep.title, holdings })
+    } catch (e) {
+      lastErr = e
+      console.error(`  ⚠️ ${symbol} ${rep.dateNorm}: ${e.message}`)
+    }
   }
-  if (months.length === 0) throw new Error('هیچ اکسلی دانلود/پارس نشد')
+  if (months.length === 0) throw new Error(lastErr?.message || 'هیچ اکسلی دانلود/پارس نشد')
 
   // قدیمی → جدید
   months.sort((a, b) => a.date.localeCompare(b.date))
