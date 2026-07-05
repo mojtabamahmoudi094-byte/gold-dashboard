@@ -36,7 +36,7 @@ loadEnv('.env.sync')
 
 const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const SYMBOL = process.argv[2] || 'اهرم'
-const MONTHS_WANTED = 2   // دو گزارش ماهانه اخیر
+const MONTHS_WANTED = 3   // سه گزارش ماهانه اخیر — یک فصل کامل (بهار: فروردین تا خرداد)
 
 const XLSX = require('xlsx')
 

@@ -227,8 +227,8 @@ export default function FundDetailPage() {
             tooltip="نسبت سرانه خریدار به سرانه فروشنده. بالای ۱ یعنی خریداران قوی‌ترند" />
         </div>
 
-        {/* پورتفوی کدال (در صورت وجود JSON در public/portfolio) */}
-        <PortfolioSection t={t} slug={slug} isMobile={isMobile} />
+        {/* پورتفوی کدال + گزارش فصلی (در صورت وجود JSON در public/portfolio) */}
+        <CodalSections t={t} slug={slug} isMobile={isMobile} />
 
         {/* ─── بخش گیت‌شده: فقط برای اعضا ─── */}
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -615,9 +615,9 @@ const PIE_COLORS = [
   'oklch(0.74 0.19 40)', 'oklch(0.7 0.12 190)', 'oklch(0.8 0.1 330)',
 ]
 
-function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobile: boolean }) {
+// یک fetch مشترک برای هر دو بخش ماهانه و فصلی
+function CodalSections({ t, slug, isMobile }: { t: any, slug: string, isMobile: boolean }) {
   const [data, setData] = useState<any>(null)
-  const [hi, setHi] = useState<number | null>(null)   // ایندکس قاچ hover شده
 
   useEffect(() => {
     if (!slug) return
@@ -626,6 +626,18 @@ function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobil
       .then(setData)
       .catch(() => setData(null))
   }, [slug])
+
+  if (!data?.months?.length) return null
+  return (
+    <>
+      <PortfolioSection t={t} data={data} isMobile={isMobile} />
+      <QuarterlySection t={t} data={data} isMobile={isMobile} />
+    </>
+  )
+}
+
+function PortfolioSection({ t, data, isMobile }: { t: any, data: any, isMobile: boolean }) {
+  const [hi, setHi] = useState<number | null>(null)   // ایندکس قاچ hover شده
 
   if (!data?.months?.length) return null
 
@@ -826,6 +838,189 @@ function PortfolioSection({ t, slug, isMobile }: { t: any, slug: string, isMobil
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── گزارش فصلی: تجمیع گزارش‌های ماهانه یک فصل (بهار/تابستان/پاییز/زمستان) ────
+const SEASON_NAMES = ['', 'بهار', 'تابستان', 'پاییز', 'زمستان']
+const Q_ACCENT = '#A78BFA'
+
+function QuarterlySection({ t, data, isMobile }: { t: any, data: any, isMobile: boolean }) {
+  if (!data?.months?.length) return null
+
+  // ماه‌های فصلِ آخرین گزارش
+  const lastDate = data.months[data.months.length - 1].date as string
+  const [yr, lastM] = lastDate.split('/').map(Number)
+  const seasonIdx = Math.ceil(lastM / 3)
+  const sm = data.months.filter((m: any) => {
+    const [y, mo] = m.date.split('/').map(Number)
+    return y === yr && Math.ceil(mo / 3) === seasonIdx
+  })
+  if (sm.length < 2) return null   // با یک ماه، گزارش فصلی معنا ندارد
+
+  const bt = (v: number) => Math.round(v / 1e10).toLocaleString('fa-IR')
+  const monthName = (d: string) => ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'][Number(d.split('/')[1])] || d
+
+  // ارزش پایان هر ماه + تجمیع خرید/فروش هر سهم در کل فصل
+  const monthTotals = sm.map((m: any) => ({
+    date: m.date,
+    total: m.holdings.reduce((s: number, h: any) => s + (h.n1 || 0), 0),
+  }))
+  const first = sm[0], last = sm[sm.length - 1]
+  const firstTot = monthTotals[0].total, lastTot = monthTotals[monthTotals.length - 1].total
+  const seasonChange = firstTot > 0 ? ((lastTot - firstTot) / firstTot) * 100 : 0
+
+  const agg = new Map<string, any>()
+  for (const m of sm) {
+    for (const h of m.holdings) {
+      const e = agg.get(h.name) || { name: h.name, bc: 0, sa: 0 }
+      e.bc += h.bc || 0
+      e.sa += h.sa || 0
+      agg.set(h.name, e)
+    }
+  }
+  const totBuy  = [...agg.values()].reduce((s, e) => s + e.bc, 0)
+  const totSell = [...agg.values()].reduce((s, e) => s + e.sa, 0)
+
+  // خالص خرید/فروش فصل به تفکیک سهم
+  const nets = [...agg.values()].map(e => ({ ...e, net: e.bc - e.sa }))
+  const topBuys  = nets.filter(e => e.net > 0).sort((a, b) => b.net - a.net).slice(0, 5)
+  const topSells = nets.filter(e => e.net < 0).sort((a, b) => a.net - b.net).slice(0, 5)
+  const maxNet = Math.max(...topBuys.map(e => e.net), ...topSells.map(e => -e.net), 1)
+
+  // تغییر وزن هر سهم از اول تا آخر فصل (بر اساس ارزش روز)
+  const wFirst = new Map<string, number>()
+  if (firstTot > 0) for (const h of first.holdings) wFirst.set(h.name, (h.n1 || 0) / firstTot * 100)
+  const wLast = new Map<string, number>()
+  if (lastTot > 0) for (const h of last.holdings) wLast.set(h.name, (h.n1 || 0) / lastTot * 100)
+  const weightChanges = [...new Set([...wFirst.keys(), ...wLast.keys()])]
+    .map(n => ({ name: n, d: (wLast.get(n) || 0) - (wFirst.get(n) || 0), w: wLast.get(n) || 0 }))
+    .filter(x => Math.abs(x.d) >= 0.15)
+    .sort((a, b) => Math.abs(b.d) - Math.abs(a.d))
+    .slice(0, 6)
+
+  // موقعیت‌های جدید و خروج کامل در طول فصل
+  const inFirst = new Set(first.holdings.filter((h: any) => (h.n1 || 0) > 0).map((h: any) => h.name))
+  const inLast  = new Set(last.holdings.filter((h: any) => (h.n1 || 0) > 0).map((h: any) => h.name))
+  const entered = [...inLast].filter(n => !inFirst.has(n)).length
+  const exited  = [...inFirst].filter(n => !inLast.has(n)).length
+
+  const maxTot = Math.max(...monthTotals.map((m: any) => m.total), 1)
+  const chips = [
+    { label: 'ارزش پایان فصل', value: `${bt(lastTot)} م.ت`, color: Q_ACCENT },
+    { label: 'تغییر ارزش طی فصل', value: `${seasonChange >= 0 ? '+' : ''}${seasonChange.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪`, color: seasonChange >= 0 ? '#00E5A0' : '#FF4D6A' },
+    { label: 'جمع خرید فصل', value: `${bt(totBuy)} م.ت`, color: '#00E5A0' },
+    { label: 'جمع فروش فصل', value: `${bt(totSell)} م.ت`, color: '#FF4D6A' },
+  ]
+
+  return (
+    <div style={{
+      background: t.panel, border: `0.5px solid ${t.border}`,
+      borderTop: `2px solid ${Q_ACCENT}55`, borderRadius: 14,
+      padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
+    }}>
+      {/* هدر */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright }}>
+            گزارش فصلی — {SEASON_NAMES[seasonIdx]} {yr.toLocaleString('fa-IR', { useGrouping: false })}
+          </div>
+          <div style={{ fontSize: 10, color: t.faint, marginTop: 3 }}>
+            تجمیع {sm.length.toLocaleString('fa-IR')} گزارش ماهانه کدال · {monthName(first.date)} تا {monthName(last.date)}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: '#00E5A0', background: 'rgba(0,229,160,0.1)', border: '0.5px solid rgba(0,229,160,0.3)', borderRadius: 20, padding: '2.5px 9px' }}>
+            {entered.toLocaleString('fa-IR')} ورود جدید
+          </span>
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: '#FF4D6A', background: 'rgba(255,77,106,0.1)', border: '0.5px solid rgba(255,77,106,0.3)', borderRadius: 20, padding: '2.5px 9px' }}>
+            {exited.toLocaleString('fa-IR')} خروج کامل
+          </span>
+        </div>
+      </div>
+
+      {/* چیپ‌های آماری */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+        {chips.map((c, i) => (
+          <div key={i} style={{ background: `${c.color}0d`, border: `0.5px solid ${c.color}30`, borderRadius: 10, padding: '10px 12px', minWidth: 0 }}>
+            <div style={{ fontSize: 9.5, color: t.muted, marginBottom: 4 }}>{c.label}</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: c.color, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* روند ارزش پورتفوی ماه‌به‌ماه + تغییر وزن‌ها */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.4fr', gap: 12, marginBottom: 16 }}>
+        <div style={{ background: t.cardInner ?? 'rgba(255,255,255,0.02)', border: `0.5px solid ${t.border}`, borderRadius: 10, padding: 12, minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, color: t.muted, marginBottom: 10 }}>ارزش سهام پایان هر ماه <span style={{ color: t.faint, fontSize: 9 }}>میلیارد تومان</span></div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, height: 110, padding: '0 6px' }}>
+            {monthTotals.map((m: any, i: number) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: t.textBright, fontFamily: 'system-ui, sans-serif' }}>{bt(m.total)}</span>
+                <div style={{
+                  width: '70%', maxWidth: 44,
+                  height: Math.max((m.total / maxTot) * 72, 4),
+                  borderRadius: '5px 5px 0 0',
+                  background: `linear-gradient(0deg, ${Q_ACCENT}40, ${Q_ACCENT}cc)`,
+                  boxShadow: `0 0 10px ${Q_ACCENT}30`,
+                }} />
+                <span style={{ fontSize: 9, color: t.muted }}>{monthName(m.date)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ background: t.cardInner ?? 'rgba(255,255,255,0.02)', border: `0.5px solid ${t.border}`, borderRadius: 10, padding: 12, minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, color: t.muted, marginBottom: 10 }}>
+            بیشترین تغییر وزن در پورتفوی <span style={{ color: t.faint, fontSize: 9 }}>واحد درصد، از اول تا پایان فصل</span>
+          </div>
+          {weightChanges.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>تغییر وزن قابل‌توجهی ثبت نشده</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {weightChanges.map((x, i) => {
+              const up = x.d >= 0
+              const maxD = Math.abs(weightChanges[0]?.d || 1)
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, minWidth: 0 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={up ? '#00E5A0' : '#FF4D6A'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    {up ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
+                  </svg>
+                  <span style={{ color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flex: '0 1 auto' }}>{x.name}</span>
+                  <span style={{ flex: 1, minWidth: 16, height: 4, borderRadius: 2, background: `${t.muted}22`, overflow: 'hidden', direction: 'ltr' }}>
+                    <span style={{ display: 'block', width: `${Math.min(Math.abs(x.d) / maxD * 100, 100)}%`, height: '100%', borderRadius: 2, background: up ? '#00E5A0' : '#FF4D6A', opacity: 0.7, marginRight: 'auto' }} />
+                  </span>
+                  <span style={{ color: up ? '#00E5A0' : '#FF4D6A', fontWeight: 800, fontFamily: 'system-ui, sans-serif', flexShrink: 0, minWidth: 52, textAlign: 'left' }}>
+                    {up ? '+' : '−'}{Math.abs(x.d).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} pp
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* خالص خرید و فروش فصل */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+        {[
+          { title: 'بیشترین خرید خالص فصل', color: '#00E5A0', rows: topBuys, val: (e: any) => `${bt(e.net)}+`, empty: 'خرید خالص قابل‌توجهی ثبت نشده' },
+          { title: 'بیشترین فروش خالص فصل', color: '#FF4D6A', rows: topSells, val: (e: any) => `${bt(-e.net)}-`, empty: 'فروش خالص قابل‌توجهی ثبت نشده' },
+        ].map((sec, si) => (
+          <div key={si} style={{ background: `${sec.color}08`, border: `0.5px solid ${sec.color}26`, borderRadius: 10, padding: 12, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: sec.color, marginBottom: 10 }}>{sec.title}</div>
+            {sec.rows.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>{sec.empty}</div>}
+            {sec.rows.map((e: any, i: number) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, marginBottom: 6, minWidth: 0 }}>
+                <span style={{ color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flex: '0 1 auto' }}>{e.name}</span>
+                <span style={{ flex: 1, minWidth: 16, height: 4, borderRadius: 2, background: `${t.muted}22`, overflow: 'hidden' }}>
+                  <span style={{ display: 'block', width: `${Math.abs(e.net) / maxNet * 100}%`, height: '100%', borderRadius: 2, background: sec.color, opacity: 0.7 }} />
+                </span>
+                <span style={{ color: sec.color, fontWeight: 700, fontFamily: 'system-ui, sans-serif', flexShrink: 0 }}>{sec.val(e)} م.ت</span>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   )
