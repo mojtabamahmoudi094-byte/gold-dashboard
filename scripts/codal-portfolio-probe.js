@@ -77,6 +77,43 @@ async function main() {
       html = await res.text()
     } catch (e) { console.log('  خطا در صفحه پیوست:', e.message); continue }
 
+    // ── DEBUG: تمام لینک‌ها و ساختار صفحه پیوست ──
+    const serial = (attUrl.match(/LetterSerial=([^&]+)/) || [])[1] || ''
+    console.log('  LetterSerial:', serial)
+    console.log('  طول HTML:', html.length)
+    const allA = html.match(/<a[^>]*href="[^"]*"[^>]*>[\s\S]*?<\/a>/g) || []
+    console.log(`  ${allA.length} تگ <a>:`)
+    allA.slice(0, 20).forEach(t => console.log('   ', t.replace(/\s+/g, ' ').slice(0, 180)))
+    const aspxLinks = [...new Set(html.match(/[A-Za-z]+\.aspx\?[^"'<>\s]*/g) || [])]
+    console.log(`  لینک‌های aspx:`)
+    aspxLinks.slice(0, 20).forEach(l => console.log('   ', l.slice(0, 160)))
+    // تلاش با سرویس اکسل استاندارد کدال
+    if (serial) {
+      const exUrl = `https://excel.codal.ir/service/Excel/GetAll/${serial}/0`
+      try {
+        const r2 = await fetch(exUrl, { signal: AbortSignal.timeout(60_000), headers: { 'User-Agent': 'Mozilla/5.0' } })
+        const b2 = Buffer.from(await r2.arrayBuffer())
+        console.log(`  excel-service: HTTP ${r2.status} | ${b2.length} bytes | sig: ${b2.slice(0, 4).toString('hex')}`)
+        if (b2.slice(0, 2).toString('hex') === '504b' || b2.slice(0, 4).toString('hex').startsWith('d0cf')) {
+          const fname = path.join(__dirname, `codal-${SYMBOL}-${(a.date_title || '').replace(/\//g, '')}-svc.xlsx`)
+          fs.writeFileSync(fname, b2)
+          const wb = XLSX.read(b2, { type: 'buffer' })
+          console.log('  ✅ شیت‌ها:', wb.SheetNames.join(' | '))
+          for (const sn of wb.SheetNames) {
+            const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
+            console.log(`\n  ─── شیت «${sn}» — ${rows.length} ردیف ───`)
+            rows.slice(0, 30).forEach((r, i) => {
+              const line = r.map(c => String(c).slice(0, 24)).join(' ⁞ ').slice(0, 230)
+              if (line.replace(/[⁞\s]/g, '')) console.log(`  ${i}: ${line}`)
+            })
+          }
+          continue
+        } else {
+          console.log('  excel-service body:', b2.toString('utf8').slice(0, 200))
+        }
+      } catch (e) { console.log('  excel-service خطا:', e.message) }
+    }
+
     const hrefs = [...new Set(
       (html.match(/DownloadFile\.aspx[^"'<>\s]*/g) || []).map(h => h.replace(/&amp;/g, '&'))
     )]
