@@ -205,9 +205,20 @@ async function buildSymbol(symbol, { verbose = true } = {}) {
 const toSlug = (name) => name.trim().replace(/\s+/g, '-')
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
+// صندوق‌هایی که در کدال گزارش پورتفوی ماهانه ندارند (تأییدشده تیر ۱۴۰۵)
+// از چرخه حذف می‌شوند تا هر اجرا بیهوده ۳۵ درخواست نسوزد؛ صفحه صندوق هم
+// بدون JSON بخش پورتفوی را نشان نمی‌دهد
+const NO_PORTFOLIO = new Set([
+  'معدن', 'چتر', 'بنکوداریوش', 'بنکر', 'طعام', 'اتوآگاه', 'بانکا', 'چاشنی',
+  'اکتان', 'پولاد', 'دارونو', 'پتروپاداش', 'فلزا', 'امگا', 'آلیاژ', 'مزه',
+  'اتوداریوش', 'نمک', 'خودران', 'نیروانا', 'پتروداریوش', 'سیمانو',
+  'نفتوداریوش', 'سورنافود', 'پتروفارس', 'سیمانا', 'آس', 'طلوع', 'آوید',
+  'عقیق', 'پادا', 'رخش', 'بذر', 'عرش', 'اعتبارسهام',
+])
+
 async function runAll() {
   const { BOURSE_SYMBOLS } = require('./bourse-symbols')
-  const names = Object.values(BOURSE_SYMBOLS).flat()
+  const names = Object.values(BOURSE_SYMBOLS).flat().filter(n => !NO_PORTFOLIO.has(n))
   const outDir = path.join(__dirname, 'portfolio-out')
   fs.mkdirSync(outDir, { recursive: true })
 
