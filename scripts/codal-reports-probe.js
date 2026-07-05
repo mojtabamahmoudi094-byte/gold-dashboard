@@ -100,14 +100,28 @@ async function main() {
     console.log('⚠️ npm install xlsx لازم است'); process.exit(1)
   }
 
-  // ۱۵ ماه اخیر: از ۱۴۰۴-۰۱-۰۱ تا امروز
-  const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
-    + `&l18=${encodeURIComponent(SYMBOL)}`
-    + `&date_start=1404-01-01&date_end=1405-04-15`
-  console.log(`═══ اطلاعیه‌های کدال «${SYMBOL}» (1404-01-01 تا 1405-04-15) ═══`)
-  const data = await fetchJson(url)
-  const list = Array.isArray(data) ? data : (data?.announcement ?? [])
-  console.log('تعداد کل:', list.length, '| count_page:', data?.count_page ?? '—')
+  // بازه بلند HTTP 400 می‌دهد — پنجره‌های ۲ ماهه از ۱۴۰۴-۰۱ تا ۱۴۰۵-۰۴
+  const windows = [
+    ['1404-01-01', '1404-02-31'], ['1404-03-01', '1404-04-31'],
+    ['1404-05-01', '1404-06-31'], ['1404-07-01', '1404-08-30'],
+    ['1404-09-01', '1404-10-30'], ['1404-11-01', '1404-12-29'],
+    ['1405-01-01', '1405-02-31'], ['1405-03-01', '1405-04-15'],
+  ]
+  console.log(`═══ اطلاعیه‌های کدال «${SYMBOL}» (1404-01-01 تا 1405-04-15، پنجره‌ای) ═══`)
+  const list = []
+  for (const [ds, de] of windows) {
+    const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
+      + `&l18=${encodeURIComponent(SYMBOL)}`
+      + `&date_start=${ds}&date_end=${de}`
+    try {
+      const data = await fetchJson(url)
+      const part = Array.isArray(data) ? data : (data?.announcement ?? [])
+      console.log(`  ${ds} تا ${de}: ${part.length} اطلاعیه`)
+      list.push(...part)
+    } catch (e) { console.log(`  ${ds} تا ${de}: خطا — ${e.message}`) }
+    await new Promise(r => setTimeout(r, 4000)) // throttle کدال
+  }
+  console.log('تعداد کل:', list.length)
 
   console.log('\n═══ همه عنوان‌ها ═══')
   list.forEach((a, i) => console.log(`${i}) [${a.date_publish ?? a.date_send}] ${a.title}`))
