@@ -222,7 +222,7 @@ async function runAll() {
       console.log(`❌ ${e.message}`)
       failed.push(`${name}: ${e.message}`)
     }
-    await sleep(1200)   // رعایت rate limit کدال/BrsAPI
+    await sleep(4000)   // رعایت rate limit کدال — کمتر از این throttle می‌شود
   }
 
   console.log(`\n═══ نتیجه: ${ok.length} موفق، ${failed.length} ناموفق ═══`)
