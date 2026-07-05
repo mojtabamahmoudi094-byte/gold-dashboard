@@ -8,6 +8,7 @@ import { useIsMobile } from '../../lib/useIsMobile'
 
 const NAV = [
   { label: 'خانه',          href: '/' },
+  { label: 'سهام',          href: '/stocks' },
   { label: 'صندوق‌ها',      href: '/funds' },
   { label: 'تحلیل',         href: '/analysis' },
   { label: 'ارزش معاملات',  href: '/trade-value' },
