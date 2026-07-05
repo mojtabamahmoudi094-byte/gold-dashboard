@@ -184,55 +184,73 @@ function parsePL(wb) {
 // ═══ انتخاب اطلاعیه‌ها ═══
 function pickReports(list) {
   const isSub = (t) => /\(شرکت /.test(t)                  // گزارش زیرمجموعه
-  const latestBy = (arr, keyFn) => {
+
+  // گروه‌بندی بر اساس کلید دوره؛ در هر گروه نسخه‌ها را به‌ترتیب اولویت مرتب می‌کند
+  const groupBy = (arr, keyFn, rank) => {
     const m = new Map()
     for (const a of arr) {
       const k = keyFn(a)
       if (!k) continue
-      const prev = m.get(k)
-      // اصلاحیه/نسخه جدیدتر برنده — بر اساس تاریخ انتشار
-      if (!prev || faDate(a.date_publish) > faDate(prev.date_publish)
-          || (norm(a.title).includes('اصلاحیه') && !norm(prev.title).includes('اصلاحیه'))) m.set(k, a)
+      if (!m.has(k)) m.set(k, [])
+      m.get(k).push(a)
     }
-    return [...m.values()]
+    const groups = []
+    for (const [k, cands] of m) {
+      cands.sort(rank)
+      groups.push({ key: k, candidates: cands })
+    }
+    return groups
   }
 
-  const monthly = latestBy(
+  // ماهانه: نسخه اصلی مقدم بر اصلاحیه (اصلاحیه گاهی اکسل خالی دارد)، بعد جدیدترین انتشار
+  const monthly = groupBy(
     list.filter(a => /گزارش فعالیت ماهانه/.test(norm(a.title)) && !isSub(norm(a.title))),
     a => faDate(a.title),
-  )
+    // اصلاحیه (داده تصحیح‌شده) اول؛ اگر اکسلش نیامد، نسخه اصلی جایگزین می‌شود
+    (a, b) => (faDate(b.date_publish) || '').localeCompare(faDate(a.date_publish) || ''),
+  ).sort((x, y) => x.key.localeCompare(y.key))
 
   const interim = list.filter(a => {
     const t = norm(a.title)
-    return /میاندوره ای|میان دوره ای|میاندوره‌ای/.test(t.replace(/‌/g, ' ')) || /میاندوره/.test(t)
-  }).filter(a => {
-    const t = norm(a.title)
-    return /دوره (۳|۶|۹|3|6|9) ماهه/.test(t) && !isSub(t)
+    return (/میاندوره/.test(t.replace(/‌/g, '')) || /میان دوره/.test(t))
+      && /دوره (۳|۶|۹|3|6|9) ماهه/.test(t) && !isSub(t)
   })
   const annual = list.filter(a => {
-    const t = norm(a.title)
-    return /^صورت های مالی\s+سال مالی منتهی به/.test(t.replace(/‌/g, ' ')) && !isSub(t)
+    const t = norm(a.title).replace(/‌/g, ' ')
+    return /^صورت های مالی\s+سال مالی منتهی به/.test(t) && !isSub(norm(a.title))
   })
 
-  // برای هر (تاریخ دوره + طول دوره): غیرتلفیقی مقدم، بعد جدیدترین انتشار
-  const key = (a) => {
-    const t = norm(a.title)
-    const dur = t.match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
-    const d = faDate(t)
-    return d ? `${d}|${dur ? faNum(dur[1]) : 12}` : null
+  const durOf = (a) => {
+    const m = norm(a.title).match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
+    return m ? faNum(m[1]) : 12
   }
-  const m = new Map()
-  for (const a of [...interim, ...annual]) {
-    const k = key(a)
-    if (!k) continue
-    const prev = m.get(k)
-    if (!prev) { m.set(k, a); continue }
-    const aCons = /تلفیقی/.test(norm(a.title))
-    const pCons = /تلفیقی/.test(norm(prev.title))
-    if (pCons && !aCons) { m.set(k, a); continue }
-    if (aCons === pCons && faDate(a.date_publish) > faDate(prev.date_publish)) m.set(k, a)
+  // صورت‌های مالی: غیرتلفیقی مقدم، بعد جدیدترین انتشار (اصلاحیه‌ها هم پوشش داده می‌شوند)
+  const quarterly = groupBy(
+    [...interim, ...annual],
+    a => { const d = faDate(norm(a.title)); return d ? `${d}|${durOf(a)}` : null },
+    (a, b) => {
+      const ac = /تلفیقی/.test(norm(a.title)) ? 1 : 0
+      const bc = /تلفیقی/.test(norm(b.title)) ? 1 : 0
+      if (ac !== bc) return ac - bc
+      return (faDate(b.date_publish) || '').localeCompare(faDate(a.date_publish) || '')
+    },
+  ).sort((x, y) => x.key.localeCompare(y.key))
+
+  return { monthly, quarterly }
+}
+
+// اولین نسخه‌ای که اکسلش می‌آید و پارس می‌شود؛ در غیر این صورت null
+async function firstParsable(candidates, parse, label) {
+  for (const a of candidates) {
+    try {
+      const wb = await fetchWorkbook(a)
+      await sleep(1500)
+      if (!wb) continue
+      const p = parse(wb)
+      if (p) return { a, p }
+    } catch { await sleep(1500) }
   }
-  return { monthly, quarterly: [...m.values()] }
+  return null
 }
 
 // ═══ پردازش یک نماد ═══
@@ -244,40 +262,30 @@ async function buildSymbol(symbol) {
   const list = await fetchAnnouncements(symbol)
   console.log(`  ${list.length} اطلاعیه`)
   const { monthly, quarterly } = pickReports(list)
-  console.log(`  فعالیت ماهانه: ${monthly.length} | صورت مالی دوره‌ای: ${quarterly.length}`)
+  console.log(`  فعالیت ماهانه: ${monthly.length} دوره | صورت مالی: ${quarterly.length} دوره`)
 
   const months = []
-  for (const a of monthly) {
-    try {
-      const wb = await fetchWorkbook(a)
-      if (!wb) { console.log(`    ⚠️ ${faDate(a.title)}: اکسل نیامد`); continue }
-      const p = parseMonthly(wb)
-      if (!p) { console.log(`    ⚠️ ${faDate(a.title)}: فرم ماهانه پارس نشد`); continue }
-      months.push({ period: faDate(a.title), publish: faDate(a.date_publish), ...p })
-    } catch (e) { console.log(`    ⚠️ ${faDate(a.title)}: ${e.message}`) }
-    await sleep(1500)
+  for (const g of monthly) {
+    const r = await firstParsable(g.candidates, parseMonthly)
+    if (!r) { console.log(`    ⚠️ ماهانه ${g.key}: نیامد/پارس نشد (${g.candidates.length} نسخه)`); continue }
+    months.push({ period: faDate(r.a.title), publish: faDate(r.a.date_publish), ...r.p })
   }
   months.sort((a, b) => a.period.localeCompare(b.period))
 
   const quarters = []
-  for (const a of quarterly) {
-    try {
-      const wb = await fetchWorkbook(a)
-      if (!wb) { console.log(`    ⚠️ فصلی ${faDate(a.title)}: اکسل نیامد`); continue }
-      const pl = parsePL(wb)
-      if (!pl) { console.log(`    ⚠️ فصلی ${faDate(a.title)}: سود و زیان پارس نشد`); continue }
-      const t = norm(a.title)
-      const dur = t.match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
-      quarters.push({
-        period: faDate(t),
-        months: dur ? faNum(dur[1]) : 12,
-        audited: /حسابرسی شده/.test(t),
-        consolidated: /تلفیقی/.test(t),
-        publish: faDate(a.date_publish),
-        ...pl,
-      })
-    } catch (e) { console.log(`    ⚠️ فصلی: ${e.message}`) }
-    await sleep(1500)
+  for (const g of quarterly) {
+    const r = await firstParsable(g.candidates, parsePL)
+    if (!r) { console.log(`    ⚠️ فصلی ${g.key}: نیامد/پارس نشد (${g.candidates.length} نسخه)`); continue }
+    const t = norm(r.a.title)
+    const dur = t.match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
+    quarters.push({
+      period: faDate(t),
+      months: dur ? faNum(dur[1]) : 12,
+      audited: /حسابرسی شده/.test(t),
+      consolidated: /تلفیقی/.test(t),
+      publish: faDate(r.a.date_publish),
+      ...r.p,
+    })
   }
   quarters.sort((a, b) => (a.period + a.months).localeCompare(b.period + b.months))
 
