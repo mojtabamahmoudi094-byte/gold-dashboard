@@ -280,5 +280,52 @@ async function runDump() {
   }
 }
 
-;(SYMBOL === '--all' ? runAll() : SYMBOL === '--dump' ? runDump() : runOne())
+// یافتن نماد کدالِ صندوق‌های جامانده — همه اطلاعیه‌های پورتفوی بازه، بدون l18
+async function runFind() {
+  const { BOURSE_SYMBOLS } = require('./bourse-symbols')
+  const names = Object.values(BOURSE_SYMBOLS).flat()
+  const outDir = path.join(__dirname, 'portfolio-out')
+  const have = new Set(
+    fs.existsSync(outDir) ? fs.readdirSync(outDir).map(f => normTxt(f.replace('.json', '').replace(/-/g, ' '))) : []
+  )
+  const missing = names.filter(n => !have.has(normTxt(n)))
+  console.log(`جامانده‌ها (${missing.length}):`, missing.join(' | '))
+
+  // اطلاعیه‌های پورتفوی خرداد از همه ناشران
+  const base = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
+    + `&date_start=1405-03-25&date_end=1405-04-14`
+  const seen = new Map()   // normName(l18) → {l18, l30}
+  let page = 1, pages = 1
+  do {
+    const d = await fetchJson(`${base}&page=${page}`)
+    pages = Number(d?.count_page) || 1
+    for (const a of d?.announcement ?? []) {
+      if (!isPortfolioTitle(a.title)) continue
+      const key = normTxt(a.l18)
+      if (key && !seen.has(key)) seen.set(key, { l18: a.l18, l30: a.l30 })
+    }
+    process.stdout.write(`\rصفحه ${page}/${pages} — ${seen.size} ناشر پورتفوی`)
+    page++
+    await sleep(800)
+  } while (page <= pages)
+  console.log('')
+
+  // برای هر جامانده: کاندیدهایی که نام ما در l18 یا l30 آن‌ها آمده
+  console.log('\n═══ کاندیدها ═══')
+  for (const m of missing) {
+    const nm = normTxt(m)
+    const cands = [...seen.values()].filter(v =>
+      normTxt(v.l18).includes(nm) || normTxt(v.l30).includes(nm)
+    )
+    console.log(`${m}: ${cands.length ? cands.map(c => `«${c.l18}» (${c.l30})`).join(' | ') : '—'}`)
+  }
+
+  // ناشرانی که با هیچ نمادی از لیست ما match نشدند (برای بررسی چشمی)
+  const matched = new Set(names.map(normTxt))
+  const unknown = [...seen.values()].filter(v => !matched.has(normTxt(v.l18)))
+  console.log(`\n═══ نمادهای پورتفوی‌دار خارج از لیست ما (${unknown.length}) ═══`)
+  unknown.forEach(v => console.log(`  ${v.l18} — ${v.l30}`))
+}
+
+;(SYMBOL === '--all' ? runAll() : SYMBOL === '--dump' ? runDump() : SYMBOL === '--find' ? runFind() : runOne())
   .catch(e => { console.error(e); process.exit(1) })
