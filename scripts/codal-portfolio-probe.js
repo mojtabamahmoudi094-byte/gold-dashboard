@@ -44,30 +44,18 @@ async function main() {
   console.log('═══ دریافت اطلاعیه‌های کدال برای «' + SYMBOL + '» (1405-02-01 تا 1405-04-14) ═══')
   const data = await fetchJson(url)
 
-  const list = Array.isArray(data) ? data : (data?.data ?? data?.announcements ?? [])
-  console.log('کلیدهای پاسخ:', Array.isArray(data) ? '(آرایه)' : Object.keys(data || {}).join(', '))
+  const list = Array.isArray(data) ? data : (data?.announcement ?? [])
   console.log('تعداد اطلاعیه:', Array.isArray(list) ? list.length : '؟')
-
-  if (!Array.isArray(list) || list.length === 0) {
-    console.log('پاسخ خام (۲۰۰۰ کاراکتر اول):')
-    console.log(JSON.stringify(data).slice(0, 2000))
-    return
-  }
 
   console.log('\n═══ همه عنوان‌ها ═══')
   list.forEach((a, i) => {
     console.log(`${i}) [${a.date_publish ?? a.date_send}] ${a.title}`)
   })
 
-  // اطلاعیه‌های صورت وضعیت پورتفوی (ماهانه)
+  // اطلاعیه‌های صورت وضعیت پورتفوی (ماهانه) — فایل در صفحه پیوست است نه link_excel
   const ports = list.filter(a => String(a.title || '').includes('پورتفوی'))
   console.log(`\n═══ اطلاعیه‌های پورتفوی: ${ports.length} ═══`)
-  ports.forEach(a => {
-    console.log(`- ${a.title}`)
-    console.log(`  excel: ${a.link_excel}`)
-  })
 
-  // دانلود اکسل هر اطلاعیه پورتفوی و چاپ ساختار
   let XLSX
   try { XLSX = require('xlsx') } catch {
     console.log('\n⚠️ پکیج xlsx نصب نیست — npm install xlsx و دوباره اجرا کنید')
@@ -75,28 +63,59 @@ async function main() {
   }
 
   for (const a of ports) {
-    if (!a.link_excel) continue
-    console.log(`\n═══════ EXCEL: ${a.title} ═══════`)
-    try {
-      const res = await fetch(a.link_excel, { signal: AbortSignal.timeout(60_000) })
-      if (!res.ok) { console.log('  دانلود ناموفق: HTTP', res.status); continue }
-      const buf = Buffer.from(await res.arrayBuffer())
-      const fname = path.join(__dirname, `codal-${SYMBOL}-${(a.date_title || '').replace(/\//g, '')}.xlsx`)
-      fs.writeFileSync(fname, buf)
-      console.log(`  ذخیره شد: ${fname} (${buf.length} bytes)`)
+    console.log(`\n═══════ ${a.title} ═══════`)
+    const attUrl = a.link_attachment || a.link
+    if (!attUrl) { console.log('  لینک پیوست ندارد'); continue }
 
-      const wb = XLSX.read(buf, { type: 'buffer' })
-      console.log('  شیت‌ها:', wb.SheetNames.join(' | '))
-      for (const sn of wb.SheetNames) {
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
-        console.log(`\n  ─── شیت «${sn}» — ${rows.length} ردیف ───`)
-        rows.slice(0, 25).forEach((r, i) => {
-          const line = r.map(c => String(c).slice(0, 22)).join(' ⁞ ').slice(0, 220)
-          if (line.replace(/[⁞\s]/g, '')) console.log(`  ${i}: ${line}`)
+    // صفحه پیوست کدال: HTML با لینک‌های DownloadFile.aspx
+    let html
+    try {
+      const res = await fetch(attUrl, {
+        signal: AbortSignal.timeout(60_000),
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      })
+      html = await res.text()
+    } catch (e) { console.log('  خطا در صفحه پیوست:', e.message); continue }
+
+    const hrefs = [...new Set(
+      (html.match(/DownloadFile\.aspx[^"'<>\s]*/g) || []).map(h => h.replace(/&amp;/g, '&'))
+    )]
+    console.log(`  ${hrefs.length} فایل پیوست پیدا شد`)
+
+    for (const [fi, href] of hrefs.entries()) {
+      const fileUrl = 'https://codal.ir/' + href
+      try {
+        const res = await fetch(fileUrl, {
+          signal: AbortSignal.timeout(120_000),
+          headers: { 'User-Agent': 'Mozilla/5.0', Referer: attUrl },
         })
+        const ctype = res.headers.get('content-type') || ''
+        const cdisp = res.headers.get('content-disposition') || ''
+        const buf = Buffer.from(await res.arrayBuffer())
+        console.log(`\n  فایل ${fi}: ${buf.length} bytes | type: ${ctype} | ${cdisp.slice(0, 80)}`)
+
+        // امضای فایل: xlsx=PK، xls=D0CF، pdf=%PDF
+        const sig = buf.slice(0, 4).toString('hex')
+        const isExcel = sig.startsWith('504b') || sig.startsWith('d0cf')
+        if (!isExcel) { console.log('  (اکسل نیست — رد شد، امضا: ' + sig + ')'); continue }
+
+        const fname = path.join(__dirname, `codal-${SYMBOL}-${(a.date_title || '').replace(/\//g, '')}-${fi}.xlsx`)
+        fs.writeFileSync(fname, buf)
+        console.log(`  ذخیره شد: ${fname}`)
+
+        const wb = XLSX.read(buf, { type: 'buffer' })
+        console.log('  شیت‌ها:', wb.SheetNames.join(' | '))
+        for (const sn of wb.SheetNames) {
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
+          console.log(`\n  ─── شیت «${sn}» — ${rows.length} ردیف ───`)
+          rows.slice(0, 30).forEach((r, i) => {
+            const line = r.map(c => String(c).slice(0, 24)).join(' ⁞ ').slice(0, 230)
+            if (line.replace(/[⁞\s]/g, '')) console.log(`  ${i}: ${line}`)
+          })
+        }
+      } catch (e) {
+        console.log('  خطا در دانلود فایل:', e.message)
       }
-    } catch (e) {
-      console.log('  خطا:', e.message)
     }
   }
 }
