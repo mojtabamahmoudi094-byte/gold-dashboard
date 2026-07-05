@@ -1,0 +1,104 @@
+#!/usr/bin/env node
+/**
+ * codal-portfolio-probe.js
+ *
+ * بورس سنج — مرحله ۱ (کاوش): دریافت اطلاعیه‌های «صورت وضعیت پورتفوی» صندوق اهرم
+ * از کدال (BrsAPI Codal) برای اردیبهشت و خرداد ۱۴۰۵ + دانلود اکسل و چاپ ساختار
+ *
+ * روی سرور ایرانی:
+ *   npm install xlsx        (فقط یک بار)
+ *   node codal-portfolio-probe.js
+ *
+ * خروجی: فهرست اطلاعیه‌ها + نام شیت‌ها و ردیف‌های اول هر اکسل — برای طراحی parser
+ */
+
+'use strict'
+
+const path = require('path')
+const fs   = require('fs')
+
+function loadEnv(file) {
+  const p = path.resolve(__dirname, file)
+  if (!fs.existsSync(p)) return
+  fs.readFileSync(p, 'utf8').split('\n').forEach(line => {
+    const m = line.match(/^([^#=\s]+)\s*=\s*(.+)$/)
+    if (m) process.env[m[1]] = m[2].trim()
+  })
+}
+loadEnv('../.env.local')
+loadEnv('.env.sync')
+
+const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const SYMBOL = process.argv[2] || 'اهرم'
+
+async function fetchJson(url) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+async function main() {
+  const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
+    + `&l18=${encodeURIComponent(SYMBOL)}`
+    + `&date_start=1405-02-01&date_end=1405-04-14`
+  console.log('═══ دریافت اطلاعیه‌های کدال برای «' + SYMBOL + '» (1405-02-01 تا 1405-04-14) ═══')
+  const data = await fetchJson(url)
+
+  const list = Array.isArray(data) ? data : (data?.data ?? data?.announcements ?? [])
+  console.log('کلیدهای پاسخ:', Array.isArray(data) ? '(آرایه)' : Object.keys(data || {}).join(', '))
+  console.log('تعداد اطلاعیه:', Array.isArray(list) ? list.length : '؟')
+
+  if (!Array.isArray(list) || list.length === 0) {
+    console.log('پاسخ خام (۲۰۰۰ کاراکتر اول):')
+    console.log(JSON.stringify(data).slice(0, 2000))
+    return
+  }
+
+  console.log('\n═══ همه عنوان‌ها ═══')
+  list.forEach((a, i) => {
+    console.log(`${i}) [${a.date_publish ?? a.date_send}] ${a.title}`)
+  })
+
+  // اطلاعیه‌های صورت وضعیت پورتفوی (ماهانه)
+  const ports = list.filter(a => String(a.title || '').includes('پورتفوی'))
+  console.log(`\n═══ اطلاعیه‌های پورتفوی: ${ports.length} ═══`)
+  ports.forEach(a => {
+    console.log(`- ${a.title}`)
+    console.log(`  excel: ${a.link_excel}`)
+  })
+
+  // دانلود اکسل هر اطلاعیه پورتفوی و چاپ ساختار
+  let XLSX
+  try { XLSX = require('xlsx') } catch {
+    console.log('\n⚠️ پکیج xlsx نصب نیست — npm install xlsx و دوباره اجرا کنید')
+    return
+  }
+
+  for (const a of ports) {
+    if (!a.link_excel) continue
+    console.log(`\n═══════ EXCEL: ${a.title} ═══════`)
+    try {
+      const res = await fetch(a.link_excel, { signal: AbortSignal.timeout(60_000) })
+      if (!res.ok) { console.log('  دانلود ناموفق: HTTP', res.status); continue }
+      const buf = Buffer.from(await res.arrayBuffer())
+      const fname = path.join(__dirname, `codal-${SYMBOL}-${(a.date_title || '').replace(/\//g, '')}.xlsx`)
+      fs.writeFileSync(fname, buf)
+      console.log(`  ذخیره شد: ${fname} (${buf.length} bytes)`)
+
+      const wb = XLSX.read(buf, { type: 'buffer' })
+      console.log('  شیت‌ها:', wb.SheetNames.join(' | '))
+      for (const sn of wb.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
+        console.log(`\n  ─── شیت «${sn}» — ${rows.length} ردیف ───`)
+        rows.slice(0, 25).forEach((r, i) => {
+          const line = r.map(c => String(c).slice(0, 22)).join(' ⁞ ').slice(0, 220)
+          if (line.replace(/[⁞\s]/g, '')) console.log(`  ${i}: ${line}`)
+        })
+      }
+    } catch (e) {
+      console.log('  خطا:', e.message)
+    }
+  }
+}
+
+main().catch(e => { console.error(e); process.exit(1) })
