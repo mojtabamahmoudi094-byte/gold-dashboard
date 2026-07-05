@@ -120,7 +120,14 @@ async function main() {
 
         const text = buf.toString('utf8')
         if (!text.includes('<table') && !text.includes('<TABLE')) {
-          console.log('  (نه اکسل نه HTML جدول‌دار — رد شد)')
+          console.log('  (HTML بدون جدول — محتوای خام برای تشخیص:)')
+          console.log('  ── ۱۵۰۰ کاراکتر اول ──')
+          console.log(text.slice(0, 1500))
+          console.log('  ── شمارش الگوها ──')
+          for (const pat of ['<div', '<script', 'var ', 'json', 'datasource', 'rowSpan', 'iframe', '.xls', 'DownloadFile']) {
+            const c = text.split(pat).length - 1
+            if (c) console.log(`   ${pat}: ${c}`)
+          }
           continue
         }
 
