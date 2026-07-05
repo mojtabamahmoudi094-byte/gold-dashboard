@@ -85,20 +85,32 @@ async function fetchAnnouncements(symbol) {
   return list
 }
 
-// ═══ دانلود اکسل-HTML کدال و پارس با XLSX ═══
-async function fetchWorkbook(a) {
+// ═══ دانلود اکسل-HTML کدال و پارس با XLSX (با retry برای throttle) ═══
+async function fetchWorkbookOnce(a) {
   if (!a.link_excel) return null
   const url = unmask(a.link_excel)
   const res = await fetch(url, {
     signal: AbortSignal.timeout(120_000),
     headers: { 'User-Agent': 'Mozilla/5.0' },
   })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const buf = Buffer.from(await res.arrayBuffer())
   const sig = buf.slice(0, 4).toString('hex')
   if (sig.startsWith('504b') || sig.startsWith('d0cf')) return XLSX.read(buf, { type: 'buffer' })
   const text = buf.toString('utf8')
-  if (!/<table/i.test(text)) return null
-  try { return XLSX.read(text, { type: 'string' }) } catch { return null }
+  if (!/<table/i.test(text)) throw new Error('بدون جدول')   // احتمالاً صفحه خطای throttle — retry
+  return XLSX.read(text, { type: 'string' })
+}
+
+async function fetchWorkbook(a) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try { return await fetchWorkbookOnce(a) }
+    catch (e) {
+      if (attempt === 3) return null
+      await sleep(8000 * attempt)   // ۸ثانیه، ۱۶ثانیه — عبور از throttle
+    }
+  }
+  return null
 }
 
 const sheetRows = (wb, sn) => XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
