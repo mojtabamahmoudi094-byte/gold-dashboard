@@ -872,13 +872,17 @@ function QuarterlySection({ t, data, isMobile }: { t: any, data: any, isMobile: 
   const firstTot = monthTotals[0].total, lastTot = monthTotals[monthTotals.length - 1].total
   const seasonChange = firstTot > 0 ? ((lastTot - firstTot) / firstTot) * 100 : 0
 
+  // نام واحد برای تطبیق بین ماه‌ها — بعضی گزارش‌ها همان سهم را با «*» یا فاصله متفاوت می‌نویسند
+  const cleanName = (n: string) => String(n || '').replace(/[*٭]/g, '').replace(/\s+/g, ' ').trim()
+
   const agg = new Map<string, any>()
   for (const m of sm) {
     for (const h of m.holdings) {
-      const e = agg.get(h.name) || { name: h.name, bc: 0, sa: 0 }
+      const k = cleanName(h.name)
+      const e = agg.get(k) || { name: k, bc: 0, sa: 0 }
       e.bc += h.bc || 0
       e.sa += h.sa || 0
-      agg.set(h.name, e)
+      agg.set(k, e)
     }
   }
   const totBuy  = [...agg.values()].reduce((s, e) => s + e.bc, 0)
@@ -892,9 +896,15 @@ function QuarterlySection({ t, data, isMobile }: { t: any, data: any, isMobile: 
 
   // تغییر وزن هر سهم از اول تا آخر فصل (بر اساس ارزش روز)
   const wFirst = new Map<string, number>()
-  if (firstTot > 0) for (const h of first.holdings) wFirst.set(h.name, (h.n1 || 0) / firstTot * 100)
+  if (firstTot > 0) for (const h of first.holdings) {
+    const k = cleanName(h.name)
+    wFirst.set(k, (wFirst.get(k) || 0) + (h.n1 || 0) / firstTot * 100)
+  }
   const wLast = new Map<string, number>()
-  if (lastTot > 0) for (const h of last.holdings) wLast.set(h.name, (h.n1 || 0) / lastTot * 100)
+  if (lastTot > 0) for (const h of last.holdings) {
+    const k = cleanName(h.name)
+    wLast.set(k, (wLast.get(k) || 0) + (h.n1 || 0) / lastTot * 100)
+  }
   const weightChanges = [...new Set([...wFirst.keys(), ...wLast.keys()])]
     .map(n => ({ name: n, d: (wLast.get(n) || 0) - (wFirst.get(n) || 0), w: wLast.get(n) || 0 }))
     .filter(x => Math.abs(x.d) >= 0.15)
@@ -902,8 +912,8 @@ function QuarterlySection({ t, data, isMobile }: { t: any, data: any, isMobile: 
     .slice(0, 6)
 
   // موقعیت‌های جدید و خروج کامل در طول فصل
-  const inFirst = new Set(first.holdings.filter((h: any) => (h.n1 || 0) > 0).map((h: any) => h.name))
-  const inLast  = new Set(last.holdings.filter((h: any) => (h.n1 || 0) > 0).map((h: any) => h.name))
+  const inFirst = new Set(first.holdings.filter((h: any) => (h.n1 || 0) > 0).map((h: any) => cleanName(h.name)))
+  const inLast  = new Set(last.holdings.filter((h: any) => (h.n1 || 0) > 0).map((h: any) => cleanName(h.name)))
   const entered = [...inLast].filter(n => !inFirst.has(n)).length
   const exited  = [...inFirst].filter(n => !inLast.has(n)).length
 
@@ -991,8 +1001,8 @@ function QuarterlySection({ t, data, isMobile }: { t: any, data: any, isMobile: 
                   <span style={{ flex: 1, minWidth: 16, height: 4, borderRadius: 2, background: `${t.muted}22`, overflow: 'hidden', direction: 'ltr' }}>
                     <span style={{ display: 'block', width: `${Math.min(Math.abs(x.d) / maxD * 100, 100)}%`, height: '100%', borderRadius: 2, background: up ? '#00E5A0' : '#FF4D6A', opacity: 0.7, marginRight: 'auto' }} />
                   </span>
-                  <span style={{ color: up ? '#00E5A0' : '#FF4D6A', fontWeight: 800, fontFamily: 'system-ui, sans-serif', flexShrink: 0, minWidth: 52, textAlign: 'left' }}>
-                    {up ? '+' : '−'}{Math.abs(x.d).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} pp
+                  <span style={{ color: up ? '#00E5A0' : '#FF4D6A', fontWeight: 800, flexShrink: 0, minWidth: 74, textAlign: 'left', fontSize: 10.5 }}>
+                    {up ? '+' : '−'}{Math.abs(x.d).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} واحد درصد
                   </span>
                 </div>
               )
