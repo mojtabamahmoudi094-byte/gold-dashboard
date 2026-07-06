@@ -62,6 +62,10 @@ type Reports = { symbol: string; updated: string; months: RMonth[]; quarters: RQ
 const pct = (v: number | null) =>
   v === null ? '—' : `${v > 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪`
 
+// نرخ فروش کدال به ریال بر واحد است → میلیون تومان بر واحد
+const rateFmt = (v: number | null) =>
+  v === null || v === 0 ? '—' : `${(v / 1e7).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت`
+
 const GREEN = 'oklch(0.74 0.16 150)'
 const RED   = 'oklch(0.68 0.19 25)'
 
@@ -158,37 +162,86 @@ export default function StockPage() {
             ['ارزش بازار', s.mv === null ? '—' : hemat(s.mv), text],
             ['P/E', s.pe === null ? '—' : s.pe.toLocaleString('fa-IR', { maximumFractionDigits: 1 }), text],
           ]
+          const up = (s.pcp ?? 0) > 0, down = (s.pcp ?? 0) < 0
+          const chgC = up ? GREEN : down ? RED : muted
           return (
             <>
-              <div style={{ margin: '14px 0 6px', display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: isMobile ? 22 : 26, fontWeight: 800, color: text }}>{s.l18}</span>
-                <span style={{ fontSize: 12.5, color: muted }}>{s.l30}</span>
-              </div>
-              <div style={{ marginBottom: 20 }}>
-                <Link href={`/stocks/${ind.id}`} style={{
-                  fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
-                  padding: '4px 10px', borderRadius: 8,
-                  background: 'rgba(59,130,246,0.08)', border: '0.5px solid rgba(59,130,246,0.25)',
-                }}>
-                  صنعت: {ind.name}
-                </Link>
+              {/* هدر hero */}
+              <div style={{
+                position: 'relative', overflow: 'hidden',
+                marginTop: 14, marginBottom: 16, padding: isMobile ? '18px 18px' : '22px 26px',
+                borderRadius: 20, border: `0.5px solid ${line}`,
+                background: isDark
+                  ? 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.08) 55%, rgba(10,18,30,0.4))'
+                  : 'linear-gradient(135deg, rgba(59,130,246,0.09), rgba(139,92,246,0.06) 55%, rgba(255,255,255,0.7))',
+                backdropFilter: 'blur(12px)',
+              }}>
+                <div style={{
+                  position: 'absolute', top: -60, left: -40, width: 200, height: 200, borderRadius: '50%',
+                  background: `radial-gradient(circle, ${chgC}22, transparent 70%)`, pointerEvents: 'none',
+                }} />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: isMobile ? 24 : 30, fontWeight: 800, letterSpacing: '-0.01em',
+                        background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+                      }}>{s.l18}</span>
+                      <span style={{ fontSize: 12.5, color: muted, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.l30}</span>
+                    </div>
+                    <Link href={`/stocks/${ind.id}`} style={{
+                      display: 'inline-block', marginTop: 10,
+                      fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
+                      padding: '4px 11px', borderRadius: 8,
+                      background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.28)',
+                    }}>
+                      {ind.name}
+                    </Link>
+                  </div>
+                  {/* پیل قیمت پایانی */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 14,
+                    background: isDark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.6)',
+                    border: `0.5px solid ${chgC}40`,
+                  }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 9.5, color: muted, marginBottom: 3 }}>قیمت پایانی</div>
+                      <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: text }}>
+                        {s.pc === null ? '—' : s.pc.toLocaleString('fa-IR')}
+                      </div>
+                    </div>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 9,
+                      background: `${chgC}18`, color: chgC, fontWeight: 800, fontSize: 13.5,
+                    }}>
+                      {(up || down) && <ToneIcon tone={up ? 'pos' : 'neg'} size={14} />}
+                      {pct(s.pcp)}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* اطلاعات تابلو */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-                gap: 10, marginBottom: 24,
+                gap: 10, marginBottom: 20,
               }}>
-                {cards.map(([k, v, c]) => (
-                  <div key={k} style={{
-                    background: panel, border: `0.5px solid ${line}`, borderRadius: 14,
-                    padding: '14px 16px', backdropFilter: 'blur(12px)', minWidth: 0,
-                  }}>
-                    <div style={{ fontSize: 10.5, color: muted, marginBottom: 6 }}>{k}</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: c, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</div>
-                  </div>
-                ))}
+                {cards.map(([k, v, c]) => {
+                  const accent = c === (GREEN as string) || c === (RED as string)
+                  return (
+                    <div key={k} style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: panel, border: `0.5px solid ${accent ? `${c}33` : line}`, borderRadius: 14,
+                      padding: '14px 16px', backdropFilter: 'blur(12px)', minWidth: 0,
+                    }}>
+                      {accent && <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 3, background: c }} />}
+                      <div style={{ fontSize: 10.5, color: muted, marginBottom: 6 }}>{k}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: c, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</div>
+                    </div>
+                  )
+                })}
               </div>
 
               <div style={{ fontSize: 10.5, color: muted }}>
@@ -196,6 +249,9 @@ export default function StockPage() {
                 {data?.updated ? ` — ${new Date(data.updated).toLocaleDateString('fa-IR')}` : ''}
               </div>
 
+              {reports && (reports.months.length > 0 || reports.quarters.length > 0) && (
+                <AnalysisSection months={reports.months} quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
+              )}
               {reports && reports.months.length > 0 && (
                 <MonthlySection months={reports.months} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
               )}
@@ -214,6 +270,120 @@ type Theme = { panel: string; text: string; muted: string; line: string; isDark:
 
 const M_ACCENT = '#38BDF8'   // آبی آسمانی — فعالیت ماهانه
 const Q_ACCENT = '#F59E0B'   // کهربایی — گزارش فصلی
+const A_ACCENT = '#A78BFA'   // بنفش — تحلیل هوشمند
+
+type Tone = 'pos' | 'neg' | 'neutral'
+type Insight = { tone: Tone; text: string }
+
+// تحلیل قاعده‌محور از گزارش‌های هر سهم
+function buildInsights(months: RMonth[], quarters: RQuarter[]): { verdict: Insight; items: Insight[] } {
+  const items: Insight[] = []
+  const fa0 = (v: number) => Math.abs(v).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
+  let score = 0
+
+  if (months.length >= 2) {
+    const last = months[months.length - 1], prev = months[months.length - 2]
+    const mom = growth(last.month, prev.month)
+    const yoy = growth(last.cum, last.lastYearCum)
+    if (mom !== null) {
+      items.push({ tone: mom >= 0 ? 'pos' : 'neg', text: `فروش ${monthLabel(last.period)} نسبت به ماه قبل ${mom >= 0 ? 'رشد' : 'افت'} ${fa0(mom)}٪ داشته است.` })
+      score += mom >= 0 ? 1 : -1
+    }
+    if (yoy !== null) {
+      items.push({ tone: yoy >= 0 ? 'pos' : 'neg', text: `فروش تجمعی سال مالی نسبت به دوره مشابه سال قبل ${yoy >= 0 ? '+' : '−'}${fa0(yoy)}٪ تغییر کرده است.` })
+      score += yoy >= 0 ? 1 : -1
+    }
+    // روند نرخ فروش محصول اصلی
+    const mainP = [...last.products].filter(p => (p.amount_m ?? 0) > 0 && (p.rate_m ?? 0) > 0).sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))[0]
+    if (mainP) {
+      const ser = months.map(m => m.products.find(x => x.name === mainP.name)?.rate_m ?? null).filter((v): v is number => v !== null && v > 0)
+      if (ser.length >= 2) {
+        const g = growth(ser[ser.length - 1], ser[0])
+        if (g !== null && Math.abs(g) >= 1) {
+          items.push({ tone: g >= 0 ? 'pos' : 'neg', text: `نرخ فروش «${mainP.name}» طی دوره ${g >= 0 ? 'صعودی' : 'نزولی'} بوده و ${g >= 0 ? '+' : '−'}${fa0(g)}٪ تغییر کرده است.` })
+          score += g >= 0 ? 1 : -1
+        }
+      }
+    }
+  }
+
+  if (quarters.length >= 1) {
+    const q = quarters[quarters.length - 1]
+    const nm = q.revenue ? ((q.net ?? 0) / q.revenue) * 100 : null
+    const netYoy = growth(q.net, q.net_ly)
+    if (netYoy !== null) {
+      items.push({ tone: netYoy >= 0 ? 'pos' : 'neg', text: `سود خالص آخرین دوره نسبت به دوره مشابه سال قبل ${netYoy >= 0 ? 'رشد' : 'افت'} ${fa0(netYoy)}٪ داشته است.` })
+      score += netYoy >= 0 ? 1 : -1
+    }
+    if (nm !== null) {
+      items.push({ tone: nm >= 25 ? 'pos' : nm >= 0 ? 'neutral' : 'neg', text: `حاشیه سود خالص آخرین دوره ${fa0(nm)}٪ بوده است${nm >= 30 ? ' که سطح بالایی است' : nm < 10 ? ' که پایین است' : ''}.` })
+    }
+    // روند حاشیه نسبت به دوره هم‌طول قبلی
+    const prevSame = [...quarters].reverse().find(x => x.months === q.months && x.period < q.period)
+    if (prevSame && prevSame.revenue && q.revenue && nm !== null) {
+      const pnm = ((prevSame.net ?? 0) / prevSame.revenue) * 100
+      const d = nm - pnm
+      if (Math.abs(d) >= 1) {
+        items.push({ tone: d >= 0 ? 'pos' : 'neg', text: `حاشیه سود خالص نسبت به دوره ${q.months.toLocaleString('fa-IR')} ماهه قبلی ${d >= 0 ? 'بهبود' : 'کاهش'} ${fa0(d)} واحد درصدی داشته است.` })
+        score += d >= 0 ? 1 : -1
+      }
+    }
+  }
+
+  const verdict: Insight =
+    score >= 2 ? { tone: 'pos', text: 'مجموع سیگنال‌های گزارش‌های اخیر مثبت است؛ روند فروش و سودآوری رو به بهبود بوده.' }
+    : score <= -2 ? { tone: 'neg', text: 'مجموع سیگنال‌های گزارش‌های اخیر منفی است؛ فشار بر فروش یا سودآوری دیده می‌شود.' }
+    : { tone: 'neutral', text: 'سیگنال‌های گزارش‌های اخیر متعادل است؛ روند مشخصی غالب نیست.' }
+
+  return { verdict, items }
+}
+
+const toneColor = (tone: Tone) => tone === 'pos' ? GREEN : tone === 'neg' ? RED : '#94A3B8'
+
+const ToneIcon = ({ tone, size = 18 }: { tone: Tone; size?: number }) => {
+  const c = toneColor(tone)
+  const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: c, strokeWidth: 2.2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, style: { pointerEvents: 'none' as const } }
+  if (tone === 'pos') return (<svg {...common}><polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" /></svg>)
+  if (tone === 'neg') return (<svg {...common}><polyline points="3 7 9 13 13 9 21 17" /><polyline points="15 17 21 17 21 11" /></svg>)
+  return (<svg {...common}><line x1="5" y1="12" x2="19" y2="12" /></svg>)
+}
+
+// ═══ تحلیل هوشمند ═══
+function AnalysisSection({ months, quarters, t, isMobile }: { months: RMonth[]; quarters: RQuarter[]; t: Theme; isMobile: boolean }) {
+  const { verdict, items } = buildInsights(months, quarters)
+  if (items.length === 0) return null
+  return (
+    <SectionCard title="تحلیل هوشمند" badge="خودکار" accent={A_ACCENT} t={t}>
+      {/* حکم کلی */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, marginBottom: 14,
+        background: `${toneColor(verdict.tone)}12`, border: `0.5px solid ${toneColor(verdict.tone)}40`,
+      }}>
+        <span style={{
+          flexShrink: 0, width: 32, height: 32, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: `${toneColor(verdict.tone)}18`, border: `0.5px solid ${toneColor(verdict.tone)}45`,
+        }}>
+          <ToneIcon tone={verdict.tone} size={18} />
+        </span>
+        <span style={{ fontSize: isMobile ? 12.5 : 13.5, fontWeight: 700, color: toneColor(verdict.tone), lineHeight: 1.7 }}>
+          {verdict.text}
+        </span>
+      </div>
+      {/* بندها */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {items.map((it, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: toneColor(it.tone), marginTop: 6, flexShrink: 0 }} />
+            <span style={{ fontSize: isMobile ? 12 : 12.5, color: t.text, lineHeight: 1.9 }}>{it.text}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 9.5, color: t.muted, marginTop: 14, lineHeight: 1.7 }}>
+        این تحلیل خودکار و صرفاً بر پایه گزارش‌های کدال محاسبه شده است و توصیه خرید یا فروش نیست.
+      </div>
+    </SectionCard>
+  )
+}
 
 function SectionCard({ title, badge, accent, t, children }: {
   title: string; badge?: string; accent: string; t: Theme; children: React.ReactNode
@@ -224,7 +394,7 @@ function SectionCard({ title, badge, accent, t, children }: {
       padding: '20px 20px 22px', marginTop: 22, backdropFilter: 'blur(12px)', minWidth: 0,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <span style={{ width: 8, height: 8, borderRadius: 3, background: accent, flexShrink: 0 }} />
+        <span style={{ width: 9, height: 9, borderRadius: 3, background: accent, flexShrink: 0, boxShadow: `0 0 10px ${accent}` }} />
         <span style={{ fontSize: 15, fontWeight: 700, color: t.text }}>{title}</span>
         {badge && (
           <span style={{
@@ -251,6 +421,45 @@ function Chip({ label, value, color, t }: { label: string; value: string; color?
   )
 }
 
+// اسپارک‌لاین نرخ فروش — جدیدترین سمت چپ (هماهنگ با RTL)
+function Sparkline({ values, color, w, h }: { values: (number | null)[]; color: string; w: number; h: number }) {
+  const nums = values.filter((v): v is number => v !== null && v > 0)
+  if (nums.length < 2) return null
+  const min = Math.min(...nums), max = Math.max(...nums)
+  const range = max - min || 1
+  const n = values.length
+  const x = (i: number) => ((n - 1 - i) / (n - 1)) * w
+  const y = (v: number) => h - ((v - min) / range) * (h - 4) - 2
+  const segs: string[] = []
+  let cur: string[] = []
+  values.forEach((v, i) => {
+    if (v === null || v <= 0) { if (cur.length) { segs.push(cur.join(' ')); cur = [] } return }
+    cur.push(`${x(i).toFixed(1)},${y(v).toFixed(1)}`)
+  })
+  if (cur.length) segs.push(cur.join(' '))
+  const lastIdx = values.findIndex(v => v !== null && v > 0)   // جدیدترین = اولین از راست
+  const lv = lastIdx >= 0 ? values[lastIdx] : null
+  const gid = `spk-${Math.random().toString(36).slice(2, 8)}`
+  // ناحیه زیر پرمصرف‌ترین قطعه پیوسته برای fill گرادیانی
+  const longest = segs.reduce((a, b) => (b.split(' ').length > a.split(' ').length ? b : a), segs[0] || '')
+  const fillPts = longest ? `${longest.split(' ')[0].split(',')[0]},${h} ${longest} ${longest.split(' ').slice(-1)[0].split(',')[0]},${h}` : ''
+  return (
+    <svg width={w} height={h} style={{ display: 'block', overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {fillPts && <polygon points={fillPts} fill={`url(#${gid})`} stroke="none" />}
+      {segs.map((pts, i) => (
+        <polyline key={i} points={pts} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      ))}
+      {lv !== null && <circle cx={x(lastIdx)} cy={y(lv)} r={2.8} fill={color} stroke={color} strokeWidth={3} strokeOpacity={0.25} />}
+    </svg>
+  )
+}
+
 // ═══ گزارش فعالیت ماهانه ═══
 function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; isMobile: boolean }) {
   const last = months[months.length - 1]
@@ -264,6 +473,23 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
     .sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))
     .slice(0, 5)
   const maxP = Math.max(...topProducts.map(p => p.amount_m ?? 0), 1)
+
+  // روند نرخ فروش ۳ محصول اصلی در طول ماه‌ها
+  const rateNames = [...last.products]
+    .filter(p => (p.amount_m ?? 0) > 0 && (p.rate_m ?? 0) > 0)
+    .sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))
+    .slice(0, 3)
+    .map(p => p.name)
+  const rateSeries = rateNames.map(name => {
+    const vals = months.map(m => {
+      const pr = m.products.find(x => x.name === name)
+      return pr && pr.rate_m ? pr.rate_m : null
+    })
+    const nums = vals.filter((v): v is number => v !== null && v > 0)
+    const first = nums[0] ?? null
+    const lastV = nums[nums.length - 1] ?? null
+    return { name, vals, latest: lastV, chg: growth(lastV, first) }
+  }).filter(s => s.vals.filter(v => v).length >= 2)
 
   return (
     <SectionCard title="گزارش فعالیت ماهانه" badge={`${months.length.toLocaleString('fa-IR')} ماه`} accent={M_ACCENT} t={t}>
@@ -316,6 +542,34 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
                 </div>
                 <span style={{ fontSize: 10.5, color: t.muted, flexShrink: 0, minWidth: 74, textAlign: 'left' }}>
                   {mrial(p.amount_m)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* روند نرخ فروش محصولات اصلی */}
+      {rateSeries.length > 0 && (
+        <>
+          <div style={{ fontSize: 11, color: t.muted, margin: '22px 0 12px' }}>
+            روند نرخ فروش محصولات اصلی (میلیون تومان بر واحد)
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {rateSeries.map(s => (
+              <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14, minWidth: 0 }}>
+                <div style={{ flex: '0 0 auto', width: isMobile ? 96 : 150, minWidth: 0 }}>
+                  <div style={{ fontSize: 11.5, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                  <div style={{ fontSize: 9.5, color: t.muted }}>نرخ فعلی: {rateFmt(s.latest)}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+                  <Sparkline values={s.vals} color={M_ACCENT} w={isMobile ? 130 : 320} h={34} />
+                </div>
+                <span style={{
+                  fontSize: 10.5, fontWeight: 700, flexShrink: 0, minWidth: 52, textAlign: 'left',
+                  color: s.chg === null ? t.muted : s.chg >= 0 ? GREEN : RED,
+                }}>
+                  {gPct(s.chg)}
                 </span>
               </div>
             ))}
