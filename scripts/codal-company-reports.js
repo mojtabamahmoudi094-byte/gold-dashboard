@@ -255,13 +255,16 @@ async function firstParsable(candidates, parse, label) {
 }
 
 // ═══ پردازش یک نماد ═══
+// خروجی: 'skip' | 'throttle' | 'empty' | 'ok'
 async function buildSymbol(symbol) {
   const outFile = path.join(OUT_DIR, `${symbol.replace(/\s+/g, '-')}.json`)
-  if (!FORCE && fs.existsSync(outFile)) { console.log(`⏭ ${symbol} — موجود است`); return }
+  if (!FORCE && fs.existsSync(outFile)) { console.log(`⏭ ${symbol} — موجود است`); return 'skip' }
 
   console.log(`\n═══ ${symbol} ═══`)
   const list = await fetchAnnouncements(symbol)
   console.log(`  ${list.length} اطلاعیه`)
+  // صفر اطلاعیه = تقریباً همیشه throttle کدال (هر شرکت بورسی اطلاعیه دارد)
+  if (list.length === 0) return 'throttle'
   const { monthly, quarterly } = pickReports(list)
   console.log(`  فعالیت ماهانه: ${monthly.length} دوره | صورت مالی: ${quarterly.length} دوره`)
 
@@ -292,18 +295,30 @@ async function buildSymbol(symbol) {
 
   if (months.length === 0 && quarters.length === 0) {
     console.log(`  ❌ ${symbol}: هیچ گزارشی پارس نشد`)
-    return
+    return 'empty'
   }
   fs.writeFileSync(outFile, JSON.stringify({ symbol, updated: new Date().toISOString(), months, quarters }))
   console.log(`  ✅ ${symbol}: ${months.length} ماه + ${quarters.length} دوره → ${path.basename(outFile)}`)
+  return 'ok'
 }
 
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
   const indIdx = process.argv.indexOf('--industry')
+  const ALL = process.argv.includes('--all')
   let symbols = []
-  if (indIdx !== -1) {
+  if (ALL) {
+    const file = path.join(__dirname, 'stocks-industries.json')
+    const data = JSON.parse(fs.readFileSync(file, 'utf8'))
+    const seen = new Set()
+    for (const ind of data.industries) {
+      for (const s of ind.symbols) {
+        if (!seen.has(s.l18)) { seen.add(s.l18); symbols.push(s.l18) }
+      }
+    }
+    console.log(`همه صنایع — ${symbols.length} نماد یکتا`)
+  } else if (indIdx !== -1) {
     const id = Number(process.argv[indIdx + 1])
     const file = path.join(__dirname, 'stocks-industries.json')
     const data = JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -313,15 +328,29 @@ async function main() {
     console.log(`صنعت «${ind.name}» — ${symbols.length} نماد`)
   } else {
     symbols = process.argv.slice(2).filter(a => !a.startsWith('--'))
-    if (symbols.length === 0) { console.error('نماد یا --industry بدهید'); process.exit(1) }
+    if (symbols.length === 0) { console.error('نماد یا --industry یا --all بدهید'); process.exit(1) }
   }
 
+  const stat = { ok: 0, skip: 0, empty: 0, fail: 0 }
+  let done = 0
   for (const s of symbols) {
-    try { await buildSymbol(s) }
-    catch (e) { console.error(`❌ ${s}: ${e.message}`) }
+    done++
+    let status = null
+    // تا ۴ بار در برابر throttle مقاومت کن: صفر اطلاعیه → صبر ۱۵ دقیقه و تلاش دوباره
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try { status = await buildSymbol(s) }
+      catch (e) { console.error(`❌ ${s}: ${e.message}`); status = 'fail'; break }
+      if (status !== 'throttle') break
+      if (attempt === 4) { console.log(`  ⛔ ${s}: throttle مداوم — رد شد`); status = 'fail'; break }
+      const wait = 15 * 60 * 1000
+      console.log(`  ⏸ throttle کدال — صبر ۱۵ دقیقه (تلاش ${attempt}/۳) [${done}/${symbols.length}]`)
+      await sleep(wait)
+    }
+    if (status && stat[status] !== undefined) stat[status]++
+    if (done % 10 === 0) console.log(`  ── پیشرفت: ${done}/${symbols.length} | ✅${stat.ok} ⏭${stat.skip} ❌${stat.empty + stat.fail}`)
     await sleep(4000)
   }
-  console.log('\nتمام شد.')
+  console.log(`\nتمام شد. ✅${stat.ok} جدید | ⏭${stat.skip} موجود | ❌${stat.empty} بدون‌گزارش | ⛔${stat.fail} ناموفق`)
 }
 
 main().catch(e => { console.error(e); process.exit(1) })
