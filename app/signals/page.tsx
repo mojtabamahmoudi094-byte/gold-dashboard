@@ -177,6 +177,8 @@ interface FundRow {
   inflowScore: number
   combinedScore: number
   bubbleVaqei: number | null
+  navChg?: number | null   // تغییر NAV برآوردی امروز از پرتفوی (صندوق‌های بورسی)
+  navLag?: number | null   // قیمت − NAV برآوردی؛ منفی = قیمت جا مانده
 }
 
 function getRankedFunds(
@@ -185,9 +187,12 @@ function getRankedFunds(
   navMap: Record<string, number>,
   category: string,
   zatiFor: (name: string) => number | null,
+  portMap?: Record<string, FundPort>,
 ): FundRow[] {
   const pool = funds.filter(f => f.category === category)
   if (pool.length === 0) return []
+
+  const clamp1 = (v: number) => Math.max(-1, Math.min(1, v))
 
   const scored = pool.map(f => {
     const net = safe(f.buy_i_volume) - safe(f.sell_i_volume)
@@ -200,13 +205,21 @@ function getRankedFunds(
     const zati = zatiFor(f.name)
     const bubbleVaqei = asmi != null && zati != null ? asmi + zati : null
 
+    // صندوق بورسی: NAV برآوردی از پرتفوی کدال × قیمت روز سهام
+    const p = portMap?.[f.slug]
+    const navChg = p?.navChg ?? null
+    const navLag = navChg != null ? chg - navChg : null
+
     // ارزندگی: حباب واقعی منفی‌تر = ارزان‌تر = جذاب‌تر برای خرید
-    const valueScore = bubbleVaqei != null ? Math.max(-1, Math.min(1, -bubbleVaqei / 5)) : 0
+    const valueScore = bubbleVaqei != null ? clamp1(-bubbleVaqei / 5) : 0
     const combinedScore = bubbleVaqei != null
       ? 0.5 * valueScore + 0.35 * inflowScore + 0.15 * (chg / 5)
-      : 0.65 * inflowScore + 0.35 * (chg / 5)
+      : navChg != null && navLag != null
+        // بورسی: رشد NAV + جاماندگی قیمت از NAV + ورود پول + مومنتوم
+        ? 0.3 * clamp1(navChg / 3) + 0.2 * clamp1(-navLag / 2) + 0.35 * inflowScore + 0.15 * (chg / 5)
+        : 0.65 * inflowScore + 0.35 * (chg / 5)
 
-    return { ...f, net, inflowScore, combinedScore, bubbleVaqei }
+    return { ...f, net, inflowScore, combinedScore, bubbleVaqei, navChg, navLag }
   })
 
   const isBuy = signalType === 'خرید' || signalType === 'تمایل خرید'
@@ -238,6 +251,10 @@ function fundReason(f: FundRow, signalType: string): string {
     if (bv < -1) parts.push(`حباب واقعی ${bv.toFixed(1)}٪ — زیر ارزش`)
     else if (bv > 3) parts.push(`حباب واقعی +${bv.toFixed(1)}٪ — گران`)
     else parts.push(`حباب واقعی ${bv >= 0 ? '+' : ''}${bv.toFixed(1)}٪`)
+  } else if (f.navChg != null) {
+    parts.push(`NAV برآوردی ${f.navChg >= 0 ? '+' : ''}${f.navChg.toFixed(1)}٪ امروز`)
+    if (f.navLag != null && f.navLag < -0.7) parts.push('قیمت از NAV جا مانده')
+    else if (f.navLag != null && f.navLag > 0.7) parts.push('قیمت جلوتر از NAV')
   }
 
   if (isBuy) {
@@ -257,10 +274,21 @@ function fundReason(f: FundRow, signalType: string): string {
 }
 
 // ── Bourse funds signal engine (اهرمی / بخشی / سهامی) ─────────────────────
-// بدون حباب بورس کالا — سیگنال بر پایه جریان پول حقیقی، عرض بازار و مومنتوم
+// سیگنال بر پایه NAV برآوردی از پرتفوی کدال + قیمت سهام اثرگذار،
+// جریان پول حقیقی، عرض بازار و مومنتوم
 interface CatTrendDay { ratio: number; avgChg: number }
+interface FundPort {
+  navChg: number
+  coverage: number
+  reportDate: string
+  top: { name: string; l18: string; w: number; chg: number }[]
+}
 
-function computeBourseSignal(todayFunds: FundRow[], trend: CatTrendDay[]) {
+function computeBourseSignal(
+  todayFunds: FundRow[],
+  trend: CatTrendDay[],
+  portMap: Record<string, FundPort>,
+) {
   if (todayFunds.length === 0) return null
   let score = 0
   const reasons: { text: string; dir: 'pos' | 'neg' | 'neu' }[] = []
@@ -286,6 +314,52 @@ function computeBourseSignal(todayFunds: FundRow[], trend: CatTrendDay[]) {
     reasons.push({ text: `خروج پول حقیقی امروز (${netStr} واحد)`, dir: 'neg' })
   } else {
     reasons.push({ text: 'جریان پول حقیقی امروز متعادل', dir: 'neu' })
+  }
+
+  // NAV برآوردی از پرتفوی کدال × قیمت روز سهام اثرگذار
+  const withPort = todayFunds
+    .map(f => ({ f, p: portMap[f.slug] }))
+    .filter(x => x.p != null)
+  if (withPort.length > 0) {
+    const avgNav = withPort.reduce((s, x) => s + x.p.navChg, 0) / withPort.length
+    // فاصله قیمت صندوق از حرکت NAV — مثبت یعنی قیمت جلوتر از دارایی‌ها رفته
+    const avgLag = withPort.reduce((s, x) => s + ((x.f.price_change_pct ?? 0) - x.p.navChg), 0) / withPort.length
+
+    if (avgNav > 1) {
+      score += 1.5
+      reasons.push({ text: `NAV برآوردی صندوق‌ها امروز +${avgNav.toFixed(1)}٪ (رشد سهام پرتفوی)`, dir: 'pos' })
+    } else if (avgNav > 0.3) {
+      score += 0.7
+      reasons.push({ text: `NAV برآوردی صندوق‌ها امروز +${avgNav.toFixed(1)}٪`, dir: 'pos' })
+    } else if (avgNav < -1) {
+      score -= 1.5
+      reasons.push({ text: `NAV برآوردی صندوق‌ها امروز ${avgNav.toFixed(1)}٪ (افت سهام پرتفوی)`, dir: 'neg' })
+    } else if (avgNav < -0.3) {
+      score -= 0.7
+      reasons.push({ text: `NAV برآوردی صندوق‌ها امروز ${avgNav.toFixed(1)}٪`, dir: 'neg' })
+    }
+
+    if (avgLag < -0.7) {
+      score += 1
+      reasons.push({ text: `قیمت صندوق‌ها ${Math.abs(avgLag).toFixed(1)}٪ از رشد NAV جا مانده — پتانسیل جبران`, dir: 'pos' })
+    } else if (avgLag > 0.7) {
+      score -= 1
+      reasons.push({ text: `قیمت صندوق‌ها ${avgLag.toFixed(1)}٪ جلوتر از NAV — حباب کوتاه‌مدت`, dir: 'neg' })
+    }
+
+    // سهام اثرگذار پرتفوی‌ها — پروزن‌ترین‌ها در کل دسته
+    const stockAgg: Record<string, { w: number; chg: number }> = {}
+    withPort.forEach(x => x.p.top.forEach(t => {
+      stockAgg[t.l18] ??= { w: 0, chg: t.chg }
+      stockAgg[t.l18].w += t.w
+    }))
+    const topStocks = Object.entries(stockAgg).sort((a, b) => b[1].w - a[1].w).slice(0, 3)
+    if (topStocks.length > 0) {
+      const txt = topStocks
+        .map(([l18, v]) => `${l18} ${v.chg >= 0 ? '+' : ''}${v.chg.toFixed(1)}٪`)
+        .join(' · ')
+      reasons.push({ text: `سهام اثرگذار: ${txt}`, dir: avgNav > 0.2 ? 'pos' : avgNav < -0.2 ? 'neg' : 'neu' })
+    }
   }
 
   // عرض بازار — چند درصد صندوق‌ها مثبت بودند
@@ -427,6 +501,7 @@ export default function SignalsPage() {
   const [flowMap, setFlowMap]     = useState<Record<string, number>>({})
   const [fundData, setFundData]   = useState<FundRow[]>([])
   const [catTrends, setCatTrends] = useState<Record<string, CatTrendDay[]>>({})
+  const [portMap, setPortMap]     = useState<Record<string, FundPort>>({})
   const [navMap, setNavMap]       = useState<Record<string, number>>({})
   const [apiData, setApiData]     = useState<any>(null)
   const [isDark, setIsDark]       = useState(true)
@@ -571,14 +646,19 @@ export default function SignalsPage() {
 
       // ۴. API طلا برای سیگنال لحظه‌ای + NAV برای حباب اسمی صندوق‌ها
       try {
-        const [res, navRes] = await Promise.all([
+        const [res, navRes, portRes] = await Promise.all([
           fetch('/api/gold-analysis'),
           fetch('/api/gold-nav'),
+          fetch('/api/portfolio-signal'),
         ])
         if (res.ok) setApiData(await res.json())
         if (navRes.ok) {
           const nd = await navRes.json()
           setNavMap(nd?.navs ?? {})
+        }
+        if (portRes.ok) {
+          const pd = await portRes.json()
+          setPortMap(pd?.funds ?? {})
         }
       } catch { /* ignore */ }
 
@@ -598,8 +678,8 @@ export default function SignalsPage() {
     ? getRankedFunds(silverSignal.type, fundData, navMap, 'نقره', n => silverFundBubbleZati(n, silverBubble))
     : []
   const bourseSections = BOURSE_CATS.map(c => {
-    const sig = computeBourseSignal(fundData.filter(f => f.category === c.label), catTrends[c.label] ?? [])
-    const funds = sig ? getRankedFunds(sig.type, fundData, navMap, c.label, () => null) : []
+    const sig = computeBourseSignal(fundData.filter(f => f.category === c.label), catTrends[c.label] ?? [], portMap)
+    const funds = sig ? getRankedFunds(sig.type, fundData, navMap, c.label, () => null, portMap) : []
     return { ...c, sig, funds }
   }).filter(s => s.sig)
 
@@ -979,7 +1059,7 @@ export default function SignalsPage() {
                 background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
                 padding: '2px 8px', borderRadius: 5,
               }}>
-                بر اساس جریان پول حقیقی، عرض بازار و مومنتوم چند روزه
+                بر اساس NAV برآوردی از پرتفوی کدال، سهام اثرگذار، جریان پول حقیقی و مومنتوم
               </span>
             </div>
             <p style={{ margin: '0 0 16px', fontSize: 11, color: MUTED }}>
@@ -1088,8 +1168,17 @@ export default function SignalsPage() {
                                   {idx + 1}
                                 </span>
                                 <span style={{ fontSize: 12, fontWeight: 600, color: TEXT }}>{f.name}</span>
+                                {f.navChg != null && (
+                                  <span style={{
+                                    fontSize: 9, fontWeight: 600, marginRight: 'auto',
+                                    color: MUTED, fontFamily: 'system-ui', whiteSpace: 'nowrap',
+                                  }}>
+                                    NAV {f.navChg >= 0 ? '+' : ''}{f.navChg.toFixed(1)}٪
+                                  </span>
+                                )}
                                 <span style={{
-                                  fontSize: 10, fontWeight: 600, marginRight: 'auto',
+                                  fontSize: 10, fontWeight: 600,
+                                  marginRight: f.navChg != null ? 0 : 'auto',
                                   color: chg >= 0 ? GREEN : RED, fontFamily: 'system-ui',
                                 }}>
                                   {chg >= 0 ? '+' : ''}{chg?.toFixed(2)}٪
@@ -1112,7 +1201,7 @@ export default function SignalsPage() {
             </div>
 
             <p style={{ margin: '14px 0 0', fontSize: 10, color: FAINT, lineHeight: 1.7 }}>
-              ⓘ  سیگنال هر دسته از جمع جریان پول حقیقی، درصد صندوق‌های مثبت و روند ۵ روز اخیر همان دسته محاسبه می‌شود — توصیه سرمایه‌گذاری نیست.
+              ⓘ  سیگنال هر دسته از NAV برآوردی (پرتفوی کدال × قیمت روز سهام)، فاصله قیمت از NAV، جریان پول حقیقی، درصد صندوق‌های مثبت و روند ۵ روز اخیر محاسبه می‌شود — توصیه سرمایه‌گذاری نیست.
             </p>
           </div>
         )}
