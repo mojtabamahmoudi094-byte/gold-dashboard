@@ -6,7 +6,7 @@ create table if not exists public.portfolio_transactions (
   user_id     uuid not null default auth.uid() references auth.users (id) on delete cascade,
   symbol      text not null,                     -- نماد (l18 برای سهام، slug برای صندوق)
   name        text not null default '',          -- نام کامل
-  asset_type  text not null default 'stock' check (asset_type in ('stock', 'fund')),
+  asset_type  text not null default 'stock' check (asset_type in ('stock', 'fund', 'physical')),
   side        text not null default 'buy'  check (side in ('buy', 'sell')),
   quantity    numeric not null check (quantity > 0),
   price       numeric not null check (price >= 0),   -- قیمت واحد به ریال

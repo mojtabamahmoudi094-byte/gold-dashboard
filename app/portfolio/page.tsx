@@ -9,17 +9,22 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from 'recharts'
+import {
+  PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
+} from 'recharts'
 import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, fmtNum, fmtPct } from '../../lib/format'
 
+type AssetType = 'stock' | 'fund' | 'physical'
+
 type Instrument = {
-  symbol: string        // l18 برای سهام، slug برای صندوق
+  symbol: string        // l18 برای سهام، slug برای صندوق و دارایی فیزیکی
   name: string
-  type: 'stock' | 'fund'
-  price: number         // آخرین قیمت (ریال)
+  type: AssetType
+  price: number         // آخرین قیمت (ریال) — برای فیزیکی ممکن است ۰ باشد (قیمت دستی)
   changePct: number
 }
 
@@ -27,7 +32,7 @@ type Tx = {
   id: number
   symbol: string
   name: string
-  asset_type: 'stock' | 'fund'
+  asset_type: AssetType
   side: 'buy' | 'sell'
   quantity: number
   price: number
@@ -39,7 +44,7 @@ type Tx = {
 type Holding = {
   symbol: string
   name: string
-  type: 'stock' | 'fund'
+  type: AssetType
   qty: number
   totalCost: number      // بهای تمام‌شده باقی‌مانده (شامل کارمزد خرید)
   avgCost: number
@@ -52,9 +57,25 @@ type Holding = {
   breakEven: number      // قیمت سربه‌سر با احتساب کارمزد فروش
 }
 
-// نرخ کارمزد تقریبی بورس تهران (خرید/فروش سهام)
+// نرخ کارمزد تقریبی بورس تهران (خرید/فروش سهام) — دارایی فیزیکی کارمزد ندارد
 const FEE_BUY = 0.003712
 const FEE_SELL = 0.0088
+
+// دارایی‌های فیزیکی قابل ثبت — قیمت روز از /api/physical-prices یا دستی
+const PHYSICAL_ITEMS: { symbol: string; name: string }[] = [
+  { symbol: 'gold-18k',     name: 'طلای ۱۸ عیار (گرم)' },
+  { symbol: 'gold-24k',     name: 'طلای ۲۴ عیار (گرم)' },
+  { symbol: 'gold-melted',  name: 'طلای آب‌شده (گرم)' },
+  { symbol: 'coin-emami',   name: 'سکه امامی' },
+  { symbol: 'coin-bahar',   name: 'سکه بهار آزادی' },
+  { symbol: 'coin-half',    name: 'نیم‌سکه' },
+  { symbol: 'coin-quarter', name: 'ربع‌سکه' },
+  { symbol: 'coin-gram',    name: 'سکه گرمی' },
+  { symbol: 'silver',       name: 'نقره (گرم)' },
+]
+const PHYSICAL_KEYWORDS = ['طلا', 'سکه', 'نقره', 'فیزیکی', 'گرم']
+
+const MANUAL_PRICES_KEY = 'portfolio_manual_prices'
 
 const todayShamsi = () =>
   new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -75,6 +96,8 @@ export default function PortfolioPage() {
   const [txs, setTxs] = useState<Tx[]>([])
   const [loading, setLoading] = useState(true)
   const [dbMissing, setDbMissing] = useState(false)
+  // قیمت دستی دارایی‌های فیزیکی وقتی قیمت آنلاین در دسترس نیست
+  const [manualPrices, setManualPrices] = useState<Record<string, number>>({})
 
   // فرم افزودن تراکنش
   const [showForm, setShowForm] = useState(false)
@@ -99,6 +122,10 @@ export default function PortfolioPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setUser(s?.user ?? null))
 
     setDate(todayShamsi())
+
+    try {
+      setManualPrices(JSON.parse(window.localStorage.getItem(MANUAL_PRICES_KEY) || '{}'))
+    } catch { /* — */ }
 
     return () => {
       window.removeEventListener('themechange', handler)
@@ -130,10 +157,28 @@ export default function PortfolioPage() {
           list.push({ symbol: a.slug, name: a.name, type: 'fund', price: safe(r.price_close), changePct: safe(r.price_change_pct) })
         }
       } catch { /* — */ }
+      // دارایی‌های فیزیکی — قیمت آنلاین از BrsApi، در نبودش ۰ (قیمت دستی)
+      let physPrices: Record<string, number> = {}
+      try {
+        const res = await fetch('/api/physical-prices')
+        const data = await res.json()
+        physPrices = data.prices ?? {}
+      } catch { /* — */ }
+      for (const p of PHYSICAL_ITEMS) {
+        list.push({ symbol: p.symbol, name: p.name, type: 'physical', price: safe(physPrices[p.symbol]), changePct: 0 })
+      }
       setInstruments(list)
     }
     load()
   }, [])
+
+  const setManualPrice = (symbol: string, value: number) => {
+    const next = { ...manualPrices }
+    if (value > 0) next[symbol] = value
+    else delete next[symbol]
+    setManualPrices(next)
+    window.localStorage.setItem(MANUAL_PRICES_KEY, JSON.stringify(next))
+  }
 
   const loadTxs = async () => {
     setLoading(true)
@@ -164,20 +209,24 @@ export default function PortfolioPage() {
     return m
   }, [instruments])
 
-  // کارمزد خودکار وقتی تعداد/قیمت/جهت عوض می‌شود
+  // کارمزد خودکار وقتی تعداد/قیمت/جهت عوض می‌شود — فیزیکی کارمزد بورسی ندارد
   useEffect(() => {
     if (!autoFee) return
+    if (picked?.type === 'physical') { setCommission('0'); return }
     const gross = safe(qty) * safe(price)
     if (gross <= 0) { setCommission(''); return }
     setCommission(String(Math.round(gross * (side === 'buy' ? FEE_BUY : FEE_SELL))))
-  }, [qty, price, side, autoFee])
+  }, [qty, price, side, autoFee, picked])
 
   const searchResults = useMemo(() => {
     const q = query.trim()
     if (q.length < 1) return []
-    return instruments
-      .filter(i => i.symbol.includes(q) || i.name.includes(q))
-      .slice(0, 8)
+    const matches = instruments.filter(i => i.symbol.includes(q) || i.name.includes(q))
+    // دارایی فیزیکی اول بیاید وقتی جستجو به طلا/سکه/نقره می‌خورد
+    if (PHYSICAL_KEYWORDS.some(k => q.includes(k))) {
+      matches.sort((a, b) => (a.type === 'physical' ? 0 : 1) - (b.type === 'physical' ? 0 : 1))
+    }
+    return matches.slice(0, 8)
   }, [query, instruments])
 
   // ─── محاسبه‌ی دارایی‌ها به روش میانگین موزون ───
@@ -209,13 +258,18 @@ export default function PortfolioPage() {
     const out: Holding[] = []
     for (const h of map.values()) {
       h.avgCost = h.qty > 0 ? h.totalCost / h.qty : 0
-      h.breakEven = h.qty > 0 ? h.avgCost / (1 - FEE_SELL) : 0
+      // فیزیکی کارمزد فروش بورسی ندارد — سربه‌سر همان میانگین است
+      h.breakEven = h.qty > 0 ? (h.type === 'physical' ? h.avgCost : h.avgCost / (1 - FEE_SELL)) : 0
       const inst = priceMap.get(h.symbol)
-      if (inst && inst.price > 0) {
-        h.price = inst.price
-        h.changePct = inst.changePct
+      // قیمت روز: آنلاین، و برای فیزیکی در نبودش قیمت دستی کاربر
+      const live = inst && inst.price > 0 ? inst.price : null
+      const manual = h.type === 'physical' ? safe(manualPrices[h.symbol]) || null : null
+      const px = live ?? manual
+      if (px != null) {
+        h.price = px
+        h.changePct = live != null && inst ? inst.changePct : null
         if (h.qty > 0) {
-          h.value = h.qty * inst.price
+          h.value = h.qty * px
           h.unrealized = h.value - h.totalCost
           h.unrealizedPct = h.totalCost > 0 ? (h.unrealized / h.totalCost) * 100 : null
         }
@@ -224,7 +278,7 @@ export default function PortfolioPage() {
     }
     // اول دارایی‌های فعال (بزرگ‌ترین ارزش)، بعد بسته‌شده‌ها
     return out.sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
-  }, [txs, priceMap])
+  }, [txs, priceMap, manualPrices])
 
   const active = holdings.filter(h => h.qty > 0)
   const closed = holdings.filter(h => h.qty <= 0 && h.realized !== 0)
@@ -248,7 +302,25 @@ export default function PortfolioPage() {
 
   const pieData = active
     .filter(h => (h.value ?? 0) > 0)
-    .map(h => ({ name: h.symbol, value: h.value as number }))
+    .map(h => ({ name: h.type === 'stock' ? h.symbol : h.name, value: h.value as number }))
+
+  // ─── نمودار رشد سرمایه: سرمایه‌ی درگیر تجمعی بر اساس تاریخ تراکنش ───
+  const growthData = useMemo(() => {
+    if (txs.length === 0) return []
+    const sorted = [...txs].sort((a, b) =>
+      a.trade_date === b.trade_date
+        ? a.created_at.localeCompare(b.created_at)
+        : a.trade_date.localeCompare(b.trade_date, undefined, { numeric: true })
+    )
+    const byDate = new Map<string, number>()
+    let cum = 0
+    for (const tx of sorted) {
+      const gross = safe(tx.quantity) * safe(tx.price)
+      cum += tx.side === 'buy' ? gross + safe(tx.commission) : -(gross - safe(tx.commission))
+      byDate.set(tx.trade_date, cum)
+    }
+    return [...byDate.entries()].map(([date, invested]) => ({ date, invested }))
+  }, [txs])
 
   // ─── ثبت تراکنش ───
   const submit = async (e: React.FormEvent) => {
@@ -285,8 +357,93 @@ export default function PortfolioPage() {
 
   const pickInstrument = (i: Instrument) => {
     setPicked(i)
-    setQuery(i.symbol)
-    if (i.price > 0 && !price) setPrice(String(i.price))
+    setQuery(i.type === 'stock' ? i.symbol : i.name)
+    const px = i.price > 0 ? i.price : safe(manualPrices[i.symbol])
+    if (px > 0 && !price) setPrice(String(px))
+  }
+
+  // ─── خروجی Excel (دو شیت: دارایی‌ها + تراکنش‌ها) ───
+  const exportExcel = async () => {
+    const XLSX = await import('xlsx')
+    const wb = XLSX.utils.book_new()
+
+    const holdingsSheet = XLSX.utils.aoa_to_sheet([
+      ['نماد', 'نام', 'نوع', 'تعداد', 'میانگین خرید', 'سربه‌سر', 'قیمت روز', 'ارزش روز', 'سود/زیان باز', 'سود/زیان ٪', 'سود/زیان محقق‌شده'],
+      ...holdings.map(h => [
+        h.symbol, h.name,
+        h.type === 'stock' ? 'سهم' : h.type === 'fund' ? 'صندوق' : 'فیزیکی',
+        h.qty, Math.round(h.avgCost), Math.round(h.breakEven),
+        h.price ?? '', h.value != null ? Math.round(h.value) : '',
+        h.unrealized != null ? Math.round(h.unrealized) : '',
+        h.unrealizedPct != null ? Number(h.unrealizedPct.toFixed(2)) : '',
+        Math.round(h.realized),
+      ]),
+      [],
+      ['بهای تمام‌شده', Math.round(totals.cost)],
+      ['ارزش روز', totals.priced ? Math.round(totals.value) : ''],
+      ['سود/زیان باز', totals.priced ? Math.round(totals.unrealized) : ''],
+      ['سود/زیان محقق‌شده', Math.round(totals.realized)],
+    ])
+    XLSX.utils.book_append_sheet(wb, holdingsSheet, 'دارایی‌ها')
+
+    const txSheet = XLSX.utils.aoa_to_sheet([
+      ['تاریخ', 'نماد', 'نام', 'نوع دارایی', 'خرید/فروش', 'تعداد', 'قیمت واحد', 'کارمزد', 'مبلغ کل'],
+      ...txs.map(tx => {
+        const gross = safe(tx.quantity) * safe(tx.price)
+        return [
+          tx.trade_date, tx.symbol, tx.name,
+          tx.asset_type === 'stock' ? 'سهم' : tx.asset_type === 'fund' ? 'صندوق' : 'فیزیکی',
+          tx.side === 'buy' ? 'خرید' : 'فروش',
+          safe(tx.quantity), safe(tx.price), safe(tx.commission),
+          Math.round(tx.side === 'buy' ? gross + safe(tx.commission) : gross - safe(tx.commission)),
+        ]
+      }),
+    ])
+    XLSX.utils.book_append_sheet(wb, txSheet, 'تراکنش‌ها')
+
+    XLSX.writeFile(wb, `portfolio-${todayShamsi().replace(/\//g, '-')}.xlsx`)
+  }
+
+  // ─── خروجی PDF از راه پنجره چاپ مرورگر (فونت فارسی سیستم) ───
+  const exportPdf = () => {
+    const row = (cells: (string | number)[], tag = 'td') =>
+      `<tr>${cells.map(c => `<${tag}>${c}</${tag}>`).join('')}</tr>`
+    const typeLabel = (ty: AssetType) => ty === 'stock' ? 'سهم' : ty === 'fund' ? 'صندوق' : 'فیزیکی'
+    const html = `<!doctype html><html dir="rtl" lang="fa"><head><meta charset="utf-8">
+<title>پورتفوی من — بورس سنج</title>
+<style>
+  body { font-family: Vazirmatn, Tahoma, Arial, sans-serif; padding: 24px; color: #111; }
+  h1 { font-size: 18px; margin: 0 0 4px; } .sub { font-size: 11px; color: #666; margin-bottom: 18px; }
+  h2 { font-size: 14px; margin: 20px 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: right; }
+  th { background: #f0f2f7; }
+  .pos { color: #059669; } .neg { color: #DC2626; }
+</style></head><body>
+<h1>پورتفوی من — بورس سنج</h1>
+<div class="sub">تاریخ گزارش: ${todayShamsi()} — bourssanj.ir</div>
+<h2>خلاصه</h2>
+<table>${row(['بهای تمام‌شده', 'ارزش روز', 'سود/زیان باز', 'سود/زیان محقق‌شده'], 'th')}
+${row([fmtRial(totals.cost), totals.priced ? fmtRial(totals.value) : '—', fmtRial(totals.unrealized), fmtRial(totals.realized)])}</table>
+<h2>دارایی‌های فعال</h2>
+<table>${row(['نماد', 'نوع', 'تعداد', 'میانگین خرید', 'سربه‌سر', 'قیمت روز', 'ارزش روز', 'سود/زیان'], 'th')}
+${active.map(h => row([
+      h.type === 'stock' ? h.symbol : h.name, typeLabel(h.type), fmtNum(h.qty), fmtRial(h.avgCost), fmtRial(h.breakEven),
+      h.price != null ? fmtRial(h.price) : '—', h.value != null ? fmtRial(h.value) : '—',
+      h.unrealized != null ? `<span class="${h.unrealized >= 0 ? 'pos' : 'neg'}">${fmtRial(h.unrealized)} (${fmtPct(h.unrealizedPct, 1)})</span>` : '—',
+    ])).join('')}</table>
+<h2>تاریخچه تراکنش‌ها</h2>
+<table>${row(['تاریخ', 'نماد', 'خرید/فروش', 'تعداد', 'قیمت', 'کارمزد'], 'th')}
+${txs.map(tx => row([
+      tx.trade_date, tx.asset_type === 'stock' ? tx.symbol : tx.name,
+      tx.side === 'buy' ? 'خرید' : 'فروش', fmtNum(tx.quantity), fmtRial(tx.price), fmtRial(tx.commission),
+    ])).join('')}</table>
+<script>window.onload = () => { window.print() }</script>
+</body></html>`
+    const w = window.open('', '_blank')
+    if (!w) { alert('پنجره چاپ باز نشد — Popup Blocker را غیرفعال کنید') ; return }
+    w.document.write(html)
+    w.document.close()
   }
 
   // ─── استایل‌های مشترک ───
@@ -369,19 +526,35 @@ export default function PortfolioPage() {
             ثبت خرید و فروش، میانگین قیمت، سود/زیان و ترکیب دارایی — قیمت‌ها بر اساس آخرین داده‌ی سایت
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowForm(!showForm)}
-          style={{
-            padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            background: showForm ? 'transparent' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-            color: showForm ? t.brand : '#fff',
-            border: showForm ? `1px solid ${t.brand}` : 'none',
-            fontFamily: 'inherit',
-          }}
-        >
-          {showForm ? 'بستن فرم' : '+ ثبت تراکنش جدید'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {txs.length > 0 && (
+            <>
+              <button type="button" onClick={exportExcel} title="دانلود فایل اکسل" style={{
+                padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)',
+                color: t.green, fontFamily: 'inherit',
+              }}>📄 Excel</button>
+              <button type="button" onClick={exportPdf} title="چاپ / ذخیره به PDF" style={{
+                padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)',
+                color: t.red, fontFamily: 'inherit',
+              }}>📄 PDF</button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowForm(!showForm)}
+            style={{
+              padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: showForm ? 'transparent' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              color: showForm ? t.brand : '#fff',
+              border: showForm ? `1px solid ${t.brand}` : 'none',
+              fontFamily: 'inherit',
+            }}
+          >
+            {showForm ? 'بستن فرم' : '+ ثبت تراکنش جدید'}
+          </button>
+        </div>
       </div>
 
       {/* فرم افزودن */}
@@ -395,7 +568,7 @@ export default function PortfolioPage() {
                 style={input}
                 value={query}
                 onChange={e => { setQuery(e.target.value); setPicked(null) }}
-                placeholder="مثلاً: فولاد، طلا…"
+                placeholder="مثلاً: فولاد، سکه امامی، طلای ۱۸…"
               />
               {query && !picked && searchResults.length > 0 && (
                 <div style={{
@@ -420,7 +593,8 @@ export default function PortfolioPage() {
                         <span style={{ color: t.muted, marginRight: 6, fontSize: 11 }}>{i.name}</span>
                       </span>
                       <span style={{ fontSize: 11, color: t.muted }}>
-                        {i.type === 'fund' ? 'صندوق' : 'سهم'} · {fmtRial(i.price)}
+                        {i.type === 'fund' ? 'صندوق' : i.type === 'physical' ? '🥇 فیزیکی' : 'سهم'}
+                        {i.price > 0 && <> · {fmtRial(i.price)}</>}
                       </span>
                     </button>
                   ))}
@@ -466,7 +640,7 @@ export default function PortfolioPage() {
                 کارمزد (ریال)
                 <label style={{ marginRight: 10, fontSize: 10.5, color: t.faint, cursor: 'pointer' }}>
                   <input type="checkbox" checked={autoFee} onChange={e => setAutoFee(e.target.checked)} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
-                  محاسبه خودکار ({side === 'buy' ? '۰٫۳۷٪ خرید' : '۰٫۸۸٪ فروش'})
+                  محاسبه خودکار ({picked?.type === 'physical' ? 'فیزیکی: بدون کارمزد' : side === 'buy' ? '۰٫۳۷٪ خرید' : '۰٫۸۸٪ فروش'})
                 </label>
               </span>
               <input style={input} inputMode="numeric" value={commission} onChange={e => { setAutoFee(false); setCommission(e.target.value.replace(/[^\d.]/g, '')) }} placeholder="۰" />
@@ -537,16 +711,34 @@ export default function PortfolioPage() {
                     <td style={td}>
                       {h.type === 'stock'
                         ? <Link href={`/stock/${encodeURIComponent(h.symbol)}`} style={{ color: t.brand, textDecoration: 'none', fontWeight: 600 }}>{h.symbol}</Link>
-                        : <Link href={`/fund/${encodeURIComponent(h.symbol)}`} style={{ color: t.brand, textDecoration: 'none', fontWeight: 600 }}>{h.name}</Link>}
-                      <div style={{ fontSize: 10, color: t.faint, marginTop: 2 }}>{h.type === 'fund' ? 'صندوق' : h.name}</div>
+                        : h.type === 'fund'
+                          ? <Link href={`/fund/${encodeURIComponent(h.symbol)}`} style={{ color: t.brand, textDecoration: 'none', fontWeight: 600 }}>{h.name}</Link>
+                          : <span style={{ fontWeight: 600 }}>🥇 {h.name}</span>}
+                      <div style={{ fontSize: 10, color: t.faint, marginTop: 2 }}>
+                        {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.name}
+                      </div>
                     </td>
                     <td style={td}>{fmtNum(h.qty)}</td>
                     <td style={td}>{fmtRial(h.avgCost)}</td>
                     <td style={{ ...td, color: t.muted }}>{fmtRial(h.breakEven)}</td>
                     <td style={td}>
-                      {h.price != null ? fmtRial(h.price) : '—'}
-                      {h.changePct != null && (
-                        <span style={{ fontSize: 10.5, marginRight: 5, color: pnlColor(h.changePct) }}>{fmtPct(h.changePct, 1)}</span>
+                      {h.type === 'physical' && (priceMap.get(h.symbol)?.price ?? 0) <= 0 ? (
+                        // قیمت آنلاین در دسترس نیست — ورودی قیمت دستی (در مرورگر ذخیره می‌شود)
+                        <input
+                          style={{ ...input, width: 110, padding: '5px 8px', fontSize: 11.5 }}
+                          inputMode="numeric"
+                          defaultValue={manualPrices[h.symbol] || ''}
+                          placeholder="قیمت دستی…"
+                          title="قیمت روز را دستی وارد کنید (ریال)"
+                          onBlur={e => setManualPrice(h.symbol, safe(e.target.value.replace(/[^\d.]/g, '')))}
+                        />
+                      ) : (
+                        <>
+                          {h.price != null ? fmtRial(h.price) : '—'}
+                          {h.changePct != null && (
+                            <span style={{ fontSize: 10.5, marginRight: 5, color: pnlColor(h.changePct) }}>{fmtPct(h.changePct, 1)}</span>
+                          )}
+                        </>
                       )}
                     </td>
                     <td style={td}>{h.value != null ? fmtRial(h.value) : '—'}</td>
@@ -617,6 +809,46 @@ export default function PortfolioPage() {
         )}
       </div>
 
+      {/* نمودار رشد سرمایه */}
+      {growthData.length > 1 && (
+        <div style={{ ...card, marginTop: 16 }}>
+          <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 4px' }}>📈 رشد سرمایه</h2>
+          <p style={{ fontSize: 11, color: t.muted, margin: '0 0 12px' }}>
+            سرمایه‌ی درگیر تجمعی (خریدها منهای فروش‌ها) بر اساس تاریخ تراکنش
+            {totals.priced && ' — خط‌چین: ارزش روز فعلی پورتفو'}
+          </p>
+          <div style={{ width: '100%', height: 260, direction: 'ltr' }}>
+            <ResponsiveContainer>
+              <AreaChart data={growthData} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+                <defs>
+                  <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={t.border} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: t.muted, fontFamily: 'Vazirmatn, Arial, sans-serif' }} tickMargin={8} />
+                <YAxis
+                  tick={{ fontSize: 10, fill: t.muted }}
+                  tickFormatter={(v: number) => v >= 1e9 ? `${(v / 1e9).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} مـ` : v >= 1e6 ? `${(v / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 0 })} م` : fmtRial(v)}
+                  width={70}
+                  orientation="right"
+                />
+                <ReTooltip
+                  formatter={(v: any) => [`${fmtRial(v)} ریال`, 'سرمایه درگیر']}
+                  labelFormatter={(l: any) => `تاریخ: ${l}`}
+                  contentStyle={{ background: t.panelSolid, border: `1px solid ${t.borderStrong}`, borderRadius: 10, fontSize: 12, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}
+                />
+                {totals.priced && totals.value > 0 && (
+                  <ReferenceLine y={totals.value} stroke={t.green} strokeDasharray="6 4" />
+                )}
+                <Area type="stepAfter" dataKey="invested" stroke="#3b82f6" strokeWidth={2} fill="url(#growthFill)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       {/* تاریخچه تراکنش‌ها */}
       {txs.length > 0 && (
         <div style={{ ...card, marginTop: 16, overflowX: 'auto' }}>
@@ -641,7 +873,7 @@ export default function PortfolioPage() {
                 return (
                   <tr key={tx.id}>
                     <td style={{ ...td, color: t.muted, fontSize: 11.5 }}>{tx.trade_date}</td>
-                    <td style={{ ...td, fontWeight: 600 }}>{tx.asset_type === 'fund' ? tx.name : tx.symbol}</td>
+                    <td style={{ ...td, fontWeight: 600 }}>{tx.asset_type === 'stock' ? tx.symbol : tx.name}</td>
                     <td style={{ ...td, color: tx.side === 'buy' ? t.green : t.red, fontWeight: 600 }}>
                       {tx.side === 'buy' ? 'خرید' : 'فروش'}
                     </td>
