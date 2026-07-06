@@ -429,33 +429,24 @@ function Sparkline({ values, color, w, h }: { values: (number | null)[]; color: 
   const range = max - min || 1
   const n = values.length
   const x = (i: number) => ((n - 1 - i) / (n - 1)) * w
-  const y = (v: number) => h - ((v - min) / range) * (h - 4) - 2
-  const segs: string[] = []
-  let cur: string[] = []
-  values.forEach((v, i) => {
-    if (v === null || v <= 0) { if (cur.length) { segs.push(cur.join(' ')); cur = [] } return }
-    cur.push(`${x(i).toFixed(1)},${y(v).toFixed(1)}`)
-  })
-  if (cur.length) segs.push(cur.join(' '))
-  const lastIdx = values.findIndex(v => v !== null && v > 0)   // جدیدترین = اولین از راست
-  const lv = lastIdx >= 0 ? values[lastIdx] : null
+  const y = (v: number) => h - ((v - min) / range) * (h - 5) - 2.5
+  // یک خط پیوسته از همه نقاط موجود — از روی ماه‌های خالی پل می‌زند (قطع نمی‌شود)
+  const pres = values.map((v, i) => ({ v, i })).filter(p => p.v !== null && p.v > 0) as { v: number; i: number }[]
+  const line = pres.map(p => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
+  const fillPts = `${x(pres[0].i).toFixed(1)},${h} ${line} ${x(pres[pres.length - 1].i).toFixed(1)},${h}`
+  const newest = pres[0]   // جدیدترین = کوچک‌ترین اندیس در سمت چپ
   const gid = `spk-${Math.random().toString(36).slice(2, 8)}`
-  // ناحیه زیر پرمصرف‌ترین قطعه پیوسته برای fill گرادیانی
-  const longest = segs.reduce((a, b) => (b.split(' ').length > a.split(' ').length ? b : a), segs[0] || '')
-  const fillPts = longest ? `${longest.split(' ')[0].split(',')[0]},${h} ${longest} ${longest.split(' ').slice(-1)[0].split(',')[0]},${h}` : ''
   return (
     <svg width={w} height={h} style={{ display: 'block', overflow: 'visible' }}>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.26" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      {fillPts && <polygon points={fillPts} fill={`url(#${gid})`} stroke="none" />}
-      {segs.map((pts, i) => (
-        <polyline key={i} points={pts} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      ))}
-      {lv !== null && <circle cx={x(lastIdx)} cy={y(lv)} r={2.8} fill={color} stroke={color} strokeWidth={3} strokeOpacity={0.25} />}
+      <polygon points={fillPts} fill={`url(#${gid})`} stroke="none" />
+      <polyline points={line} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={x(newest.i)} cy={y(newest.v)} r={2.8} fill={color} stroke={color} strokeWidth={3} strokeOpacity={0.25} />
     </svg>
   )
 }
