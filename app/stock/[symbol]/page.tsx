@@ -431,13 +431,13 @@ function Sparkline({ values, periods, color, w, h, t }: {
   const min = Math.min(...nums), max = Math.max(...nums)
   const range = max - min || 1
   const n = values.length
-  const x = (i: number) => ((n - 1 - i) / (n - 1)) * w
+  const x = (i: number) => (i / (n - 1)) * w   // قدیمی چپ، جدید راست
   const y = (v: number) => h - ((v - min) / range) * (h - 5) - 2.5
   // یک خط پیوسته از همه نقاط موجود — از روی ماه‌های خالی پل می‌زند (قطع نمی‌شود)
   const pres = values.map((v, i) => ({ v, i })).filter(p => p.v !== null && p.v > 0) as { v: number; i: number }[]
   const line = pres.map(p => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
   const fillPts = `${x(pres[0].i).toFixed(1)},${h} ${line} ${x(pres[pres.length - 1].i).toFixed(1)},${h}`
-  const newest = pres[0]   // جدیدترین = کوچک‌ترین اندیس در سمت چپ
+  const newest = pres[pres.length - 1]   // جدیدترین = بزرگ‌ترین اندیس در سمت راست
   const gid = `spk-${Math.random().toString(36).slice(2, 8)}`
   const hv = hover !== null ? values[hover] : null
   return (
@@ -520,7 +520,7 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
 
       {/* روند فروش ماهانه */}
       <div style={{ fontSize: 11, color: t.muted, marginBottom: 10 }}>روند فروش ماهانه (میلیارد تومان)</div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: isMobile ? 3 : 6, height: 120, minWidth: 0 }}>
+      <div style={{ display: 'flex', direction: 'ltr', alignItems: 'flex-end', gap: isMobile ? 3 : 6, height: 120, minWidth: 0 }}>
         {months.map((m, i) => {
           const h = Math.max(((m.month ?? 0) / maxM) * 100, 2)
           const isLast = i === months.length - 1
