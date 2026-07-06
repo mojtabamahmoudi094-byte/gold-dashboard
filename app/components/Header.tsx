@@ -14,6 +14,7 @@ const NAV = [
   { label: 'ارزش معاملات',  href: '/trade-value' },
   { label: 'مقایسه',        href: '/compare' },
   { label: 'سیگنال‌ها',     href: '/signals' },
+  { label: 'پورتفوی من',    href: '/portfolio' },
 ]
 
 const pn = { style: { pointerEvents: 'none' as const } }
