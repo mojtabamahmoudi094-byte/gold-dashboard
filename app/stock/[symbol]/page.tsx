@@ -258,6 +258,7 @@ export default function StockPage() {
               {reports && reports.quarters.length > 0 && (
                 <QuarterlyFinSection quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
               )}
+              <AiChatSection symbol={symbol} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
             </>
           )
         })()}
@@ -271,6 +272,8 @@ type Theme = { panel: string; text: string; muted: string; line: string; isDark:
 const M_ACCENT = '#FACC15'   // زرد طلایی — فعالیت ماهانه
 const Q_ACCENT = '#F59E0B'   // کهربایی — گزارش فصلی
 const A_ACCENT = '#A78BFA'   // بنفش — تحلیل هوشمند
+const AI_ACCENT = '#2DD4BF'  // فیروزه‌ای — دستیار تحلیلگر
+const AI_API = 'https://newbot.dadashchekhabare.qzz.io/ai/ask'
 
 type Tone = 'pos' | 'neg' | 'neutral'
 type Insight = { tone: Tone; text: string }
@@ -677,6 +680,114 @@ function QuarterlyFinSection({ quarters, t, isMobile }: { quarters: RQuarter[]; 
             })}
           </tbody>
         </table>
+      </div>
+    </SectionCard>
+  )
+}
+
+// ————— دستیار تحلیلگر هوشمند (RAG کتاب‌های بنیادی + داده کدال + Gemini) —————
+type ChatMsg = { role: 'user' | 'ai'; text: string }
+
+const SUGGESTED_QS = [
+  'وضعیت بنیادی این سهم چطوره؟',
+  'روند فروش و سودآوری رو تحلیل کن',
+  'EPS و رشدش نسبت به سال قبل چطوره؟',
+]
+
+// حذف نشانه‌گذاری markdown از جواب (bold/heading) برای نمایش تمیز
+const stripMd = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,4}\s*/gm, '').replace(/^\s*[*-]\s+/gm, '• ')
+
+function AiChatSection({ symbol, t, isMobile }: { symbol: string; t: Theme; isMobile: boolean }) {
+  const [messages, setMessages] = useState<ChatMsg[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const send = async (raw?: string) => {
+    const q = (raw ?? input).trim()
+    if (!q || loading) return
+    setInput('')
+    setMessages(m => [...m, { role: 'user', text: q }])
+    setLoading(true)
+    try {
+      // اگر کاربر نماد را نگفته، به سوال اضافه کن تا داده کدال درست وصل شود
+      const full = q.includes(symbol) ? q : `درباره نماد ${symbol}: ${q}`
+      const res = await fetch(AI_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: full }),
+      })
+      const data = await res.json()
+      setMessages(m => [...m, { role: 'ai', text: stripMd(data.answer || data.error || 'خطایی رخ داد.') }])
+    } catch {
+      setMessages(m => [...m, { role: 'ai', text: 'ارتباط با دستیار برقرار نشد. کمی بعد دوباره امتحان کنید.' }])
+    }
+    setLoading(false)
+  }
+
+  return (
+    <SectionCard title="دستیار تحلیلگر" badge="هوش مصنوعی" accent={AI_ACCENT} t={t}>
+      {messages.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14, maxHeight: 420, overflowY: 'auto' }}>
+          {messages.map((m, i) => (
+            <div key={i} style={{
+              alignSelf: m.role === 'user' ? 'flex-start' : 'stretch',
+              maxWidth: m.role === 'user' ? '85%' : '100%',
+              padding: '10px 14px', borderRadius: 12, lineHeight: 2,
+              fontSize: isMobile ? 12 : 12.5,
+              whiteSpace: 'pre-wrap',
+              background: m.role === 'user' ? `${AI_ACCENT}14` : (t.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,30,46,0.03)'),
+              border: `0.5px solid ${m.role === 'user' ? `${AI_ACCENT}40` : t.line}`,
+              color: t.text,
+            }}>
+              {m.text}
+            </div>
+          ))}
+          {loading && (
+            <div style={{ fontSize: 12, color: t.muted, padding: '6px 4px' }}>
+              در حال تحلیل… (ممکن است تا ۳۰ ثانیه طول بکشد)
+            </div>
+          )}
+        </div>
+      )}
+
+      {messages.length === 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          {SUGGESTED_QS.map(q => (
+            <button key={q} onClick={() => send(q)} disabled={loading} style={{
+              fontSize: 11.5, padding: '7px 12px', borderRadius: 9, cursor: 'pointer',
+              background: `${AI_ACCENT}10`, border: `0.5px solid ${AI_ACCENT}35`, color: t.text,
+              fontFamily: 'inherit',
+            }}>{q}</button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') send() }}
+          placeholder={`سوالت درباره ${symbol} رو بپرس…`}
+          disabled={loading}
+          style={{
+            flex: 1, minWidth: 0, padding: '11px 14px', borderRadius: 11, fontSize: 12.5,
+            background: t.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,30,46,0.04)',
+            border: `0.5px solid ${t.line}`, color: t.text, outline: 'none',
+            fontFamily: 'inherit',
+          }}
+        />
+        <button onClick={() => send()} disabled={loading || !input.trim()} style={{
+          padding: '11px 18px', borderRadius: 11, fontSize: 12.5, fontWeight: 700, cursor: loading ? 'wait' : 'pointer',
+          background: `${AI_ACCENT}18`, border: `0.5px solid ${AI_ACCENT}50`, color: AI_ACCENT,
+          opacity: loading || !input.trim() ? 0.5 : 1, flexShrink: 0,
+          fontFamily: 'inherit',
+        }}>
+          {loading ? '…' : 'بپرس'}
+        </button>
+      </div>
+
+      <div style={{ fontSize: 9.5, color: t.muted, marginTop: 12, lineHeight: 1.7 }}>
+        پاسخ‌ها با هوش مصنوعی بر پایه کتاب‌های تحلیل بنیادی و گزارش‌های کدال تولید می‌شوند و توصیه خرید یا فروش نیستند.
       </div>
     </SectionCard>
   )
