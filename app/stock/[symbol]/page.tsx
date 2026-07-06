@@ -268,7 +268,7 @@ export default function StockPage() {
 
 type Theme = { panel: string; text: string; muted: string; line: string; isDark: boolean }
 
-const M_ACCENT = '#38BDF8'   // آبی آسمانی — فعالیت ماهانه
+const M_ACCENT = '#FACC15'   // زرد طلایی — فعالیت ماهانه
 const Q_ACCENT = '#F59E0B'   // کهربایی — گزارش فصلی
 const A_ACCENT = '#A78BFA'   // بنفش — تحلیل هوشمند
 
@@ -421,8 +421,11 @@ function Chip({ label, value, color, t }: { label: string; value: string; color?
   )
 }
 
-// اسپارک‌لاین نرخ فروش — جدیدترین سمت چپ (هماهنگ با RTL)
-function Sparkline({ values, color, w, h }: { values: (number | null)[]; color: string; w: number; h: number }) {
+// اسپارک‌لاین نرخ فروش — جدیدترین سمت چپ (هماهنگ با RTL)، با tooltip تاریخ+نرخ روی hover
+function Sparkline({ values, periods, color, w, h, t }: {
+  values: (number | null)[]; periods: string[]; color: string; w: number; h: number; t: Theme
+}) {
+  const [hover, setHover] = useState<number | null>(null)
   const nums = values.filter((v): v is number => v !== null && v > 0)
   if (nums.length < 2) return null
   const min = Math.min(...nums), max = Math.max(...nums)
@@ -436,18 +439,42 @@ function Sparkline({ values, color, w, h }: { values: (number | null)[]; color: 
   const fillPts = `${x(pres[0].i).toFixed(1)},${h} ${line} ${x(pres[pres.length - 1].i).toFixed(1)},${h}`
   const newest = pres[0]   // جدیدترین = کوچک‌ترین اندیس در سمت چپ
   const gid = `spk-${Math.random().toString(36).slice(2, 8)}`
+  const hv = hover !== null ? values[hover] : null
   return (
-    <svg width={w} height={h} style={{ display: 'block', overflow: 'visible' }}>
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.26" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={fillPts} fill={`url(#${gid})`} stroke="none" />
-      <polyline points={line} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={x(newest.i)} cy={y(newest.v)} r={2.8} fill={color} stroke={color} strokeWidth={3} strokeOpacity={0.25} />
-    </svg>
+    <div style={{ position: 'relative', width: w, height: h }}>
+      <svg width={w} height={h} style={{ display: 'block', overflow: 'visible' }}>
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.26" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon points={fillPts} fill={`url(#${gid})`} stroke="none" />
+        <polyline points={line} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+        {hover !== null && hv !== null && (
+          <line x1={x(hover)} y1={0} x2={x(hover)} y2={h} stroke={color} strokeWidth={0.8} strokeOpacity={0.4} strokeDasharray="2 2" />
+        )}
+        <circle cx={x(newest.i)} cy={y(newest.v)} r={2.8} fill={color} stroke={color} strokeWidth={3} strokeOpacity={0.25} />
+        {hover !== null && hv !== null && <circle cx={x(hover)} cy={y(hv)} r={3.4} fill={color} stroke={t.panel} strokeWidth={1.5} />}
+        {/* نواحی hover — کل ارتفاع هر ماه */}
+        {pres.map(p => (
+          <rect key={p.i} x={x(p.i) - w / (2 * (n - 1))} y={0} width={w / (n - 1)} height={h}
+            fill="transparent" style={{ cursor: 'pointer' }}
+            onMouseEnter={() => setHover(p.i)} onMouseLeave={() => setHover(null)} />
+        ))}
+      </svg>
+      {hover !== null && hv !== null && (
+        <div style={{
+          position: 'absolute', left: x(hover), top: -6, transform: 'translate(-50%, -100%)',
+          background: t.isDark ? 'rgba(2,6,14,0.96)' : 'rgba(255,255,255,0.98)',
+          border: `0.5px solid ${color}66`, borderRadius: 8, padding: '5px 9px', whiteSpace: 'nowrap',
+          pointerEvents: 'none', zIndex: 5, boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
+        }}>
+          <div style={{ fontSize: 9.5, color: t.muted, marginBottom: 2 }}>{monthLabel(periods[hover])}</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color }}>{rateFmt(hv)}</div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -479,7 +506,7 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
     const nums = vals.filter((v): v is number => v !== null && v > 0)
     const first = nums[0] ?? null
     const lastV = nums[nums.length - 1] ?? null
-    return { name, vals, latest: lastV, chg: growth(lastV, first) }
+    return { name, vals, periods: months.map(m => m.period), latest: lastV, chg: growth(lastV, first) }
   }).filter(s => s.vals.filter(v => v).length >= 2)
 
   return (
@@ -508,8 +535,13 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
                 width: '100%', maxWidth: 34, height: `${h}%`, borderRadius: '4px 4px 2px 2px',
                 background: isLast ? M_ACCENT : `${M_ACCENT}55`,
               }} />
-              <div style={{ fontSize: isMobile ? 7.5 : 9, color: isLast ? t.text : t.muted, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: '100%' }}>
-                {monthLabel(m.period).split(' ')[0].slice(0, isMobile ? 3 : 8)}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.25 }}>
+                <div style={{ fontSize: isMobile ? 7.5 : 9, color: isLast ? t.text : t.muted, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: '100%' }}>
+                  {monthLabel(m.period).split(' ')[0].slice(0, isMobile ? 3 : 8)}
+                </div>
+                <div style={{ fontSize: isMobile ? 6.5 : 8, color: isLast ? M_ACCENT : t.muted, opacity: isLast ? 1 : 0.65, whiteSpace: 'nowrap' }}>
+                  {(monthLabel(m.period).split(' ')[1] || '').slice(-2)}
+                </div>
               </div>
             </div>
           )
@@ -546,24 +578,29 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
           <div style={{ fontSize: 11, color: t.muted, margin: '22px 0 12px' }}>
             روند نرخ فروش محصولات اصلی (میلیون تومان بر واحد)
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {rateSeries.map(s => (
-              <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14, minWidth: 0 }}>
-                <div style={{ flex: '0 0 auto', width: isMobile ? 96 : 150, minWidth: 0 }}>
-                  <div style={{ fontSize: 11.5, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
-                  <div style={{ fontSize: 9.5, color: t.muted }}>نرخ فعلی: {rateFmt(s.latest)}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {rateSeries.map(s => {
+              const trend = s.chg === null ? t.muted : s.chg >= 0 ? GREEN : RED
+              return (
+                <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14, minWidth: 0 }}>
+                  <div style={{ flex: '0 0 auto', width: isMobile ? 96 : 150, minWidth: 0 }}>
+                    <div style={{ fontSize: 11.5, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                    <div style={{ fontSize: 9.5, color: t.muted }}>نرخ فعلی: {rateFmt(s.latest)}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+                    <Sparkline values={s.vals} periods={s.periods} color={trend} w={isMobile ? 130 : 320} h={34} t={t} />
+                  </div>
+                  <span style={{
+                    display: 'flex', alignItems: 'center', gap: 3,
+                    fontSize: 10.5, fontWeight: 700, flexShrink: 0, minWidth: 56, justifyContent: 'flex-start',
+                    color: trend,
+                  }}>
+                    {s.chg !== null && <ToneIcon tone={s.chg >= 0 ? 'pos' : 'neg'} size={12} />}
+                    {gPct(s.chg)}
+                  </span>
                 </div>
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>
-                  <Sparkline values={s.vals} color={M_ACCENT} w={isMobile ? 130 : 320} h={34} />
-                </div>
-                <span style={{
-                  fontSize: 10.5, fontWeight: 700, flexShrink: 0, minWidth: 52, textAlign: 'left',
-                  color: s.chg === null ? t.muted : s.chg >= 0 ? GREEN : RED,
-                }}>
-                  {gPct(s.chg)}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}
