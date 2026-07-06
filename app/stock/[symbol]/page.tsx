@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
@@ -694,13 +694,97 @@ const SUGGESTED_QS = [
   'EPS و رشدش نسبت به سال قبل چطوره؟',
 ]
 
+const THINKING_STEPS = [
+  'در حال خواندن گزارش‌های کدال…',
+  'مرور کتاب‌های تحلیل بنیادی…',
+  'محاسبه نسبت‌های مالی…',
+  'نوشتن جواب…',
+]
+
 // حذف نشانه‌گذاری markdown از جواب (bold/heading) برای نمایش تمیز
 const stripMd = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,4}\s*/gm, '').replace(/^\s*[*-]\s+/gm, '• ')
+
+// صدای اعلان ding دو-نتی با WebAudio — بدون فایل صوتی
+function playDing() {
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    type AC = typeof AudioContext
+    const Ctx: AC = window.AudioContext || (window as unknown as { webkitAudioContext: AC }).webkitAudioContext
+    const ctx = new Ctx()
+    const notes: [number, number][] = [[660, 0], [990, 0.09]]
+    for (const [freq, at] of notes) {
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.type = 'sine'
+      o.frequency.value = freq
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + at)
+      g.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + at + 0.02)
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.28)
+      o.connect(g); g.connect(ctx.destination)
+      o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + 0.3)
+    }
+    setTimeout(() => ctx.close(), 800)
+  } catch { /* صدا حیاتی نیست */ }
+}
+
+// آیکن‌های SVG (بدون وابستگی)
+const SparkIcon = ({ size = 18, color = AI_ACCENT }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4L12 3z" fill={color} />
+    <path d="M19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9L19 15z" fill={color} opacity={0.7} />
+  </svg>
+)
+const SendIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: 'scaleX(-1)' }}>
+    <path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" />
+  </svg>
+)
+const CopyIcon = ({ size = 13 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+  </svg>
+)
+const CheckIcon = ({ size = 13 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+)
+
+function AiAvatar({ pulsing }: { pulsing?: boolean }) {
+  return (
+    <span style={{
+      flexShrink: 0, width: 30, height: 30, borderRadius: 10,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: `linear-gradient(135deg, ${AI_ACCENT}28, ${AI_ACCENT}10)`,
+      border: `0.5px solid ${AI_ACCENT}50`,
+      boxShadow: pulsing ? `0 0 14px ${AI_ACCENT}50` : `0 0 8px ${AI_ACCENT}20`,
+      animation: pulsing ? 'aiPulse 1.6s ease-in-out infinite' : undefined,
+    }}>
+      <SparkIcon size={16} />
+    </span>
+  )
+}
 
 function AiChatSection({ symbol, t, isMobile }: { symbol: string; t: Theme; isMobile: boolean }) {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState(0)
+  const [copied, setCopied] = useState<number | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // چرخش پیام وضعیت هنگام انتظار
+  useEffect(() => {
+    if (!loading) return
+    setStep(0)
+    const id = setInterval(() => setStep(s => (s + 1) % THINKING_STEPS.length), 6000)
+    return () => clearInterval(id)
+  }, [loading])
+
+  // اسکرول خودکار به آخرین پیام
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
+  }, [messages, loading])
 
   const send = async (raw?: string) => {
     const q = (raw ?? input).trim()
@@ -718,76 +802,184 @@ function AiChatSection({ symbol, t, isMobile }: { symbol: string; t: Theme; isMo
       })
       const data = await res.json()
       setMessages(m => [...m, { role: 'ai', text: stripMd(data.answer || data.error || 'خطایی رخ داد.') }])
+      playDing()
     } catch {
       setMessages(m => [...m, { role: 'ai', text: 'ارتباط با دستیار برقرار نشد. کمی بعد دوباره امتحان کنید.' }])
     }
     setLoading(false)
   }
 
+  const copyAnswer = async (i: number, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(i)
+      setTimeout(() => setCopied(null), 1800)
+    } catch { /* clipboard در دسترس نیست */ }
+  }
+
+  const bubbleBase = {
+    padding: '12px 15px', borderRadius: 14, lineHeight: 2,
+    fontSize: isMobile ? 12 : 12.5, whiteSpace: 'pre-wrap' as const, color: t.text,
+    animation: 'aiMsgIn 0.35s ease both',
+  }
+
   return (
     <SectionCard title="دستیار تحلیلگر" badge="هوش مصنوعی" accent={AI_ACCENT} t={t}>
-      {messages.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14, maxHeight: 420, overflowY: 'auto' }}>
-          {messages.map((m, i) => (
-            <div key={i} style={{
-              alignSelf: m.role === 'user' ? 'flex-start' : 'stretch',
-              maxWidth: m.role === 'user' ? '85%' : '100%',
-              padding: '10px 14px', borderRadius: 12, lineHeight: 2,
-              fontSize: isMobile ? 12 : 12.5,
-              whiteSpace: 'pre-wrap',
-              background: m.role === 'user' ? `${AI_ACCENT}14` : (t.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,30,46,0.03)'),
-              border: `0.5px solid ${m.role === 'user' ? `${AI_ACCENT}40` : t.line}`,
-              color: t.text,
-            }}>
-              {m.text}
+      <style>{`
+        @keyframes aiMsgIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+        @keyframes aiPulse { 0%,100% { box-shadow: 0 0 8px ${AI_ACCENT}30 } 50% { box-shadow: 0 0 18px ${AI_ACCENT}60 } }
+        @keyframes aiDot { 0%,80%,100% { transform: translateY(0); opacity: .45 } 40% { transform: translateY(-4px); opacity: 1 } }
+        @keyframes aiShimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+        @media (prefers-reduced-motion: reduce) {
+          .ai-anim, .ai-anim * { animation: none !important; transition: none !important }
+        }
+        .ai-chip { transition: transform .18s ease, box-shadow .18s ease, background .18s ease }
+        .ai-chip:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 14px ${AI_ACCENT}25; background: ${AI_ACCENT}1e }
+        .ai-send { transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease }
+        .ai-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px ${AI_ACCENT}40 }
+        .ai-send:active:not(:disabled) { transform: translateY(0) }
+        .ai-input:focus { border-color: ${AI_ACCENT}70 !important; box-shadow: 0 0 0 3px ${AI_ACCENT}22 }
+        .ai-copy { transition: color .15s ease, background .15s ease }
+        .ai-copy:hover { background: ${AI_ACCENT}18 }
+      `}</style>
+
+      <div className="ai-anim">
+        {/* حالت خالی: معرفی + سوال‌های پیشنهادی */}
+        {messages.length === 0 && (
+          <div style={{ textAlign: 'center', padding: isMobile ? '18px 4px 22px' : '26px 10px 30px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <span style={{
+                width: 54, height: 54, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: `linear-gradient(135deg, ${AI_ACCENT}25, ${AI_ACCENT}08)`,
+                border: `0.5px solid ${AI_ACCENT}45`, animation: 'aiPulse 2.4s ease-in-out infinite',
+              }}>
+                <SparkIcon size={26} />
+              </span>
             </div>
-          ))}
-          {loading && (
-            <div style={{ fontSize: 12, color: t.muted, padding: '6px 4px' }}>
-              در حال تحلیل… (ممکن است تا ۳۰ ثانیه طول بکشد)
+            <div style={{ fontSize: isMobile ? 13.5 : 15, fontWeight: 800, color: t.text, marginBottom: 6 }}>
+              درباره {symbol} هر سوالی داری بپرس
             </div>
-          )}
+            <div style={{ fontSize: isMobile ? 11 : 11.5, color: t.muted, marginBottom: 18, lineHeight: 1.9 }}>
+              تحلیل بر پایه ۱۷ کتاب تحلیل بنیادی و گزارش‌های واقعی کدال
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {SUGGESTED_QS.map(q => (
+                <button key={q} className="ai-chip" onClick={() => send(q)} disabled={loading} aria-label={`پرسیدن: ${q}`} style={{
+                  fontSize: isMobile ? 11 : 11.5, padding: '10px 15px', borderRadius: 999, cursor: 'pointer',
+                  background: `${AI_ACCENT}10`, border: `0.5px solid ${AI_ACCENT}38`, color: t.text,
+                  fontFamily: 'inherit', minHeight: 40,
+                }}>{q}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* پیام‌ها */}
+        {messages.length > 0 && (
+          <div ref={listRef} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16, maxHeight: 460, overflowY: 'auto', paddingLeft: 2 }}>
+            {messages.map((m, i) => m.role === 'user' ? (
+              <div key={i} style={{
+                ...bubbleBase, alignSelf: 'flex-start', maxWidth: '82%',
+                background: `linear-gradient(135deg, ${AI_ACCENT}1c, ${AI_ACCENT}0d)`,
+                border: `0.5px solid ${AI_ACCENT}42`,
+                borderTopRightRadius: 4,
+              }}>
+                {m.text}
+              </div>
+            ) : (
+              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <AiAvatar />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: AI_ACCENT }}>دستیار بورس سنج</span>
+                    <button className="ai-copy" onClick={() => copyAnswer(i, m.text)} aria-label="کپی جواب" style={{
+                      display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+                      fontSize: 9.5, padding: '3px 8px', borderRadius: 6, fontFamily: 'inherit',
+                      background: 'transparent', border: `0.5px solid ${t.line}`,
+                      color: copied === i ? GREEN : t.muted,
+                    }}>
+                      {copied === i ? <CheckIcon /> : <CopyIcon />}
+                      {copied === i ? 'کپی شد' : 'کپی'}
+                    </button>
+                  </div>
+                  <div style={{
+                    ...bubbleBase,
+                    background: t.isDark ? 'rgba(255,255,255,0.028)' : 'rgba(15,30,46,0.028)',
+                    border: `0.5px solid ${t.line}`,
+                    borderTopLeftRadius: 4,
+                  }}>
+                    {m.text}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* وضعیت در حال فکرکردن */}
+            {loading && (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <AiAvatar pulsing />
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderRadius: 14, borderTopLeftRadius: 4,
+                  background: t.isDark ? 'rgba(255,255,255,0.028)' : 'rgba(15,30,46,0.028)', border: `0.5px solid ${t.line}`,
+                }}>
+                  <span style={{ display: 'flex', gap: 4 }} aria-hidden="true">
+                    {[0, 1, 2].map(d => (
+                      <span key={d} style={{
+                        width: 6, height: 6, borderRadius: 3, background: AI_ACCENT,
+                        animation: `aiDot 1.2s ease-in-out ${d * 0.18}s infinite`,
+                      }} />
+                    ))}
+                  </span>
+                  <span aria-live="polite" style={{
+                    fontSize: 11.5, fontWeight: 600,
+                    background: `linear-gradient(90deg, ${t.muted}, ${AI_ACCENT}, ${t.muted})`,
+                    backgroundSize: '200% 100%', animation: 'aiShimmer 2.2s linear infinite',
+                    WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+                  }}>
+                    {THINKING_STEPS[step]}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ورودی */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="ai-input"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') send() }}
+            placeholder={`سوالت درباره ${symbol} رو بپرس…`}
+            disabled={loading}
+            aria-label={`سوال درباره ${symbol}`}
+            style={{
+              flex: 1, minWidth: 0, padding: '13px 17px', borderRadius: 999, fontSize: isMobile ? 12 : 12.5,
+              background: t.isDark ? 'rgba(255,255,255,0.045)' : 'rgba(15,30,46,0.045)',
+              border: `0.5px solid ${t.line}`, color: t.text, outline: 'none',
+              fontFamily: 'inherit', minHeight: 46, transition: 'border-color .2s ease, box-shadow .2s ease',
+            }}
+          />
+          <button className="ai-send" onClick={() => send()} disabled={loading || !input.trim()} aria-label="ارسال سوال" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            padding: isMobile ? '0 16px' : '0 20px', minHeight: 46, minWidth: 46,
+            borderRadius: 999, fontSize: 12.5, fontWeight: 800,
+            cursor: loading || !input.trim() ? 'default' : 'pointer',
+            background: loading || !input.trim()
+              ? (t.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,30,46,0.05)')
+              : `linear-gradient(135deg, ${AI_ACCENT}, #14B8A6)`,
+            border: 'none', color: loading || !input.trim() ? t.muted : '#04241F',
+            opacity: loading ? 0.7 : 1, flexShrink: 0, fontFamily: 'inherit',
+          }}>
+            <SendIcon />
+            {!isMobile && 'بپرس'}
+          </button>
         </div>
-      )}
 
-      {messages.length === 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-          {SUGGESTED_QS.map(q => (
-            <button key={q} onClick={() => send(q)} disabled={loading} style={{
-              fontSize: 11.5, padding: '7px 12px', borderRadius: 9, cursor: 'pointer',
-              background: `${AI_ACCENT}10`, border: `0.5px solid ${AI_ACCENT}35`, color: t.text,
-              fontFamily: 'inherit',
-            }}>{q}</button>
-          ))}
+        <div style={{ fontSize: 9.5, color: t.muted, marginTop: 12, lineHeight: 1.7 }}>
+          پاسخ‌ها با هوش مصنوعی بر پایه کتاب‌های تحلیل بنیادی و گزارش‌های کدال تولید می‌شوند و توصیه خرید یا فروش نیستند.
         </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') send() }}
-          placeholder={`سوالت درباره ${symbol} رو بپرس…`}
-          disabled={loading}
-          style={{
-            flex: 1, minWidth: 0, padding: '11px 14px', borderRadius: 11, fontSize: 12.5,
-            background: t.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,30,46,0.04)',
-            border: `0.5px solid ${t.line}`, color: t.text, outline: 'none',
-            fontFamily: 'inherit',
-          }}
-        />
-        <button onClick={() => send()} disabled={loading || !input.trim()} style={{
-          padding: '11px 18px', borderRadius: 11, fontSize: 12.5, fontWeight: 700, cursor: loading ? 'wait' : 'pointer',
-          background: `${AI_ACCENT}18`, border: `0.5px solid ${AI_ACCENT}50`, color: AI_ACCENT,
-          opacity: loading || !input.trim() ? 0.5 : 1, flexShrink: 0,
-          fontFamily: 'inherit',
-        }}>
-          {loading ? '…' : 'بپرس'}
-        </button>
-      </div>
-
-      <div style={{ fontSize: 9.5, color: t.muted, marginTop: 12, lineHeight: 1.7 }}>
-        پاسخ‌ها با هوش مصنوعی بر پایه کتاب‌های تحلیل بنیادی و گزارش‌های کدال تولید می‌شوند و توصیه خرید یا فروش نیستند.
       </div>
     </SectionCard>
   )
