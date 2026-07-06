@@ -256,6 +256,102 @@ function fundReason(f: FundRow, signalType: string): string {
   return parts.join(' · ')
 }
 
+// ── Bourse funds signal engine (اهرمی / بخشی / سهامی) ─────────────────────
+// بدون حباب بورس کالا — سیگنال بر پایه جریان پول حقیقی، عرض بازار و مومنتوم
+interface CatTrendDay { ratio: number; avgChg: number }
+
+function computeBourseSignal(todayFunds: FundRow[], trend: CatTrendDay[]) {
+  if (todayFunds.length === 0) return null
+  let score = 0
+  const reasons: { text: string; dir: 'pos' | 'neg' | 'neu' }[] = []
+
+  // جریان پول حقیقی امروز (نسبت خالص به کل)
+  const buy = todayFunds.reduce((s, f) => s + safe(f.buy_i_volume), 0)
+  const sell = todayFunds.reduce((s, f) => s + safe(f.sell_i_volume), 0)
+  const total = buy + sell
+  const ratio = total > 0 ? (buy - sell) / total : 0
+  const netM = Math.round((buy - sell) / 1e6)
+  const netStr = `${netM >= 0 ? '+' : ''}${netM.toLocaleString('fa-IR')}M`
+  if (ratio > 0.15) {
+    score += 2
+    reasons.push({ text: `ورود قوی پول حقیقی امروز (${netStr} واحد)`, dir: 'pos' })
+  } else if (ratio > 0.05) {
+    score += 1
+    reasons.push({ text: `ورود پول حقیقی امروز (${netStr} واحد)`, dir: 'pos' })
+  } else if (ratio < -0.15) {
+    score -= 2
+    reasons.push({ text: `خروج شدید پول حقیقی امروز (${netStr} واحد)`, dir: 'neg' })
+  } else if (ratio < -0.05) {
+    score -= 1
+    reasons.push({ text: `خروج پول حقیقی امروز (${netStr} واحد)`, dir: 'neg' })
+  } else {
+    reasons.push({ text: 'جریان پول حقیقی امروز متعادل', dir: 'neu' })
+  }
+
+  // عرض بازار — چند درصد صندوق‌ها مثبت بودند
+  const up = todayFunds.filter(f => (f.price_change_pct ?? 0) > 0).length
+  const pctUp = up / todayFunds.length
+  if (pctUp >= 0.75) {
+    score += 1
+    reasons.push({ text: `${Math.round(pctUp * 100)}٪ صندوق‌ها مثبت — تقاضای فراگیر`, dir: 'pos' })
+  } else if (pctUp <= 0.25) {
+    score -= 1
+    reasons.push({ text: `فقط ${Math.round(pctUp * 100)}٪ صندوق‌ها مثبت — فشار فروش گسترده`, dir: 'neg' })
+  }
+
+  // میانگین تغییر قیمت امروز
+  const avgChg = todayFunds.reduce((s, f) => s + (f.price_change_pct ?? 0), 0) / todayFunds.length
+  if (avgChg > 1.5) {
+    score += 1
+    reasons.push({ text: `میانگین رشد امروز ${avgChg.toFixed(1)}٪`, dir: 'pos' })
+  } else if (avgChg > 0.5) {
+    score += 0.5
+    reasons.push({ text: `میانگین رشد امروز ${avgChg.toFixed(1)}٪`, dir: 'pos' })
+  } else if (avgChg < -1.5) {
+    score -= 1
+    reasons.push({ text: `میانگین افت امروز ${Math.abs(avgChg).toFixed(1)}٪`, dir: 'neg' })
+  } else if (avgChg < -0.5) {
+    score -= 0.5
+    reasons.push({ text: `میانگین افت امروز ${Math.abs(avgChg).toFixed(1)}٪`, dir: 'neg' })
+  }
+
+  // روند چند روز اخیر — جریان پول و مومنتوم
+  if (trend.length >= 3) {
+    const avgRatio = trend.reduce((s, t) => s + t.ratio, 0) / trend.length
+    const posDays = trend.filter(t => t.ratio > 0).length
+    if (avgRatio > 0.08) {
+      score += 1.5
+      reasons.push({ text: `ورود پول در ${posDays.toLocaleString('fa-IR')} روز از ${trend.length.toLocaleString('fa-IR')} روز اخیر`, dir: 'pos' })
+    } else if (avgRatio < -0.08) {
+      score -= 1.5
+      reasons.push({ text: `خروج پول در ${(trend.length - posDays).toLocaleString('fa-IR')} روز از ${trend.length.toLocaleString('fa-IR')} روز اخیر`, dir: 'neg' })
+    }
+    const cum = trend.reduce((s, t) => s + t.avgChg, 0)
+    if (cum > 4) {
+      score += 0.5
+      reasons.push({ text: `مومنتوم مثبت ${cum.toFixed(1)}٪ در ${trend.length.toLocaleString('fa-IR')} روز اخیر`, dir: 'pos' })
+    } else if (cum < -4) {
+      score -= 0.5
+      reasons.push({ text: `افت ${Math.abs(cum).toFixed(1)}٪ در ${trend.length.toLocaleString('fa-IR')} روز اخیر`, dir: 'neg' })
+    }
+  }
+
+  let type: string, color: string, confidence: number
+  if (score >= 2.5) { type = 'خرید'; color = '#10B981'; confidence = Math.min(90, Math.round(50 + score * 8)) }
+  else if (score <= -2.5) { type = 'فروش'; color = '#EF4444'; confidence = Math.min(90, Math.round(50 + Math.abs(score) * 8)) }
+  else if (score >= 1) { type = 'تمایل خرید'; color = '#3BB07A'; confidence = Math.round(40 + score * 6) }
+  else if (score <= -1) { type = 'احتیاط'; color = '#F59E0B'; confidence = Math.round(40 + Math.abs(score) * 6) }
+  else { type = 'نگه‌داری'; color = '#00C8FF'; confidence = Math.round(45 + Math.abs(score) * 4) }
+
+  return { type, color, confidence, score, reasons }
+}
+
+const BOURSE_CATS = [
+  { key: 'leveraged', label: 'اهرمی', color: '#F0654A' },
+  { key: 'sector',    label: 'بخشی',  color: '#38BDF8' },
+  { key: 'equity',    label: 'سهامی', color: '#A78BFA' },
+]
+
 // ── Silver signal engine ───────────────────────────────────────────────────
 function computeSilverSignal(silverBubble: number | null, api: any) {
   if (silverBubble == null) return null
@@ -330,6 +426,7 @@ export default function SignalsPage() {
   const [priceMap, setPriceMap]   = useState<Record<string, number>>({})
   const [flowMap, setFlowMap]     = useState<Record<string, number>>({})
   const [fundData, setFundData]   = useState<FundRow[]>([])
+  const [catTrends, setCatTrends] = useState<Record<string, CatTrendDay[]>>({})
   const [navMap, setNavMap]       = useState<Record<string, number>>({})
   const [apiData, setApiData]     = useState<any>(null)
   const [isDark, setIsDark]       = useState(true)
@@ -426,6 +523,48 @@ export default function SignalsPage() {
               .map((f: any) => ({ ...f, ...(assetMap[f.asset_id] || {}) }))
               .filter((f: any) => f.name && f.category)
             setFundData(merged as FundRow[])
+
+            // روند ۵ روز اخیر صندوق‌های بورسی (اهرمی/بخشی/سهامی) برای موتور سیگنال
+            const bourseCatSet = new Set(BOURSE_CATS.map(c => c.label))
+            const bourseIds = assets
+              .filter((a: any) => bourseCatSet.has(a.category))
+              .map((a: any) => a.id)
+            const trendDates = (prices ?? [])
+              .map((p: any) => p.trade_date_shamsi as string)
+              .filter(d => d < lastDate)
+              .slice(-5)
+            if (bourseIds.length && trendDates.length) {
+              const { data: hist } = await supabase.from('gold_funds')
+                .select('asset_id, trade_date_shamsi, price_change_pct, buy_i_volume, sell_i_volume')
+                .in('trade_date_shamsi', trendDates)
+                .in('asset_id', bourseIds)
+                .not('price_close', 'is', null)
+              if (hist) {
+                const byCatDate: Record<string, Record<string, { buy: number; sell: number; chg: number; cnt: number }>> = {}
+                hist.forEach((r: any) => {
+                  const cat = assetMap[r.asset_id]?.category
+                  if (!cat) return
+                  byCatDate[cat] ??= {}
+                  byCatDate[cat][r.trade_date_shamsi] ??= { buy: 0, sell: 0, chg: 0, cnt: 0 }
+                  const o = byCatDate[cat][r.trade_date_shamsi]
+                  o.buy += safe(r.buy_i_volume)
+                  o.sell += safe(r.sell_i_volume)
+                  o.chg += r.price_change_pct ?? 0
+                  o.cnt++
+                })
+                const ct: Record<string, CatTrendDay[]> = {}
+                Object.entries(byCatDate).forEach(([cat, days]) => {
+                  ct[cat] = trendDates
+                    .filter(d => days[d])
+                    .map(d => {
+                      const o = days[d]
+                      const tot = o.buy + o.sell
+                      return { ratio: tot > 0 ? (o.buy - o.sell) / tot : 0, avgChg: o.cnt ? o.chg / o.cnt : 0 }
+                    })
+                })
+                setCatTrends(ct)
+              }
+            }
           }
         }
       } catch { /* ignore */ }
@@ -458,6 +597,11 @@ export default function SignalsPage() {
   const rankedSilverFunds = silverSignal
     ? getRankedFunds(silverSignal.type, fundData, navMap, 'نقره', n => silverFundBubbleZati(n, silverBubble))
     : []
+  const bourseSections = BOURSE_CATS.map(c => {
+    const sig = computeBourseSignal(fundData.filter(f => f.category === c.label), catTrends[c.label] ?? [])
+    const funds = sig ? getRankedFunds(sig.type, fundData, navMap, c.label, () => null) : []
+    return { ...c, sig, funds }
+  }).filter(s => s.sig)
 
   // ثبت خودکار سیگنال موتور جدید در تاریخچه (فقط ادمین، یک بار برای هر روز+نوع)
   useEffect(() => {
@@ -538,7 +682,7 @@ export default function SignalsPage() {
               سیگنال‌های بازار
             </h1>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: MUTED }}>
-              بر پایه حباب شمش و گواهی سکه بورس کالا، حباب واقعی صندوق‌ها، انس جهانی و جریان پول حقیقی
+              بر پایه حباب شمش و گواهی سکه بورس کالا، حباب واقعی صندوق‌ها، انس جهانی و جریان پول حقیقی — به‌همراه سیگنال صندوق‌های بورسی (اهرمی، بخشی، سهامی)
             </p>
           </div>
           {apiData?.updatedAt && (
@@ -815,6 +959,163 @@ export default function SignalsPage() {
           </div>
           )
         })}
+
+        {/* ── Bourse funds signals (اهرمی / بخشی / سهامی) ── */}
+        {!loading && bourseSections.length > 0 && (
+          <div style={{
+            background: PANEL,
+            border: `0.5px solid ${BORDER}`,
+            borderRadius: 14,
+            padding: isMobile ? '18px 16px' : '20px 24px',
+            backdropFilter: 'blur(12px)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <div style={{ width: 3, height: 20, borderRadius: 2, background: t.accent }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
+                سیگنال صندوق‌های بورسی
+              </span>
+              <span style={{
+                fontSize: 10, color: MUTED, marginRight: 'auto',
+                background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                padding: '2px 8px', borderRadius: 5,
+              }}>
+                بر اساس جریان پول حقیقی، عرض بازار و مومنتوم چند روزه
+              </span>
+            </div>
+            <p style={{ margin: '0 0 16px', fontSize: 11, color: MUTED }}>
+              اهرمی · بخشی · سهامی
+            </p>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+              gap: 12,
+            }}>
+              {bourseSections.map(sec => {
+                const sig = sec.sig!
+                return (
+                  <div key={sec.key} style={{
+                    background: isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)',
+                    border: `1px solid ${sig.color}28`,
+                    borderRadius: 12,
+                    padding: '16px 16px 14px',
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                    position: 'relative', overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, right: 0, height: 2.5,
+                      background: `linear-gradient(90deg, ${sig.color}, transparent)`,
+                    }} />
+
+                    {/* category + signal badge */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        fontSize: 13, fontWeight: 700, color: sec.color,
+                      }}>
+                        صندوق {sec.label}
+                      </span>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, color: sig.color,
+                        background: `${sig.color}16`, border: `1px solid ${sig.color}30`,
+                        padding: '2px 10px', borderRadius: 5,
+                        marginRight: 'auto',
+                      }}>
+                        {sig.type}
+                      </span>
+                    </div>
+
+                    {/* confidence */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: BORDER, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 2,
+                          width: `${sig.confidence}%`,
+                          background: `linear-gradient(90deg, ${sig.color}99, ${sig.color})`,
+                          transition: 'width 0.5s ease',
+                        }} />
+                      </div>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: sig.color, fontFamily: 'system-ui' }}>
+                        {sig.confidence}٪
+                      </span>
+                    </div>
+
+                    {/* reasons */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {sig.reasons.map((r, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                          <span style={{ fontSize: 8, marginTop: 3, color: r.dir === 'pos' ? GREEN : r.dir === 'neg' ? RED : MUTED }}>
+                            {r.dir === 'pos' ? '▲' : r.dir === 'neg' ? '▼' : '●'}
+                          </span>
+                          <span style={{ fontSize: 10.5, lineHeight: 1.6, color: r.dir === 'pos' ? GREEN : r.dir === 'neg' ? RED : MUTED }}>
+                            {r.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* top funds */}
+                    {sec.funds.length > 0 && (
+                      <div style={{ borderTop: `0.5px solid ${BORDER}`, paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <span style={{ fontSize: 9.5, color: FAINT, letterSpacing: '0.04em' }}>
+                          {sig.type === 'خرید' || sig.type === 'تمایل خرید'
+                            ? 'گزینه‌های خرید'
+                            : sig.type === 'فروش' || sig.type === 'احتیاط'
+                              ? 'کاندیدهای فروش'
+                              : 'کم‌ریسک‌ترین‌ها برای نگه‌داری'}
+                        </span>
+                        {sec.funds.map((f, idx) => {
+                          const netM = Math.round(f.net / 1e6)
+                          const chg = f.price_change_pct ?? 0
+                          return (
+                            <Link key={f.asset_id} href={`/fund/${f.slug}`} style={{ textDecoration: 'none' }}>
+                              <div style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '5px 8px', borderRadius: 8,
+                                background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                                transition: 'background 0.15s',
+                              }}
+                                onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}
+                              >
+                                <span style={{
+                                  width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                                  background: `${idx === 0 ? sec.color : MUTED}18`,
+                                  border: `1px solid ${idx === 0 ? sec.color : MUTED}30`,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 9, fontWeight: 700, color: idx === 0 ? sec.color : MUTED,
+                                  fontFamily: 'system-ui',
+                                }}>
+                                  {idx + 1}
+                                </span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: TEXT }}>{f.name}</span>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 600, marginRight: 'auto',
+                                  color: chg >= 0 ? GREEN : RED, fontFamily: 'system-ui',
+                                }}>
+                                  {chg >= 0 ? '+' : ''}{chg?.toFixed(2)}٪
+                                </span>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 600,
+                                  color: netM >= 0 ? GREEN : RED, fontFamily: 'system-ui',
+                                }}>
+                                  {netM >= 0 ? '+' : ''}{netM.toLocaleString('fa-IR')}M
+                                </span>
+                              </div>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <p style={{ margin: '14px 0 0', fontSize: 10, color: FAINT, lineHeight: 1.7 }}>
+              ⓘ  سیگنال هر دسته از جمع جریان پول حقیقی، درصد صندوق‌های مثبت و روند ۵ روز اخیر همان دسته محاسبه می‌شود — توصیه سرمایه‌گذاری نیست.
+            </p>
+          </div>
+        )}
 
         {/* ── Summary stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
