@@ -75,6 +75,18 @@ const PHYSICAL_ITEMS: { symbol: string; name: string }[] = [
 ]
 const PHYSICAL_KEYWORDS = ['طلا', 'سکه', 'نقره', 'فیزیکی', 'گرم']
 
+// نرمال‌سازی فارسی برای جستجو — ی/ي، ک/ك، نیم‌فاصله، اعراب و همزه‌ها
+const normFa = (s: string) =>
+  s.replace(/[يی]/g, 'ی')
+   .replace(/[كک]/g, 'ک')
+   .replace(/[‌‎‏]/g, ' ')  // نیم‌فاصله → فاصله
+   .replace(/[أإآ]/g, 'ا')
+   .replace(/ؤ/g, 'و')
+   .replace(/ة/g, 'ه')
+   .replace(/[ً-ٰٟ]/g, '')  // اعراب
+   .replace(/\s+/g, ' ')
+   .trim()
+
 const MANUAL_PRICES_KEY = 'portfolio_manual_prices'
 
 const todayShamsi = () =>
@@ -219,14 +231,36 @@ export default function PortfolioPage() {
   }, [qty, price, side, autoFee, picked])
 
   const searchResults = useMemo(() => {
-    const q = query.trim()
+    const q = normFa(query)
     if (q.length < 1) return []
-    const matches = instruments.filter(i => i.symbol.includes(q) || i.name.includes(q))
-    // دارایی فیزیکی اول بیاید وقتی جستجو به طلا/سکه/نقره می‌خورد
-    if (PHYSICAL_KEYWORDS.some(k => q.includes(k))) {
-      matches.sort((a, b) => (a.type === 'physical' ? 0 : 1) - (b.type === 'physical' ? 0 : 1))
+    // رتبه‌بندی: تطبیق دقیق نماد → شروع نماد → تطبیق دقیق/شروع نام → شامل‌بودن
+    // بدون این، جستجوی «فولاد» بین ده‌ها نماد حاوی «فولاد» گم می‌شد
+    const scored: { i: Instrument; score: number }[] = []
+    for (const i of instruments) {
+      const sym = normFa(i.symbol)
+      const name = normFa(i.name)
+      let score: number
+      if (sym === q) score = 0
+      else if (sym.startsWith(q)) score = 1
+      else if (name === q) score = 2
+      else if (name.startsWith(q)) score = 3
+      else if (sym.includes(q)) score = 4
+      else if (name.includes(q)) score = 5
+      else continue
+      scored.push({ i, score })
     }
-    return matches.slice(0, 8)
+    // دارایی فیزیکی بالاتر بیاید وقتی جستجو به طلا/سکه/نقره می‌خورد
+    const physBoost = PHYSICAL_KEYWORDS.some(k => q.includes(normFa(k)))
+    scored.sort((a, b) => {
+      if (physBoost) {
+        const pa = a.i.type === 'physical' ? 0 : 1
+        const pb = b.i.type === 'physical' ? 0 : 1
+        if (pa !== pb) return pa - pb
+      }
+      if (a.score !== b.score) return a.score - b.score
+      return a.i.symbol.length - b.i.symbol.length
+    })
+    return scored.slice(0, 10).map(s => s.i)
   }, [query, instruments])
 
   // ─── محاسبه‌ی دارایی‌ها به روش میانگین موزون ───
@@ -261,9 +295,10 @@ export default function PortfolioPage() {
       // فیزیکی کارمزد فروش بورسی ندارد — سربه‌سر همان میانگین است
       h.breakEven = h.qty > 0 ? (h.type === 'physical' ? h.avgCost : h.avgCost / (1 - FEE_SELL)) : 0
       const inst = priceMap.get(h.symbol)
-      // قیمت روز: آنلاین، و برای فیزیکی در نبودش قیمت دستی کاربر
+      // قیمت روز: آنلاین، و در نبودش قیمت دستی کاربر (هر نوع دارایی —
+      // مثلاً نمادی که در دیتای روز جا افتاده یا نماد متوقف)
       const live = inst && inst.price > 0 ? inst.price : null
-      const manual = h.type === 'physical' ? safe(manualPrices[h.symbol]) || null : null
+      const manual = safe(manualPrices[h.symbol]) || null
       const px = live ?? manual
       if (px != null) {
         h.price = px
@@ -570,7 +605,7 @@ ${txs.map(tx => row([
                 onChange={e => { setQuery(e.target.value); setPicked(null) }}
                 placeholder="مثلاً: فولاد، سکه امامی، طلای ۱۸…"
               />
-              {query && !picked && searchResults.length > 0 && (
+              {query.trim() && !picked && (
                 <div style={{
                   position: 'absolute', top: '100%', right: 0, left: 0, zIndex: 20,
                   background: t.panelSolid, border: `1px solid ${t.borderStrong}`, borderRadius: 10,
@@ -598,6 +633,20 @@ ${txs.map(tx => row([
                       </span>
                     </button>
                   ))}
+                  {/* اگر نماد در دیتای روز نبود (مثلاً متوقف/جاافتاده) ثبت دستی ممکن باشد */}
+                  {!searchResults.some(i => normFa(i.symbol) === normFa(query)) && (
+                    <button
+                      type="button"
+                      onClick={() => pickInstrument({ symbol: query.trim(), name: query.trim(), type: 'stock', price: 0, changePct: 0 })}
+                      style={{
+                        display: 'block', width: '100%', padding: '9px 12px', fontSize: 12, cursor: 'pointer',
+                        background: 'rgba(59,130,246,0.06)', border: 'none',
+                        color: t.brand, fontFamily: 'inherit', textAlign: 'right',
+                      }}
+                    >
+                      ➕ ثبت دستی نماد «{query.trim()}» — قیمت را خودتان وارد می‌کنید
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -722,7 +771,7 @@ ${txs.map(tx => row([
                     <td style={td}>{fmtRial(h.avgCost)}</td>
                     <td style={{ ...td, color: t.muted }}>{fmtRial(h.breakEven)}</td>
                     <td style={td}>
-                      {h.type === 'physical' && (priceMap.get(h.symbol)?.price ?? 0) <= 0 ? (
+                      {(priceMap.get(h.symbol)?.price ?? 0) <= 0 ? (
                         // قیمت آنلاین در دسترس نیست — ورودی قیمت دستی (در مرورگر ذخیره می‌شود)
                         <input
                           style={{ ...input, width: 110, padding: '5px 8px', fontSize: 11.5 }}

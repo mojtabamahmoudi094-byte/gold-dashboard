@@ -51,8 +51,9 @@ async function main() {
     const cs  = clean(it.cs)
     const l18 = clean(it.l18)
     const l30 = clean(it.l30)
-    if (!cs || !l18) return false
-    if (NOT_STOCK_CS.test(cs)) return false
+    // cs خالی حذف نمی‌شود — نماد متوقف/بدون طبقه‌بندی (مثل فولاد در برخی روزها) به «سایر» می‌رود
+    if (!l18) return false
+    if (cs && NOT_STOCK_CS.test(cs)) return false
     if (/[0-9۰-۹]/.test(l18)) return false                       // اوراق با پسوند عددی
     if (/حق تقدم|حق‌تقدم/.test(l30)) return false                // حق تقدم
     if (l18.endsWith('ح') && allL18.has(l18.slice(0, -1))) return false
@@ -62,8 +63,8 @@ async function main() {
   const byIndustry = new Map()
   for (const it of arr) {
     if (!isStock(it)) continue
-    const key = num(it.cs_id) ?? clean(it.cs)
-    if (!byIndustry.has(key)) byIndustry.set(key, { id: num(it.cs_id), name: clean(it.cs), symbols: [] })
+    const key = clean(it.cs) ? (num(it.cs_id) ?? clean(it.cs)) : 'سایر'
+    if (!byIndustry.has(key)) byIndustry.set(key, { id: num(it.cs_id), name: clean(it.cs) || 'سایر', symbols: [] })
     byIndustry.get(key).symbols.push({
       l18: clean(it.l18),
       l30: clean(it.l30),
