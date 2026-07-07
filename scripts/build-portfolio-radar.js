@@ -194,8 +194,21 @@ const list = [...stocks.values()]
     if (st.sym) matched++
     // نام نمایشی: پرتکرارترین واریانت بین گزارش‌ها
     const n = [...st.variants.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    // بعد از ادغام واریانت‌ها یک صندوق ممکن است دو بار آمده باشد — یکتاسازی:
+    // h با جمع ارزش/درصد per صندوق، e و x با Set
+    const byFund = new Map()
+    for (const [fi, val, pct] of st.h) {
+      const cur = byFund.get(fi)
+      if (cur) { cur[1] = Math.round((cur[1] + val) * 100) / 100; cur[2] = Math.round((cur[2] + pct) * 100) / 100 }
+      else byFund.set(fi, [fi, val, pct])
+    }
+    const h = [...byFund.values()].sort((a, b) => b[1] - a[1])
     const { variants, sym, ...rest } = st
-    return { ...rest, n, ...(sym ? { sym } : {}), v: bt(st.v), b: bt(st.b), s: bt(st.s), h: st.h.sort((a, b) => b[1] - a[1]) }
+    return {
+      ...rest, n, ...(sym ? { sym } : {}),
+      v: bt(st.v), c: h.length, b: bt(st.b), s: bt(st.s),
+      e: [...new Set(st.e)], x: [...new Set(st.x)], h,
+    }
   })
   .filter(st => st.v > 0 || st.s > 0)
   .sort((a, b) => b.v - a.v)

@@ -11,7 +11,7 @@ import { useIsMobile } from '../../../lib/useIsMobile'
 
 type Holder = [number, number, number]   // [ایندکس صندوق، ارزش م.ت، درصد از NAV]
 type RadarStock = {
-  n: string; v: number; c: number; b: number; s: number
+  n: string; sym?: string; v: number; c: number; b: number; s: number
   e: number[]; x: number[]; h: Holder[]
 }
 type RadarFund = { s: string; g: string; nav: number; date: string }
@@ -70,7 +70,11 @@ export default function SmartMoneyRadarPage() {
   const matches = useMemo(() => {
     if (!data || query.trim().length < 2) return []
     const q = normQ(query)
-    return data.stocks.filter(s => s.n.includes(q)).slice(0, 8)
+    // نماد جلوتر از نام — جستجوی «فملی» باید قبل از نام‌های حاوی عبارت بیاید
+    return [
+      ...data.stocks.filter(s => s.sym && s.sym.includes(q)),
+      ...data.stocks.filter(s => !(s.sym && s.sym.includes(q)) && s.n.includes(q)),
+    ].slice(0, 8)
   }, [data, query])
 
   const monthLabel = data ? `${MONTH_NAMES[Number(data.month.split('/')[1])]} ${data.month.split('/')[0]}` : ''
@@ -105,6 +109,16 @@ export default function SmartMoneyRadarPage() {
     boxShadow: t.cardShadow,
   })
 
+  // نماد پررنگ + نام کامل کم‌رنگ — اگر نماد نداریم فقط نام
+  const StockName = ({ st, size = 11.5 }: { st: RadarStock, size?: number }) => (
+    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+      <span style={{ fontWeight: 800, color: t.text, fontSize: size }}>{st.sym || st.n}</span>
+      {st.sym && !isMobile && (
+        <span style={{ fontSize: size - 2, color: t.faint, marginRight: 6 }}>{st.n}</span>
+      )}
+    </span>
+  )
+
   const fundChip = (fi: number, extra?: string) => {
     const f = data.funds[fi]
     if (!f) return null
@@ -129,7 +143,7 @@ export default function SmartMoneyRadarPage() {
             all: 'unset', cursor: 'pointer', display: 'block',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, marginBottom: 3 }}>
-              <span style={{ color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.n}</span>
+              <StockName st={st} />
               <span style={{ color, fontWeight: 700, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>
                 {sign > 0 ? '+' : '−'}{fmtBt(Math.abs(st.net))}
               </span>
@@ -181,7 +195,7 @@ export default function SmartMoneyRadarPage() {
           <input
             value={query}
             onChange={e => { setQuery(e.target.value); setSelected(null) }}
-            placeholder="نام شرکت را بنویسید… مثلاً: ملی صنایع مس"
+            placeholder="نماد یا نام شرکت… مثلاً: فملی"
             style={{
               width: '100%', boxSizing: 'border-box', background: t.inputBg,
               border: `1px solid ${t.borderStrong}`, borderRadius: 10,
@@ -192,13 +206,13 @@ export default function SmartMoneyRadarPage() {
           {matches.length > 0 && !selected && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
               {matches.map(st => (
-                <button key={st.n} onClick={() => { setSelected(st); setQuery(st.n) }} style={{
+                <button key={st.n} onClick={() => { setSelected(st); setQuery(st.sym || st.n) }} style={{
                   all: 'unset', cursor: 'pointer', padding: '8px 10px', borderRadius: 8,
                   fontSize: 12, color: t.text, background: `${t.accent}0a`,
                   display: 'flex', justifyContent: 'space-between', gap: 8,
                 }}>
-                  <span>{st.n}</span>
-                  <span style={{ color: t.muted, fontSize: 11 }}>{fa(st.c)} صندوق · {fmtBt(st.v)}</span>
+                  <StockName st={st} size={12} />
+                  <span style={{ color: t.muted, fontSize: 11, flexShrink: 0 }}>{fa(st.c)} صندوق · {fmtBt(st.v)}</span>
                 </button>
               ))}
             </div>
@@ -207,7 +221,10 @@ export default function SmartMoneyRadarPage() {
           {selected && (
             <div style={{ marginTop: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: t.textBright }}>{selected.n}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: t.textBright }}>
+                  {selected.sym || selected.n}
+                  {selected.sym && <span style={{ fontSize: 11, fontWeight: 400, color: t.muted, marginRight: 8 }}>{selected.n}</span>}
+                </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
                   <span style={{ color: t.muted }}>{fa(selected.c)} صندوق دارنده</span>
                   <span style={{ color: t.accent, fontWeight: 700 }}>{fmtBt(selected.v)}</span>
@@ -290,8 +307,8 @@ export default function SmartMoneyRadarPage() {
               <tbody>
                 {views.popular.map(st => (
                   <tr key={st.n} style={{ borderTop: `0.5px solid ${t.border}`, cursor: 'pointer' }}
-                    onClick={() => { setSelected(st); setQuery(st.n); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
-                    <td style={{ padding: '8px', fontWeight: 700, color: t.text }}>{st.n}</td>
+                    onClick={() => { setSelected(st); setQuery(st.sym || st.n); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
+                    <td style={{ padding: '8px' }}><StockName st={st} size={12} /></td>
                     <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fa(st.c)}</td>
                     <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fmtBt(st.v)}</td>
                     <td style={{ padding: '8px' }}>{st.h[0] ? fundChip(st.h[0][0], `${fa(st.h[0][2], 1)}٪`) : '—'}</td>
@@ -311,7 +328,7 @@ export default function SmartMoneyRadarPage() {
               {views.fresh.map(st => (
                 <div key={st.n}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, marginBottom: 5 }}>
-                    <span style={{ fontWeight: 700, color: t.text }}>{st.n}</span>
+                    <StockName st={st} />
                     <span style={{ color: t.green, flexShrink: 0 }}>{fa(st.e.length)} صندوق</span>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -330,7 +347,7 @@ export default function SmartMoneyRadarPage() {
               {views.exits.map(st => (
                 <div key={st.n}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, marginBottom: 5 }}>
-                    <span style={{ fontWeight: 700, color: t.text }}>{st.n}</span>
+                    <StockName st={st} />
                     <span style={{ color: t.red, flexShrink: 0 }}>{fa(st.x.length)} صندوق</span>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
