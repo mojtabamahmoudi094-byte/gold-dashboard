@@ -6,10 +6,15 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useIsMobile } from '../../lib/useIsMobile'
 
-const NAV = [
+type NavItem = { label: string; href: string; menu?: { label: string; href: string }[] }
+
+const NAV: NavItem[] = [
   { label: 'خانه',          href: '/' },
   { label: 'سهام',          href: '/stocks' },
   { label: 'صندوق‌ها',      href: '/funds' },
+  { label: 'نمودار',        href: '/monitor', menu: [
+    { label: 'نمودار لحظه‌ای رصد بازارها', href: '/monitor' },
+  ] },
   { label: 'تحلیل',         href: '/analysis' },
   { label: 'ارزش معاملات',  href: '/trade-value' },
   { label: 'مقایسه',        href: '/compare' },
@@ -92,6 +97,7 @@ export default function Header() {
   const isMobile = useIsMobile()
   const [user, setUser]         = useState<any>(null)
   const [scrolled, setScrolled] = useState(false)
+  const [openDrop, setOpenDrop] = useState<string | null>(null) // href آیتم بازشوی فعال
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -214,28 +220,77 @@ export default function Header() {
         {!isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, direction: 'rtl' }}>
             <nav style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {NAV.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={isActive(item.href) ? 'page' : undefined}
-                  style={navLink(isActive(item.href))}
-                  onMouseEnter={e => {
-                    if (!isActive(item.href)) {
-                      e.currentTarget.style.color = '#3b82f6'
-                      e.currentTarget.style.background = 'rgba(59,130,246,0.08)'
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!isActive(item.href)) {
-                      e.currentTarget.style.color = TEXT_NAV
-                      e.currentTarget.style.background = 'transparent'
-                    }
-                  }}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {NAV.map((item) => {
+                const link = (
+                  <Link
+                    key={item.menu ? undefined : item.href}
+                    href={item.href}
+                    aria-current={isActive(item.href) ? 'page' : undefined}
+                    aria-expanded={item.menu ? openDrop === item.href : undefined}
+                    style={{ ...navLink(isActive(item.href)), display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                    onMouseEnter={e => {
+                      if (!isActive(item.href)) {
+                        e.currentTarget.style.color = '#3b82f6'
+                        e.currentTarget.style.background = 'rgba(59,130,246,0.08)'
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive(item.href)) {
+                        e.currentTarget.style.color = TEXT_NAV
+                        e.currentTarget.style.background = 'transparent'
+                      }
+                    }}
+                  >
+                    {item.label}
+                    {item.menu && (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ transform: openDrop === item.href ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', pointerEvents: 'none' }}>
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    )}
+                  </Link>
+                )
+                if (!item.menu) return link
+                return (
+                  <div key={item.href} style={{ position: 'relative' }}
+                    onMouseEnter={() => setOpenDrop(item.href)}
+                    onMouseLeave={() => setOpenDrop(null)}>
+                    {link}
+                    {openDrop === item.href && (
+                      <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, paddingTop: 10 }}>
+                        <div style={{
+                          minWidth: 250,
+                          background: isDark ? '#12161f' : '#fffdf8',
+                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(59,130,246,0.15)'}`,
+                          borderRadius: 14, padding: 6,
+                          boxShadow: isDark ? '0 18px 50px rgba(0,0,0,0.6)' : '0 14px 40px rgba(0,0,0,0.14)',
+                        }}>
+                          {item.menu.map((m) => (
+                            <Link key={m.href} href={m.href} style={{
+                              display: 'block', textDecoration: 'none',
+                              fontSize: 13, fontWeight: 500,
+                              color: isDark ? '#c7cddc' : '#5A4A30',
+                              padding: '11px 14px', borderRadius: 9,
+                              whiteSpace: 'nowrap', fontFamily: 'inherit',
+                              transition: 'background 0.15s, color 0.15s',
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.background = 'rgba(59,130,246,0.1)'
+                              e.currentTarget.style.color = '#3b82f6'
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.background = 'transparent'
+                              e.currentTarget.style.color = isDark ? '#c7cddc' : '#5A4A30'
+                            }}>
+                              {m.label}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </nav>
 
             <div style={{

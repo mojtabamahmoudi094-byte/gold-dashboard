@@ -128,16 +128,10 @@ const FEATURES = [
   },
 ]
 
-// گزینه‌های کارت «نمودار» — با hover باز می‌شود
-const CHART_MENU = [
-  { href: '/monitor', title: 'نمودار لحظه‌ای رصد بازارها', desc: 'هیجان، تحرک، صف‌ها، سرانه‌ها و ورود پول — هر ۵ دقیقه' },
-]
-
 export default function HomePage() {
   const isMobile = useIsMobile()
   const [stats, setStats] = useState<{ totalTV: number; fundCount: number; avgChange: number; positiveCount: number } | null>(null)
   const [ticker, setTicker] = useState<TickerItem[]>([])
-  const [chartMenuOpen, setChartMenuOpen] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -450,63 +444,6 @@ export default function HomePage() {
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
           gap: isMobile ? 12 : 20,
         }}>
-          {/* کارت «نمودار» — منوی بازشو با hover */}
-          <div className="animate-rise" style={{ position: 'relative' }}
-            onMouseEnter={() => setChartMenuOpen(true)}
-            onMouseLeave={() => setChartMenuOpen(false)}>
-            <div style={{
-              display: 'flex', flexDirection: 'column',
-              background: 'linear-gradient(165deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-              border: `1px solid ${chartMenuOpen ? '#22d3ee66' : 'rgba(255,255,255,0.08)'}`,
-              borderRadius: 22, padding: isMobile ? '22px 18px' : '30px',
-              transition: 'transform 0.3s, border-color 0.3s',
-              transform: chartMenuOpen ? 'translateY(-6px)' : 'translateY(0)',
-              cursor: 'pointer', height: '100%', boxSizing: 'border-box',
-            }}
-            onClick={() => { if (isMobile) setChartMenuOpen(o => !o) }}>
-              <div style={{
-                width: 52, height: 52, borderRadius: 15, background: '#22d3ee28',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20, flexShrink: 0,
-              }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 3v18h18" />
-                  <path d="M7 15l4-5 3 3 5-7" />
-                </svg>
-              </div>
-              <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 10px', color: '#eef1f8', display: 'flex', alignItems: 'center', gap: 8 }}>
-                نمودار
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a9b0c2" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ transform: chartMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.25s' }}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </h3>
-              <p style={{ color: '#a9b0c2', fontSize: 15, lineHeight: 1.7, margin: 0 }}>نمودارهای لحظه‌ای و تحلیلی بازار — روی کارت بروید و گزینه را انتخاب کنید</p>
-            </div>
-            {chartMenuOpen && (
-              <div style={{
-                position: 'absolute', top: '100%', right: 0, left: 0, zIndex: 30,
-                paddingTop: 8,
-              }}>
-                <div style={{
-                  background: '#141927', border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 16, padding: 8, boxShadow: '0 20px 50px rgba(0,0,0,0.55)',
-                }}>
-                  {CHART_MENU.map((m, j) => (
-                    <Link key={j} href={m.href} style={{
-                      display: 'block', textDecoration: 'none', borderRadius: 11, padding: '13px 15px',
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(34,211,238,0.10)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                      <div style={{ color: '#eef1f8', fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{m.title}</div>
-                      <div style={{ color: '#a9b0c2', fontSize: 12.5, lineHeight: 1.6 }}>{m.desc}</div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
           {FEATURES.map((feat, i) => (
             <Link key={i} href={feat.href} className="animate-rise" style={{
               textDecoration: 'none', display: 'flex', flexDirection: 'column', gap: 0,
