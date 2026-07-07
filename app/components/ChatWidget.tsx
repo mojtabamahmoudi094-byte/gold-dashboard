@@ -85,8 +85,141 @@ const TrashIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 )
 
+const MailIcon = ({ size = 15 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ pointerEvents: 'none' }}>
+    <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 6L2 7" />
+  </svg>
+)
+
+const CheckCircleIcon = ({ size = 42, color = '#4ade80' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ pointerEvents: 'none' }}>
+    <circle cx="12" cy="12" r="10" /><path d="M8 12.5l2.5 2.5L16 9" />
+  </svg>
+)
+
+// ————— فرم پیام به مدیر —————
+function ContactForm({ isDark, TEXT, MUTED, PANEL_BORDER, INPUT_BG, INPUT_BORDER }: {
+  isDark: boolean; TEXT: string; MUTED: string; PANEL_BORDER: string; INPUT_BG: string; INPUT_BORDER: string
+}) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [message, setMessage] = useState('')
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  const submit = async () => {
+    if (!message.trim() || status === 'sending') return
+    setStatus('sending')
+    try {
+      const res = await fetch('/api/contact-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), message: message.trim() }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setStatus('sent')
+        setMessage('')
+        playDing()
+      } else {
+        setStatus('error')
+      }
+    } catch {
+      setStatus('error')
+    }
+  }
+
+  const fieldStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 12,
+    background: INPUT_BG, border: `1px solid ${INPUT_BORDER}`,
+    color: TEXT, fontSize: 12.5, fontFamily: 'inherit',
+    transition: 'border-color .15s ease, box-shadow .15s ease',
+  }
+
+  if (status === 'sent') {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', animation: 'cwMsgIn 0.3s ease both' }}>
+        <CheckCircleIcon />
+        <div style={{ fontSize: 14.5, fontWeight: 800, color: TEXT, margin: '14px 0 6px' }}>پیامت ارسال شد ✅</div>
+        <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 2, marginBottom: 18 }}>
+          پیام به ایمیل مدیر رسید. در اولین فرصت پاسخ داده می‌شود.
+        </div>
+        <button
+          className="cw-chip"
+          onClick={() => setStatus('idle')}
+          style={{
+            fontSize: 11.5, padding: '9px 18px', borderRadius: 999, cursor: 'pointer',
+            background: `${ACCENT}12`, border: `1px solid ${ACCENT}35`,
+            color: isDark ? '#93c5fd' : '#2563eb', fontFamily: 'inherit',
+          }}
+        >
+          ارسال پیام جدید
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+      <div style={{ textAlign: 'center', marginBottom: 4 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: TEXT, marginBottom: 4 }}>پیام به مدیر سایت</div>
+        <div style={{ fontSize: 10.5, color: MUTED, lineHeight: 1.9 }}>
+          انتقاد، پیشنهاد یا هر حرفی داری بنویس — مستقیم به ایمیل مدیر می‌رسد
+        </div>
+      </div>
+      <input
+        className="cw-input"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        placeholder="نام (اختیاری)"
+        aria-label="نام"
+        style={fieldStyle}
+      />
+      <input
+        className="cw-input"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="ایمیل برای دریافت پاسخ (اختیاری)"
+        aria-label="ایمیل"
+        type="email"
+        dir="ltr"
+        style={{ ...fieldStyle, textAlign: 'right' }}
+      />
+      <textarea
+        className="cw-input"
+        value={message}
+        onChange={e => setMessage(e.target.value)}
+        placeholder="متن پیام…"
+        aria-label="متن پیام"
+        rows={5}
+        style={{ ...fieldStyle, resize: 'none', lineHeight: 1.9 }}
+      />
+      {status === 'error' && (
+        <div style={{ fontSize: 11, color: '#ef4444', textAlign: 'center' }}>
+          ارسال ناموفق بود. دوباره امتحان کن.
+        </div>
+      )}
+      <button
+        className="cw-send"
+        onClick={submit}
+        disabled={status === 'sending' || !message.trim()}
+        aria-label="ارسال پیام به مدیر"
+        style={{
+          padding: '12px 0', borderRadius: 12, border: 'none',
+          cursor: status === 'sending' || !message.trim() ? 'default' : 'pointer',
+          background: GRAD, color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          opacity: status === 'sending' || !message.trim() ? 0.45 : 1,
+        }}
+      >
+        {status === 'sending' ? 'در حال ارسال…' : <><SendIcon size={15} /> ارسال به مدیر</>}
+      </button>
+    </div>
+  )
+}
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'ai' | 'contact'>('ai')
   const [isDark, setIsDark] = useState(true)
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
@@ -247,7 +380,7 @@ export default function ChatWidget() {
                 آنلاین — هوش مصنوعی
               </div>
             </div>
-            {messages.length > 0 && (
+            {tab === 'ai' && messages.length > 0 && (
               <button
                 className="cw-hbtn"
                 onClick={clearChat}
@@ -268,6 +401,36 @@ export default function ChatWidget() {
             </button>
           </div>
 
+          {/* تب‌ها: دستیار هوشمند / پیام به مدیر */}
+          <div style={{ flexShrink: 0, display: 'flex', borderBottom: `1px solid ${PANEL_BORDER}` }}>
+            {([
+              { id: 'ai' as const, label: 'دستیار هوشمند', icon: <SparkIcon size={13} color={tab === 'ai' ? ACCENT : MUTED} /> },
+              { id: 'contact' as const, label: 'پیام به مدیر', icon: <MailIcon size={13} /> },
+            ]).map(t2 => (
+              <button
+                key={t2.id}
+                onClick={() => setTab(t2.id)}
+                aria-selected={tab === t2.id}
+                role="tab"
+                style={{
+                  flex: 1, padding: '11px 0', border: 'none', cursor: 'pointer',
+                  background: tab === t2.id ? `${ACCENT}10` : 'transparent',
+                  color: tab === t2.id ? (isDark ? '#93c5fd' : '#2563eb') : MUTED,
+                  fontSize: 11.5, fontWeight: tab === t2.id ? 700 : 500, fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  borderBottom: tab === t2.id ? `2px solid ${ACCENT}` : '2px solid transparent',
+                  transition: 'all .18s ease',
+                }}
+              >
+                {t2.icon} {t2.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'contact' ? (
+            <ContactForm isDark={isDark} TEXT={TEXT} MUTED={MUTED} PANEL_BORDER={PANEL_BORDER} INPUT_BG={INPUT_BG} INPUT_BORDER={INPUT_BORDER} />
+          ) : (
+            <>
           {/* پیام‌ها */}
           <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {messages.length === 0 && (
@@ -379,6 +542,8 @@ export default function ChatWidget() {
               <SendIcon />
             </button>
           </div>
+            </>
+          )}
 
           {/* امضا */}
           <div style={{ flexShrink: 0, textAlign: 'center', fontSize: 9.5, color: MUTED, padding: '0 0 8px' }}>
