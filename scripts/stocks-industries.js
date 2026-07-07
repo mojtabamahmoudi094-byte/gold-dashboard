@@ -61,6 +61,12 @@ const clean = (s) => String(s || '')
 // صنایعی که سهم نیستند — صندوق، اوراق بدهی، تسهیلات مسکن و…
 const NOT_STOCK_CS = /صندوق|اوراق|تسهیلات|صکوک|اسناد|اختیار|آتی|سپرده|امتیاز|مشارکت|اجاره|مرابحه|خزانه/
 
+// صندوق‌های مبتنی بر سهام (سهامی/اهرمی/بخشی) — در سنجه‌های «رصد لحظه‌ای» کنار سهام حساب می‌شوند
+const { BOURSE_SYMBOLS } = require('./bourse-symbols')
+const EQUITY_FUND_NAMES = new Set(
+  ['سهامی', 'اهرمی', 'بخشی'].flatMap(cat => BOURSE_SYMBOLS[cat] || []).map(clean)
+)
+
 async function main() {
   if (!FORCE && !PROBE && !isMarketOpen()) {
     console.log('[stocks-industries] خارج از ساعت بازار (شنبه–چهارشنبه ۹:۰۰–۱۲:۳۵ تهران) — رد شد. با --force اجباری کنید.')
@@ -90,11 +96,15 @@ async function main() {
     return true
   }
 
-  const stockItems = []
+  // دامنه «رصد لحظه‌ای»: سهام + صندوق‌های مبتنی بر سهام (سهامی/اهرمی/بخشی)
+  const watchItems = []
   const byIndustry = new Map()
   for (const it of arr) {
-    if (!isStock(it)) continue
-    stockItems.push(it)
+    if (!isStock(it)) {
+      if (EQUITY_FUND_NAMES.has(clean(it.l18))) watchItems.push(it)
+      continue
+    }
+    watchItems.push(it)
     const key = clean(it.cs) ? (num(it.cs_id) ?? clean(it.cs)) : 'سایر'
     if (!byIndustry.has(key)) byIndustry.set(key, { id: num(it.cs_id), name: clean(it.cs) || 'سایر', symbols: [] })
     byIndustry.get(key).symbols.push({
@@ -150,7 +160,7 @@ async function main() {
   console.log('✅ Supabase (stock_industries) بروز شد')
 
   // ── رصد لحظه‌ای بازار: یک اسنپ‌شات ۵ دقیقه‌ای از سنجه‌های کل بازار سهام ──
-  const watch = computeMarketWatch(stockItems)
+  const watch = computeMarketWatch(watchItems)
   const { error: mwErr } = await sb.from('market_watch').insert({ cat: 'stocks', d: watch })
   if (mwErr) console.error(`[stocks-industries] market_watch: ${mwErr.message}`)
   else console.log(`✅ market_watch ثبت شد (${watch.t} — هیجان ${watch.excitement})`)
