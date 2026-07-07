@@ -55,25 +55,27 @@ fi
 CRON_FILE="/etc/cron.d/sync-funds"
 
 cat > "$CRON_FILE" << EOF
-# بورس سنج — بروزرسانی صندوق‌های کالایی از BrsAPI
-# هر ۱۰ دقیقه، شنبه تا چهارشنبه، ۱۲:۰۰ تا ۱۷:۱۰ به وقت تهران
-# (اسکریپت خودش چک می‌کند ۱۷:۰۵ گذشته یا نه)
+# بورس سنج — همه زمان‌ها UTC (تهران = UTC+3:30)
+# هشدار: cron دبیان TZ= را برای «زمان‌بندی» نادیده می‌گیرد — ساعت‌ها را UTC بنویسید
 # روزهای cron: 0=یکشنبه ... 6=شنبه → شنبه تا چهارشنبه = 6,0-3
 SHELL=/bin/bash
 MAILTO=""
-TZ=Asia/Tehran
 
-*/10 12-17 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-funds.js >> $LOG_FILE 2>&1
+# کالایی (طلا/نقره/زعفران) + بورس کالا + جهانی + NAV — هر ۱۰ دقیقه، ۱۲:۰۰–۱۷:۰۵ تهران (گارد داخل اسکریپت)
+30-50/10 8 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-funds.js >> $LOG_FILE 2>&1
+*/10 9-13 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-funds.js >> $LOG_FILE 2>&1
+# اسنپ‌شات نهایی ۱۷:۰۶ تهران
+36 13 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-funds.js --force >> $LOG_FILE 2>&1
 
-# بورس سنج — بروزرسانی صندوق‌های بورسی (اهرمی/بخشی/سهامی) از BrsAPI
-# هر ۱۰ دقیقه، شنبه تا چهارشنبه، ۹:۰۰ تا ۱۲:۳۰ به وقت تهران
-# (دو خط چون cron بازه «تا ۱۲:۳۰» را یک‌خطی پشتیبانی نمی‌کند)
-*/10 9-11 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
-0,10,20,30 12 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
+# صندوق‌های بورسی (اهرمی/بخشی/سهامی) — هر ۱۰ دقیقه، ۹:۰۰–۱۲:۳۰ تهران
+30-50/10 5 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
+*/10 6-8 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
+0 9 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
 
-# بورس سنج — قیمت لحظه‌ای سهام به تفکیک صنعت (stock_industries در Supabase)
-# هر ۵ دقیقه، شنبه تا چهارشنبه، ۹:۰۰ تا ۱۲:۳۵ تهران (گارد دقیق داخل اسکریپت)
-*/5 9-12 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
+# سهام به تفکیک صنعت (stock_industries در Supabase) — هر ۵ دقیقه، ۹:۰۰–۱۲:۳۵ تهران
+30-55/5 5 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
+*/5 6-8 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
+0,5 9 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
 EOF
 
 chmod 644 "$CRON_FILE"
