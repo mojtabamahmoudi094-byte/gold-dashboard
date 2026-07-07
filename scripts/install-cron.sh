@@ -72,10 +72,10 @@ MAILTO=""
 */5 6-8 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
 0 9 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
 
-# سهام به تفکیک صنعت (stock_industries در Supabase) — هر ۵ دقیقه، ۹:۰۰–۱۲:۳۵ تهران
+# سهام (۹:۰۰–۱۲:۳۰) + رصد صندوق‌های کالایی (۱۲:۰۰–۱۷:۳۰) — هر ۵ دقیقه، گارد پر-دسته داخل اسکریپت
 30-55/5 5 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
-*/5 6-8 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
-0,5 9 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
+*/5 6-13 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
+0 14 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
 EOF
 
 chmod 644 "$CRON_FILE"

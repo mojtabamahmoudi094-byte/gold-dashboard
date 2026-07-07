@@ -1,13 +1,15 @@
 'use client'
 
 /**
- * رصد لحظه‌ای بازار سهام — ۱۱ نمودار ۵ دقیقه‌ای از سنجه‌های کل بازار
- * داده از /api/market-watch?cat=stocks (جدول market_watch — سرور ایران هر ۵ دقیقه درج می‌کند)
+ * رصد لحظه‌ای بازار — ۱۱ نمودار ۵ دقیقه‌ای برای هر دسته
+ * دسته‌ها: سهام و صندوق‌های بورسی (۹:۰۰–۱۲:۳۰)، صندوق‌های طلا/نقره/زعفران (۱۲:۰۰–۱۷:۳۰)
+ * داده از /api/market-watch?cat=… (جدول market_watch — سرور ایران هر ۵ دقیقه درج می‌کند)
  * همه ارزش‌ها در دیتابیس «ریال»اند؛ اینجا به میلیارد/میلیون تومان تبدیل می‌شوند.
  */
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import {
   ResponsiveContainer, LineChart, Line, ComposedChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ReferenceLine,
@@ -26,6 +28,14 @@ type Row = {
   ord_demand: number; ord_supply: number
   ordx_demand: number; ordx_supply: number
   money_in: number
+}
+
+const CATS: Record<string, { title: string; hours: string }> = {
+  stocks:         { title: 'بازار سهام',       hours: '۹:۰۰ تا ۱۲:۳۰' },
+  'bourse-funds': { title: 'صندوق‌های بورسی',  hours: '۹:۰۰ تا ۱۲:۳۰' },
+  gold:           { title: 'صندوق‌های طلا',    hours: '۱۲:۰۰ تا ۱۷:۳۰' },
+  silver:         { title: 'صندوق‌های نقره',   hours: '۱۲:۰۰ تا ۱۷:۳۰' },
+  saffron:        { title: 'صندوق‌های زعفران', hours: '۱۲:۰۰ تا ۱۷:۳۰' },
 }
 
 const fa = (n: number, d = 0) => n.toLocaleString('fa-IR', { maximumFractionDigits: d })
@@ -65,17 +75,21 @@ const commonAxes = (yFmt: (v: number) => string) => (
   </>
 )
 
-export default function StocksMonitorPage() {
+export default function MarketMonitorPage() {
   const isMobile = useIsMobile()
+  const params = useParams<{ cat: string }>()
+  const cat = String(params?.cat ?? 'stocks')
+  const cfg = CATS[cat]
   const [rows, setRows] = useState<Row[]>([])
   const [date, setDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!cfg) return
     let stop = false
     const load = async () => {
       try {
-        const res = await fetch('/api/market-watch?cat=stocks', { cache: 'no-store' })
+        const res = await fetch(`/api/market-watch?cat=${encodeURIComponent(cat)}`, { cache: 'no-store' })
         if (!res.ok) return
         const j = await res.json()
         if (!stop) { setRows(j.rows ?? []); setDate(j.date ?? null) }
@@ -84,7 +98,7 @@ export default function StocksMonitorPage() {
     load()
     const iv = setInterval(load, 60_000) // دیتای سرور هر ۵ دقیقه عوض می‌شود
     return () => { stop = true; clearInterval(iv) }
-  }, [])
+  }, [cat, cfg])
 
   const data = useMemo(() => rows.map((r, i) => ({
     ...r,
@@ -99,15 +113,24 @@ export default function StocksMonitorPage() {
 
   const last = data.length > 0 ? data[data.length - 1] : null
 
+  if (!cfg) {
+    return (
+      <main style={{ minHeight: '100vh', background: '#0a0d14', color: '#eef1f8', fontFamily: FONT, direction: 'rtl', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 18 }}>
+        <div style={{ color: COLORS.text }}>دسته‌ای با این نام وجود ندارد.</div>
+        <Link href="/monitor" style={{ color: COLORS.blue, textDecoration: 'none', fontWeight: 700 }}>→ بازگشت به رصد بازارها</Link>
+      </main>
+    )
+  }
+
   return (
     <main style={{ minHeight: '100vh', background: '#0a0d14', color: '#eef1f8', fontFamily: FONT, direction: 'rtl', padding: isMobile ? '20px 12px 40px' : '28px 3vw 60px' }}>
       <div style={{ maxWidth: 1500, margin: '0 auto' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 22 }}>
           <div>
-            <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 900, margin: 0 }}>رصد لحظه‌ای بازار سهام</h1>
+            <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 900, margin: 0 }}>رصد لحظه‌ای {cfg.title}</h1>
             <p style={{ color: COLORS.text, fontSize: 13.5, margin: '6px 0 0' }}>
-              بروزرسانی هر ۵ دقیقه، شنبه تا چهارشنبه ۹:۰۰ تا ۱۲:۳۵
+              بروزرسانی هر ۵ دقیقه، شنبه تا چهارشنبه {cfg.hours}
               {date ? ` — آخرین روز: ${new Date(date).toLocaleDateString('fa-IR')}` : ''}
               {last ? ` — آخرین اسنپ‌شات: ${last.t}` : ''}
             </p>
@@ -121,7 +144,7 @@ export default function StocksMonitorPage() {
           <div style={{ color: COLORS.text, textAlign: 'center', padding: 80 }}>در حال بارگذاری…</div>
         ) : data.length === 0 ? (
           <div style={{ color: COLORS.text, textAlign: 'center', padding: 80, lineHeight: 2 }}>
-            هنوز داده‌ای ثبت نشده.<br />اولین اسنپ‌شات‌ها فردای روز معاملاتی از ساعت ۹:۰۰ ثبت می‌شوند.
+            هنوز داده‌ای ثبت نشده.<br />اسنپ‌شات‌ها در روز معاملاتی از ساعت {cfg.hours.split(' ')[0]} ثبت می‌شوند.
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: 16 }}>

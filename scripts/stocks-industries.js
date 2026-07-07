@@ -38,14 +38,16 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_RO
 const PROBE = process.argv.includes('--probe')
 const FORCE = process.argv.includes('--force')
 
-// ساعت بازار: شنبه–چهارشنبه ۹:۰۰–۱۲:۳۵ تهران — خارج از آن کاری نمی‌کنیم
-function isMarketOpen() {
+// ساعت بازار تهران — سهام/صندوق‌های بورسی ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی (طلا/نقره/زعفران) ۱۲:۰۰–۱۷:۳۰
+function tehranClock() {
   const tehran = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
-  const day = tehran.getDay() // 0=یکشنبه … 6=شنبه → شنبه تا چهارشنبه = 6,0,1,2,3
-  if (![6, 0, 1, 2, 3].includes(day)) return false
-  const mins = tehran.getHours() * 60 + tehran.getMinutes()
-  return mins >= 9 * 60 && mins <= 12 * 60 + 35
+  return { day: tehran.getDay(), mins: tehran.getHours() * 60 + tehran.getMinutes() } // 0=یکشنبه … 6=شنبه
 }
+const STOCKS_OPEN  = 9 * 60
+const STOCKS_CLOSE = 12 * 60 + 30
+const FUNDS_OPEN   = 12 * 60
+const FUNDS_CLOSE  = 17 * 60 + 30
+const isMarketDay = (day) => [6, 0, 1, 2, 3].includes(day) // شنبه تا چهارشنبه
 
 const num = (v) => {
   const n = Number(v)
@@ -68,10 +70,15 @@ const EQUITY_FUND_NAMES = new Set(
 )
 
 async function main() {
-  if (!FORCE && !PROBE && !isMarketOpen()) {
-    console.log('[stocks-industries] خارج از ساعت بازار (شنبه–چهارشنبه ۹:۰۰–۱۲:۳۵ تهران) — رد شد. با --force اجباری کنید.')
+  const { day, mins } = tehranClock()
+  const inWindow = isMarketDay(day) && mins >= STOCKS_OPEN && mins <= FUNDS_CLOSE
+  if (!FORCE && !PROBE && !inWindow) {
+    console.log('[stocks-industries] خارج از ساعت بازار (شنبه–چهارشنبه ۹:۰۰–۱۷:۳۰ تهران) — رد شد. با --force اجباری کنید.')
     return
   }
+  // سهام/بورسی ۹:۰۰–۱۲:۳۰ — کالایی‌ها ۱۲:۰۰–۱۷:۳۰
+  const stocksOpen = FORCE || (mins >= STOCKS_OPEN && mins <= STOCKS_CLOSE)
+  const fundsOpen  = FORCE || (mins >= FUNDS_OPEN && mins <= FUNDS_CLOSE)
   const url = `https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${KEY}`
   const res = await fetch(url, { signal: AbortSignal.timeout(120_000) })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -137,16 +144,8 @@ async function main() {
 
   if (PROBE) return
 
-  const out = {
-    updated: new Date().toISOString(),
-    industries,
-  }
-  const file = path.join(__dirname, 'stocks-industries.json')
-  fs.writeFileSync(file, JSON.stringify(out))
-  console.log(`\n✅ ذخیره شد: ${file} (${(fs.statSync(file).size / 1024).toFixed(0)} KB)`)
-
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.log('[stocks-industries] SUPABASE_URL/KEY تنظیم نشده — فقط فایل محلی ذخیره شد')
+    console.log('[stocks-industries] SUPABASE_URL/KEY تنظیم نشده — خروجی Supabase رد شد')
     return
   }
   const { createClient } = require('@supabase/supabase-js')
@@ -155,15 +154,53 @@ async function main() {
   try { wsTransport = require('ws') } catch { /* Node 22+ نیازی ندارد */ }
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY,
     wsTransport ? { realtime: { transport: wsTransport } } : {})
-  const { error } = await sb.from('stock_industries').upsert({ id: 1, data: out, updated: out.updated })
-  if (error) throw new Error(`Supabase upsert: ${error.message}`)
-  console.log('✅ Supabase (stock_industries) بروز شد')
 
-  // ── رصد لحظه‌ای بازار: یک اسنپ‌شات ۵ دقیقه‌ای از سنجه‌های کل بازار سهام ──
-  const watch = computeMarketWatch(watchItems)
-  const { error: mwErr } = await sb.from('market_watch').insert({ cat: 'stocks', d: watch })
-  if (mwErr) console.error(`[stocks-industries] market_watch: ${mwErr.message}`)
-  else console.log(`✅ market_watch ثبت شد (${watch.t} — هیجان ${watch.excitement})`)
+  // ── خروجی‌های مخصوص سهام — فقط تا ۱۲:۳۵ (بعدش قیمت سهام ثابت است) ──
+  if (stocksOpen) {
+    const out = {
+      updated: new Date().toISOString(),
+      industries,
+    }
+    const file = path.join(__dirname, 'stocks-industries.json')
+    fs.writeFileSync(file, JSON.stringify(out))
+    console.log(`\n✅ ذخیره شد: ${file} (${(fs.statSync(file).size / 1024).toFixed(0)} KB)`)
+    const { error } = await sb.from('stock_industries').upsert({ id: 1, data: out, updated: out.updated })
+    if (error) throw new Error(`Supabase upsert: ${error.message}`)
+    console.log('✅ Supabase (stock_industries) بروز شد')
+  }
+
+  // ── رصد لحظه‌ای بازار: هر دسته یک اسنپ‌شات ۵ دقیقه‌ای در market_watch ──
+  const cats = []
+  if (stocksOpen) {
+    cats.push(['stocks', watchItems])
+    cats.push(['bourse-funds', arr.filter(it => EQUITY_FUND_NAMES.has(clean(it.l18)))])
+  }
+
+  // صندوق‌های کالایی (طلا/نقره/زعفران) — فهرست نمادها از جدول assets — بازار ۱۲:۰۰–۱۷:۳۰
+  if (fundsOpen) {
+    const { data: assets, error: aErr } = await sb.from('assets').select('name, category')
+    if (aErr) {
+      console.error(`[stocks-industries] assets: ${aErr.message}`)
+    } else {
+      const CAT_MAP = { 'طلا': 'gold', 'نقره': 'silver', 'زعفران': 'saffron' }
+      const sets = { gold: new Set(), silver: new Set(), saffron: new Set() }
+      for (const a of assets) {
+        const c = CAT_MAP[a.category]
+        if (c) sets[c].add(clean(a.name))
+      }
+      for (const [cat, set] of Object.entries(sets)) {
+        cats.push([cat, arr.filter(it => set.has(clean(it.l18)))])
+      }
+    }
+  }
+
+  for (const [cat, items] of cats) {
+    if (items.length === 0) { console.log(`[stocks-industries] ${cat}: نمادی پیدا نشد — رد شد`); continue }
+    const watch = computeMarketWatch(items)
+    const { error: mwErr } = await sb.from('market_watch').insert({ cat, d: watch })
+    if (mwErr) console.error(`[stocks-industries] market_watch(${cat}): ${mwErr.message}`)
+    else console.log(`✅ market_watch(${cat}) ثبت شد (${watch.t} — ${watch.count} نماد، هیجان ${watch.excitement})`)
+  }
 }
 
 // سنجه‌های تجمیعی کل بازار سهام برای نمودارهای «رصد لحظه‌ای» — همه ارزش‌ها به ریال

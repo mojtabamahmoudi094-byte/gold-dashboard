@@ -11,27 +11,27 @@ import { useIsMobile } from '../../lib/useIsMobile'
 const CATS = [
   {
     href: '/monitor/stocks', ready: true,
-    title: 'سهام', desc: 'هیجان، تحرک قیمتی، ارزش معاملات خرد، صف‌ها، سرانه‌ها و ورود پول حقیقی',
+    title: 'سهام', desc: 'هیجان، تحرک قیمتی، ارزش معاملات خرد، صف‌ها، سرانه‌ها و ورود پول حقیقی — ۹:۰۰ تا ۱۲:۳۰',
     color: '#3b82f6',
   },
   {
-    href: '#', ready: false,
-    title: 'صندوق‌های بورسی', desc: 'رصد لحظه‌ای صندوق‌های اهرمی، بخشی و سهامی',
+    href: '/monitor/bourse-funds', ready: true,
+    title: 'صندوق‌های بورسی', desc: 'رصد لحظه‌ای صندوق‌های اهرمی، بخشی و سهامی — ۹:۰۰ تا ۱۲:۳۰',
     color: '#8b5cf6',
   },
   {
-    href: '#', ready: false,
-    title: 'صندوق‌های طلا', desc: 'رصد لحظه‌ای صندوق‌های مبتنی بر طلا',
+    href: '/monitor/gold', ready: true,
+    title: 'صندوق‌های طلا', desc: 'رصد لحظه‌ای صندوق‌های مبتنی بر طلا — ۱۲:۰۰ تا ۱۷:۳۰',
     color: 'oklch(0.82 0.15 70)',
   },
   {
-    href: '#', ready: false,
-    title: 'صندوق‌های نقره', desc: 'رصد لحظه‌ای صندوق‌های مبتنی بر نقره',
+    href: '/monitor/silver', ready: true,
+    title: 'صندوق‌های نقره', desc: 'رصد لحظه‌ای صندوق‌های مبتنی بر نقره — ۱۲:۰۰ تا ۱۷:۳۰',
     color: 'oklch(0.84 0.03 240)',
   },
   {
-    href: '#', ready: false,
-    title: 'صندوق‌های زعفران', desc: 'رصد لحظه‌ای صندوق‌های کالایی زعفران',
+    href: '/monitor/saffron', ready: true,
+    title: 'صندوق‌های زعفران', desc: 'رصد لحظه‌ای صندوق‌های کالایی زعفران — ۱۲:۰۰ تا ۱۷:۳۰',
     color: 'oklch(0.70 0.19 40)',
   },
 ]
