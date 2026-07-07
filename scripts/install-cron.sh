@@ -70,6 +70,10 @@ TZ=Asia/Tehran
 # (دو خط چون cron بازه «تا ۱۲:۳۰» را یک‌خطی پشتیبانی نمی‌کند)
 */10 9-11 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
 0,10,20,30 12 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
+
+# بورس سنج — قیمت لحظه‌ای سهام به تفکیک صنعت (stock_industries در Supabase)
+# هر ۵ دقیقه، شنبه تا چهارشنبه، ۹:۰۰ تا ۱۲:۳۵ تهران (گارد دقیق داخل اسکریپت)
+*/5 9-12 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
 EOF
 
 chmod 644 "$CRON_FILE"

@@ -48,7 +48,7 @@ export default function IndustryPage() {
   }, [])
 
   useEffect(() => {
-    fetch('/stocks/industries.json')
+    fetch('/api/stocks-industries')
       .then(r => { if (!r.ok) throw new Error(); return r.json() })
       .then(setData)
       .catch(() => setFailed(true))

@@ -150,7 +150,7 @@ export default function PortfolioPage() {
     const load = async () => {
       const list: Instrument[] = []
       try {
-        const res = await fetch('/stocks/industries.json')
+        const res = await fetch('/api/stocks-industries')
         const data = await res.json()
         for (const ind of data.industries ?? []) {
           for (const s of ind.symbols ?? []) {

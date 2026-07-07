@@ -9,7 +9,10 @@
  *   node stocks-industries.js            → stocks-industries.json کنار اسکریپت
  *   node stocks-industries.js --probe    → فقط فهرست صنایع و تعداد نماد هر کدام
  *
- * سپس از مک:
+ * خروجی به جدول stock_industries در Supabase هم upsert می‌شود (سایت از /api/stocks-industries می‌خواند)
+ * cron: هر ۵ دقیقه، شنبه–چهارشنبه ۹:۰۰–۱۲:۳۵ تهران (گارد ساعت داخل خود اسکریپت است، --force برای رد کردن)
+ *
+ * fallback دستی از مک:
  *   scp root@45.94.215.115:/opt/stocks-industries.json public/stocks/industries.json
  */
 
@@ -18,8 +21,31 @@
 const path = require('path')
 const fs   = require('fs')
 
+function loadEnv(file) {
+  const p = path.resolve(__dirname, file)
+  if (!fs.existsSync(p)) return
+  fs.readFileSync(p, 'utf8').split('\n').forEach(line => {
+    const m = line.match(/^([^#=\s]+)\s*=\s*(.+)$/)
+    if (m) process.env[m[1]] = m[2].trim()
+  })
+}
+loadEnv('../.env.local')
+loadEnv('.env.sync')
+
 const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const PROBE = process.argv.includes('--probe')
+const FORCE = process.argv.includes('--force')
+
+// ساعت بازار: شنبه–چهارشنبه ۹:۰۰–۱۲:۳۵ تهران — خارج از آن کاری نمی‌کنیم
+function isMarketOpen() {
+  const tehran = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
+  const day = tehran.getDay() // 0=یکشنبه … 6=شنبه → شنبه تا چهارشنبه = 6,0,1,2,3
+  if (![6, 0, 1, 2, 3].includes(day)) return false
+  const mins = tehran.getHours() * 60 + tehran.getMinutes()
+  return mins >= 9 * 60 && mins <= 12 * 60 + 35
+}
 
 const num = (v) => {
   const n = Number(v)
@@ -36,6 +62,10 @@ const clean = (s) => String(s || '')
 const NOT_STOCK_CS = /صندوق|اوراق|تسهیلات|صکوک|اسناد|اختیار|آتی|سپرده|امتیاز|مشارکت|اجاره|مرابحه|خزانه/
 
 async function main() {
+  if (!FORCE && !PROBE && !isMarketOpen()) {
+    console.log('[stocks-industries] خارج از ساعت بازار (شنبه–چهارشنبه ۹:۰۰–۱۲:۳۵ تهران) — رد شد. با --force اجباری کنید.')
+    return
+  }
   const url = `https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${KEY}`
   const res = await fetch(url, { signal: AbortSignal.timeout(120_000) })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -102,6 +132,16 @@ async function main() {
   const file = path.join(__dirname, 'stocks-industries.json')
   fs.writeFileSync(file, JSON.stringify(out))
   console.log(`\n✅ ذخیره شد: ${file} (${(fs.statSync(file).size / 1024).toFixed(0)} KB)`)
+
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.log('[stocks-industries] SUPABASE_URL/KEY تنظیم نشده — فقط فایل محلی ذخیره شد')
+    return
+  }
+  const { createClient } = require('@supabase/supabase-js')
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+  const { error } = await sb.from('stock_industries').upsert({ id: 1, data: out, updated: out.updated })
+  if (error) throw new Error(`Supabase upsert: ${error.message}`)
+  console.log('✅ Supabase (stock_industries) بروز شد')
 }
 
 main().catch(e => { console.error(e); process.exit(1) })

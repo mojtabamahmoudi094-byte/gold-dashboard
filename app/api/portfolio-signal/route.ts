@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -72,11 +73,22 @@ export async function GET() {
 
   const pub = path.join(process.cwd(), 'public')
 
-  let industries: any
+  // قیمت روز سهام: اول Supabase (هر ۵ دقیقه بروز)، بعد fallback فایل استاتیک
+  let industries: any = null
   try {
-    industries = JSON.parse(await fs.readFile(path.join(pub, 'stocks', 'industries.json'), 'utf8'))
-  } catch {
-    return NextResponse.json({ funds: {}, error: 'stocks/industries.json missing' })
+    const sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    const { data } = await sb.from('stock_industries').select('data').eq('id', 1).maybeSingle()
+    if (data?.data) industries = data.data
+  } catch { /* fallback پایین */ }
+  if (!industries) {
+    try {
+      industries = JSON.parse(await fs.readFile(path.join(pub, 'stocks', 'industries.json'), 'utf8'))
+    } catch {
+      return NextResponse.json({ funds: {}, error: 'stocks/industries.json missing' })
+    }
   }
 
   const stocks: { name: string; tokens: Set<string>; info: StockInfo }[] = []
