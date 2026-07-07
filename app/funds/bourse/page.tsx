@@ -53,6 +53,25 @@ const SUBCATS = [
       </svg>
     ),
   },
+  {
+    slug: 'radar',
+    num: '۴',
+    title: 'رادار پول هوشمند',
+    desc: 'تجمیع پرتفوی ماهانه ۱۰۰+ صندوق از کدال — صندوق‌ها چه خریدند و چه فروختند؟',
+    color: 'oklch(0.82 0.15 70)',
+    borderColor: 'oklch(0.82 0.15 70 / 0.3)',
+    bgColor: 'oklch(0.82 0.15 70 / 0.07)',
+    tags: ['خرید و فروش ماه', 'ورود و خروج', 'جستجوی سهم'],
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.82 0.15 70)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="4.5" />
+        <circle cx="12" cy="12" r="0.8" fill="oklch(0.82 0.15 70)" />
+        <path d="M12 3v4.5" />
+        <path d="m16.8 16.8 3 3" />
+      </svg>
+    ),
+  },
 ]
 
 export default function BourseFundsPage() {

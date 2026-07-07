@@ -1,0 +1,353 @@
+'use client'
+
+// رادار پول هوشمند — تجمیع پرتفوی ماهانه ۱۰۰+ صندوق سهامی/اهرمی/بخشی از کدال
+// داده از public/portfolio/_radar.json (خروجی scripts/build-portfolio-radar.js)
+
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { darkTheme, lightTheme } from '../../../lib/theme'
+import { Skeleton, SkeletonBlock } from '../../components/ui/Skeleton'
+import { useIsMobile } from '../../../lib/useIsMobile'
+
+type Holder = [number, number, number]   // [ایندکس صندوق، ارزش م.ت، درصد از NAV]
+type RadarStock = {
+  n: string; v: number; c: number; b: number; s: number
+  e: number[]; x: number[]; h: Holder[]
+}
+type RadarFund = { s: string; g: string; nav: number; date: string }
+type Radar = {
+  updated: string; month: string; fundsTotal: number; stale: number
+  funds: RadarFund[]; stocks: RadarStock[]
+}
+
+const MONTH_NAMES = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
+
+const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
+// م.ت → نمایش خوانا (از ۱۰۰۰ به بعد: همت)
+const fmtBt = (v: number) => (v >= 1000 ? `${fa(v / 1000, 1)} همت` : `${fa(v)} م.ت`)
+const normQ = (s: string) => s.replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim()
+
+export default function SmartMoneyRadarPage() {
+  const [isDark, setIsDark] = useState(true)
+  const [data, setData] = useState<Radar | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<RadarStock | null>(null)
+  const isMobile = useIsMobile()
+  const t = isDark ? darkTheme : lightTheme
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('theme')
+    if (saved === 'light') setIsDark(false)
+    const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
+    window.addEventListener('themechange', handler)
+    return () => window.removeEventListener('themechange', handler)
+  }, [])
+
+  useEffect(() => {
+    fetch('/portfolio/_radar.json', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { setData(j); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const views = useMemo(() => {
+    if (!data) return null
+    const withFlow = data.stocks.map(st => ({ ...st, net: st.b - st.s }))
+    const netBuy = [...withFlow].filter(s => s.net > 1).sort((a, b) => b.net - a.net).slice(0, 10)
+    const netSell = [...withFlow].filter(s => s.net < -1).sort((a, b) => a.net - b.net).slice(0, 10)
+    const popular = [...data.stocks].sort((a, b) => b.c - a.c || b.v - a.v).slice(0, 10)
+    const fresh = [...data.stocks].filter(s => s.e.length >= 2)
+      .sort((a, b) => b.e.length - a.e.length || b.v - a.v).slice(0, 8)
+    const exits = [...data.stocks].filter(s => s.x.length >= 2)
+      .sort((a, b) => b.x.length - a.x.length || b.s - a.s).slice(0, 8)
+    const totBuy = data.stocks.reduce((s, x) => s + x.b, 0)
+    const totSell = data.stocks.reduce((s, x) => s + x.s, 0)
+    const totNav = data.funds.reduce((s, f) => s + f.nav, 0)
+    return { netBuy, netSell, popular, fresh, exits, totBuy, totSell, totNav }
+  }, [data])
+
+  const matches = useMemo(() => {
+    if (!data || query.trim().length < 2) return []
+    const q = normQ(query)
+    return data.stocks.filter(s => s.n.includes(q)).slice(0, 8)
+  }, [data, query])
+
+  const monthLabel = data ? `${MONTH_NAMES[Number(data.month.split('/')[1])]} ${data.month.split('/')[0]}` : ''
+
+  if (loading) {
+    return (
+      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Skeleton width={180} height={12} />
+          <Skeleton width={280} height={30} radius={10} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonBlock key={i} height={80} />)}
+          </div>
+          <SkeletonBlock height={320} />
+        </div>
+      </main>
+    )
+  }
+
+  if (!data || !views) {
+    return (
+      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', color: t.muted, fontSize: 13 }}>داده رادار در دسترس نیست.</div>
+      </main>
+    )
+  }
+
+  const panelStyle = (accent: string): React.CSSProperties => ({
+    background: t.panel, border: `0.5px solid ${t.border}`,
+    borderTop: `2px solid ${accent}55`, borderRadius: 14,
+    padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
+    boxShadow: t.cardShadow,
+  })
+
+  const fundChip = (fi: number, extra?: string) => {
+    const f = data.funds[fi]
+    if (!f) return null
+    return (
+      <Link key={f.g} href={`/fund/${encodeURIComponent(f.g)}`} style={{
+        fontSize: 10.5, color: t.accent, textDecoration: 'none',
+        background: `${t.accent}12`, border: `0.5px solid ${t.accent}33`,
+        borderRadius: 7, padding: '3px 8px', whiteSpace: 'nowrap',
+      }}>
+        {f.s}{extra ? ` · ${extra}` : ''}
+      </Link>
+    )
+  }
+
+  // ── لیست میله‌ای خرید/فروش خالص ──
+  const FlowList = ({ items, color, sign }: { items: (RadarStock & { net: number })[], color: string, sign: 1 | -1 }) => {
+    const max = Math.max(...items.map(s => Math.abs(s.net)), 1)
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map(st => (
+          <button key={st.n} onClick={() => { setSelected(st); setQuery('') }} style={{
+            all: 'unset', cursor: 'pointer', display: 'block',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, marginBottom: 3 }}>
+              <span style={{ color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{st.n}</span>
+              <span style={{ color, fontWeight: 700, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>
+                {sign > 0 ? '+' : '−'}{fmtBt(Math.abs(st.net))}
+              </span>
+            </div>
+            <div style={{ height: 5, background: t.border, borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${(Math.abs(st.net) / max) * 100}%`, background: color, borderRadius: 3 }} />
+            </div>
+          </button>
+        ))}
+        {items.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>موردی یافت نشد</div>}
+      </div>
+    )
+  }
+
+  const stat = (label: string, value: string, color?: string) => (
+    <div style={{ ...panelStyle(color || t.accent), padding: '14px 16px' }}>
+      <div style={{ fontSize: 10.5, color: t.muted, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 17, fontWeight: 800, color: color || t.textBright, fontFamily: 'system-ui, sans-serif' }}>{value}</div>
+    </div>
+  )
+
+  return (
+    <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 64px' }}>
+
+        {/* ── سربرگ ── */}
+        <Link href="/funds" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← بازگشت به دیدبان صندوق‌ها</Link>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', margin: '10px 0 4px' }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: t.textBright, margin: 0 }}>رادار پول هوشمند</h1>
+          <span style={{ fontSize: 12, color: t.accent, fontWeight: 700 }}>گزارش {monthLabel}</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 22 }}>
+          صندوق‌های سهامی، اهرمی و بخشی این ماه چه خریدند و چه فروختند؟ — تجمیع پرتفوی ماهانه {fa(data.funds.length)} صندوق از گزارش‌های رسمی کدال
+        </div>
+
+        {/* ── آمار کلی ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+          {stat('ارزش سهام نزد صندوق‌ها', fmtBt(views.totNav))}
+          {stat('خرید ماه صندوق‌ها', fmtBt(views.totBuy), t.green)}
+          {stat('فروش ماه صندوق‌ها', fmtBt(views.totSell), t.red)}
+          {stat('سهم‌های ردیابی‌شده', fa(data.stocks.length))}
+        </div>
+
+        {/* ── جستجوی سهم ── */}
+        <div style={{ ...panelStyle(t.brand2), marginBottom: 20, position: 'relative' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 10 }}>
+            کدام صندوق‌ها این سهم را دارند؟
+          </div>
+          <input
+            value={query}
+            onChange={e => { setQuery(e.target.value); setSelected(null) }}
+            placeholder="نام شرکت را بنویسید… مثلاً: ملی صنایع مس"
+            style={{
+              width: '100%', boxSizing: 'border-box', background: t.inputBg,
+              border: `1px solid ${t.borderStrong}`, borderRadius: 10,
+              padding: '10px 14px', fontSize: 13, color: t.text,
+              fontFamily: 'inherit', outline: 'none', direction: 'rtl',
+            }}
+          />
+          {matches.length > 0 && !selected && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+              {matches.map(st => (
+                <button key={st.n} onClick={() => { setSelected(st); setQuery(st.n) }} style={{
+                  all: 'unset', cursor: 'pointer', padding: '8px 10px', borderRadius: 8,
+                  fontSize: 12, color: t.text, background: `${t.accent}0a`,
+                  display: 'flex', justifyContent: 'space-between', gap: 8,
+                }}>
+                  <span>{st.n}</span>
+                  <span style={{ color: t.muted, fontSize: 11 }}>{fa(st.c)} صندوق · {fmtBt(st.v)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selected && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: t.textBright }}>{selected.n}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
+                  <span style={{ color: t.muted }}>{fa(selected.c)} صندوق دارنده</span>
+                  <span style={{ color: t.accent, fontWeight: 700 }}>{fmtBt(selected.v)}</span>
+                  {selected.b - selected.s > 1 && <span style={{ color: t.green, fontWeight: 700 }}>خرید خالص ماه: {fmtBt(selected.b - selected.s)}</span>}
+                  {selected.s - selected.b > 1 && <span style={{ color: t.red, fontWeight: 700 }}>فروش خالص ماه: {fmtBt(selected.s - selected.b)}</span>}
+                </div>
+              </div>
+              {selected.h.length > 0 ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+                    <thead>
+                      <tr style={{ color: t.muted, textAlign: 'right' }}>
+                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>صندوق</th>
+                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>ارزش نزد صندوق</th>
+                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>سهم از پرتفوی صندوق</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selected.h.slice(0, 15).map(([fi, val, pct]) => {
+                        const f = data.funds[fi]
+                        if (!f) return null
+                        return (
+                          <tr key={f.g} style={{ borderTop: `0.5px solid ${t.border}` }}>
+                            <td style={{ padding: '7px 8px' }}>
+                              <Link href={`/fund/${encodeURIComponent(f.g)}`} style={{ color: t.accent, textDecoration: 'none', fontWeight: 700 }}>{f.s}</Link>
+                            </td>
+                            <td style={{ padding: '7px 8px', fontFamily: 'system-ui, sans-serif' }}>{fmtBt(val)}</td>
+                            <td style={{ padding: '7px 8px', fontFamily: 'system-ui, sans-serif' }}>
+                              {fa(pct, 2)}٪
+                              <span style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8, width: 60, height: 4, background: t.border, borderRadius: 2, overflow: 'hidden' }}>
+                                <span style={{ display: 'block', height: '100%', width: `${Math.min(pct * 8, 100)}%`, background: t.brand2, borderRadius: 2 }} />
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  {selected.h.length > 15 && (
+                    <div style={{ fontSize: 10.5, color: t.faint, marginTop: 6 }}>و {fa(selected.h.length - 15)} صندوق دیگر…</div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11.5, color: t.muted }}>
+                  در پایان {monthLabel} هیچ صندوقی این سهم را در پرتفوی نداشت{selected.s > 0 ? ` — طی ماه ${fmtBt(selected.s)} فروخته و خارج شده‌اند` : ''}.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── خرید و فروش خالص ماه ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 20 }}>
+          <div style={panelStyle(t.green)}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>بیشترین خرید خالص ماه</div>
+            <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>سهم‌هایی که صندوق‌ها در {monthLabel} بیشترین پول را واردشان کردند</div>
+            <FlowList items={views.netBuy} color={t.green} sign={1} />
+          </div>
+          <div style={panelStyle(t.red)}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>بیشترین فروش خالص ماه</div>
+            <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>سهم‌هایی که صندوق‌ها در {monthLabel} بیشترین خروج پول را داشتند</div>
+            <FlowList items={views.netSell} color={t.red} sign={-1} />
+          </div>
+        </div>
+
+        {/* ── محبوب‌ترین سهم‌ها ── */}
+        <div style={{ ...panelStyle(t.accent), marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>محبوب‌ترین سهم‌ها نزد صندوق‌ها</div>
+          <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>بر اساس تعداد صندوق‌هایی که سهم را در پرتفوی دارند</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+              <thead>
+                <tr style={{ color: t.muted, textAlign: 'right' }}>
+                  <th style={{ padding: '6px 8px', fontWeight: 600 }}>شرکت</th>
+                  <th style={{ padding: '6px 8px', fontWeight: 600 }}>تعداد صندوق</th>
+                  <th style={{ padding: '6px 8px', fontWeight: 600 }}>ارزش کل</th>
+                  <th style={{ padding: '6px 8px', fontWeight: 600 }}>بزرگ‌ترین دارنده</th>
+                </tr>
+              </thead>
+              <tbody>
+                {views.popular.map(st => (
+                  <tr key={st.n} style={{ borderTop: `0.5px solid ${t.border}`, cursor: 'pointer' }}
+                    onClick={() => { setSelected(st); setQuery(st.n); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
+                    <td style={{ padding: '8px', fontWeight: 700, color: t.text }}>{st.n}</td>
+                    <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fa(st.c)}</td>
+                    <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fmtBt(st.v)}</td>
+                    <td style={{ padding: '8px' }}>{st.h[0] ? fundChip(st.h[0][0], `${fa(st.h[0][2], 1)}٪`) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── ورود تازه و خروج کامل ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+          <div style={panelStyle(t.green)}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>ورودهای تازه</div>
+            <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>سهم‌هایی که برای اولین بار به پرتفوی چند صندوق آمدند (عرضه‌های اولیه اینجا دیده می‌شوند)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {views.fresh.map(st => (
+                <div key={st.n}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, marginBottom: 5 }}>
+                    <span style={{ fontWeight: 700, color: t.text }}>{st.n}</span>
+                    <span style={{ color: t.green, flexShrink: 0 }}>{fa(st.e.length)} صندوق</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {st.e.slice(0, 6).map(fi => fundChip(fi))}
+                    {st.e.length > 6 && <span style={{ fontSize: 10, color: t.faint, alignSelf: 'center' }}>+{fa(st.e.length - 6)}</span>}
+                  </div>
+                </div>
+              ))}
+              {views.fresh.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>این ماه ورود تازه‌ی گروهی ثبت نشد</div>}
+            </div>
+          </div>
+          <div style={panelStyle(t.red)}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>خروج‌های کامل</div>
+            <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>سهم‌هایی که چند صندوق به‌طور کامل از آن‌ها خارج شدند</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {views.exits.map(st => (
+                <div key={st.n}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, marginBottom: 5 }}>
+                    <span style={{ fontWeight: 700, color: t.text }}>{st.n}</span>
+                    <span style={{ color: t.red, flexShrink: 0 }}>{fa(st.x.length)} صندوق</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {st.x.slice(0, 6).map(fi => fundChip(fi))}
+                    {st.x.length > 6 && <span style={{ fontSize: 10, color: t.faint, alignSelf: 'center' }}>+{fa(st.x.length - 6)}</span>}
+                  </div>
+                </div>
+              ))}
+              {views.exits.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>این ماه خروج کامل گروهی ثبت نشد</div>}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 10, color: t.faint, marginTop: 18, textAlign: 'center' }}>
+          منبع: صورت وضعیت پرتفوی ماهانه صندوق‌ها در کدال · واحدها: میلیارد تومان (م.ت) و هزار میلیارد تومان (همت)
+        </div>
+      </div>
+    </main>
+  )
+}

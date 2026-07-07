@@ -11,7 +11,10 @@ type NavItem = { label: string; href: string; menu?: { label: string; href: stri
 const NAV: NavItem[] = [
   { label: 'خانه',          href: '/' },
   { label: 'سهام',          href: '/stocks' },
-  { label: 'صندوق‌ها',      href: '/funds' },
+  { label: 'صندوق‌ها',      href: '/funds', menu: [
+    { label: 'دیدبان صندوق‌ها', href: '/funds' },
+    { label: 'رادار پول هوشمند', href: '/funds/radar' },
+  ] },
   { label: 'نمودار',        href: '/monitor', menu: [
     { label: 'نمودار لحظه‌ای رصد بازارها', href: '/monitor' },
   ] },
