@@ -29,6 +29,27 @@ try { XLSX = require('xlsx') } catch { console.error('npm install xlsx لازم 
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
+// ═══ تشخیص توقف: لاگ synchronous در فایل جدا (بافر نمی‌شود، حتی هنگام مرگ ناگهانی) ═══
+const DIAG_FILE = path.join(__dirname, 'reports-diag.log')
+const ts = () => new Date().toISOString()
+const mem = () => {
+  const m = process.memoryUsage()
+  return `rss=${(m.rss / 1e6).toFixed(0)}MB heap=${(m.heapUsed / 1e6).toFixed(0)}/${(m.heapTotal / 1e6).toFixed(0)}MB`
+}
+function diag(msg) {
+  const line = `[${ts()}] ${msg}\n`
+  try { fs.appendFileSync(DIAG_FILE, line) } catch {}
+  try { process.stdout.write(line) } catch {}
+}
+process.on('uncaughtException', (e) => { diag(`FATAL uncaughtException: ${(e && e.stack) || e}`); process.exit(1) })
+process.on('unhandledRejection', (e) => { diag(`FATAL unhandledRejection: ${(e && e.stack) || e}`) })
+process.on('exit', (code) => { diag(`EXIT code=${code} ${mem()}`) })
+process.on('beforeExit', (code) => { diag(`beforeExit code=${code}`) })
+for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP', 'SIGABRT']) {
+  process.on(sig, () => { diag(`SIGNAL ${sig} — پردازش توسط سیستم متوقف شد`); process.exit(1) })
+}
+diag(`▶ شروع اجرا — pid=${process.pid} node=${process.version} argv=${process.argv.slice(2).join(' ')}`)
+
 // ماسک BrsAPI روی base64: QQQaQQQ = %2f و OOObOOO = %2b
 const unmask = (s) => String(s).replace(/QQQaQQQ/g, '%2f').replace(/OOObOOO/g, '%2b')
 
@@ -335,11 +356,12 @@ async function main() {
   let done = 0
   for (const s of symbols) {
     done++
+    diag(`START ${done}/${symbols.length} «${s}» ${mem()}`)
     let status = null
     // تا ۴ بار در برابر throttle مقاومت کن: صفر اطلاعیه → صبر ۱۵ دقیقه و تلاش دوباره
     for (let attempt = 1; attempt <= 4; attempt++) {
       try { status = await buildSymbol(s) }
-      catch (e) { console.error(`❌ ${s}: ${e.message}`); status = 'fail'; break }
+      catch (e) { diag(`❌ ${s}: ${(e && e.stack) || e.message}`); status = 'fail'; break }
       if (status !== 'throttle') break
       if (attempt === 4) { console.log(`  ⛔ ${s}: throttle مداوم — رد شد`); status = 'fail'; break }
       const wait = 15 * 60 * 1000
@@ -347,10 +369,10 @@ async function main() {
       await sleep(wait)
     }
     if (status && stat[status] !== undefined) stat[status]++
-    if (done % 10 === 0) console.log(`  ── پیشرفت: ${done}/${symbols.length} | ✅${stat.ok} ⏭${stat.skip} ❌${stat.empty + stat.fail}`)
+    diag(`END «${s}» → ${status} | پیشرفت ${done}/${symbols.length} ✅${stat.ok} ⏭${stat.skip} ❌${stat.empty} ⛔${stat.fail}`)
     await sleep(4000)
   }
-  console.log(`\nتمام شد. ✅${stat.ok} جدید | ⏭${stat.skip} موجود | ❌${stat.empty} بدون‌گزارش | ⛔${stat.fail} ناموفق`)
+  diag(`✔ تمام شد. ✅${stat.ok} جدید | ⏭${stat.skip} موجود | ❌${stat.empty} بدون‌گزارش | ⛔${stat.fail} ناموفق`)
 }
 
 main().catch(e => { console.error(e); process.exit(1) })
