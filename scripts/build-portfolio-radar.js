@@ -12,10 +12,14 @@
  * ساختار خروجی (واحد ارزش‌ها: میلیارد تومان، گرد به ۲ رقم):
  *   month      "1405/03" — ماه غالب بین آخرین گزارش صندوق‌ها
  *   funds      [{ s: نماد, g: slug فایل, nav, date }]
- *   stocks     [{ n: نام شرکت, v: ارزش کل نزد صندوق‌ها, c: تعداد صندوق دارنده,
+ *   stocks     [{ n: نام شرکت, sym: نماد (از نگاشت l30→l18، اگر پیدا شد),
+ *                 v: ارزش کل نزد صندوق‌ها, c: تعداد صندوق دارنده,
  *                 b: جمع خرید ماه, s: جمع فروش ماه,
  *                 e: [idx صندوق‌های تازه‌وارد], x: [idx صندوق‌های خارج‌شده],
  *                 h: [[idx صندوق, ارزش, درصد از NAV صندوق], …] }]
+ *
+ * نگاشت نام شرکت → نماد از stocks-industries (اولین مسیر موجود):
+ *   /opt/stocks-industries.json (سرور) یا public/stocks/industries.json (repo)
  */
 
 'use strict'
@@ -31,10 +35,106 @@ const bt = (v) => Math.round(v / 1e10 * 100) / 100
 // نرمال‌سازی نام شرکت — همان منطق codal-portfolio.js
 const normTxt = (s) => String(s ?? '')
   .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
+  .replace(/[أإ]/g, 'ا').replace(/ؤ/g, 'و').replace(/ة/g, 'ه')
   .replace(/[‌‎‏‪-‮]/g, ' ')
   .replace(/\s+/g, ' ').trim()
 // ردیف‌های غیرسهم شیت اکسل: نقل از/به صفحه، جمع، جمع کل
 const isJunkRow = (n) => /^(نقل (از|به) صفحه|جمع( کل)?$)/.test(n)
+
+// ── نگاشت نام کامل شرکت → نماد (l30 → l18) ─────────────────────────
+// کلید تطبیق: نام نرمال‌شده بدون هیچ فاصله‌ای — نام‌های کدال و TSETMC در
+// فاصله/نیم‌فاصله فرق دارند ولی بعد از حذف فاصله‌ها تقریباً یکی می‌شوند
+const nameKey = (s) => normTxt(s)
+  .replace(/\(.*?\)/g, '')                 // (هلدینگ)، (سهامی عام)…
+  .replace(/سهامی عام|هلدینگ|شرکت/g, '')
+  .replace(/[\s‌.\-،]+/g, '')              // «س. نفت» و «سرمایه‌گذاری» هم‌کلید شوند
+
+// دیکشنری تجمعی — AllSymbols نمادهای «ممنوع-متوقف» را حذف می‌کند (مثل فولاد
+// از اسفند ۱۴۰۴)، پس هر نمادی که یک بار دیده شد در این فایل می‌ماند
+const MAP_FILE = path.join(DIR, '_symbols.json')
+const symbolMap = new Map()   // nameKey → l18
+
+// ۱) seed دستی — نمادهای بزرگِ در حال حاضر متوقف/غایب از AllSymbols
+const SEED = {
+  'فولاد مبارکه اصفهان': 'فولاد', 'فولاد مبارکه': 'فولاد',
+  'فروشگاههای زنجیره ای افق کوروش': 'کورش', 'افق کوروش': 'کورش',
+  'مبین انرژی خلیج فارس': 'مبین',
+  'سرمایه گذاری صدرتامین': 'تاصیکو', 'صدرتامین': 'تاصیکو',
+  'پالایش نفت اصفهان': 'شپنا', 'نفت اصفهان': 'شپنا',
+  'ملی صنایع مس ایران': 'فملی', 'ملی مس': 'فملی',
+  'بانک اقتصادنوین': 'ونوین', 'اقتصاد نوین': 'ونوین',
+  'فجر انرژی خلیج فارس': 'بفجر',
+  'فولاد خوزستان': 'فخوز',
+  'حفاری شمال': 'حفاری',
+  'سیمرغ': 'سیمرغ',
+  'پاکدیس': 'غدیس',
+  'داروسازی شهید قاضی': 'دقاضی',
+  'صنایع خاک چینی ایران': 'کخاک',
+  'کشت و صنعت دشت خرم دره': 'زدشت',
+  'تولیدمواداولیه داروپخش': 'دتولید',
+  'پتروشیمی تامین': 'تاپیکو',
+  'کشاورزی ودامپروی مگسال': 'زمگسا',
+  'سرمایه گذاری توسعه صنایع سیمان': 'سیدکو',
+  'فولاد خراسان': 'فخاس',
+  'مپنا': 'رمپنا',
+}
+for (const [n, sym] of Object.entries(SEED)) symbolMap.set(nameKey(n), sym)
+
+// ۲) دیکشنری تجمعی قبلی
+if (fs.existsSync(MAP_FILE)) {
+  try {
+    for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(MAP_FILE, 'utf8'))))
+      symbolMap.set(k, v)
+  } catch { /* فایل خراب — از بقیه منابع ساخته می‌شود */ }
+}
+
+// ۳) منابع تازه: AllSymbols کامل (سرور) و stock_industries (fallback)
+const addPairs = (pairs) => {
+  for (const s of pairs) if (s.l18 && s.l30) symbolMap.set(nameKey(s.l30), normTxt(s.l18))
+}
+for (const p of ['/opt/all-symbols.json', path.resolve(__dirname, '../public/stocks/all-symbols.json')]) {
+  if (!fs.existsSync(p)) continue
+  try {
+    const j = JSON.parse(fs.readFileSync(p, 'utf8'))
+    addPairs(Array.isArray(j) ? j : j.data || [])
+    break
+  } catch { /* ادامه با منبع بعدی */ }
+}
+for (const p of ['/opt/stocks-industries.json', path.resolve(__dirname, '../public/stocks/industries.json')]) {
+  if (!fs.existsSync(p)) continue
+  try {
+    for (const g of (JSON.parse(fs.readFileSync(p, 'utf8')).industries || [])) addPairs(g.symbols || [])
+    break
+  } catch { /* نگاشت از منابع قبلی کافی است */ }
+}
+
+// نوشتن دیکشنری تجمعی به‌روز — دفعه بعد نمادهای متوقف هم پوشش دارند
+fs.writeFileSync(MAP_FILE, JSON.stringify(Object.fromEntries([...symbolMap.entries()].sort())))
+
+const symbolKeys = [...symbolMap.keys()]
+const knownSymbols = new Set(symbolMap.values())
+const findSymbol = (name) => {
+  const raw = normTxt(name)
+  // حق تقدم: «ح . نام شرکت» → نماد پایه + «ح»
+  const rights = raw.match(/^ح\s*[.،]?\s+(.+)$/)
+  if (rights) {
+    const base = findSymbol(rights[1])
+    return base ? `${base}ح` : null
+  }
+  // نماد داخل پرانتز: «سر. غدیر (وغدیر)»
+  const paren = raw.match(/\(([آ-ی]{2,12})\)/)
+  if (paren && knownSymbols.has(paren[1])) return paren[1]
+  const k = nameKey(raw)
+  if (!k) return null
+  const exact = symbolMap.get(k)
+  if (exact) return exact
+  // تطبیق دربرگیری — فقط اگر دقیقاً یک کاندید باشد (از ابهام جلوگیری می‌کند)
+  if (k.length >= 5) {
+    const cands = symbolKeys.filter(sk => sk.length >= 5 && (sk.includes(k) || k.includes(sk)))
+    if (cands.length === 1) return symbolMap.get(cands[0])
+  }
+  return null
+}
 
 const files = fs.readdirSync(DIR).filter(f => f.endsWith('.json') && !f.startsWith('_'))
 
@@ -68,8 +168,13 @@ inMonth.forEach((p, fi) => {
   for (const h of p.cur.holdings) {
     const name = normTxt(h.name)
     if (!name || isJunkRow(name)) continue
-    let st = stocks.get(name)
-    if (!st) stocks.set(name, st = { n: name, v: 0, c: 0, b: 0, s: 0, e: [], x: [], h: [] })
+    // کلید تجمیع: نماد اگر پیدا شد — واریانت‌های اسمی یک سهم (ملی مس/ملی
+    // صنایع مس ایران) در صندوق‌های مختلف با هم یکی می‌شوند
+    const sym = findSymbol(name)
+    const key = sym ? `s:${sym}` : `n:${nameKey(name)}`
+    let st = stocks.get(key)
+    if (!st) stocks.set(key, st = { n: name, sym, v: 0, c: 0, b: 0, s: 0, e: [], x: [], h: [], variants: new Map() })
+    st.variants.set(name, (st.variants.get(name) || 0) + 1)
     const held = (h.n1 || 0) > 0
     if (held) {
       st.v += h.n1
@@ -83,8 +188,15 @@ inMonth.forEach((p, fi) => {
   }
 })
 
+let matched = 0
 const list = [...stocks.values()]
-  .map(st => ({ ...st, v: bt(st.v), b: bt(st.b), s: bt(st.s), h: st.h.sort((a, b) => b[1] - a[1]) }))
+  .map(st => {
+    if (st.sym) matched++
+    // نام نمایشی: پرتکرارترین واریانت بین گزارش‌ها
+    const n = [...st.variants.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    const { variants, sym, ...rest } = st
+    return { ...rest, n, ...(sym ? { sym } : {}), v: bt(st.v), b: bt(st.b), s: bt(st.s), h: st.h.sort((a, b) => b[1] - a[1]) }
+  })
   .filter(st => st.v > 0 || st.s > 0)
   .sort((a, b) => b.v - a.v)
 
@@ -101,3 +213,4 @@ fs.writeFileSync(OUT, JSON.stringify(out))
 const kb = Math.round(fs.statSync(OUT).size / 1024)
 console.log(`ماه غالب: ${month} — ${inMonth.length} صندوق (${stale} قدیمی کنار گذاشته شد)`)
 console.log(`${list.length} سهم منحصربه‌فرد → ${OUT} (${kb}KB)`)
+console.log(`نگاشت نماد: ${matched}/${list.length} (${symbolMap.size} نماد در مرجع)`)
