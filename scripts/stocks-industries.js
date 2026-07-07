@@ -90,9 +90,11 @@ async function main() {
     return true
   }
 
+  const stockItems = []
   const byIndustry = new Map()
   for (const it of arr) {
     if (!isStock(it)) continue
+    stockItems.push(it)
     const key = clean(it.cs) ? (num(it.cs_id) ?? clean(it.cs)) : 'سایر'
     if (!byIndustry.has(key)) byIndustry.set(key, { id: num(it.cs_id), name: clean(it.cs) || 'سایر', symbols: [] })
     byIndustry.get(key).symbols.push({
@@ -146,6 +148,69 @@ async function main() {
   const { error } = await sb.from('stock_industries').upsert({ id: 1, data: out, updated: out.updated })
   if (error) throw new Error(`Supabase upsert: ${error.message}`)
   console.log('✅ Supabase (stock_industries) بروز شد')
+
+  // ── رصد لحظه‌ای بازار: یک اسنپ‌شات ۵ دقیقه‌ای از سنجه‌های کل بازار سهام ──
+  const watch = computeMarketWatch(stockItems)
+  const { error: mwErr } = await sb.from('market_watch').insert({ cat: 'stocks', d: watch })
+  if (mwErr) console.error(`[stocks-industries] market_watch: ${mwErr.message}`)
+  else console.log(`✅ market_watch ثبت شد (${watch.t} — هیجان ${watch.excitement})`)
+}
+
+// سنجه‌های تجمیعی کل بازار سهام برای نمودارهای «رصد لحظه‌ای» — همه ارزش‌ها به ریال
+function computeMarketWatch(items) {
+  let mov_pos = 0, mov_neg = 0   // تحرک: درصد «آخرین» مثبت/منفی
+  let sym_pos = 0, sym_neg = 0   // نمادها: درصد «پایانی» مثبت/منفی
+  let buyq = 0, sellq = 0        // صف خرید/فروش: بهترین سفارش روی سقف/کف دامنه
+  let tval_total = 0, sPlp = 0, sPcp = 0, n = 0
+  let biVal = 0, siVal = 0, biC = 0, siC = 0   // حقیقی
+  let bnVal = 0, snVal = 0, bnC = 0, snC = 0   // حقوقی
+  let money_in = 0
+  let ord_demand = 0, ord_supply = 0     // ارزش کل سفارشات
+  let ordx_demand = 0, ordx_supply = 0   // بدون سطح‌های داخل صف
+
+  for (const it of items) {
+    const plp = num(it.plp) ?? 0, pcp = num(it.pcp) ?? 0
+    const pc  = num(it.pc) ?? 0
+    if (plp > 0) mov_pos++; else if (plp < 0) mov_neg++
+    if (pcp > 0) sym_pos++; else if (pcp < 0) sym_neg++
+    tval_total += num(it.tval) ?? 0
+    sPlp += plp; sPcp += pcp; n++
+
+    const tmax = num(it.tmax), tmin = num(it.tmin)
+    if (tmax && (num(it.pd1) ?? 0) >= tmax && (num(it.qd1) ?? 0) > 0) buyq++
+    if (tmin && (num(it.po1) ?? Infinity) <= tmin && (num(it.qo1) ?? 0) > 0) sellq++
+
+    biVal += (num(it.Buy_I_Volume) ?? 0) * pc;  biC += num(it.Buy_CountI) ?? 0
+    siVal += (num(it.Sell_I_Volume) ?? 0) * pc; siC += num(it.Sell_CountI) ?? 0
+    bnVal += (num(it.Buy_N_Volume) ?? 0) * pc;  bnC += num(it.Buy_CountN) ?? 0
+    snVal += (num(it.Sell_N_Volume) ?? 0) * pc; snC += num(it.Sell_CountN) ?? 0
+    money_in += ((num(it.Buy_I_Volume) ?? 0) - (num(it.Sell_I_Volume) ?? 0)) * pc
+
+    for (let i = 1; i <= 5; i++) {
+      const qd = num(it['qd' + i]) ?? 0, pd = num(it['pd' + i]) ?? 0
+      const qo = num(it['qo' + i]) ?? 0, po = num(it['po' + i]) ?? 0
+      if (qd > 0 && pd > 0) { ord_demand += qd * pd; if (!(tmax && pd >= tmax)) ordx_demand += qd * pd }
+      if (qo > 0 && po > 0) { ord_supply += qo * po; if (!(tmin && po <= tmin)) ordx_supply += qo * po }
+    }
+  }
+
+  const tehran = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
+  const t = `${String(tehran.getHours()).padStart(2, '0')}:${String(tehran.getMinutes()).padStart(2, '0')}`
+  const r = (v) => Math.round(v)
+  return {
+    t, count: n,
+    mov_pos, mov_neg, excitement: mov_pos - mov_neg,
+    sym_pos, sym_neg,
+    buyq, sellq,
+    tval_total: r(tval_total),
+    avg_plp: n ? +(sPlp / n).toFixed(3) : 0,
+    avg_pcp: n ? +(sPcp / n).toFixed(3) : 0,
+    ind_buy_pc: biC ? r(biVal / biC) : 0, ind_sell_pc: siC ? r(siVal / siC) : 0,
+    leg_buy_pc: bnC ? r(bnVal / bnC) : 0, leg_sell_pc: snC ? r(snVal / snC) : 0,
+    ord_demand: r(ord_demand), ord_supply: r(ord_supply),
+    ordx_demand: r(ordx_demand), ordx_supply: r(ordx_supply),
+    money_in: r(money_in),
+  }
 }
 
 main().catch(e => { console.error(e); process.exit(1) })
