@@ -138,7 +138,11 @@ async function main() {
     return
   }
   const { createClient } = require('@supabase/supabase-js')
-  const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+  // Node < 22 بدون WebSocket بومی — پکیج ws را صریح پاس می‌دهیم (مثل sync-bourse.js)
+  let wsTransport
+  try { wsTransport = require('ws') } catch { /* Node 22+ نیازی ندارد */ }
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY,
+    wsTransport ? { realtime: { transport: wsTransport } } : {})
   const { error } = await sb.from('stock_industries').upsert({ id: 1, data: out, updated: out.updated })
   if (error) throw new Error(`Supabase upsert: ${error.message}`)
   console.log('✅ Supabase (stock_industries) بروز شد')
