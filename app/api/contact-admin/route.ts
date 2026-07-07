@@ -25,10 +25,18 @@ export async function POST(req: NextRequest) {
   try {
     const res = await fetch(`https://formsubmit.co/ajax/${ADMIN_EMAIL}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        // formsubmit بدون Origin/Referer درخواست را رد می‌کند (خطای «web server»)
+        Origin: 'https://bourssanj.ir',
+        Referer: 'https://bourssanj.ir/',
+      },
       body: JSON.stringify({
         _subject: `📩 پیام جدید از سایت بورس سنج${name ? ` — ${name}` : ''}`,
         _template: 'box',
+        // با _replyto جوابِ ایمیل مستقیم به فرستنده می‌رود
+        ...(email ? { _replyto: email } : {}),
         name: name || 'بدون نام',
         email: email || 'ذکر نشده',
         message,
