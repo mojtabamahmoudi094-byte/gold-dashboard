@@ -41,6 +41,7 @@ export default function ValuationCalculatorPage() {
   const [reports, setReports] = useState<Reports | null | 'missing'>(null)
 
   // ورودی‌های قابل‌تنظیم — پیش‌فرض بعد از انتخاب نماد محاسبه می‌شود
+  const [showTutorial, setShowTutorial] = useState(true)
   const [eps, setEps] = useState(0)
   const [epsManual, setEpsManual] = useState(false)
   const [payout, setPayout] = useState(50)   // درصد سود تقسیمی از EPS (فرض — داده واقعی تقسیم سود نداریم)
@@ -57,6 +58,17 @@ export default function ValuationCalculatorPage() {
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)
   }, [])
+
+  // آموزش پیش‌فرض برای کاربر تازه باز است — بعد از بستن، انتخاب کاربر در همان مرورگر یادآوری می‌شود
+  useEffect(() => {
+    setShowTutorial(window.localStorage.getItem('valuation_tutorial_open') !== '0')
+  }, [])
+  const toggleTutorial = () => {
+    setShowTutorial(v => {
+      window.localStorage.setItem('valuation_tutorial_open', v ? '0' : '1')
+      return !v
+    })
+  }
 
   useEffect(() => {
     fetch('/api/stocks-industries').then(r => (r.ok ? r.json() : null)).then(setPayload).catch(() => setPayload(null))
@@ -208,6 +220,73 @@ export default function ValuationCalculatorPage() {
         </div>
         <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 22 }}>
           ارزش ذاتی سهم را با مدل رشد گوردون، مدل چندمرحله‌ای و NPVGO تخمین بزنید — EPS از گزارش‌های واقعی کدال، فرضیات رشد و بازده با اسلایدر
+        </div>
+
+        {/* ── آموزش استفاده ── */}
+        <div style={{ ...panelStyle(t.green), marginBottom: 20 }}>
+          <button
+            type="button"
+            onClick={toggleTutorial}
+            style={{
+              all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              width: '100%', boxSizing: 'border-box',
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, color: t.textBright }}>
+              📘 چطور از این ماشین‌حساب استفاده کنم؟
+            </span>
+            <span style={{ fontSize: 11, color: t.muted }}>{showTutorial ? 'بستن ▲' : 'باز کردن ▼'}</span>
+          </button>
+
+          {showTutorial && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 12, color: cream, lineHeight: 2, marginBottom: 16 }}>
+                این ابزار ارزش ذاتی هر سهم را از روی سود تقسیمی آن تخمین می‌زند: هرچه امروز به‌ازای هر سهم سود نقدی
+                بیشتری بگیرید و انتظار رشد بالاتری داشته باشید، ارزش ذاتی سهم بالاتر می‌رود. سه مدل زیر همین ایده را
+                با فرض‌های مختلف حساب می‌کنند:
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 10, marginBottom: 18 }}>
+                {[
+                  { title: 'بدون رشد', formula: 'P = D₀ / r', desc: 'برای سهم‌هایی که سود تقسیمی‌شان ثابت می‌ماند — مثل سهام ممتاز.', accent: cream },
+                  { title: 'رشد گوردون', formula: 'P = D₁ / (r − g)', desc: 'رایج‌ترین مدل — سود هر سال با نرخ ثابت g رشد می‌کند تا همیشه.', accent: t.accent },
+                  { title: 'چندمرحله‌ای', formula: 'رشد فوق‌العاده چند سال، بعد رشد پایدار', desc: 'برای شرکت‌های در حال رشد سریع که بعداً روند رشدشان کند می‌شود.', accent: t.brand2 },
+                ].map(m => (
+                  <div key={m.title} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: m.accent, marginBottom: 4 }}>{m.title}</div>
+                    <div style={{ fontSize: 10.5, color: t.muted, fontFamily: 'system-ui, sans-serif', marginBottom: 6 }}>{m.formula}</div>
+                    <div style={{ fontSize: 11, color: t.text, lineHeight: 1.8 }}>{m.desc}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: t.textBright, marginBottom: 10 }}>مراحل استفاده</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                {[
+                  ['نماد را جستجو و انتخاب کنید', 'در کادر پایین اسم یا نماد شرکت را بنویسید — اگر گزارش کدال آن نماد موجود باشد، EPS واقعی خودکار پر می‌شود.'],
+                  ['سلایدرها را با فرض خودتان تنظیم کنید', 'درصد تقسیم سود، نرخ بازده مورد انتظار (r) و نرخ رشد (g) فرض‌های شما هستند، نه داده رسمی — با تغییرشان نتایج آنی به‌روز می‌شوند.'],
+                  ['نتیجه را کنار قیمت فعلی بخوانید', 'هر کارت برچسب «زیر ارزش ذاتی»، «بالای ارزش ذاتی» یا «نزدیک ارزش منصفانه» را نسبت به قیمت فعلی نشان می‌دهد.'],
+                ].map(([title, desc], i) => (
+                  <div key={title} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{
+                      flexShrink: 0, width: 22, height: 22, borderRadius: 999, background: `${t.green}18`,
+                      border: `1px solid ${t.green}44`, color: t.green, fontSize: 11, fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif',
+                    }}>{i + 1}</span>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: t.text }}>{title}</div>
+                      <div style={{ fontSize: 11, color: t.muted, lineHeight: 1.8 }}>{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ fontSize: 10.5, color: t.muted, lineHeight: 1.9, borderTop: `1px solid ${t.border}`, paddingTop: 12 }}>
+                💡 اگر برچسب «EPS دستی» دیدید یعنی گزارش کدال این نماد هنوز در پایگاه‌داده ما ثبت نشده — سود هر سهم را
+                از آخرین گزارش رسمی خودتان وارد کنید. r باید همیشه از g بزرگ‌تر باشد وگرنه مدل معتبر نیست.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── جستجوی نماد ── */}
