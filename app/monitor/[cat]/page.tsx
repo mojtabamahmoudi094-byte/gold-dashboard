@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * رصد لحظه‌ای بازار — ۱۱ نمودار ۵ دقیقه‌ای برای هر دسته (config-محور)
+ * رصد لحظه‌ای بازار — ۱۲ نمودار ۵ دقیقه‌ای برای هر دسته (config-محور)
  * دسته‌ها: سهام و صندوق‌های بورسی (۹:۰۰–۱۲:۳۰)، صندوق‌های طلا/نقره/زعفران (۱۲:۰۰–۱۷:۳۰)
  * داده از /api/market-watch?cat=… (جدول market_watch — سرور ایران هر ۵ دقیقه درج می‌کند)
  * همه ارزش‌ها در دیتابیس «ریال»اند؛ اینجا به میلیارد/میلیون تومان تبدیل می‌شوند.
@@ -32,11 +32,13 @@ type Row = {
   ord_demand: number; ord_supply: number
   ordx_demand: number; ordx_supply: number
   money_in: number
+  big_buy: number; big_sell: number
 }
 type Datum = Row & {
   tvalB: number; tval5m: number
   indBuyM: number; indSellM: number; legBuyM: number; legSellM: number
   ordDB: number; ordSB: number; ordxDB: number; ordxSB: number; moneyB: number
+  bigBuyB: number; bigSellB: number
 }
 
 const CATS: Record<string, { title: string; hours: string }> = {
@@ -160,6 +162,19 @@ const DEFS: ChartDef[] = [
     series: [{ key: 'moneyB', name: 'ورود پول حقیقی', color: C.green, kind: 'area' }],
     sub: l => [{ txt: `آخرین ${fa(l.moneyB)} میلیارد تومان`, color: l.moneyB >= 0 ? C.green : C.red }],
   },
+  {
+    // کدهای حقیقی با سرانه خرید/فروش بالای ۵۰ میلیون تومان — نشانه ورود سرمایه‌گذار درشت/آگاه
+    id: 'bigmoney', title: 'ورود و خروج پول درشت', unit: ' میلیارد تومان',
+    series: [
+      { key: 'bigBuyB', name: 'ورود پول درشت', color: C.green, kind: 'line' },
+      { key: 'bigSellB', name: 'خروج پول درشت', color: C.red, kind: 'line' },
+    ],
+    sub: l => [
+      { txt: `ورود ${fa(l.bigBuyB)}`, color: C.green }, { txt: ' | ' },
+      { txt: `خروج ${fa(l.bigSellB)} میلیارد تومان`, color: C.red },
+      ...(l.bigSellB > 0 ? [{ txt: ` | خالص ${fa(l.bigBuyB - l.bigSellB)}`, color: l.bigBuyB - l.bigSellB >= 0 ? C.green : C.red }] : []),
+    ],
+  },
 ]
 
 // نقطه تپنده روی آخرین داده — حس «زنده بودن» نمودار
@@ -229,6 +244,7 @@ export default function MarketMonitorPage() {
     ordDB: r.ord_demand / 1e10, ordSB: r.ord_supply / 1e10,
     ordxDB: r.ordx_demand / 1e10, ordxSB: r.ordx_supply / 1e10,
     moneyB: r.money_in / 1e10,
+    bigBuyB: r.big_buy / 1e10, bigSellB: r.big_sell / 1e10,
   })), [rows])
 
   const last = data.length > 0 ? data[data.length - 1] : null

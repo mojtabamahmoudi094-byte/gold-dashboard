@@ -203,6 +203,9 @@ async function main() {
   }
 }
 
+// کد حقیقی با سرانه خرید/فروش بالای این آستانه «پول درشت» تلقی می‌شود (۵۰۰ میلیون ریال = ۵۰ میلیون تومان)
+const BIG_MONEY_PC_RIAL = 500_000_000
+
 // سنجه‌های تجمیعی کل بازار سهام برای نمودارهای «رصد لحظه‌ای» — همه ارزش‌ها به ریال
 function computeMarketWatch(items) {
   let mov_pos = 0, mov_neg = 0   // تحرک: درصد «آخرین» مثبت/منفی
@@ -212,6 +215,7 @@ function computeMarketWatch(items) {
   let biVal = 0, siVal = 0, biC = 0, siC = 0   // حقیقی
   let bnVal = 0, snVal = 0, bnC = 0, snC = 0   // حقوقی
   let money_in = 0
+  let bigBuyVal = 0, bigSellVal = 0   // پول درشت: فقط کدهای حقیقی با سرانه بالای آستانه
   let ord_demand = 0, ord_supply = 0     // ارزش کل سفارشات
   let ordx_demand = 0, ordx_supply = 0   // بدون سطح‌های داخل صف
 
@@ -232,6 +236,12 @@ function computeMarketWatch(items) {
     bnVal += (num(it.Buy_N_Volume) ?? 0) * pc;  bnC += num(it.Buy_CountN) ?? 0
     snVal += (num(it.Sell_N_Volume) ?? 0) * pc; snC += num(it.Sell_CountN) ?? 0
     money_in += ((num(it.Buy_I_Volume) ?? 0) - (num(it.Sell_I_Volume) ?? 0)) * pc
+
+    // پول درشت: سرانه خرید/فروش حقیقی این نماد را جدا از میانگین بازار می‌سنجیم
+    const symBuyCI = num(it.Buy_CountI) ?? 0, symSellCI = num(it.Sell_CountI) ?? 0
+    const symBuyVal = (num(it.Buy_I_Volume) ?? 0) * pc, symSellVal = (num(it.Sell_I_Volume) ?? 0) * pc
+    if (symBuyCI && symBuyVal / symBuyCI >= BIG_MONEY_PC_RIAL) bigBuyVal += symBuyVal
+    if (symSellCI && symSellVal / symSellCI >= BIG_MONEY_PC_RIAL) bigSellVal += symSellVal
 
     for (let i = 1; i <= 5; i++) {
       const qd = num(it['qd' + i]) ?? 0, pd = num(it['pd' + i]) ?? 0
@@ -257,6 +267,7 @@ function computeMarketWatch(items) {
     ord_demand: r(ord_demand), ord_supply: r(ord_supply),
     ordx_demand: r(ordx_demand), ordx_supply: r(ordx_supply),
     money_in: r(money_in),
+    big_buy: r(bigBuyVal), big_sell: r(bigSellVal),
   }
 }
 
