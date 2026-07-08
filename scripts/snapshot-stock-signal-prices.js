@@ -16,7 +16,7 @@
  * متغیرهای لازم (.env.sync):
  *   SITE_URL                    (پیش‌فرض https://bourssanj.ir)
  *   SUPABASE_URL یا NEXT_PUBLIC_SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY   — یا anon کافی است چون این جدول برای کاربر خاصی نیست، ولی service-role مطمئن‌تر است
+ *   SUPABASE_KEY (یا SUPABASE_SERVICE_ROLE_KEY/anon) — anon کافی است چون این جدول برای کاربر خاصی نیست
  */
 
 'use strict'
@@ -37,7 +37,7 @@ loadEnv('.env.sync')
 
 const SITE = (process.env.SITE_URL || 'https://bourssanj.ir').replace(/\/$/, '')
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('[snapshot-stock-signal-prices] SUPABASE_URL و SUPABASE_KEY تنظیم نشده‌اند')

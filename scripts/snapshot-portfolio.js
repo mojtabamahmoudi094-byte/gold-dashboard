@@ -16,7 +16,7 @@
  * متغیرهای لازم (.env.sync):
  *   SITE_URL                    (پیش‌فرض https://bourssanj.ir) — قیمت لحظه‌ای سهام/صندوق/فیزیکی از API عمومی سایت
  *   SUPABASE_URL یا NEXT_PUBLIC_SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY   — باید service_role باشد (نه anon)؛ چون باید تراکنش‌های همه‌ی کاربران خوانده شود
+ *   SUPABASE_KEY (یا SUPABASE_SERVICE_ROLE_KEY) — باید service_role باشد (نه anon)؛ چون باید تراکنش‌های همه‌ی کاربران خوانده شود
  *                                 و RLS جدول portfolio_transactions هر کاربر را فقط به خودش محدود می‌کند.
  *
  * محدودیت شناخته‌شده: قیمت دستیِ کاربر برای نمادهای بدون قیمت آنلاین (مثلاً نماد متوقف) فقط در
@@ -42,7 +42,7 @@ loadEnv('.env.sync')
 
 const SITE = (process.env.SITE_URL || 'https://bourssanj.ir').replace(/\/$/, '')
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('[snapshot-portfolio] SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY تنظیم نشده‌اند')
