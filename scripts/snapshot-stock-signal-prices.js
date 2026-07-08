@@ -45,7 +45,10 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const { createClient } = require('@supabase/supabase-js')
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+// Node 20 فاقد WebSocket بومی است — بدون این، ساخت کلاینت realtime کرش می‌کند (Node 22+ نیازی ندارد)
+let wsTransport
+try { wsTransport = require('ws') } catch { /* Node 22+ */ }
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, wsTransport ? { realtime: { transport: wsTransport } } : {})
 
 const safe = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 
