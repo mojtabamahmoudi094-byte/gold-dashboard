@@ -103,18 +103,26 @@ export default function SmartMoneyRadarPage() {
   }
 
   const panelStyle = (accent: string): React.CSSProperties => ({
-    background: t.panel, border: `0.5px solid ${t.border}`,
-    borderTop: `2px solid ${accent}55`, borderRadius: 14,
+    background: `linear-gradient(160deg, ${accent}0e, transparent 45%), ${t.panel}`,
+    border: `0.5px solid ${t.border}`,
+    borderTop: `2px solid ${accent}66`, borderRadius: 14,
     padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
     boxShadow: t.cardShadow,
   })
 
-  // نماد پررنگ + نام کامل کم‌رنگ — اگر نماد نداریم فقط نام
+  // متن ثانویه (نام کامل شرکت، زیرنویس‌ها) — کرم روشن، خوانا روی قاب تیره
+  const cream = isDark ? '#ddd5bd' : '#6B5A3A'
+
+  // نماد پررنگ (هیچ‌وقت بریده نمی‌شود) + نام کامل کرم با ellipsis
+  // نکته: overflow:hidden روی span درون‌خطی گلیف آخر فارسی را می‌بُرید — flex شد
   const StockName = ({ st, size = 11.5 }: { st: RadarStock, size?: number }) => (
-    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-      <span style={{ fontWeight: 800, color: t.text, fontSize: size }}>{st.sym || st.n}</span>
+    <span style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, overflow: 'hidden' }}>
+      <span style={st.sym
+        ? { fontWeight: 800, color: t.text, fontSize: size, flexShrink: 0, whiteSpace: 'nowrap' }
+        : { fontWeight: 800, color: t.text, fontSize: size, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }
+      }>{st.sym || st.n}</span>
       {st.sym && !isMobile && (
-        <span style={{ fontSize: size - 2, color: t.faint, marginRight: 6 }}>{st.n}</span>
+        <span style={{ display: 'block', fontSize: size - 2, color: cream, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{st.n}</span>
       )}
     </span>
   )
@@ -137,33 +145,51 @@ export default function SmartMoneyRadarPage() {
   const FlowList = ({ items, color, sign }: { items: (RadarStock & { net: number })[], color: string, sign: 1 | -1 }) => {
     const max = Math.max(...items.map(s => Math.abs(s.net)), 1)
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map(st => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {items.map((st, i) => (
           <button key={st.n} onClick={() => { setSelected(st); setQuery('') }} style={{
             all: 'unset', cursor: 'pointer', display: 'block',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, marginBottom: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11.5, marginBottom: 4 }}>
+              <span style={{
+                flexShrink: 0, width: 17, height: 17, borderRadius: 6, fontSize: 9.5, fontWeight: 800,
+                color: i < 3 ? color : t.muted, background: i < 3 ? `${color}1c` : `${t.border}88`,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', alignSelf: 'center',
+              }}>{fa(i + 1)}</span>
               <StockName st={st} />
-              <span style={{ color, fontWeight: 700, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>
+              <span style={{ color, fontWeight: 700, flexShrink: 0, fontFamily: 'system-ui, sans-serif', marginRight: 'auto' }}>
                 {sign > 0 ? '+' : '−'}{fmtBt(Math.abs(st.net))}
               </span>
             </div>
             <div style={{ height: 5, background: t.border, borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${(Math.abs(st.net) / max) * 100}%`, background: color, borderRadius: 3 }} />
+              <div style={{
+                height: '100%', width: `${(Math.abs(st.net) / max) * 100}%`, borderRadius: 3,
+                background: `linear-gradient(to left, ${color}, ${color}77)`,
+                boxShadow: `0 0 8px ${color}55`,
+              }} />
             </div>
           </button>
         ))}
-        {items.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>موردی یافت نشد</div>}
+        {items.length === 0 && <div style={{ fontSize: 11, color: cream }}>موردی یافت نشد</div>}
       </div>
     )
   }
 
-  const stat = (label: string, value: string, color?: string) => (
-    <div style={{ ...panelStyle(color || t.accent), padding: '14px 16px' }}>
-      <div style={{ fontSize: 10.5, color: t.muted, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 17, fontWeight: 800, color: color || t.textBright, fontFamily: 'system-ui, sans-serif' }}>{value}</div>
-    </div>
-  )
+  const stat = (label: string, value: string, color?: string) => {
+    const c = color || t.accent
+    return (
+      <div style={{ ...panelStyle(c), padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: t.muted, marginBottom: 7 }}>
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: c, boxShadow: `0 0 7px ${c}` }} />
+          {label}
+        </div>
+        <div style={{
+          fontSize: 18, fontWeight: 800, color: color || t.textBright,
+          fontFamily: 'system-ui, sans-serif', textShadow: isDark ? `0 0 22px ${c}44` : 'none',
+        }}>{value}</div>
+      </div>
+    )
+  }
 
   return (
     <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
@@ -173,7 +199,10 @@ export default function SmartMoneyRadarPage() {
         <Link href="/funds" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← بازگشت به دیدبان صندوق‌ها</Link>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', margin: '10px 0 4px' }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: t.textBright, margin: 0 }}>رادار پول هوشمند</h1>
-          <span style={{ fontSize: 12, color: t.accent, fontWeight: 700 }}>گزارش {monthLabel}</span>
+          <span style={{
+            fontSize: 11, color: '#F5B93E', fontWeight: 800, background: '#F5B93E16',
+            border: '0.5px solid #F5B93E4d', borderRadius: 999, padding: '3px 11px',
+          }}>گزارش {monthLabel}</span>
         </div>
         <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 22 }}>
           صندوق‌های سهامی، اهرمی و بخشی این ماه چه خریدند و چه فروختند؟ — تجمیع پرتفوی ماهانه {fa(data.funds.length)} صندوق از گزارش‌های رسمی کدال
@@ -264,7 +293,7 @@ export default function SmartMoneyRadarPage() {
                     </tbody>
                   </table>
                   {selected.h.length > 15 && (
-                    <div style={{ fontSize: 10.5, color: t.faint, marginTop: 6 }}>و {fa(selected.h.length - 15)} صندوق دیگر…</div>
+                    <div style={{ fontSize: 10.5, color: cream, marginTop: 6 }}>و {fa(selected.h.length - 15)} صندوق دیگر…</div>
                   )}
                 </div>
               ) : (
@@ -280,12 +309,12 @@ export default function SmartMoneyRadarPage() {
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 20 }}>
           <div style={panelStyle(t.green)}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>بیشترین خرید خالص ماه</div>
-            <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>سهم‌هایی که صندوق‌ها در {monthLabel} بیشترین پول را واردشان کردند</div>
+            <div style={{ fontSize: 10.5, color: cream, marginBottom: 12 }}>سهم‌هایی که صندوق‌ها در {monthLabel} بیشترین پول را واردشان کردند</div>
             <FlowList items={views.netBuy} color={t.green} sign={1} />
           </div>
           <div style={panelStyle(t.red)}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>بیشترین فروش خالص ماه</div>
-            <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>سهم‌هایی که صندوق‌ها در {monthLabel} بیشترین خروج پول را داشتند</div>
+            <div style={{ fontSize: 10.5, color: cream, marginBottom: 12 }}>سهم‌هایی که صندوق‌ها در {monthLabel} بیشترین خروج پول را داشتند</div>
             <FlowList items={views.netSell} color={t.red} sign={-1} />
           </div>
         </div>
@@ -293,7 +322,7 @@ export default function SmartMoneyRadarPage() {
         {/* ── محبوب‌ترین سهم‌ها ── */}
         <div style={{ ...panelStyle(t.accent), marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>محبوب‌ترین سهم‌ها نزد صندوق‌ها</div>
-          <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>بر اساس تعداد صندوق‌هایی که سهم را در پرتفوی دارند</div>
+          <div style={{ fontSize: 10.5, color: cream, marginBottom: 12 }}>بر اساس تعداد صندوق‌هایی که سهم را در پرتفوی دارند</div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
               <thead>
@@ -323,7 +352,7 @@ export default function SmartMoneyRadarPage() {
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           <div style={panelStyle(t.green)}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>ورودهای تازه</div>
-            <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>سهم‌هایی که برای اولین بار به پرتفوی چند صندوق آمدند (عرضه‌های اولیه اینجا دیده می‌شوند)</div>
+            <div style={{ fontSize: 10.5, color: cream, marginBottom: 12 }}>سهم‌هایی که برای اولین بار به پرتفوی چند صندوق آمدند (عرضه‌های اولیه اینجا دیده می‌شوند)</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {views.fresh.map(st => (
                 <div key={st.n}>
@@ -333,16 +362,16 @@ export default function SmartMoneyRadarPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {st.e.slice(0, 6).map(fi => fundChip(fi))}
-                    {st.e.length > 6 && <span style={{ fontSize: 10, color: t.faint, alignSelf: 'center' }}>+{fa(st.e.length - 6)}</span>}
+                    {st.e.length > 6 && <span style={{ fontSize: 10, color: cream, alignSelf: 'center' }}>+{fa(st.e.length - 6)}</span>}
                   </div>
                 </div>
               ))}
-              {views.fresh.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>این ماه ورود تازه‌ی گروهی ثبت نشد</div>}
+              {views.fresh.length === 0 && <div style={{ fontSize: 11, color: cream }}>این ماه ورود تازه‌ی گروهی ثبت نشد</div>}
             </div>
           </div>
           <div style={panelStyle(t.red)}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>خروج‌های کامل</div>
-            <div style={{ fontSize: 10.5, color: t.faint, marginBottom: 12 }}>سهم‌هایی که چند صندوق به‌طور کامل از آن‌ها خارج شدند</div>
+            <div style={{ fontSize: 10.5, color: cream, marginBottom: 12 }}>سهم‌هایی که چند صندوق به‌طور کامل از آن‌ها خارج شدند</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {views.exits.map(st => (
                 <div key={st.n}>
@@ -352,16 +381,16 @@ export default function SmartMoneyRadarPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {st.x.slice(0, 6).map(fi => fundChip(fi))}
-                    {st.x.length > 6 && <span style={{ fontSize: 10, color: t.faint, alignSelf: 'center' }}>+{fa(st.x.length - 6)}</span>}
+                    {st.x.length > 6 && <span style={{ fontSize: 10, color: cream, alignSelf: 'center' }}>+{fa(st.x.length - 6)}</span>}
                   </div>
                 </div>
               ))}
-              {views.exits.length === 0 && <div style={{ fontSize: 11, color: t.faint }}>این ماه خروج کامل گروهی ثبت نشد</div>}
+              {views.exits.length === 0 && <div style={{ fontSize: 11, color: cream }}>این ماه خروج کامل گروهی ثبت نشد</div>}
             </div>
           </div>
         </div>
 
-        <div style={{ fontSize: 10, color: t.faint, marginTop: 18, textAlign: 'center' }}>
+        <div style={{ fontSize: 10, color: cream, marginTop: 18, textAlign: 'center' }}>
           منبع: صورت وضعیت پرتفوی ماهانه صندوق‌ها در کدال · واحدها: میلیارد تومان (م.ت) و هزار میلیارد تومان (همت)
         </div>
       </div>

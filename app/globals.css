@@ -218,3 +218,15 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── ناوبار واکنش‌گرا با CSS (نه JS) ──
+   رندر سرور isMobile را نمی‌داند؛ اگر ناوبار دسکتاپ در HTML اولیه بیاید،
+   عرض ~۷۹۰px قبل از hydration باعث انبساط viewport موبایل می‌شود و
+   useIsMobile برای همیشه false می‌ماند. media query از اولین بایت درست است. */
+.nav-desktop { display: flex; }
+.nav-mobile  { display: none; }
+@media (max-width: 767px) {
+  .nav-desktop { display: none; }
+  .nav-mobile  { display: flex; }
+}
+@media (min-width: 768px) { .nav-mobile-menu { display: none; } }

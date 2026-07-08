@@ -4,7 +4,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useIsMobile } from '../../lib/useIsMobile'
 
 type NavItem = { label: string; href: string; menu?: { label: string; href: string }[] }
 
@@ -97,7 +96,6 @@ export default function Header() {
   const router   = useRouter()
   const [isDark, setIsDark]     = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
-  const isMobile = useIsMobile()
   const [user, setUser]         = useState<any>(null)
   const [scrolled, setScrolled] = useState(false)
   const [openDrop, setOpenDrop] = useState<string | null>(null) // href آیتم بازشوی فعال
@@ -219,9 +217,9 @@ export default function Header() {
           </div>
         </Link>
 
-        {/* Desktop nav */}
-        {!isMobile && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, direction: 'rtl' }}>
+        {/* Desktop nav — نمایش/عدم نمایش با CSS تا HTML سرور هم روی موبایل درست باشد */}
+        {(
+          <div className="nav-desktop" style={{ alignItems: 'center', gap: 6, direction: 'rtl' }}>
             <nav style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {NAV.map((item) => {
                 const link = (
@@ -387,8 +385,8 @@ export default function Header() {
         )}
 
         {/* Mobile controls */}
-        {isMobile && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {(
+          <div className="nav-mobile" style={{ alignItems: 'center', gap: 8 }}>
             <button
               onClick={toggleTheme}
               aria-label={isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب'}
@@ -421,10 +419,10 @@ export default function Header() {
         )}
       </div>
 
-      {/* Mobile menu */}
-      {isMobile && menuOpen && (
+      {/* Mobile menu — دکمه بازکننده فقط در .nav-mobile دیده می‌شود */}
+      {menuOpen && (
         <div
-          className="animate-slide-down"
+          className="animate-slide-down nav-mobile-menu"
           style={{
             position: 'absolute', top: '100%', left: 0, right: 0,
             background: MOBILE_BG,
