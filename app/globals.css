@@ -253,3 +253,28 @@ body {
   to   { opacity: 1; transform: none; }
 }
 .chart-modal { animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── اسلایدر سفارشی (ماشین‌حساب ارزش‌گذاری) ── */
+input[type="range"].vs-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; border-radius: 999px;
+  background: var(--vs-track, rgba(255,255,255,0.1));
+  outline: none; cursor: pointer;
+}
+input[type="range"].vs-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 999px;
+  background: var(--vs-thumb, #3b82f6);
+  border: 2.5px solid #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+input[type="range"].vs-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+input[type="range"].vs-slider::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 999px;
+  background: var(--vs-thumb, #3b82f6);
+  border: 2.5px solid #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  cursor: pointer;
+}

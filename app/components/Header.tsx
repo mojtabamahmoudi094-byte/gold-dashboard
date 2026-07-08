@@ -17,7 +17,10 @@ const NAV: NavItem[] = [
   { label: 'نمودار',        href: '/monitor', menu: [
     { label: 'نمودار لحظه‌ای رصد بازارها', href: '/monitor' },
   ] },
-  { label: 'تحلیل',         href: '/analysis' },
+  { label: 'تحلیل',         href: '/analysis', menu: [
+    { label: 'تحلیل نمادها', href: '/analysis' },
+    { label: 'ماشین‌حساب ارزش‌گذاری', href: '/valuation' },
+  ] },
   { label: 'ارزش معاملات',  href: '/trade-value' },
   { label: 'مقایسه',        href: '/compare' },
   { label: 'سیگنال‌ها',     href: '/signals' },
@@ -438,19 +441,41 @@ export default function Header() {
           {NAV.map((item) => {
             const active = isActive(item.href)
             return (
-              <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} style={{
-                display: 'flex', alignItems: 'center',
-                textDecoration: 'none', fontSize: 14,
-                fontWeight: active ? 600 : 400,
-                color: active ? '#3b82f6' : isDark ? '#8A9BAE' : '#7A6A50',
-                padding: '13px 16px', borderRadius: 10,
-                background: active ? 'rgba(59,130,246,0.08)' : 'transparent',
-                fontFamily: 'inherit', marginBottom: 2,
-                borderRight: active ? '2.5px solid rgba(59,130,246,0.6)' : '2.5px solid transparent',
-                transition: 'all 0.15s',
-              }}>
-                {item.label}
-              </Link>
+              <div key={item.href}>
+                <Link href={item.href} aria-current={active ? 'page' : undefined} style={{
+                  display: 'flex', alignItems: 'center',
+                  textDecoration: 'none', fontSize: 14,
+                  fontWeight: active ? 600 : 400,
+                  color: active ? '#3b82f6' : isDark ? '#8A9BAE' : '#7A6A50',
+                  padding: '13px 16px', borderRadius: 10,
+                  background: active ? 'rgba(59,130,246,0.08)' : 'transparent',
+                  fontFamily: 'inherit', marginBottom: 2,
+                  borderRight: active ? '2.5px solid rgba(59,130,246,0.6)' : '2.5px solid transparent',
+                  transition: 'all 0.15s',
+                }}>
+                  {item.label}
+                </Link>
+                {/* زیرمنو — دسکتاپ با هاور باز می‌شود؛ موبایل باید همیشه دیده شود وگرنه مسیرهایی مثل ارزش‌گذاری/رادار غیرقابل‌دسترس می‌مانند */}
+                {item.menu && (
+                  <div style={{ display: 'flex', flexDirection: 'column', marginBottom: 4 }}>
+                    {item.menu.map(m => {
+                      const mActive = pathname === m.href
+                      return (
+                        <Link key={m.href} href={m.href} aria-current={mActive ? 'page' : undefined} style={{
+                          display: 'block', textDecoration: 'none', fontSize: 12.5,
+                          fontWeight: mActive ? 600 : 400,
+                          color: mActive ? '#3b82f6' : isDark ? '#6b7a8c' : '#8a7a5a',
+                          padding: '9px 16px 9px 16px', margin: '0 16px 0 0', borderRadius: 8,
+                          background: mActive ? 'rgba(59,130,246,0.07)' : 'transparent',
+                          fontFamily: 'inherit',
+                        }}>
+                          · {m.label}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             )
           })}
           </nav>
