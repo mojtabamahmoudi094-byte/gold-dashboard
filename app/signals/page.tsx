@@ -6,7 +6,11 @@ import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe } from '../../lib/format'
-import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, computeSilverBubble, silverFundBubbleZati, type MarketBubbles } from '../../lib/goldBubbles'
+import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, computeSilverBubble, silverFundBubbleZati, SILVER_FUND_WEIGHTS, type MarketBubbles } from '../../lib/goldBubbles'
+import { computeStockSignal, type Reports } from '../../lib/stockInsights'
+
+type PriceSeries = { dates: string[]; priceMap: Record<string, number> }
+const EMPTY_SERIES: PriceSeries = { dates: [], priceMap: {} }
 
 const pct = (v: number | null, d = 1) =>
   v == null ? null : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(d)}٪`
@@ -14,6 +18,23 @@ const fmt = (v: number) => v.toLocaleString('fa-IR', { maximumFractionDigits: 0 
 const fmtM = (v: number) => {
   const m = Math.round(v / 1e6)
   return `${m >= 0 ? '+' : ''}${m.toLocaleString('fa-IR')}M`
+}
+const todayShamsi = () =>
+  new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' })
+    .format(new Date())
+
+// روزهای بعد از سیگنال — برای چارت مستطیلی نتیجه ۱۰ روزه
+function getDailyOutcomes(signalDate: string, signalType: string, dts: string[], pm: Record<string, number>, maxN: number): (number | null)[] {
+  const idx = dts.findIndex(d => d >= signalDate)
+  const out: (number | null)[] = []
+  for (let n = 1; n <= maxN; n++) {
+    if (idx < 0 || idx + n >= dts.length) { out.push(null); continue }
+    const entry = pm[dts[idx]], exit_ = pm[dts[idx + n]]
+    if (!entry || !exit_) { out.push(null); continue }
+    const ret = (exit_ - entry) / entry * 100
+    out.push(signalType === 'فروش' ? -ret : ret)
+  }
+  return out
 }
 
 // ── Auto-signal engine ─────────────────────────────────────────────────────
@@ -426,6 +447,10 @@ const BOURSE_CATS = [
   { key: 'equity',    label: 'سهامی', color: '#A78BFA' },
 ]
 
+const CATEGORY_LABELS: Record<string, string> = {
+  gold: 'طلا', silver: 'نقره', leveraged: 'اهرمی', sector: 'بخشی', equity: 'سهامی', stock: 'سهام',
+}
+
 // ── Silver signal engine ───────────────────────────────────────────────────
 function computeSilverSignal(silverBubble: number | null, api: any) {
   if (silverBubble == null) return null
@@ -509,6 +534,14 @@ export default function SignalsPage() {
   const [loading, setLoading]     = useState(true)
   const isMobile = useIsMobile()
   const [showDays, setShowDays]   = useState<5 | 10 | 20>(10)
+  const [lastFundsDate, setLastFundsDate] = useState<string | null>(null)
+  // سری قیمت مرجع برای محاسبه نتیجه سیگنال — طلا (dates/priceMap بالا) پیش‌فرض تاریخی است،
+  // این‌ها برای دسته‌های تازه‌اضافه‌شده (نقره، صندوق‌های بورسی، سهام) هستند
+  const [silverSeries, setSilverSeries] = useState<PriceSeries>(EMPTY_SERIES)
+  const [bourseSeries, setBourseSeries] = useState<Record<string, PriceSeries>>({})
+  const [stockSeries, setStockSeries]   = useState<Record<string, PriceSeries>>({})
+  const [stockCandidates, setStockCandidates] = useState<{ symbol: string; name: string; chg: number; sig: NonNullable<ReturnType<typeof computeStockSignal>> }[]>([])
+  const [historyCat, setHistoryCat] = useState<'all' | 'gold' | 'silver' | 'leveraged' | 'sector' | 'equity' | 'stock'>('all')
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -592,12 +625,66 @@ export default function SignalsPage() {
             supabase.from('assets').select('id, name, category, slug'),
           ])
           if (funds && assets) {
+            setLastFundsDate(lastDate)
             const assetMap: Record<number, any> = {}
             assets.forEach((a: any) => { assetMap[a.id] = a })
             const merged = funds
               .map((f: any) => ({ ...f, ...(assetMap[f.asset_id] || {}) }))
               .filter((f: any) => f.name && f.category)
             setFundData(merged as FundRow[])
+
+            // قیمت مرجع نقره — صندوق تقریباً خالص نقره (برای محاسبه نتیجه سیگنال نقره)
+            const silverAssets = assets.filter((a: any) => a.category === 'نقره')
+            const silverBenchmark = silverAssets.find((a: any) => (SILVER_FUND_WEIGHTS[a.name]?.silver ?? 0) >= 99) ?? silverAssets[0]
+            if (silverBenchmark) {
+              const { data: sp } = await supabase.from('gold_funds')
+                .select('trade_date_shamsi, price_close')
+                .eq('asset_id', silverBenchmark.id)
+                .not('price_close', 'is', null)
+                .order('trade_date_shamsi', { ascending: true })
+              if (sp?.length) {
+                const spm: Record<string, number> = {}
+                sp.forEach((p: any) => { spm[p.trade_date_shamsi] = safe(p.price_close) })
+                setSilverSeries({ dates: sp.map((p: any) => p.trade_date_shamsi as string), priceMap: spm })
+              }
+            }
+
+            // شاخص ترکیبی روزانه هر دسته بورسی (اهرمی/بخشی/سهامی) — برای محاسبه نتیجه سیگنال آن دسته
+            const bourseCatSetFull = new Set(BOURSE_CATS.map(c => c.label))
+            const catByKey: Record<string, string> = Object.fromEntries(BOURSE_CATS.map(c => [c.label, c.key]))
+            const allBourseIds = assets.filter((a: any) => bourseCatSetFull.has(a.category)).map((a: any) => a.id)
+            if (allBourseIds.length) {
+              const { data: fullHist } = await supabase.from('gold_funds')
+                .select('asset_id, trade_date_shamsi, price_change_pct')
+                .in('asset_id', allBourseIds)
+                .not('price_change_pct', 'is', null)
+                .order('trade_date_shamsi', { ascending: true })
+              if (fullHist?.length) {
+                const byCatDateFull: Record<string, Record<string, { sum: number; cnt: number }>> = {}
+                fullHist.forEach((r: any) => {
+                  const cat = assetMap[r.asset_id]?.category
+                  const key = cat ? catByKey[cat] : null
+                  if (!key) return
+                  byCatDateFull[key] ??= {}
+                  byCatDateFull[key][r.trade_date_shamsi] ??= { sum: 0, cnt: 0 }
+                  byCatDateFull[key][r.trade_date_shamsi].sum += r.price_change_pct ?? 0
+                  byCatDateFull[key][r.trade_date_shamsi].cnt++
+                })
+                const bs: Record<string, PriceSeries> = {}
+                Object.entries(byCatDateFull).forEach(([key, days]) => {
+                  const ds = Object.keys(days).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+                  const pm: Record<string, number> = {}
+                  let idx = 100
+                  ds.forEach(d => {
+                    const avgChg = days[d].sum / days[d].cnt
+                    idx *= (1 + avgChg / 100)
+                    pm[d] = idx
+                  })
+                  bs[key] = { dates: ds, priceMap: pm }
+                })
+                setBourseSeries(bs)
+              }
+            }
 
             // روند ۵ روز اخیر صندوق‌های بورسی (اهرمی/بخشی/سهامی) برای موتور سیگنال
             const bourseCatSet = new Set(BOURSE_CATS.map(c => c.label))
@@ -644,6 +731,22 @@ export default function SignalsPage() {
         }
       } catch { /* ignore */ }
 
+      // ۳ب. تاریخچه قیمت نمادهایی که سیگنال سهام برایشان صادر شده (برای نتیجه N روزه)
+      try {
+        const { data: sp } = await supabase.from('stock_signal_prices')
+          .select('symbol, snap_date, price')
+          .order('snap_date', { ascending: true })
+        if (sp?.length) {
+          const bySym: Record<string, PriceSeries> = {}
+          sp.forEach((r: any) => {
+            bySym[r.symbol] ??= { dates: [], priceMap: {} }
+            bySym[r.symbol].dates.push(r.snap_date)
+            bySym[r.symbol].priceMap[r.snap_date] = safe(r.price)
+          })
+          setStockSeries(bySym)
+        }
+      } catch { /* جدول ممکن است هنوز ساخته نشده باشد */ }
+
       // ۴. API طلا برای سیگنال لحظه‌ای + NAV برای حباب اسمی صندوق‌ها
       try {
         const [res, navRes, portRes] = await Promise.all([
@@ -667,6 +770,60 @@ export default function SignalsPage() {
     load()
   }, [])
 
+  // سیگنال سهام — قانون‌محور از گزارش‌های کدال (فقط نمادهایی که گزارش دارند، ۱۹۰ از ۶۷۱ نماد)
+  useEffect(() => {
+    const loadStockSignals = async () => {
+      try {
+        const [listRes, stocksRes] = await Promise.all([
+          fetch('/api/stock-reports-list'),
+          fetch('/api/stocks-industries'),
+        ])
+        const { symbols: reportSymbols } = await listRes.json()
+        const stocksData = await stocksRes.json()
+        const bySymbol = new Map<string, { name: string; chg: number }>()
+        for (const ind of stocksData.industries ?? []) {
+          for (const s of ind.symbols ?? []) bySymbol.set(s.l18, { name: s.l30 || s.l18, chg: safe(s.pcp) })
+        }
+
+        const CONCURRENCY = 20
+        const results: { symbol: string; name: string; chg: number; sig: NonNullable<ReturnType<typeof computeStockSignal>> }[] = []
+        for (let i = 0; i < (reportSymbols?.length ?? 0); i += CONCURRENCY) {
+          const batch: string[] = reportSymbols.slice(i, i + CONCURRENCY)
+          const settled = await Promise.allSettled(batch.map((sym: string) =>
+            fetch(`/reports/${encodeURIComponent(sym.replace(/\s+/g, '-'))}.json`).then(r => {
+              if (!r.ok) throw new Error('report fetch failed')
+              return r.json()
+            })
+          ))
+          settled.forEach((r, idx) => {
+            if (r.status !== 'fulfilled') return
+            const rep: Reports = r.value
+            const sig = computeStockSignal(rep.months ?? [], rep.quarters ?? [])
+            if (!sig || sig.type === 'نگه‌داری') return
+            const meta = bySymbol.get(batch[idx]) ?? { name: batch[idx], chg: 0 }
+            results.push({ symbol: batch[idx], name: meta.name, chg: meta.chg, sig })
+          })
+        }
+        results.sort((a, b) => Math.abs(b.sig.score) - Math.abs(a.sig.score))
+        setStockCandidates(results)
+      } catch { /* — */ }
+    }
+    loadStockSignals()
+  }, [])
+
+  const stockBuys = stockCandidates.filter(c => c.sig.type === 'خرید' || c.sig.type === 'تمایل خرید').slice(0, 3)
+  const stockSells = stockCandidates.filter(c => c.sig.type === 'فروش' || c.sig.type === 'احتیاط').slice(0, 3)
+  const bestStockCandidate = stockCandidates[0] ?? null
+
+  // سری قیمت مرجع برای محاسبه نتیجه سیگنال — بر اساس دسته (طلا/نقره/بورسی/سهام)
+  const seriesFor = (category: string | undefined, symbol?: string | null): PriceSeries => {
+    const cat = category || 'gold'
+    if (cat === 'gold') return { dates, priceMap }
+    if (cat === 'silver') return silverSeries
+    if (cat === 'stock') return (symbol && stockSeries[symbol]) || EMPTY_SERIES
+    return bourseSeries[cat] || EMPTY_SERIES
+  }
+
   const marketBubbles = apiData?.ime ? computeMarketBubbles(apiData.ime) : null
   const silverBubble = apiData?.ime ? computeSilverBubble(apiData.ime) : null
   const autoSignal = computeAutoSignal(apiData, marketBubbles)
@@ -683,54 +840,92 @@ export default function SignalsPage() {
     return { ...c, sig, funds }
   }).filter(s => s.sig)
 
-  // ثبت خودکار سیگنال موتور جدید در تاریخچه (فقط ادمین، یک بار برای هر روز+نوع)
+  // ثبت خودکار همه‌ی موتورهای سیگنال در تاریخچه (طلا، نقره، بورسی، سهام) — فقط ادمین، یک بار برای هر روز+دسته+نوع
   useEffect(() => {
-    if (!isAdmin || loading || !autoSignal || !apiData?.lastMarketDate) return
-    const date = apiData.lastMarketDate as string
-    if (signals.some(s => s.signal_date_shamsi === date && s.signal_type === autoSignal.type)) return
+    if (!isAdmin || loading) return
+
+    type Candidate = { category: string; sig: { type: string; confidence: number; reasons: { text: string }[] }; date: string; symbol?: string; note: string; telegram?: boolean }
+    const candidates: Candidate[] = []
+    if (autoSignal && apiData?.lastMarketDate) {
+      candidates.push({ category: 'gold', sig: autoSignal, date: apiData.lastMarketDate, note: '[v2] موتور حباب واقعی بورس کالا', telegram: true })
+    }
+    if (silverSignal && apiData?.lastMarketDate) {
+      candidates.push({ category: 'silver', sig: silverSignal, date: apiData.lastMarketDate, note: '[v2] موتور حباب واقعی نقره' })
+    }
+    if (lastFundsDate) {
+      bourseSections.forEach(sec => {
+        if (sec.sig) candidates.push({ category: sec.key, sig: sec.sig, date: lastFundsDate, note: `[v2] موتور NAV صندوق‌های ${sec.label}` })
+      })
+    }
+    if (bestStockCandidate) {
+      candidates.push({
+        category: 'stock', sig: bestStockCandidate.sig, date: todayShamsi(), symbol: bestStockCandidate.symbol,
+        note: '[v2] موتور قاعده‌محور گزارش‌های کدال',
+      })
+    }
+
+    const toInsert = candidates.filter(c =>
+      c.sig.type !== 'نگه‌داری' &&
+      !signals.some(s =>
+        s.signal_date_shamsi === c.date && s.signal_type === c.sig.type &&
+        (s.category || 'gold') === c.category && (c.category !== 'stock' || s.symbol === c.symbol)
+      )
+    )
+    if (toInsert.length === 0) return
 
     let cancelled = false
     const save = async () => {
-      const reason = autoSignal.reasons.map((r: any) => r.text).join(' · ')
-      const { data, error } = await supabase.from('signals').insert([{
-        signal_date_shamsi: date,
-        signal_type: autoSignal.type,
-        confidence: autoSignal.confidence,
-        note: '[v2] موتور حباب واقعی بورس کالا',
-        reason,
-      }]).select()
-      if (error || cancelled || !data?.[0]) return
-      setSignals(prev => [data[0], ...prev])
-      const fundLine = (f: FundRow) =>
-        f.bubbleVaqei != null ? `${f.name} (حباب واقعی ${f.bubbleVaqei >= 0 ? '+' : ''}${f.bubbleVaqei.toFixed(1)}٪)` : f.name
-      fetch('/api/telegram-notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signal_type: autoSignal.type,
-          date,
-          confidence: autoSignal.confidence,
-          note: reason,
-          gold_funds: rankedFunds.map(fundLine),
-          silver_signal: silverSignal?.type ?? null,
-          silver_confidence: silverSignal?.confidence ?? null,
-          silver_funds: rankedSilverFunds.map(fundLine),
-        }),
-      }).catch(() => {/* fire-and-forget */})
+      for (const c of toInsert) {
+        const reason = c.sig.reasons.map(r => r.text).join(' · ')
+        const { data, error } = await supabase.from('signals').insert([{
+          signal_date_shamsi: c.date,
+          signal_type: c.sig.type,
+          confidence: c.sig.confidence,
+          category: c.category,
+          symbol: c.symbol ?? null,
+          note: c.note,
+          reason,
+        }]).select()
+        if (error || cancelled || !data?.[0]) continue
+        setSignals(prev => [data[0], ...prev])
+        if (c.telegram) {
+          const fundLine = (f: FundRow) =>
+            f.bubbleVaqei != null ? `${f.name} (حباب واقعی ${f.bubbleVaqei >= 0 ? '+' : ''}${f.bubbleVaqei.toFixed(1)}٪)` : f.name
+          fetch('/api/telegram-notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              signal_type: c.sig.type,
+              date: c.date,
+              confidence: c.sig.confidence,
+              note: reason,
+              gold_funds: rankedFunds.map(fundLine),
+              silver_signal: silverSignal?.type ?? null,
+              silver_confidence: silverSignal?.confidence ?? null,
+              silver_funds: rankedSilverFunds.map(fundLine),
+            }),
+          }).catch(() => {/* fire-and-forget */})
+        }
+      }
     }
     save()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, loading, autoSignal?.type, apiData?.lastMarketDate])
+  }, [isAdmin, loading, autoSignal?.type, silverSignal?.type, lastFundsDate, bestStockCandidate?.symbol])
 
+  // فیلتر تاریخچه بر اساس دسته — پیش‌فرض همه
+  const filteredSignals = historyCat === 'all' ? signals : signals.filter(s => (s.category || 'gold') === historyCat)
 
-  // stats — only valid signals
-  const buys   = signals.filter(s => s.signal_type === 'خرید')
-  const sells  = signals.filter(s => s.signal_type === 'فروش')
-  const holds  = signals.filter(s => s.signal_type === 'نگه‌داری')
-  const trading = signals.filter(s => s.signal_type !== 'نگه‌داری')
+  // stats — only valid signals (مطابق فیلتر دسته‌ی انتخاب‌شده)
+  const buys   = filteredSignals.filter(s => s.signal_type === 'خرید')
+  const sells  = filteredSignals.filter(s => s.signal_type === 'فروش')
+  const holds  = filteredSignals.filter(s => s.signal_type === 'نگه‌داری')
+  const trading = filteredSignals.filter(s => s.signal_type !== 'نگه‌داری')
 
-  const outcomes10 = trading.map(s => getOutcome(s.signal_date_shamsi, s.signal_type, dates, priceMap, 10))
+  const outcomes10 = trading.map(s => {
+    const ser = seriesFor(s.category, s.symbol)
+    return getOutcome(s.signal_date_shamsi, s.signal_type, ser.dates, ser.priceMap, 10)
+  })
   const evOuts     = outcomes10.filter(o => o !== null) as number[]
   const won        = evOuts.filter(o => o > 0)
   const winRate    = evOuts.length > 0 ? Math.round(won.length / evOuts.length * 100) : null
@@ -1206,6 +1401,82 @@ export default function SignalsPage() {
           </div>
         )}
 
+        {/* ── Stock signals (سیگنال سهام) — قانون‌محور از گزارش‌های ماهانه/فصلی کدال ── */}
+        {(stockBuys.length > 0 || stockSells.length > 0) && (
+          <div style={{
+            background: PANEL, border: `0.5px solid ${BORDER}`,
+            borderRadius: 14, padding: isMobile ? '18px 16px' : '20px 24px',
+            backdropFilter: 'blur(12px)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <div style={{ width: 3, height: 20, borderRadius: 2, background: t.accent }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>سیگنال سهام</span>
+              <span style={{
+                fontSize: 10, color: MUTED, marginRight: 'auto',
+                background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                padding: '2px 8px', borderRadius: 5,
+              }}>
+                قاعده‌محور از گزارش‌های ماهانه و فصلی کدال ({stockCandidates.length.toLocaleString('fa-IR')} نماد بررسی‌شده)
+              </span>
+            </div>
+            <p style={{ margin: '0 0 16px', fontSize: 11, color: MUTED }}>
+              فقط نمادهایی که گزارش کدال دارند بررسی می‌شوند — تحلیل بیشتر هر نماد در صفحه اختصاصی آن
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+              {[
+                { title: 'کاندیدهای خرید', list: stockBuys, color: GREEN },
+                { title: 'کاندیدهای فروش', list: stockSells, color: RED },
+              ].filter(col => col.list.length > 0).map(col => (
+                <div key={col.title} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: col.color }}>{col.title}</span>
+                  {col.list.map(c => (
+                    <Link key={c.symbol} href={`/stock/${encodeURIComponent(c.symbol)}`} style={{ textDecoration: 'none' }}>
+                      <div style={{
+                        background: isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)',
+                        border: `1px solid ${col.color}28`, borderRadius: 12, padding: '12px 14px',
+                        cursor: 'pointer', transition: 'background 0.18s',
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.045)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 700, color: TEXT }}>{c.symbol}</span>
+                          <span style={{ fontSize: 10.5, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          <span style={{ fontSize: 10.5, fontWeight: 600, marginRight: 'auto', color: c.chg >= 0 ? GREEN : RED, fontFamily: 'system-ui' }}>
+                            {c.chg >= 0 ? '+' : ''}{c.chg.toFixed(2)}٪
+                          </span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, color: c.sig.color,
+                            background: `${c.sig.color}16`, border: `1px solid ${c.sig.color}30`,
+                            padding: '1px 8px', borderRadius: 5,
+                          }}>
+                            {c.sig.type} · {c.sig.confidence}٪
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {c.sig.reasons.slice(0, 3).map((r, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                              <span style={{ fontSize: 8, marginTop: 3, color: r.dir === 'pos' ? GREEN : r.dir === 'neg' ? RED : MUTED }}>
+                                {r.dir === 'pos' ? '▲' : r.dir === 'neg' ? '▼' : '●'}
+                              </span>
+                              <span style={{ fontSize: 10.5, lineHeight: 1.6, color: MUTED }}>{r.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <p style={{ margin: '14px 0 0', fontSize: 10, color: FAINT, lineHeight: 1.7 }}>
+              ⓘ  علت هر سیگنال از رشد/افت فروش ماهانه نسبت به سال قبل، رشد سود خالص فصلی و حاشیه سود استخراج می‌شود — توصیه سرمایه‌گذاری نیست.
+            </p>
+          </div>
+        )}
+
         {/* ── Summary stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
           {[
@@ -1231,16 +1502,67 @@ export default function SignalsPage() {
           ))}
         </div>
 
+        {/* ── نتیجه ۱۰ روزه سیگنال‌ها — چارت مستطیلی ── */}
+        {trading.length > 0 && (
+          <div style={{
+            background: PANEL, border: `0.5px solid ${BORDER}`,
+            borderRadius: 14, padding: '16px 20px',
+            backdropFilter: 'blur(12px)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: TEXT }}>نتیجه ۱۰ روزه سیگنال‌ها</span>
+              <span style={{ fontSize: 11, color: MUTED }}>هر خانه = بازده تجمعی تا آن روز؛ خاکستری یعنی هنوز داده کافی نیست</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 480 }}>
+                {trading.slice(0, 10).map(s => {
+                  const ser = seriesFor(s.category, s.symbol)
+                  const daily = getDailyOutcomes(s.signal_date_shamsi, s.signal_type, ser.dates, ser.priceMap, 10)
+                  const cat = s.category || 'gold'
+                  return (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span style={{ fontSize: 11, color: TEXT, fontWeight: 600 }}>
+                          {CATEGORY_LABELS[cat] ?? cat}{cat === 'stock' && s.symbol ? ` · ${s.symbol}` : ''}
+                        </span>
+                        <span style={{ fontSize: 9.5, color: FAINT }}>{s.signal_date_shamsi} · {s.signal_type}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 3 }}>
+                        {daily.map((v, i) => {
+                          const bg = v == null
+                            ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)')
+                            : v > 0
+                              ? `rgba(16,185,129,${Math.min(0.9, 0.25 + Math.abs(v) / 12)})`
+                              : v < 0
+                                ? `rgba(239,68,68,${Math.min(0.9, 0.25 + Math.abs(v) / 12)})`
+                                : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')
+                          return (
+                            <div
+                              key={i}
+                              title={v == null ? `روز ${i + 1}: در انتظار` : `روز ${i + 1}: ${v > 0 ? '+' : ''}${v.toFixed(1)}٪`}
+                              style={{ width: 20, height: 20, borderRadius: 4, background: bg }}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Signals history table ── */}
         <div style={{
           background: PANEL, border: `0.5px solid ${BORDER}`,
           borderRadius: 14, padding: '16px 20px',
           backdropFilter: 'blur(12px)',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
             <div>
               <span style={{ fontSize: 13, fontWeight: 600, color: TEXT }}>تاریخچه سیگنال‌ها</span>
-              <span style={{ fontSize: 11, color: MUTED, marginRight: 8 }}>نتیجه بر اساس قیمت پایانی عیار</span>
+              <span style={{ fontSize: 11, color: MUTED, marginRight: 8 }}>نتیجه بر اساس قیمت مرجع همان دسته</span>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {([5, 10, 20] as const).map(d => (
@@ -1262,6 +1584,28 @@ export default function SignalsPage() {
             </div>
           </div>
 
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+            {([
+              ['all', 'همه'], ['gold', 'طلا'], ['silver', 'نقره'],
+              ['leveraged', 'اهرمی'], ['sector', 'بخشی'], ['equity', 'سهامی'], ['stock', 'سهام'],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setHistoryCat(key)}
+                style={{
+                  fontSize: 10.5, padding: '4px 11px', borderRadius: 6, cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  background: historyCat === key ? 'rgba(59,130,246,0.14)' : 'transparent',
+                  border: `1px solid ${historyCat === key ? 'rgba(59,130,246,0.4)' : BORDER}`,
+                  color: historyCat === key ? '#60A5FA' : MUTED,
+                  transition: 'all 0.18s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           {loading ? (
             <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 0 }}>
               {Array.from({ length: 6 }).map((_, i) => (
@@ -1275,7 +1619,7 @@ export default function SignalsPage() {
                 </div>
               ))}
             </div>
-          ) : signals.length === 0 ? (
+          ) : filteredSignals.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}>
               <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>📊</div>
               <p style={{ color: MUTED, fontSize: 13, margin: 0 }}>
@@ -1290,7 +1634,7 @@ export default function SignalsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
-                    {['تاریخ', 'نوع', 'اعتماد', `نتیجه ${showDays} روزه`, 'جریان پول', 'دلیل'].map(h => (
+                    {['تاریخ', 'دسته', 'نوع', 'اعتماد', `نتیجه ${showDays} روزه`, 'جریان پول', 'دلیل'].map(h => (
                       <th key={h} style={{
                         color: MUTED, fontWeight: 500, textAlign: 'right',
                         padding: '8px 10px',
@@ -1301,15 +1645,18 @@ export default function SignalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {signals.map((s) => {
+                  {filteredSignals.map((s) => {
+                    const cat = s.category || 'gold'
                     const sigColor = s.signal_type === 'خرید' ? GREEN : s.signal_type === 'فروش' ? RED : t.accent
                     const conf = typeof s.confidence === 'number' ? s.confidence : null
                     const confColor = conf === null ? FAINT : conf >= 70 ? GREEN : conf >= 40 ? '#F59E0B' : RED
+                    const ser = seriesFor(s.category, s.symbol)
                     const outcome = s.signal_type !== 'نگه‌داری'
-                      ? getOutcome(s.signal_date_shamsi, s.signal_type, dates, priceMap, showDays)
+                      ? getOutcome(s.signal_date_shamsi, s.signal_type, ser.dates, ser.priceMap, showDays)
                       : null
                     const ocColor = outcome === null ? FAINT : outcome > 2 ? GREEN : outcome < -2 ? RED : '#F59E0B'
-                    const netFlow = flowMap[s.signal_date_shamsi]
+                    // جریان پول فقط برای طلا موجود است (asset_id=2)
+                    const netFlow = cat === 'gold' ? flowMap[s.signal_date_shamsi] : null
                     const flowM = netFlow != null ? Math.round(netFlow / 1e6) : null
 
                     return (
@@ -1319,6 +1666,14 @@ export default function SignalsPage() {
                       >
                         <td style={{ padding: '11px 10px', color: TEXT, whiteSpace: 'nowrap', fontSize: 12 }}>
                           {s.signal_date_shamsi}
+                        </td>
+                        <td style={{ padding: '11px 10px', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: 11, color: MUTED }}>{CATEGORY_LABELS[cat] ?? cat}</span>
+                          {cat === 'stock' && s.symbol && (
+                            <Link href={`/stock/${encodeURIComponent(s.symbol)}`} style={{ fontSize: 10.5, color: '#60A5FA', textDecoration: 'none', marginRight: 6 }}>
+                              {s.symbol}
+                            </Link>
+                          )}
                         </td>
                         <td style={{ padding: '11px 10px' }}>
                           <span style={{
@@ -1396,7 +1751,7 @@ export default function SignalsPage() {
               </div>
             ))}
             <span style={{ fontSize: 10, color: FAINT, marginRight: 'auto' }}>
-              قیمت مبنا: صندوق عیار (بزرگ‌ترین ETF طلا)
+              قیمت مبنا: طلا=صندوق عیار · نقره=صندوق نقره خالص · بورسی=شاخص ترکیبی همان دسته · سهام=قیمت خود نماد
             </span>
           </div>
         </div>

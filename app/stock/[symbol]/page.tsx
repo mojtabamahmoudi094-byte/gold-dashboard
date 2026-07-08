@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
+import { buildInsights, monthLabel, growth, type RMonth, type RQuarter, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
 
 type Sym = {
   l18: string; l30: string
@@ -28,37 +29,8 @@ const hemat = (rial: number) =>
 // مقادیر گزارش‌های کدال به میلیون ریال هستند
 const mrial = (v: number | null) => (v === null ? '—' : hemat(v * 1e6))
 
-const MONTH_NAMES = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
-const monthLabel = (period: string) => {
-  const m = period.match(/^(\d{4})\/(\d{2})/)
-  return m ? `${MONTH_NAMES[Number(m[2])]} ${Number(m[1]).toLocaleString('fa-IR', { useGrouping: false })}` : period
-}
-
-const growth = (cur: number | null, prev: number | null) =>
-  cur === null || prev === null || prev === 0 ? null : ((cur - prev) / Math.abs(prev)) * 100
-
 const gPct = (v: number | null) =>
   v === null ? '—' : `${v > 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}٪`
-
-type RProduct = {
-  name: string; unit: string | null
-  prod_m: number | null; qty_m: number | null; rate_m: number | null
-  amount_m: number | null; amount_cum: number | null
-}
-type RMonth = {
-  period: string; publish: string | null
-  month: number | null; cum: number | null; lastYearCum: number | null
-  products: RProduct[]
-}
-type RQuarter = {
-  period: string; months: number; audited: boolean; consolidated: boolean; publish: string | null
-  revenue: number | null; revenue_ly: number | null
-  cogs: number | null; gross: number | null; gross_ly: number | null
-  sga: number | null; op: number | null; fin_cost: number | null
-  net: number | null; net_ly: number | null
-  eps: number | null; capital: number | null
-}
-type Reports = { symbol: string; updated: string; months: RMonth[]; quarters: RQuarter[] }
 
 const pct = (v: number | null) =>
   v === null ? '—' : `${v > 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪`
@@ -277,71 +249,6 @@ const A_ACCENT = '#A78BFA'   // بنفش — تحلیل هوشمند
 const AI_ACCENT = '#2DD4BF'  // فیروزه‌ای — دستیار تحلیلگر
 const AI_API = 'https://newbot.dadashchekhabare.qzz.io/ai/ask'
 
-type Tone = 'pos' | 'neg' | 'neutral'
-type Insight = { tone: Tone; text: string }
-
-// تحلیل قاعده‌محور از گزارش‌های هر سهم
-function buildInsights(months: RMonth[], quarters: RQuarter[]): { verdict: Insight; items: Insight[] } {
-  const items: Insight[] = []
-  const fa0 = (v: number) => Math.abs(v).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
-  let score = 0
-
-  if (months.length >= 2) {
-    const last = months[months.length - 1], prev = months[months.length - 2]
-    const mom = growth(last.month, prev.month)
-    const yoy = growth(last.cum, last.lastYearCum)
-    if (mom !== null) {
-      items.push({ tone: mom >= 0 ? 'pos' : 'neg', text: `فروش ${monthLabel(last.period)} نسبت به ماه قبل ${mom >= 0 ? 'رشد' : 'افت'} ${fa0(mom)}٪ داشته است.` })
-      score += mom >= 0 ? 1 : -1
-    }
-    if (yoy !== null) {
-      items.push({ tone: yoy >= 0 ? 'pos' : 'neg', text: `فروش تجمعی سال مالی نسبت به دوره مشابه سال قبل ${yoy >= 0 ? '+' : '−'}${fa0(yoy)}٪ تغییر کرده است.` })
-      score += yoy >= 0 ? 1 : -1
-    }
-    // روند نرخ فروش محصول اصلی
-    const mainP = [...last.products].filter(p => (p.amount_m ?? 0) > 0 && (p.rate_m ?? 0) > 0).sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))[0]
-    if (mainP) {
-      const ser = months.map(m => m.products.find(x => x.name === mainP.name)?.rate_m ?? null).filter((v): v is number => v !== null && v > 0)
-      if (ser.length >= 2) {
-        const g = growth(ser[ser.length - 1], ser[0])
-        if (g !== null && Math.abs(g) >= 1) {
-          items.push({ tone: g >= 0 ? 'pos' : 'neg', text: `نرخ فروش «${mainP.name}» طی دوره ${g >= 0 ? 'صعودی' : 'نزولی'} بوده و ${g >= 0 ? '+' : '−'}${fa0(g)}٪ تغییر کرده است.` })
-          score += g >= 0 ? 1 : -1
-        }
-      }
-    }
-  }
-
-  if (quarters.length >= 1) {
-    const q = quarters[quarters.length - 1]
-    const nm = q.revenue ? ((q.net ?? 0) / q.revenue) * 100 : null
-    const netYoy = growth(q.net, q.net_ly)
-    if (netYoy !== null) {
-      items.push({ tone: netYoy >= 0 ? 'pos' : 'neg', text: `سود خالص آخرین دوره نسبت به دوره مشابه سال قبل ${netYoy >= 0 ? 'رشد' : 'افت'} ${fa0(netYoy)}٪ داشته است.` })
-      score += netYoy >= 0 ? 1 : -1
-    }
-    if (nm !== null) {
-      items.push({ tone: nm >= 25 ? 'pos' : nm >= 0 ? 'neutral' : 'neg', text: `حاشیه سود خالص آخرین دوره ${fa0(nm)}٪ بوده است${nm >= 30 ? ' که سطح بالایی است' : nm < 10 ? ' که پایین است' : ''}.` })
-    }
-    // روند حاشیه نسبت به دوره هم‌طول قبلی
-    const prevSame = [...quarters].reverse().find(x => x.months === q.months && x.period < q.period)
-    if (prevSame && prevSame.revenue && q.revenue && nm !== null) {
-      const pnm = ((prevSame.net ?? 0) / prevSame.revenue) * 100
-      const d = nm - pnm
-      if (Math.abs(d) >= 1) {
-        items.push({ tone: d >= 0 ? 'pos' : 'neg', text: `حاشیه سود خالص نسبت به دوره ${q.months.toLocaleString('fa-IR')} ماهه قبلی ${d >= 0 ? 'بهبود' : 'کاهش'} ${fa0(d)} واحد درصدی داشته است.` })
-        score += d >= 0 ? 1 : -1
-      }
-    }
-  }
-
-  const verdict: Insight =
-    score >= 2 ? { tone: 'pos', text: 'مجموع سیگنال‌های گزارش‌های اخیر مثبت است؛ روند فروش و سودآوری رو به بهبود بوده.' }
-    : score <= -2 ? { tone: 'neg', text: 'مجموع سیگنال‌های گزارش‌های اخیر منفی است؛ فشار بر فروش یا سودآوری دیده می‌شود.' }
-    : { tone: 'neutral', text: 'سیگنال‌های گزارش‌های اخیر متعادل است؛ روند مشخصی غالب نیست.' }
-
-  return { verdict, items }
-}
 
 const toneColor = (tone: Tone) => tone === 'pos' ? GREEN : tone === 'neg' ? RED : '#94A3B8'
 
