@@ -18,7 +18,7 @@ const NAV: NavItem[] = [
     { label: 'نمودار لحظه‌ای رصد بازارها', href: '/monitor' },
   ] },
   { label: 'تحلیل',         href: '/analysis', menu: [
-    { label: 'تحلیل نمادها', href: '/analysis' },
+    { label: 'تحلیل بازارها', href: '/analysis' },
     { label: 'ماشین‌حساب ارزش‌گذاری', href: '/valuation' },
   ] },
   { label: 'ارزش معاملات',  href: '/trade-value' },
