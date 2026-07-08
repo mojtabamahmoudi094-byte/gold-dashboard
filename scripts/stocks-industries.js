@@ -10,7 +10,7 @@
  *   node stocks-industries.js --probe    → فقط فهرست صنایع و تعداد نماد هر کدام
  *
  * خروجی به جدول stock_industries در Supabase هم upsert می‌شود (سایت از /api/stocks-industries می‌خواند)
- * cron: هر ۵ دقیقه، شنبه–چهارشنبه ۹:۰۰–۱۲:۳۵ تهران (گارد ساعت داخل خود اسکریپت است، --force برای رد کردن)
+ * cron: هر ۵ دقیقه، شنبه–چهارشنبه — سهام ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی ۱۲:۳۰–۱۸:۰۰ (گارد ساعت داخل خود اسکریپت است، --force برای رد کردن)
  *
  * fallback دستی از مک:
  *   scp root@45.94.215.115:/opt/stocks-industries.json public/stocks/industries.json
@@ -38,15 +38,15 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_RO
 const PROBE = process.argv.includes('--probe')
 const FORCE = process.argv.includes('--force')
 
-// ساعت بازار تهران — سهام/صندوق‌های بورسی ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی (طلا/نقره/زعفران) ۱۲:۰۰–۱۷:۳۰
+// ساعت بازار تهران — سهام/صندوق‌های بورسی ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی (طلا/نقره/زعفران) ۱۲:۳۰–۱۸:۰۰
 function tehranClock() {
   const tehran = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
   return { day: tehran.getDay(), mins: tehran.getHours() * 60 + tehran.getMinutes() } // 0=یکشنبه … 6=شنبه
 }
 const STOCKS_OPEN  = 9 * 60
 const STOCKS_CLOSE = 12 * 60 + 30
-const FUNDS_OPEN   = 12 * 60
-const FUNDS_CLOSE  = 17 * 60 + 30
+const FUNDS_OPEN   = 12 * 60 + 30
+const FUNDS_CLOSE  = 18 * 60
 const isMarketDay = (day) => [6, 0, 1, 2, 3].includes(day) // شنبه تا چهارشنبه
 
 const num = (v) => {
@@ -73,10 +73,10 @@ async function main() {
   const { day, mins } = tehranClock()
   const inWindow = isMarketDay(day) && mins >= STOCKS_OPEN && mins <= FUNDS_CLOSE
   if (!FORCE && !PROBE && !inWindow) {
-    console.log('[stocks-industries] خارج از ساعت بازار (شنبه–چهارشنبه ۹:۰۰–۱۷:۳۰ تهران) — رد شد. با --force اجباری کنید.')
+    console.log('[stocks-industries] خارج از ساعت بازار (شنبه–چهارشنبه ۹:۰۰–۱۸:۰۰ تهران) — رد شد. با --force اجباری کنید.')
     return
   }
-  // سهام/بورسی ۹:۰۰–۱۲:۳۰ — کالایی‌ها ۱۲:۰۰–۱۷:۳۰
+  // سهام/بورسی ۹:۰۰–۱۲:۳۰ — کالایی‌ها ۱۲:۳۰–۱۸:۰۰
   const stocksOpen = FORCE || (mins >= STOCKS_OPEN && mins <= STOCKS_CLOSE)
   const fundsOpen  = FORCE || (mins >= FUNDS_OPEN && mins <= FUNDS_CLOSE)
   const url = `https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${KEY}`
@@ -176,7 +176,7 @@ async function main() {
     cats.push(['bourse-funds', arr.filter(it => EQUITY_FUND_NAMES.has(clean(it.l18)))])
   }
 
-  // صندوق‌های کالایی (طلا/نقره/زعفران) — فهرست نمادها از جدول assets — بازار ۱۲:۰۰–۱۷:۳۰
+  // صندوق‌های کالایی (طلا/نقره/زعفران) — فهرست نمادها از جدول assets — بازار ۱۲:۳۰–۱۸:۰۰
   if (fundsOpen) {
     const { data: assets, error: aErr } = await sb.from('assets').select('name, category')
     if (aErr) {
