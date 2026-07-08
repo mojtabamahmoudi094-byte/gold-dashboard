@@ -156,7 +156,7 @@ export default function AuthPage() {
               <div style={{ fontSize: 13, color: '#A0B4C8', lineHeight: 1.8 }}>
                 لینک تأیید به ایمیل <span style={{ color: '#E8F4FF', fontWeight: 600 }}>{regEmail}</span> ارسال شد.
               </div>
-              <div style={{ fontSize: 12, color: '#5A7088', marginTop: 6, lineHeight: 1.7 }}>
+              <div style={{ fontSize: 12, color: '#ddd5bd', marginTop: 6, lineHeight: 1.7 }}>
                 ایمیل را باز کنید، روی لینک تأیید کلیک کنید، سپس وارد شوید.
               </div>
             </div>
@@ -164,7 +164,7 @@ export default function AuthPage() {
               padding: '12px 16px', borderRadius: 10,
               background: 'rgba(0,229,160,0.06)',
               border: '0.5px solid rgba(0,229,160,0.2)',
-              fontSize: 12, color: '#5A7088', lineHeight: 1.7, textAlign: 'right', width: '100%',
+              fontSize: 12, color: '#ddd5bd', lineHeight: 1.7, textAlign: 'right', width: '100%',
             }}>
               اسپم رو هم چک کنید اگر ایمیل نیومد.
             </div>
@@ -193,10 +193,10 @@ export default function AuthPage() {
           }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#fff' }}>بورس سنج</div>
-            <div style={{ fontSize: 9, color: '#3A5068', marginTop: -1 }}>bourssanj.ir · شاگرد تنبل بازار</div>
+            <div style={{ fontSize: 9, color: '#ddd5bd', marginTop: -1 }}>bourssanj.ir · شاگرد تنبل بازار</div>
           </div>
           <Link href="/funds" style={{
-            fontSize: 11, color: '#3A5068', textDecoration: 'none',
+            fontSize: 11, color: '#ddd5bd', textDecoration: 'none',
             padding: '5px 12px', borderRadius: 8,
             border: '0.5px solid rgba(0,200,255,0.1)',
           }}>
@@ -221,7 +221,7 @@ export default function AuthPage() {
                 : '0.5px solid transparent',
               color: tab === t
                 ? (t === 'register' ? '#00E5A0' : '#00C8FF')
-                : '#3A5068',
+                : '#ddd5bd',
               cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s',
             }}>
               {t === 'login' ? 'ورود' : 'ثبت‌نام'}
@@ -262,7 +262,7 @@ export default function AuthPage() {
               />
             </Field>
             <Btn loading={loading} color="#00C8FF" label="ورود به حساب" />
-            <div style={{ textAlign: 'center', fontSize: 12, color: '#3A5068', marginTop: 4 }}>
+            <div style={{ textAlign: 'center', fontSize: 12, color: '#ddd5bd', marginTop: 4 }}>
               حساب ندارید؟{' '}
               <button type="button" onClick={() => { setTab('register'); setMsg(null) }} style={{
                 background: 'none', border: 'none', color: '#00E5A0', fontSize: 12,
@@ -357,7 +357,7 @@ export default function AuthPage() {
             </div>
 
             <Btn loading={loading} color="#00E5A0" label="ایجاد حساب کاربری" />
-            <div style={{ textAlign: 'center', fontSize: 12, color: '#3A5068', marginTop: 4 }}>
+            <div style={{ textAlign: 'center', fontSize: 12, color: '#ddd5bd', marginTop: 4 }}>
               قبلاً ثبت‌نام کرده‌اید؟{' '}
               <button type="button" onClick={() => { setTab('login'); setMsg(null) }} style={{
                 background: 'none', border: 'none', color: '#00C8FF', fontSize: 12,
@@ -389,7 +389,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     : children
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label htmlFor={id} style={{ fontSize: 11, color: '#5A7088', fontWeight: 500 }}>{label}</label>
+      <label htmlFor={id} style={{ fontSize: 11, color: '#ddd5bd', fontWeight: 500 }}>{label}</label>
       {child}
     </div>
   )

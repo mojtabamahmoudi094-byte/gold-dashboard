@@ -98,7 +98,7 @@ export default function SilverAnalysisPage() {
   const accent = '#C0C8D8'
   const green  = '#00E5A0'
   const red    = '#FF4D6A'
-  const muted  = '#5A7088'
+  const muted  = '#ddd5bd'
   const text   = '#E8F4FF'
 
   const silverUsd = api?.inputs?.silverUsd ?? null
@@ -149,16 +149,33 @@ export default function SilverAnalysisPage() {
       fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
     }}>
       <style>{`
+        @keyframes popIn { from { opacity: 0; transform: translateY(16px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .pop-col > * { opacity: 0; animation: popIn .6s cubic-bezier(.16,1,.3,1) forwards; }
+        .pop-col > *:nth-child(1) { animation-delay: .02s }
+        .pop-col > *:nth-child(2) { animation-delay: .09s }
+        .pop-col > *:nth-child(3) { animation-delay: .16s }
+        .pop-col > *:nth-child(4) { animation-delay: .23s }
+        .pop-col > *:nth-child(5) { animation-delay: .30s }
+        .pop-grid > * { opacity: 0; animation: popIn .5s cubic-bezier(.16,1,.3,1) forwards; }
+        .pop-grid > *:nth-child(1) { animation-delay: .05s }
+        .pop-grid > *:nth-child(2) { animation-delay: .10s }
+        .pop-grid > *:nth-child(3) { animation-delay: .15s }
+        .pop-grid > *:nth-child(4) { animation-delay: .20s }
+        .pop-grid > *:nth-child(5) { animation-delay: .25s }
+        .pop-grid > *:nth-child(6) { animation-delay: .30s }
+        .pop-grid > *:nth-child(n+7) { animation-delay: .35s }
         .ssec { transition: border-color .2s ease, box-shadow .2s ease; }
         .ssec:hover { border-color: rgba(192,200,216,.32) !important; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
-        .scard { transition: transform .2s ease, border-color .2s ease, background .2s ease; }
-        .scard:hover { border-color: rgba(192,200,216,.4) !important; background: rgba(192,200,216,.07) !important; transform: translateY(-2px); }
-        tr.srow { transition: background .15s ease; }
-        tr.srow:hover { background: rgba(192,200,216,.05); }
+        .scard { transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease; }
+        .scard:hover { border-color: rgba(192,200,216,.45) !important; background: rgba(192,200,216,.08) !important; transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,.35); }
+        .sbadge { transition: transform .15s ease, box-shadow .15s ease; }
+        .sbadge:hover { transform: scale(1.06); }
+        tr.srow { transition: background .15s ease; animation: popIn .4s ease forwards; opacity: 0; }
+        tr.srow:hover { background: rgba(192,200,216,.06); }
         tbody tr.srow:nth-child(even) { background: rgba(255,255,255,.017); }
-        tbody tr.srow:nth-child(even):hover { background: rgba(192,200,216,.05); }
+        tbody tr.srow:nth-child(even):hover { background: rgba(192,200,216,.06); }
         @media (prefers-reduced-motion: reduce) {
-          .ssec, .scard, tr.srow { transition: none !important; }
+          .ssec, .scard, tr.srow, .sbadge, .pop-col > *, .pop-grid > * { transition: none !important; animation: none !important; opacity: 1 !important; }
           .scard:hover { transform: none !important; }
         }
       `}</style>
@@ -204,34 +221,34 @@ export default function SilverAnalysisPage() {
         )}
       </div>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="pop-col" style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* Row 1: ورودی‌های زنده */}
         <Section title="ورودی‌های روزانه" subtitle="داده زنده از API" border={border} text={text} muted={muted}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <div className="pop-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             <StatCard label="انس نقره" value={fmtUsd(silverUsd)} unit="دلار" accent={accent} border={border} muted={muted} />
             <StatCard label="انس طلا" value={fmtUsd(goldUsd)} unit="دلار" accent="#FFC94A" border={border} muted={muted} />
             <StatCard label="ارز بازار" value={fmt(dollarT)} unit="تومان" accent={green} border={border} muted={muted} />
             <StatCard label="نسبت طلا به نقره" value={goldSilverRatio != null ? goldSilverRatio.toLocaleString('fa-IR', { maximumFractionDigits: 1 }) : '—'}
-              unit="Gold/Silver Ratio" accent={accent} border={border} muted={muted}
+              unit="Gold/Silver Ratio" accent="#8B5CF6" border={border} muted={muted}
               note={goldSilverRatio != null ? (goldSilverRatio > 80 ? 'نقره نسبتاً ارزان' : goldSilverRatio < 55 ? 'نقره نسبتاً گران' : 'محدوده تاریخی') : undefined} />
           </div>
         </Section>
 
         {/* Row 2: قیمت واقعی گرم نقره + بورس کالا */}
         <Section title="قیمت واقعی نقره و بورس کالا" subtitle="هر گرم نقره خالص ۹۹۹ — انس جهانی vs تابلو نقدی شمش نقره (BrsAPI — بورس کالا)" border={border} text={text} muted={muted}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div className="pop-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <StatCard label="قیمت واقعی گرم نقره" value={fmt(fairSilverGram)} unit="تومان"
-              note="انس ÷ انس‌گرم × (درهم × ۳.۶۷۳۲)" accent={accent} border={border} muted={muted} />
+              note="انس ÷ انس‌گرم × (درهم × ۳.۶۷۳۲)" accent="#00C8FF" border={border} muted={muted} />
             <StatCard label="قیمت تابلو نقدی شمش نقره" value={fmt(silverBarT)} unit="تومان هر گرم"
-              note="قیمت پایانی SilverBar — بورس کالا" accent={accent} border={border} muted={muted} />
+              note="قیمت پایانی SilverBar — بورس کالا" accent="#8B5CF6" border={border} muted={muted} />
             <StatCard label="حباب شمش نقره"
               value={silverBubble != null ? fmtPct(silverBubble) : '—'} unit="تابلو نسبت به واقعی"
               note="(تابلو − واقعی) ÷ واقعی × ۱۰۰"
               accent={silverBubble == null ? muted : silverBubble > 0 ? red : green}
               border={border} muted={muted} />
             <StatCard label="گرم نقره با دلار بازار" value={fmt(fairGramMarket)} unit="تومان"
-              note={`انس ÷ ${GRAMS_PER_OZ} × دلار بازار`} accent={accent} border={border} muted={muted} />
+              note={`انس ÷ ${GRAMS_PER_OZ} × دلار بازار`} accent="#FFC94A" border={border} muted={muted} />
             <StatCard label="ارزش کل صندوق‌های نقره" value={fmt(totalMarketBT)} unit="میلیارد تومان"
               note={`${funds.length.toLocaleString('fa-IR')} صندوق فعال`} accent={green} border={border} muted={muted} />
           </div>
@@ -296,9 +313,9 @@ export default function SilverAnalysisPage() {
                       </td>
                       <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
                         {f.bubbleAsmi != null ? (
-                          <span style={{
+                          <span className="sbadge" style={{
                             display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
-                            background: `${bc}18`, border: `0.5px solid ${bc}30`,
+                            background: `${bc}18`, border: `0.5px solid ${bc}30`, boxShadow: `0 0 10px ${bc}30`,
                             borderRadius: 6, padding: '2px 10px', fontFamily: 'system-ui',
                           }}>{fmtPct(f.bubbleAsmi)}</span>
                         ) : <span style={{ color: muted }}>—</span>}
@@ -314,9 +331,9 @@ export default function SilverAnalysisPage() {
                       <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}
                         title={bv != null ? `حباب اسمی ${f.bubbleAsmi!.toFixed(1)}٪ + حباب ذاتی ${bz!.toFixed(1)}٪` : undefined}>
                         {bv != null ? (
-                          <span style={{
+                          <span className="sbadge" style={{
                             display: 'inline-block', fontSize: 11, fontWeight: 700, color: bvc,
-                            background: `${bvc}18`, border: `0.5px solid ${bvc}30`,
+                            background: `${bvc}18`, border: `0.5px solid ${bvc}30`, boxShadow: `0 0 10px ${bvc}30`,
                             borderRadius: 6, padding: '2px 10px', fontFamily: 'system-ui', cursor: 'help',
                           }}>{fmtPct(bv)}</span>
                         ) : <span style={{ color: muted }}>—</span>}
@@ -350,7 +367,7 @@ export default function SilverAnalysisPage() {
           {/* Summary */}
           <div style={{ borderTop: `0.5px solid ${border}`, padding: '16px 18px' }}>
             <div style={{ fontSize: 11, color: muted, marginBottom: 10 }}>خلاصه بازار نقره</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+            <div className="pop-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
               {[
                 {
                   label: 'میانگین حباب اسمی صندوق‌ها',
@@ -379,10 +396,11 @@ export default function SilverAnalysisPage() {
                 },
               ].map(item => (
                 <div key={item.label} className="scard" style={{
-                  background: 'rgba(192,200,216,0.03)', border: `0.5px solid ${border}`,
+                  background: `linear-gradient(160deg, ${item.color}14, transparent 60%), rgba(192,200,216,0.03)`,
+                  border: `0.5px solid ${item.color}33`,
                   borderRadius: 10, padding: '14px 16px', textAlign: 'center',
                 }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: item.color, fontFamily: 'system-ui', marginBottom: 6, textShadow: item.value === '—' ? 'none' : `0 0 16px ${item.color}33` }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: item.color, fontFamily: 'system-ui', marginBottom: 6, textShadow: item.value === '—' ? 'none' : `0 0 18px ${item.color}55` }}>
                     {item.value}
                   </div>
                   <div style={{ fontSize: 10, color: muted }}>{item.label}</div>
@@ -421,11 +439,12 @@ function Section({ title, subtitle, border, text, muted, children }: any) {
 function StatCard({ label, value, unit, note, accent, border, muted }: any) {
   return (
     <div className="scard" style={{
-      background: 'rgba(192,200,216,0.03)', border: `0.5px solid ${border}`,
+      background: `linear-gradient(160deg, ${accent}12, transparent 55%), rgba(192,200,216,0.03)`,
+      border: `0.5px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
       borderRadius: 12, padding: '14px 16px',
     }}>
       <div style={{ fontSize: 11, color: muted, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: 'system-ui', lineHeight: 1.2, textShadow: `0 0 14px ${accent}33` }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: 'system-ui', lineHeight: 1.2, textShadow: `0 0 18px ${accent}55` }}>
         {value}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>

@@ -286,7 +286,7 @@ export default function TradeValueDetailPage() {
   }, [rawRows, slug])
 
   const t = isDark
-    ? { bg: '#060B14', text: '#E8F4FF', card: 'rgba(10,18,30,0.88)', border: `0.5px solid ${cat.borderColor}`, muted: '#5A7088', cardInner: 'rgba(255,255,255,0.025)' }
+    ? { bg: '#060B14', text: '#E8F4FF', card: 'rgba(10,18,30,0.88)', border: `0.5px solid ${cat.borderColor}`, muted: '#ddd5bd', cardInner: 'rgba(255,255,255,0.025)' }
     : { bg: '#F4F7FB', text: '#0F1E2E', card: 'rgba(255,255,255,0.9)', border: `0.5px solid ${cat.borderColor}`, muted: '#6B7F90', cardInner: 'rgba(0,0,0,0.02)' }
 
   const isUp = (chartState?.stats.change ?? 0) >= 0

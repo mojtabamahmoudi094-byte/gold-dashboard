@@ -101,6 +101,7 @@ export default function PortfolioPage() {
   const [isDark, setIsDark] = useState(true)
   const isMobile = useIsMobile()
   const t = isDark ? darkTheme : lightTheme
+  const cream = isDark ? '#ddd5bd' : '#6B5A3A'
 
   const [user, setUser] = useState<any>(null)
   const [authChecked, setAuthChecked] = useState(false)
@@ -687,7 +688,7 @@ ${txs.map(tx => row([
             <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 2' }}>
               <span style={label}>
                 کارمزد (ریال)
-                <label style={{ marginRight: 10, fontSize: 10.5, color: t.faint, cursor: 'pointer' }}>
+                <label style={{ marginRight: 10, fontSize: 10.5, color: cream, cursor: 'pointer' }}>
                   <input type="checkbox" checked={autoFee} onChange={e => setAutoFee(e.target.checked)} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
                   محاسبه خودکار ({picked?.type === 'physical' ? 'فیزیکی: بدون کارمزد' : side === 'buy' ? '۰٫۳۷٪ خرید' : '۰٫۸۸٪ فروش'})
                 </label>
@@ -763,7 +764,7 @@ ${txs.map(tx => row([
                         : h.type === 'fund'
                           ? <Link href={`/fund/${encodeURIComponent(h.symbol)}`} style={{ color: t.brand, textDecoration: 'none', fontWeight: 600 }}>{h.name}</Link>
                           : <span style={{ fontWeight: 600 }}>🥇 {h.name}</span>}
-                      <div style={{ fontSize: 10, color: t.faint, marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: cream, marginTop: 2 }}>
                         {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.name}
                       </div>
                     </td>

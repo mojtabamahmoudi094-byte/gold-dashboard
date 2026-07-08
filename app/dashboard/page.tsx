@@ -80,6 +80,7 @@ export default function TerminalPage() {
   const perPage = 15
 
   const t: any = isDark ? darkTheme : lightTheme
+  const cream = isDark ? '#ddd5bd' : '#6B5A3A'
 
   // check auth status
   useEffect(() => {
@@ -489,7 +490,7 @@ export default function TerminalPage() {
                   const isAnomaly = intel.anomalyFlags[idx]
                   return (
                     <tr key={r.id} style={{ borderBottom: `0.5px solid ${t.border}`, background: isAnomaly ? 'rgba(255,77,106,0.04)' : 'transparent' }}>
-                      <td style={{ padding: '9px 10px', color: t.faint }}>{r.id}</td>
+                      <td style={{ padding: '9px 10px', color: cream }}>{r.id}</td>
                       <td style={{ padding: '9px 10px', color: t.text }}>
                         {editingId === r.id ? (
                           <input value={editDate} onChange={e => setEditDate(e.target.value)}
@@ -501,7 +502,7 @@ export default function TerminalPage() {
                         {editingId === r.id ? (
                           <input value={editValue} onChange={e => setEditValue(e.target.value)}
                             style={{ background: t.inputBg, border: `0.5px solid ${t.borderStrong}`, borderRadius: 6, padding: '4px 8px', color: t.text, fontSize: 12, fontFamily: 'inherit', width: 130 }} />
-                        ) : <span>{fmtVal(cur)} <span style={{ color: t.faint, fontSize: 10 }}>{UNIT}</span></span>}
+                        ) : <span>{fmtVal(cur)} <span style={{ color: cream, fontSize: 10 }}>{UNIT}</span></span>}
                       </td>
                       <td style={{ padding: '9px 10px' }}>
                         {chg !== null && (
@@ -642,12 +643,13 @@ function Tooltip({ text, children, t }: any) {
 }
 
 function IntelCard({ title, main, sub, color, bar, t, tooltip }: any) {
+  const cream = t === darkTheme ? '#ddd5bd' : '#6B5A3A'
   return (
     <Tooltip text={tooltip} t={t}>
       <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', backdropFilter: 'blur(12px)', cursor: tooltip ? 'help' : 'default' }}>
         <div style={{ fontSize: 10, color: t.muted, marginBottom: 8 }}>{title}</div>
         <div style={{ fontSize: 18, fontWeight: 700, color }}>{main}</div>
-        <div style={{ fontSize: 10, color: t.faint, marginTop: 4 }}>{sub}</div>
+        <div style={{ fontSize: 10, color: cream, marginTop: 4 }}>{sub}</div>
         {typeof bar === 'number' && (
           <div style={{ marginTop: 8, height: 3, background: `${t.accent}1A`, borderRadius: 2, overflow: 'hidden' }}>
             <div style={{ width: `${bar}%`, height: '100%', background: color, borderRadius: 2 }} />

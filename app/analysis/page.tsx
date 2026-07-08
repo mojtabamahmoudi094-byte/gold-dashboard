@@ -54,7 +54,7 @@ export default function AnalysisPage() {
   const panel  = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
   const border = isDark ? 'rgba(0,200,255,0.12)' : 'rgba(0,120,170,0.15)'
   const text   = isDark ? '#E8F4FF' : '#0F1E2E'
-  const muted  = isDark ? '#5A7088' : '#6B7F90'
+  const muted  = isDark ? '#ddd5bd' : '#6B7F90'
   const accent = '#00C8FF'
   const green  = '#00E5A0'
 

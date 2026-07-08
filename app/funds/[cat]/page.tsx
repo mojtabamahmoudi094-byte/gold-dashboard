@@ -32,6 +32,7 @@ export default function FundsCatPage() {
 
   const router = useRouter()
   const t: any = isDark ? darkTheme : lightTheme
+  const cream = isDark ? '#ddd5bd' : '#6B5A3A'
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -234,12 +235,12 @@ export default function FundsCatPage() {
               display: 'flex', flexWrap: 'wrap', gap: isMobile ? '8px 14px' : '4px 20px',
               alignItems: 'center',
             }}>
-              <span style={{ fontSize: 10, color: t.faint, letterSpacing: '0.04em', marginLeft: 4 }}>
+              <span style={{ fontSize: 10, color: cream, letterSpacing: '0.04em', marginLeft: 4 }}>
                 امروز
               </span>
               {items.map((item, i) => (
                 <span key={i} style={{ display: 'flex', gap: 5, alignItems: 'center', fontSize: 11 }}>
-                  <span style={{ color: t.faint }}>{item.label}:</span>
+                  <span style={{ color: cream }}>{item.label}:</span>
                   <span style={{ fontWeight: 700, color: item.color, fontFamily: 'system-ui, sans-serif' }}>{item.val}</span>
                 </span>
               ))}
@@ -293,7 +294,7 @@ export default function FundsCatPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 16 }}>⚡</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#F59E0B' }}>هشدار جریان پول غیرعادی</span>
-              <span style={{ fontSize: 9, color: t.faint, background: 'rgba(245,158,11,0.12)', padding: '2px 8px', borderRadius: 6 }}>بر اساس ۷ روز اخیر</span>
+              <span style={{ fontSize: 9, color: cream, background: 'rgba(245,158,11,0.12)', padding: '2px 8px', borderRadius: 6 }}>بر اساس ۷ روز اخیر</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
               {anomalies.filter(a => a.category === catInfo.category).map((a, i) => {
@@ -366,7 +367,7 @@ export default function FundsCatPage() {
 
           return (
             <div className="animate-fade-in">
-              <div style={{ fontSize: 11, color: t.faint, marginBottom: 8, letterSpacing: '0.04em' }}>رتبه‌بندی</div>
+              <div style={{ fontSize: 11, color: cream, marginBottom: 8, letterSpacing: '0.04em' }}>رتبه‌بندی</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <Col title="🏆 بهترین امتیاز" color="#F59E0B" rows={top5Score}
                   renderVal={f => `${f.score}`} />
@@ -388,7 +389,7 @@ export default function FundsCatPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <span style={{ fontSize: 18 }}>🤖</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: t.textBright }}>تحلیل هوشمند بازار</span>
-              <span style={{ fontSize: 9, color: t.faint, background: `${t.accent}15`, padding: '2px 8px', borderRadius: 6 }}>خودکار</span>
+              <span style={{ fontSize: 9, color: cream, background: `${t.accent}15`, padding: '2px 8px', borderRadius: 6 }}>خودکار</span>
             </div>
             <div style={{ fontSize: 12, color: t.text, lineHeight: 2.2, direction: 'rtl' }}>
               {(() => {
@@ -547,23 +548,23 @@ export default function FundsCatPage() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
                       <div>
-                        <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>قیمت پایانی</div>
+                        <div style={{ fontSize: 10, color: cream, marginBottom: 2 }}>قیمت پایانی</div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{f.priceClose.toLocaleString('fa-IR')}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>ارزش معاملات</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{fmtVal(f.tradeValue / 1e10)} <span style={{ fontSize: 10, color: t.faint }}>م.ت</span></div>
+                        <div style={{ fontSize: 10, color: cream, marginBottom: 2 }}>ارزش معاملات</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{fmtVal(f.tradeValue / 1e10)} <span style={{ fontSize: 10, color: cream }}>م.ت</span></div>
                       </div>
                       <div>
-                        <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>خریدار / فروشنده</div>
+                        <div style={{ fontSize: 10, color: cream, marginBottom: 2 }}>خریدار / فروشنده</div>
                         <div style={{ fontSize: 13 }}>
                           <span style={{ color: '#00E5A0', fontWeight: 600 }}>{f.buyCountI.toLocaleString('fa-IR')}</span>
-                          <span style={{ color: t.faint }}> / </span>
+                          <span style={{ color: cream }}> / </span>
                           <span style={{ color: '#FF4D6A', fontWeight: 600 }}>{f.sellCountI.toLocaleString('fa-IR')}</span>
                         </div>
                       </div>
                       <div>
-                        <div style={{ fontSize: 10, color: t.faint, marginBottom: 2 }}>جریان پول حقیقی</div>
+                        <div style={{ fontSize: 10, color: cream, marginBottom: 2 }}>جریان پول حقیقی</div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: netFlowF >= 0 ? '#00E5A0' : '#FF4D6A' }}>
                           {netFlowF >= 0 ? '+' : ''}{netFlowBT.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت
                         </div>
@@ -646,8 +647,8 @@ export default function FundsCatPage() {
                             {isPositive ? '+' : ''}{f.changePct.toFixed(2)}٪
                           </span>
                         </td>
-                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.tradeValue / 1e10)} <span style={{ color: t.faint, fontSize: 10 }}>م.ت</span></td>
-                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.marketValue)} <span style={{ color: t.faint, fontSize: 10 }}>م.ر</span></td>
+                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.tradeValue / 1e10)} <span style={{ color: cream, fontSize: 10 }}>م.ت</span></td>
+                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.marketValue)} <span style={{ color: cream, fontSize: 10 }}>م.ر</span></td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{f.volume.toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '10px 8px', color: '#00E5A0' }}>{f.buyCountI.toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '10px 8px', color: '#FF4D6A' }}>{f.sellCountI.toLocaleString('fa-IR')}</td>
@@ -665,7 +666,7 @@ export default function FundsCatPage() {
           <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
             <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 12 }}>
               نقشه‌ی بازار صندوق‌های {catInfo.label}
-              <span style={{ fontSize: 10, color: t.faint, marginRight: 8 }}>اندازه: ارزش معاملات · رنگ: درصد تغییر</span>
+              <span style={{ fontSize: 10, color: cream, marginRight: 8 }}>اندازه: ارزش معاملات · رنگ: درصد تغییر</span>
             </div>
             <div style={{
               display: 'flex', flexWrap: 'wrap', gap: 2,
@@ -756,7 +757,7 @@ export default function FundsCatPage() {
           <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
             <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 16 }}>
               ورود و خروج پول حقیقی
-              <span style={{ fontSize: 10, color: t.faint, marginRight: 8 }}>میلیارد تومان</span>
+              <span style={{ fontSize: 10, color: cream, marginRight: 8 }}>میلیارد تومان</span>
             </div>
             {(() => {
               const flows = funds.map(f => {

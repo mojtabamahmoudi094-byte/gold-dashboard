@@ -18,7 +18,7 @@ const fmtPct = (n: number | null) => {
 }
 
 const bubbleColor = (n: number | null) => {
-  if (n == null) return '#5A7088'
+  if (n == null) return '#ddd5bd'
   if (n > 0.05) return '#FF4D6A'
   if (n > 0.01) return '#F59E0B'
   if (n < -0.01) return '#00E5A0'
@@ -134,7 +134,7 @@ export default function GoldAnalysisPage() {
   const border = 'rgba(0,200,255,0.12)'
   const accent = '#00C8FF'
   const green  = '#00E5A0'
-  const muted  = '#5A7088'
+  const muted  = '#ddd5bd'
   const text   = '#E8F4FF'
 
   return (
@@ -147,20 +147,39 @@ export default function GoldAnalysisPage() {
       fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
     }}>
       <style>{`
+        @keyframes popIn { from { opacity: 0; transform: translateY(16px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .pop-col > * { opacity: 0; animation: popIn .6s cubic-bezier(.16,1,.3,1) forwards; }
+        .pop-col > *:nth-child(1) { animation-delay: .02s }
+        .pop-col > *:nth-child(2) { animation-delay: .08s }
+        .pop-col > *:nth-child(3) { animation-delay: .14s }
+        .pop-col > *:nth-child(4) { animation-delay: .20s }
+        .pop-col > *:nth-child(5) { animation-delay: .26s }
+        .pop-col > *:nth-child(6) { animation-delay: .32s }
+        .pop-col > *:nth-child(n+7) { animation-delay: .38s }
+        .pop-grid > * { opacity: 0; animation: popIn .5s cubic-bezier(.16,1,.3,1) forwards; }
+        .pop-grid > *:nth-child(1) { animation-delay: .05s }
+        .pop-grid > *:nth-child(2) { animation-delay: .10s }
+        .pop-grid > *:nth-child(3) { animation-delay: .15s }
+        .pop-grid > *:nth-child(4) { animation-delay: .20s }
+        .pop-grid > *:nth-child(5) { animation-delay: .25s }
+        .pop-grid > *:nth-child(6) { animation-delay: .30s }
+        .pop-grid > *:nth-child(n+7) { animation-delay: .35s }
         .gsec { transition: border-color .2s ease, box-shadow .2s ease; }
         .gsec:hover { border-color: rgba(0,200,255,.28) !important; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
-        .gcard { transition: transform .2s ease, border-color .2s ease, background .2s ease; }
-        .gcard:hover { border-color: rgba(0,200,255,.35) !important; background: rgba(0,200,255,.07) !important; transform: translateY(-2px); }
+        .gcard { transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease; }
+        .gcard:hover { border-color: rgba(0,200,255,.4) !important; background: rgba(0,200,255,.08) !important; transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,.35); }
+        .gbadge { transition: transform .15s ease; }
+        .gbadge:hover { transform: scale(1.06); }
         .gbtn { transition: background .2s ease, box-shadow .2s ease; }
         .gbtn:hover:not(:disabled) { background: rgba(0,200,255,.2) !important; box-shadow: 0 0 16px rgba(0,200,255,.25); }
         .gbtn:focus-visible { outline: 2px solid #00C8FF; outline-offset: 2px; }
-        tr.grow { transition: background .15s ease; }
-        tr.grow:hover { background: rgba(0,200,255,.045); }
+        tr.grow { transition: background .15s ease; animation: popIn .4s ease forwards; opacity: 0; }
+        tr.grow:hover { background: rgba(0,200,255,.05); }
         tbody tr.grow:nth-child(even) { background: rgba(255,255,255,.017); }
-        tbody tr.grow:nth-child(even):hover { background: rgba(0,200,255,.045); }
+        tbody tr.grow:nth-child(even):hover { background: rgba(0,200,255,.05); }
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) {
-          .gsec, .gcard, .gbtn, tr.grow { transition: none !important; }
+          .gsec, .gcard, .gbtn, .gbadge, tr.grow, .pop-col > *, .pop-grid > * { transition: none !important; animation: none !important; opacity: 1 !important; }
           .gcard:hover { transform: none !important; }
           .gbtn svg { animation: none !important; }
         }
@@ -227,22 +246,22 @@ export default function GoldAnalysisPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="pop-col" style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* ── Row 1: Live Inputs ── */}
         <Section title="ورودی‌های روزانه" subtitle="داده زنده از API" badge="LIVE" badgeColor={green}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-            <InputCard icon="🪙" label="انس طلا"    unit="دلار"  value={fmtUsd(data?.inputs?.goldUsd)}  change={ch.goldUsd   ?? null} accent={accent} />
-            <InputCard icon="🥈" label="انس نقره"   unit="دلار"  value={fmtUsd(data?.inputs?.silverUsd)} change={ch.silverUsd ?? null} accent="#C0C0D0" />
+          <div className="pop-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+            <InputCard icon="🪙" label="انس طلا"    unit="دلار"  value={fmtUsd(data?.inputs?.goldUsd)}  change={ch.goldUsd   ?? null} accent="#FFC94A" />
+            <InputCard icon="🥈" label="انس نقره"   unit="دلار"  value={fmtUsd(data?.inputs?.silverUsd)} change={ch.silverUsd ?? null} accent="#C0C8D8" />
             <InputCard icon="💵" label="ارز بازار"  unit="تومان" value={fmt(data?.inputs?.dollarT)}      change={ch.dollarT   ?? null} accent={green} />
             <InputCard icon="🇦🇪" label="قیمت درهم" unit="تومان" value={fmt(data?.inputs?.dirhamT)}      change={ch.dirhamT   ?? null} accent="#F59E0B" />
-            <InputCard icon="₮"  label="تتر (USDT)" unit="تومان" value={fmt(data?.inputs?.usdtT)}        change={ch.usdtT     ?? null} note="≈ ارز بازار" accent={accent} />
+            <InputCard icon="₮"  label="تتر (USDT)" unit="تومان" value={fmt(data?.inputs?.usdtT)}        change={ch.usdtT     ?? null} note="≈ ارز بازار" accent="#8B5CF6" />
           </div>
         </Section>
 
         {/* ── Row 2: Dollar Analysis ── */}
         <Section title="تحلیل نرخ ارز" subtitle="مقایسه روش‌های قیمت‌گذاری دلار">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+          <div className="pop-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <DollarCard
               label="دلار با درهم" formula={`درهم × ${constants.AED_PER_USD}`}
               value={fmt(derived?.derived?.dollarViaDirham ?? null)} unit="تومان" accent={accent}
@@ -391,11 +410,12 @@ export default function GoldAnalysisPage() {
                       <td style={{ padding: '10px 12px', fontFamily: 'system-ui', textAlign: 'left' }}>
                         {row.value != null ? (
                           row.isBubble ? (
-                            <span style={{
+                            <span className="gbadge" style={{
                               display: 'inline-block', fontWeight: 700, fontSize: 12,
                               color: row.value > 0 ? '#FF4D6A' : '#00E5A0',
                               background: row.value > 0 ? 'rgba(255,77,106,0.1)' : 'rgba(0,229,160,0.1)',
                               border: `0.5px solid ${row.value > 0 ? 'rgba(255,77,106,0.3)' : 'rgba(0,229,160,0.3)'}`,
+                              boxShadow: `0 0 10px ${row.value > 0 ? 'rgba(255,77,106,0.3)' : 'rgba(0,229,160,0.3)'}`,
                               borderRadius: 6, padding: '2px 10px',
                             }}>
                               {row.value.toLocaleString('fa-IR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}٪
@@ -447,9 +467,9 @@ export default function GoldAnalysisPage() {
 // ──────────────── Sub-components ────────────────
 
 function DailyChangeBadge({ pct }: { pct: number | null }) {
-  if (pct == null) return <span style={{ color: '#5A7088', fontSize: 11 }}>—</span>
+  if (pct == null) return <span style={{ color: '#ddd5bd', fontSize: 11 }}>—</span>
   if (Math.abs(pct) < 0.005) {
-    return <span style={{ color: '#5A7088', fontSize: 11, fontFamily: 'system-ui' }}>۰.۰۰٪</span>
+    return <span style={{ color: '#ddd5bd', fontSize: 11, fontFamily: 'system-ui' }}>۰.۰۰٪</span>
   }
   const color = pct > 0 ? '#00E5A0' : '#FF4D6A'
   const arrow = pct > 0 ? '▲' : '▼'
@@ -484,7 +504,7 @@ function Section({ title, subtitle, badge, badgeColor, children }: any) {
               }}>{badge}</span>
             )}
           </div>
-          {subtitle && <div style={{ fontSize: 10, color: '#5A7088', marginTop: 2 }}>{subtitle}</div>}
+          {subtitle && <div style={{ fontSize: 10, color: '#ddd5bd', marginTop: 2 }}>{subtitle}</div>}
         </div>
       </div>
       <div style={{ padding: '16px 18px' }}>{children}</div>
@@ -493,30 +513,31 @@ function Section({ title, subtitle, badge, badgeColor, children }: any) {
 }
 
 function InputCard({ icon, label, unit, value, change, note, accent }: any) {
-  const changeColor = change == null ? '#5A7088' : change > 0 ? '#00E5A0' : change < 0 ? '#FF4D6A' : '#5A7088'
+  const changeColor = change == null ? '#ddd5bd' : change > 0 ? '#00E5A0' : change < 0 ? '#FF4D6A' : '#ddd5bd'
   return (
     <div className="gcard" style={{
-      background: 'rgba(0,200,255,0.03)', border: '0.5px solid rgba(0,200,255,0.1)',
+      background: `linear-gradient(160deg, ${accent}14, transparent 55%), rgba(0,200,255,0.03)`,
+      border: `0.5px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
       borderRadius: 12, padding: '14px 16px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         <span style={{ fontSize: 14 }}>{icon}</span>
-        <span style={{ fontSize: 11, color: '#5A7088' }}>{label}</span>
+        <span style={{ fontSize: 11, color: '#ddd5bd' }}>{label}</span>
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: 'system-ui', lineHeight: 1.2, textShadow: `0 0 14px ${accent}33` }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: accent, fontFamily: 'system-ui', lineHeight: 1.2, textShadow: `0 0 18px ${accent}55` }}>
         {value}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-        <span style={{ fontSize: 10, color: '#5A7088' }}>{unit}</span>
+        <span style={{ fontSize: 10, color: '#ddd5bd' }}>{unit}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {note && <span style={{ fontSize: 10, color: '#5A7088' }}>{note}</span>}
+          {note && <span style={{ fontSize: 10, color: '#ddd5bd' }}>{note}</span>}
           {change != null && Math.abs(change) >= 0.005 && (
             <span style={{ fontSize: 11, color: changeColor, fontFamily: 'system-ui', fontWeight: 600 }}>
               {change > 0 ? '▲' : '▼'} {change > 0 ? '+' : ''}{change.toFixed(2)}٪
             </span>
           )}
           {change != null && Math.abs(change) < 0.005 && (
-            <span style={{ fontSize: 11, color: '#5A7088', fontFamily: 'system-ui' }}>۰.۰۰٪</span>
+            <span style={{ fontSize: 11, color: '#ddd5bd', fontFamily: 'system-ui' }}>۰.۰۰٪</span>
           )}
         </div>
       </div>
@@ -527,13 +548,16 @@ function InputCard({ icon, label, unit, value, change, note, accent }: any) {
 function DollarCard({ label, formula, value, unit, color, desc, accent }: any) {
   const c = color ?? accent ?? '#00C8FF'
   return (
-    <div className="gcard" style={{ background: 'rgba(0,200,255,0.03)', border: '0.5px solid rgba(0,200,255,0.1)', borderRadius: 12, padding: '14px 16px' }}>
-      <div style={{ fontSize: 11, color: '#5A7088', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: c, fontFamily: 'system-ui', marginBottom: 4, textShadow: `0 0 14px ${c}33` }}>
+    <div className="gcard" style={{
+      background: `linear-gradient(160deg, ${c}14, transparent 55%), rgba(0,200,255,0.03)`,
+      border: `0.5px solid ${c}2e`, borderTop: `2px solid ${c}55`, borderRadius: 12, padding: '14px 16px',
+    }}>
+      <div style={{ fontSize: 11, color: '#ddd5bd', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: c, fontFamily: 'system-ui', marginBottom: 4, textShadow: `0 0 18px ${c}55` }}>
         {value}
-        {unit && <span style={{ fontSize: 11, color: '#5A7088', marginRight: 4 }}>{unit}</span>}
+        {unit && <span style={{ fontSize: 11, color: '#ddd5bd', marginRight: 4 }}>{unit}</span>}
       </div>
-      <div style={{ fontSize: 10, color: '#3A5068' }}>{formula}</div>
+      <div style={{ fontSize: 10, color: '#ddd5bd' }}>{formula}</div>
       {desc && <div style={{ fontSize: 10, color: c, marginTop: 4, fontWeight: 600 }}>{desc}</div>}
     </div>
   )
@@ -554,9 +578,9 @@ function GoldRow({ label, fair, market, bubble, impliedDollar, dailyChange, bord
         <DailyChangeBadge pct={dailyChange} />
       </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <span style={{
+        <span className="gbadge" style={{
           display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
-          background: `${bc}18`, borderRadius: 4, padding: '2px 8px', fontFamily: 'system-ui',
+          background: `${bc}18`, boxShadow: `0 0 10px ${bc}30`, borderRadius: 4, padding: '2px 8px', fontFamily: 'system-ui',
         }}>
           {fmtPct(bubble)}
         </span>
@@ -595,9 +619,9 @@ function CoinRow({ label, weight, fair, market, bubble, dailyChange, marketNote,
       </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         {bubble != null ? (
-          <span style={{
+          <span className="gbadge" style={{
             display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
-            background: `${bc}18`, borderRadius: 4, padding: '2px 8px', fontFamily: 'system-ui',
+            background: `${bc}18`, boxShadow: `0 0 10px ${bc}30`, borderRadius: 4, padding: '2px 8px', fontFamily: 'system-ui',
           }}>
             {fmtPct(bubble)}
           </span>
@@ -931,7 +955,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
       {/* Summary averages */}
       <div style={{ borderTop: `0.5px solid ${tabBorder}`, padding: '16px 18px' }}>
         <div style={{ fontSize: 11, color: muted, marginBottom: 10 }}>میانگین شاخص‌های حبابی صندوق‌ها</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div className="pop-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {[
             {
               label: 'میانگین حباب ذاتی صندوق‌ها',
@@ -964,13 +988,13 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
             const vColor = item.value === '—' ? muted : item.value.startsWith('+') ? '#FF4D6A' : '#00E5A0'
             return (
               <div key={item.label} className="gcard" style={{
-                background: 'rgba(0,200,255,0.03)',
-                border: `0.5px solid ${tabBorder}`,
+                background: `linear-gradient(160deg, ${vColor}14, transparent 60%), rgba(0,200,255,0.03)`,
+                border: `0.5px solid ${vColor}33`,
                 borderRadius: 10,
                 padding: '14px 16px',
                 textAlign: 'center',
               }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: vColor, fontFamily: 'system-ui', marginBottom: 6, textShadow: item.value === '—' ? 'none' : `0 0 16px ${vColor}33` }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: vColor, fontFamily: 'system-ui', marginBottom: 6, textShadow: item.value === '—' ? 'none' : `0 0 18px ${vColor}55` }}>
                   {item.value}
                 </div>
                 <div style={{ fontSize: 10, color: muted }}>{item.label}</div>

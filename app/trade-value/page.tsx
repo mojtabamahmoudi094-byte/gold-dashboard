@@ -82,7 +82,7 @@ export default function TradeValuePage() {
   const bg    = isDark ? '#060B14' : '#F4F7FB'
   const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
   const text  = isDark ? '#E8F4FF' : '#0F1E2E'
-  const muted = isDark ? '#5A7088' : '#6B7F90'
+  const muted = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
     <main style={{

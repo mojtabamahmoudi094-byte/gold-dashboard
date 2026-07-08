@@ -741,7 +741,7 @@ export default function SignalsPage() {
   const BORDER = t.border
   const TEXT   = t.text
   const MUTED  = t.muted
-  const FAINT  = t.faint
+  const FAINT  = isDark ? '#ddd5bd' : '#6B5A3A'
   const GOLD   = t.gold
   const GOLD_BG = isDark ? 'rgba(212,168,71,0.08)' : 'rgba(212,168,71,0.1)'
   const GREEN  = t.green
