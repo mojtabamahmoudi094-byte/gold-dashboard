@@ -1,7 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+
+const TerminalChart = dynamic(() => import('../dashboard/TerminalChart'), { ssr: false })
+
+type DailyTotalRow = { date: string; total: number; stocks: number; gold: number; silver: number; saffron: number }
+
+const gregorianToShamsi = (iso: string) => {
+  try {
+    return new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso))
+  } catch { return iso }
+}
+
+// مقادیر market_watch به ریال‌اند — به میلیارد تومان برای نمایش
+const toBT = (rial: number) => rial / 1e10
+const fmtBT = (rial: number) => toBT(rial).toLocaleString('fa-IR', { maximumFractionDigits: 1 })
 
 const CATS = [
   {
@@ -70,6 +85,10 @@ const CATS = [
 
 export default function TradeValuePage() {
   const [isDark, setIsDark] = useState(true)
+  const [series, setSeries] = useState<DailyTotalRow[]>([])
+  const [today, setToday] = useState<DailyTotalRow | null>(null)
+  const [loadingTotal, setLoadingTotal] = useState(true)
+  const [showTrend, setShowTrend] = useState(false)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -78,6 +97,21 @@ export default function TradeValuePage() {
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)
   }, [])
+
+  useEffect(() => {
+    fetch('/api/market-watch/daily-total')
+      .then(r => r.json())
+      .then(d => { setSeries(d.series ?? []); setToday(d.today ?? null) })
+      .catch(() => {})
+      .finally(() => setLoadingTotal(false))
+  }, [])
+
+  const chartData = useMemo(
+    () => series.map(r => ({ time: r.date, value: toBT(r.total), shamsi: gregorianToShamsi(r.date) })),
+    [series]
+  )
+  const prevTotal = series.length >= 2 ? series[series.length - 2].total : null
+  const dayChange = prevTotal && today ? ((today.total - prevTotal) / prevTotal) * 100 : null
 
   const bg    = isDark ? '#060B14' : '#F4F7FB'
   const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
@@ -97,6 +131,106 @@ export default function TradeValuePage() {
             ارزش کل معاملات روزانه صندوق‌های طلا، نقره و زعفران — نمودار تاریخی با میانگین متحرک
           </div>
         </div>
+
+        {/* کارت ارزش معاملات کل بازار — سهام + همه صندوق‌ها */}
+        <div style={{
+          background: panel, border: '0.5px solid rgba(59,130,246,0.3)', borderRadius: 18,
+          padding: '22px 26px', marginBottom: 20, backdropFilter: 'blur(12px)',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', top: 0, right: 0, left: 0, height: 3, background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, transparent)' }} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: text, marginBottom: 6 }}>ارزش کل معاملات بازار</div>
+              <div style={{ fontSize: 11, color: muted, marginBottom: 10 }}>سهام + صندوق‌های اهرمی/بخشی/سهامی + طلا + نقره + زعفران — امروز</div>
+              {loadingTotal ? (
+                <div style={{ width: 160, height: 30, borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }} />
+              ) : today ? (
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: '#60A5FA', fontFamily: 'system-ui, sans-serif' }}>
+                    {fmtBT(today.total)}
+                  </span>
+                  <span style={{ fontSize: 12, color: muted }}>میلیارد تومان</span>
+                  {dayChange != null && (
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                      color: dayChange >= 0 ? '#10B981' : '#EF4444',
+                      background: dayChange >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                    }}>
+                      {dayChange >= 0 ? '+' : ''}{dayChange.toFixed(1)}٪
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span style={{ fontSize: 13, color: muted }}>داده‌ای در دسترس نیست</span>
+              )}
+              {today && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                  {[
+                    ['سهام + بورسی', today.stocks],
+                    ['طلا', today.gold],
+                    ['نقره', today.silver],
+                    ['زعفران', today.saffron],
+                  ].map(([label, v]) => (
+                    <span key={label as string} style={{
+                      fontSize: 10.5, color: muted, background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                      border: `0.5px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                      borderRadius: 6, padding: '3px 9px',
+                    }}>
+                      {label as string}: {fmtBT(v as number)} م.ت
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            {chartData.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setShowTrend(true)}
+                style={{
+                  padding: '10px 20px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none',
+                  fontFamily: 'inherit', flexShrink: 0,
+                }}
+              >
+                نمایش روند 📈
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* پاپ‌آپ روند کل ارزش معاملات بازار */}
+        {showTrend && (
+          <div
+            onClick={() => setShowTrend(false)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16,
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: panel, border: '0.5px solid rgba(59,130,246,0.3)', borderRadius: 18,
+                padding: '22px 26px', maxWidth: 760, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: text }}>روند ارزش کل معاملات بازار (میلیارد تومان)</span>
+                <button
+                  type="button"
+                  onClick={() => setShowTrend(false)}
+                  aria-label="بستن"
+                  style={{ width: 30, height: 30, borderRadius: 8, cursor: 'pointer', background: 'transparent', border: `1px solid ${muted}`, color: muted, fontFamily: 'inherit' }}
+                >✕</button>
+              </div>
+              <TerminalChart data={chartData} ma5={[]} ma10={[]} anomalies={[]} height={320} isDark={isDark} />
+              <p style={{ fontSize: 10.5, color: muted, marginTop: 10, lineHeight: 1.7 }}>
+                داده از تاریخ شروع ثبت «رصد لحظه‌ای بازار» موجود است و هر روز به‌صورت خودکار افزوده می‌شود.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {CATS.map(cat => (

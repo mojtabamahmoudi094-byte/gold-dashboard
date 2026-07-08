@@ -29,8 +29,14 @@ interface Props {
   isDark?: boolean
 }
 
+const todayShamsi = () =>
+  new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' })
+    .format(new Date())
+
 export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360, isDark = true }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const areaRef = useRef<ISeriesApi<'Area'> | null>(null)
   const ma5Ref = useRef<ISeriesApi<'Line'> | null>(null)
@@ -41,6 +47,10 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
   const [showMA5, setShowMA5] = useState(true)
   const [showMA10, setShowMA10] = useState(true)
   const [showAnomaly, setShowAnomaly] = useState(true)
+
+  // «زنده» یعنی آخرین نقطه داده مربوط به امروز است — یک نشانگر پالس‌دار نشان می‌دهد
+  const lastPoint = data.length ? data[data.length - 1] : null
+  const isLive = !!lastPoint?.shamsi && lastPoint.shamsi === todayShamsi()
 
   const colors = isDark
     ? { text: '#7B93AC', grid: 'rgba(0,200,255,0.04)', border: 'rgba(0,200,255,0.1)', accent: '#00C8FF', cross: 'rgba(0,200,255,0.3)', crossBg: '#0D1726' }
@@ -134,6 +144,30 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
     })
     ro.observe(containerRef.current)
 
+    // پاپ‌آپ شناور روی هاور — نشان‌دادن مقدار و تاریخ شمسی همان نقطه
+    chart.subscribeCrosshairMove(param => {
+      const tip = tooltipRef.current
+      if (!tip) return
+      if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
+        tip.style.opacity = '0'
+        return
+      }
+      const d = param.seriesData.get(area) as { value?: number } | undefined
+      if (d?.value == null) { tip.style.opacity = '0'; return }
+      const key = typeof param.time === 'string'
+        ? param.time
+        : `${(param.time as any).year}-${String((param.time as any).month).padStart(2, '0')}-${String((param.time as any).day).padStart(2, '0')}`
+      const shamsi = shamsiMap.current[key] || ''
+      tip.innerHTML = `<div style="font-size:10px;opacity:0.75;margin-bottom:2px">${shamsi}</div><div style="font-size:13px;font-weight:700">${d.value.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}</div>`
+      tip.style.opacity = '1'
+      const wrapW = wrapRef.current?.clientWidth ?? 0
+      const tipW = tip.offsetWidth || 120
+      let left = param.point.x + 14
+      if (left + tipW > wrapW) left = param.point.x - tipW - 14
+      tip.style.left = `${left}px`
+      tip.style.top = `${Math.max(0, param.point.y - 10)}px`
+    })
+
     return () => {
       ro.disconnect()
       chart.remove()
@@ -192,7 +226,7 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <button onClick={() => setShowMA5(!showMA5)} style={btnStyle(showMA5, '#F59E0B')}>
           میانگین ۵ {showMA5 ? '●' : '○'}
         </button>
@@ -202,8 +236,39 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
         <button onClick={() => setShowAnomaly(!showAnomaly)} style={btnStyle(showAnomaly, '#FF4D6A')}>
           ناهنجاری {showAnomaly ? '●' : '○'}
         </button>
+        {isLive && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, marginRight: 'auto',
+            fontSize: 10.5, fontWeight: 700, color: '#10B981',
+            background: 'rgba(16,185,129,0.12)', border: '0.5px solid rgba(16,185,129,0.3)',
+            borderRadius: 20, padding: '3px 10px',
+          }}>
+            <span className="tc-live-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+            زنده
+          </span>
+        )}
       </div>
-      <div ref={containerRef} style={{ width: '100%' }} />
+      <div ref={wrapRef} style={{ position: 'relative', width: '100%', animation: 'tc-fade-in 420ms ease-out' }}>
+        <div ref={containerRef} style={{ width: '100%' }} />
+        <div
+          ref={tooltipRef}
+          style={{
+            position: 'absolute', pointerEvents: 'none', opacity: 0, transition: 'opacity 120ms ease',
+            background: isDark ? 'rgba(6,11,20,0.92)' : 'rgba(255,255,255,0.96)',
+            border: `1px solid ${colors.border}`, borderRadius: 8, padding: '6px 10px',
+            color: colors.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+            whiteSpace: 'nowrap', zIndex: 5, boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          }}
+        />
+      </div>
+      <style>{`
+        @keyframes tc-fade-in { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
+        @keyframes tc-pulse { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.55) } 70% { box-shadow: 0 0 0 6px rgba(16,185,129,0) } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0) } }
+        .tc-live-dot { animation: tc-pulse 1.8s ease-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .tc-live-dot { animation: none; }
+        }
+      `}</style>
     </div>
   )
 }
