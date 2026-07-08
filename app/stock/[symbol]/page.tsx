@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
+import CodalAnnouncements from '../../components/CodalAnnouncements'
 
 type Sym = {
   l18: string; l30: string
@@ -258,6 +259,7 @@ export default function StockPage() {
               {reports && reports.quarters.length > 0 && (
                 <QuarterlyFinSection quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
               )}
+              <CodalAnnouncements symbol={symbol} isDark={isDark} isMobile={isMobile} />
               <AiChatSection symbol={symbol} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
             </>
           )

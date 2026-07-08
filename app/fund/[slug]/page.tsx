@@ -8,6 +8,7 @@ import { darkTheme, lightTheme } from '../../../lib/theme'
 import { Skeleton, SkeletonBlock, SkeletonRows } from '../../components/ui/Skeleton'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
+import CodalAnnouncements from '../../components/CodalAnnouncements'
 
 
 export default function FundDetailPage() {
@@ -229,6 +230,9 @@ export default function FundDetailPage() {
 
         {/* پورتفوی کدال + گزارش فصلی (در صورت وجود JSON در public/portfolio) */}
         <CodalSections t={t} slug={slug} isMobile={isMobile} />
+
+        {/* اطلاعیه‌های کدال — دریافت زنده کلاینت‌ساید */}
+        <CodalAnnouncements symbol={slug} isDark={isDark} isMobile={isMobile} />
 
         {/* ─── بخش گیت‌شده: فقط برای اعضا ─── */}
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>
