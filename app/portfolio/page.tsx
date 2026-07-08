@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Sector, Tooltip as ReTooltip, ResponsiveContainer,
   AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
 } from 'recharts'
 import { supabase } from '../../lib/supabase'
@@ -38,6 +38,13 @@ type Tx = {
   price: number
   commission: number
   trade_date: string
+  created_at: string
+}
+
+type Snapshot = {
+  snap_date: string        // تاریخ شمسی
+  total_value: number      // ارزش روز پورتفو (ریال) — ثبت‌شده توسط کرون روزانه
+  invested_capital: number
   created_at: string
 }
 
@@ -93,9 +100,25 @@ const todayShamsi = () =>
   new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit' })
     .format(new Date())
 
-const fmtRial = (v: any) => safe(v).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
+// همه‌ی مبالغ داخلی (تراکنش‌ها، محاسبات، دیتابیس) بر حسب ریال ذخیره/محاسبه می‌شوند؛
+// نمایش به کاربر بر حسب تومان است (تقسیم بر ۱۰).
+const RIAL_PER_TOMAN = 10
+const fmtToman = (v: any) => safe(safe(v) / RIAL_PER_TOMAN).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
+const toToman = (v: any) => Math.round(safe(v) / RIAL_PER_TOMAN)
+const tomanToRial = (v: any) => Math.round(safe(v) * RIAL_PER_TOMAN)
 
-const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1']
+// پالت مدرن ترکیب پورتفو — رنگ‌های زنده با کنتراست کافی روی هر دو تم
+const PIE_COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#0ea5e9', '#a855f7', '#14b8a6', '#fb923c', '#ec4899', '#84cc16']
+
+// شکل بزرگ‌شده‌ی برش هاور — حس مدرن و زنده به چارت دایره‌ای می‌دهد
+const renderActivePieShape = (props: any) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props
+  return (
+    <g style={{ filter: `drop-shadow(0 0 10px ${fill}80)` }}>
+      <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 7} startAngle={startAngle} endAngle={endAngle} fill={fill} />
+    </g>
+  )
+}
 
 export default function PortfolioPage() {
   const [isDark, setIsDark] = useState(true)
@@ -107,10 +130,14 @@ export default function PortfolioPage() {
   const [authChecked, setAuthChecked] = useState(false)
   const [instruments, setInstruments] = useState<Instrument[]>([])
   const [txs, setTxs] = useState<Tx[]>([])
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [dbMissing, setDbMissing] = useState(false)
   // قیمت دستی دارایی‌های فیزیکی وقتی قیمت آنلاین در دسترس نیست
   const [manualPrices, setManualPrices] = useState<Record<string, number>>({})
+  // چارت ترکیب پورتفو: برش هاورشده + دارایی انتخاب‌شده برای مودال جزئیات
+  const [pieActiveIdx, setPieActiveIdx] = useState<number | undefined>(undefined)
+  const [pieSelected, setPieSelected] = useState<Holding | null>(null)
 
   // فرم افزودن تراکنش
   const [showForm, setShowForm] = useState(false)
@@ -211,8 +238,17 @@ export default function PortfolioPage() {
     setLoading(false)
   }
 
+  // تصویر روزانه‌ی ارزش پورتفو — برای عملکرد دوره‌ای و چارت روند واقعی (اسکریپت scripts/snapshot-portfolio.js)
+  const loadSnapshots = async () => {
+    const { data, error } = await supabase
+      .from('portfolio_daily_snapshot')
+      .select('snap_date, total_value, invested_capital, created_at')
+      .order('created_at', { ascending: true })
+    if (!error) setSnapshots((data ?? []) as Snapshot[])
+  }
+
   useEffect(() => {
-    if (user) loadTxs()
+    if (user) { loadTxs(); loadSnapshots() }
     else if (authChecked) setLoading(false)
   }, [user, authChecked])
 
@@ -338,7 +374,7 @@ export default function PortfolioPage() {
 
   const pieData = active
     .filter(h => (h.value ?? 0) > 0)
-    .map(h => ({ name: h.type === 'stock' ? h.symbol : h.name, value: h.value as number }))
+    .map(h => ({ name: h.type === 'stock' ? h.symbol : h.name, value: h.value as number, holding: h }))
 
   // ─── نمودار رشد سرمایه: سرمایه‌ی درگیر تجمعی بر اساس تاریخ تراکنش ───
   const growthData = useMemo(() => {
@@ -358,6 +394,36 @@ export default function PortfolioPage() {
     return [...byDate.entries()].map(([date, invested]) => ({ date, invested }))
   }, [txs])
 
+  // ─── عملکرد دوره‌ای: مقایسه‌ی ارزش فعلی پورتفو با نزدیک‌ترین snapshot به شروع هر بازه ───
+  // مبنای مقایسه created_at واقعی (میلادی) هر snapshot است، نه رشته‌ی تاریخ شمسی —
+  // چون کتابخانه‌ی تقویم جلالی در پروژه وجود ندارد و created_at قابل‌اتکاست.
+  const PERIODS = [
+    { key: 'week', label: 'هفتگی', days: 7 },
+    { key: 'month', label: 'ماهانه', days: 30 },
+    { key: 'quarter', label: 'فصلی', days: 91 },
+    { key: 'year', label: 'سالیانه', days: 365 },
+  ] as const
+
+  const periodPerformance = useMemo(() => {
+    const now = Date.now()
+    return PERIODS.map(p => {
+      const cutoff = now - p.days * 86400000
+      // آخرین snapshot ثبت‌شده در یا قبل از نقطه‌ی شروع بازه
+      let baseline: Snapshot | null = null
+      for (const s of snapshots) {
+        if (new Date(s.created_at).getTime() <= cutoff) baseline = s
+        else break
+      }
+      if (!baseline || baseline.total_value <= 0 || !totals.priced) {
+        return { ...p, pct: null as number | null }
+      }
+      const pct = ((totals.value - baseline.total_value) / baseline.total_value) * 100
+      return { ...p, pct }
+    })
+  }, [snapshots, totals])
+
+  const firstSnapshotDate = snapshots[0]?.snap_date ?? null
+
   // ─── ثبت تراکنش ───
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -371,8 +437,9 @@ export default function PortfolioPage() {
       asset_type: picked.type,
       side,
       quantity: safe(qty),
-      price: safe(price),
-      commission: safe(commission),
+      // فرم بر حسب تومان پر می‌شود؛ ذخیره در دیتابیس هم‌سو با رکوردهای قدیمی بر حسب ریال است
+      price: tomanToRial(price),
+      commission: tomanToRial(commission),
       trade_date: date || todayShamsi(),
     })
     setSaving(false)
@@ -395,7 +462,7 @@ export default function PortfolioPage() {
     setPicked(i)
     setQuery(i.type === 'stock' ? i.symbol : i.name)
     const px = i.price > 0 ? i.price : safe(manualPrices[i.symbol])
-    if (px > 0 && !price) setPrice(String(px))
+    if (px > 0 && !price) setPrice(String(toToman(px)))
   }
 
   // ─── خروجی Excel (دو شیت: دارایی‌ها + تراکنش‌ها) ───
@@ -404,34 +471,34 @@ export default function PortfolioPage() {
     const wb = XLSX.utils.book_new()
 
     const holdingsSheet = XLSX.utils.aoa_to_sheet([
-      ['نماد', 'نام', 'نوع', 'تعداد', 'میانگین خرید', 'سربه‌سر', 'قیمت روز', 'ارزش روز', 'سود/زیان باز', 'سود/زیان ٪', 'سود/زیان محقق‌شده'],
+      ['نماد', 'نام', 'نوع', 'تعداد', 'میانگین خرید (تومان)', 'سربه‌سر (تومان)', 'قیمت روز (تومان)', 'ارزش روز (تومان)', 'سود/زیان باز (تومان)', 'سود/زیان ٪', 'سود/زیان محقق‌شده (تومان)'],
       ...holdings.map(h => [
         h.symbol, h.name,
         h.type === 'stock' ? 'سهم' : h.type === 'fund' ? 'صندوق' : 'فیزیکی',
-        h.qty, Math.round(h.avgCost), Math.round(h.breakEven),
-        h.price ?? '', h.value != null ? Math.round(h.value) : '',
-        h.unrealized != null ? Math.round(h.unrealized) : '',
+        h.qty, toToman(h.avgCost), toToman(h.breakEven),
+        h.price != null ? toToman(h.price) : '', h.value != null ? toToman(h.value) : '',
+        h.unrealized != null ? toToman(h.unrealized) : '',
         h.unrealizedPct != null ? Number(h.unrealizedPct.toFixed(2)) : '',
-        Math.round(h.realized),
+        toToman(h.realized),
       ]),
       [],
-      ['بهای تمام‌شده', Math.round(totals.cost)],
-      ['ارزش روز', totals.priced ? Math.round(totals.value) : ''],
-      ['سود/زیان باز', totals.priced ? Math.round(totals.unrealized) : ''],
-      ['سود/زیان محقق‌شده', Math.round(totals.realized)],
+      ['بهای تمام‌شده', toToman(totals.cost)],
+      ['ارزش روز', totals.priced ? toToman(totals.value) : ''],
+      ['سود/زیان باز', totals.priced ? toToman(totals.unrealized) : ''],
+      ['سود/زیان محقق‌شده', toToman(totals.realized)],
     ])
     XLSX.utils.book_append_sheet(wb, holdingsSheet, 'دارایی‌ها')
 
     const txSheet = XLSX.utils.aoa_to_sheet([
-      ['تاریخ', 'نماد', 'نام', 'نوع دارایی', 'خرید/فروش', 'تعداد', 'قیمت واحد', 'کارمزد', 'مبلغ کل'],
+      ['تاریخ', 'نماد', 'نام', 'نوع دارایی', 'خرید/فروش', 'تعداد', 'قیمت واحد (تومان)', 'کارمزد (تومان)', 'مبلغ کل (تومان)'],
       ...txs.map(tx => {
         const gross = safe(tx.quantity) * safe(tx.price)
         return [
           tx.trade_date, tx.symbol, tx.name,
           tx.asset_type === 'stock' ? 'سهم' : tx.asset_type === 'fund' ? 'صندوق' : 'فیزیکی',
           tx.side === 'buy' ? 'خرید' : 'فروش',
-          safe(tx.quantity), safe(tx.price), safe(tx.commission),
-          Math.round(tx.side === 'buy' ? gross + safe(tx.commission) : gross - safe(tx.commission)),
+          safe(tx.quantity), toToman(tx.price), toToman(tx.commission),
+          toToman(tx.side === 'buy' ? gross + safe(tx.commission) : gross - safe(tx.commission)),
         ]
       }),
     ])
@@ -459,20 +526,20 @@ export default function PortfolioPage() {
 <h1>پورتفوی من — بورس سنج</h1>
 <div class="sub">تاریخ گزارش: ${todayShamsi()} — bourssanj.ir</div>
 <h2>خلاصه</h2>
-<table>${row(['بهای تمام‌شده', 'ارزش روز', 'سود/زیان باز', 'سود/زیان محقق‌شده'], 'th')}
-${row([fmtRial(totals.cost), totals.priced ? fmtRial(totals.value) : '—', fmtRial(totals.unrealized), fmtRial(totals.realized)])}</table>
+<table>${row(['بهای تمام‌شده (تومان)', 'ارزش روز (تومان)', 'سود/زیان باز (تومان)', 'سود/زیان محقق‌شده (تومان)'], 'th')}
+${row([fmtToman(totals.cost), totals.priced ? fmtToman(totals.value) : '—', fmtToman(totals.unrealized), fmtToman(totals.realized)])}</table>
 <h2>دارایی‌های فعال</h2>
-<table>${row(['نماد', 'نوع', 'تعداد', 'میانگین خرید', 'سربه‌سر', 'قیمت روز', 'ارزش روز', 'سود/زیان'], 'th')}
+<table>${row(['نماد', 'نوع', 'تعداد', 'میانگین خرید (تومان)', 'سربه‌سر (تومان)', 'قیمت روز (تومان)', 'ارزش روز (تومان)', 'سود/زیان (تومان)'], 'th')}
 ${active.map(h => row([
-      h.type === 'stock' ? h.symbol : h.name, typeLabel(h.type), fmtNum(h.qty), fmtRial(h.avgCost), fmtRial(h.breakEven),
-      h.price != null ? fmtRial(h.price) : '—', h.value != null ? fmtRial(h.value) : '—',
-      h.unrealized != null ? `<span class="${h.unrealized >= 0 ? 'pos' : 'neg'}">${fmtRial(h.unrealized)} (${fmtPct(h.unrealizedPct, 1)})</span>` : '—',
+      h.type === 'stock' ? h.symbol : h.name, typeLabel(h.type), fmtNum(h.qty), fmtToman(h.avgCost), fmtToman(h.breakEven),
+      h.price != null ? fmtToman(h.price) : '—', h.value != null ? fmtToman(h.value) : '—',
+      h.unrealized != null ? `<span class="${h.unrealized >= 0 ? 'pos' : 'neg'}">${fmtToman(h.unrealized)} (${fmtPct(h.unrealizedPct, 1)})</span>` : '—',
     ])).join('')}</table>
 <h2>تاریخچه تراکنش‌ها</h2>
-<table>${row(['تاریخ', 'نماد', 'خرید/فروش', 'تعداد', 'قیمت', 'کارمزد'], 'th')}
+<table>${row(['تاریخ', 'نماد', 'خرید/فروش', 'تعداد', 'قیمت (تومان)', 'کارمزد (تومان)'], 'th')}
 ${txs.map(tx => row([
       tx.trade_date, tx.asset_type === 'stock' ? tx.symbol : tx.name,
-      tx.side === 'buy' ? 'خرید' : 'فروش', fmtNum(tx.quantity), fmtRial(tx.price), fmtRial(tx.commission),
+      tx.side === 'buy' ? 'خرید' : 'فروش', fmtNum(tx.quantity), fmtToman(tx.price), fmtToman(tx.commission),
     ])).join('')}</table>
 <script>window.onload = () => { window.print() }</script>
 </body></html>`
@@ -630,7 +697,7 @@ ${txs.map(tx => row([
                       </span>
                       <span style={{ fontSize: 11, color: t.muted }}>
                         {i.type === 'fund' ? 'صندوق' : i.type === 'physical' ? '🥇 فیزیکی' : 'سهم'}
-                        {i.price > 0 && <> · {fmtRial(i.price)}</>}
+                        {i.price > 0 && <> · {fmtToman(i.price)}</>}
                       </span>
                     </button>
                   ))}
@@ -676,8 +743,8 @@ ${txs.map(tx => row([
             </div>
 
             <div>
-              <span style={label}>قیمت واحد (ریال)</span>
-              <input style={input} inputMode="numeric" value={price} onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, ''))} placeholder={picked ? String(picked.price) : '—'} />
+              <span style={label}>قیمت واحد (تومان)</span>
+              <input style={input} inputMode="numeric" value={price} onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, ''))} placeholder={picked ? String(toToman(picked.price)) : '—'} />
             </div>
 
             <div>
@@ -687,7 +754,7 @@ ${txs.map(tx => row([
 
             <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 2' }}>
               <span style={label}>
-                کارمزد (ریال)
+                کارمزد (تومان)
                 <label style={{ marginRight: 10, fontSize: 10.5, color: cream, cursor: 'pointer' }}>
                   <input type="checkbox" checked={autoFee} onChange={e => setAutoFee(e.target.checked)} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
                   محاسبه خودکار ({picked?.type === 'physical' ? 'فیزیکی: بدون کارمزد' : side === 'buy' ? '۰٫۳۷٪ خرید' : '۰٫۸۸٪ فروش'})
@@ -716,14 +783,14 @@ ${txs.map(tx => row([
         gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
       }}>
         {[
-          { title: 'بهای تمام‌شده', value: fmtRial(totals.cost) + ' ریال', color: t.text },
-          { title: 'ارزش روز پورتفو', value: totals.priced ? fmtRial(totals.value) + ' ریال' : '—', color: t.brand },
+          { title: 'بهای تمام‌شده', value: fmtToman(totals.cost) + ' تومان', color: t.text },
+          { title: 'ارزش روز پورتفو', value: totals.priced ? fmtToman(totals.value) + ' تومان' : '—', color: t.brand },
           {
             title: 'سود/زیان باز',
-            value: totals.priced ? `${fmtRial(totals.unrealized)} (${fmtPct(totals.unrealizedPct, 1)})` : '—',
+            value: totals.priced ? `${fmtToman(totals.unrealized)} (${fmtPct(totals.unrealizedPct, 1)})` : '—',
             color: pnlColor(totals.unrealized),
           },
-          { title: 'سود/زیان محقق‌شده', value: fmtRial(totals.realized) + ' ریال', color: pnlColor(totals.realized) },
+          { title: 'سود/زیان محقق‌شده', value: fmtToman(totals.realized) + ' تومان', color: pnlColor(totals.realized) },
         ].map(c => (
           <div key={c.title} style={{ ...card, padding: isMobile ? '12px 14px' : '16px 18px' }}>
             <div style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>{c.title}</div>
@@ -769,31 +836,31 @@ ${txs.map(tx => row([
                       </div>
                     </td>
                     <td style={td}>{fmtNum(h.qty)}</td>
-                    <td style={td}>{fmtRial(h.avgCost)}</td>
-                    <td style={{ ...td, color: t.muted }}>{fmtRial(h.breakEven)}</td>
+                    <td style={td}>{fmtToman(h.avgCost)}</td>
+                    <td style={{ ...td, color: t.muted }}>{fmtToman(h.breakEven)}</td>
                     <td style={td}>
                       {(priceMap.get(h.symbol)?.price ?? 0) <= 0 ? (
                         // قیمت آنلاین در دسترس نیست — ورودی قیمت دستی (در مرورگر ذخیره می‌شود)
                         <input
                           style={{ ...input, width: 110, padding: '5px 8px', fontSize: 11.5 }}
                           inputMode="numeric"
-                          defaultValue={manualPrices[h.symbol] || ''}
+                          defaultValue={manualPrices[h.symbol] ? toToman(manualPrices[h.symbol]) : ''}
                           placeholder="قیمت دستی…"
-                          title="قیمت روز را دستی وارد کنید (ریال)"
-                          onBlur={e => setManualPrice(h.symbol, safe(e.target.value.replace(/[^\d.]/g, '')))}
+                          title="قیمت روز را دستی وارد کنید (تومان)"
+                          onBlur={e => setManualPrice(h.symbol, tomanToRial(e.target.value.replace(/[^\d.]/g, '')))}
                         />
                       ) : (
                         <>
-                          {h.price != null ? fmtRial(h.price) : '—'}
+                          {h.price != null ? fmtToman(h.price) : '—'}
                           {h.changePct != null && (
                             <span style={{ fontSize: 10.5, marginRight: 5, color: pnlColor(h.changePct) }}>{fmtPct(h.changePct, 1)}</span>
                           )}
                         </>
                       )}
                     </td>
-                    <td style={td}>{h.value != null ? fmtRial(h.value) : '—'}</td>
+                    <td style={td}>{h.value != null ? fmtToman(h.value) : '—'}</td>
                     <td style={{ ...td, color: pnlColor(h.unrealized), fontWeight: 600 }}>
-                      {h.unrealized != null ? <>{fmtRial(h.unrealized)}<span style={{ fontSize: 10.5, marginRight: 5 }}>{fmtPct(h.unrealizedPct, 1)}</span></> : '—'}
+                      {h.unrealized != null ? <>{fmtToman(h.unrealized)}<span style={{ fontSize: 10.5, marginRight: 5 }}>{fmtPct(h.unrealizedPct, 1)}</span></> : '—'}
                     </td>
                   </tr>
                 ))}
@@ -815,7 +882,7 @@ ${txs.map(tx => row([
                   {closed.map(h => (
                     <tr key={h.symbol}>
                       <td style={td}>{h.symbol}</td>
-                      <td style={{ ...td, color: pnlColor(h.realized), fontWeight: 600 }}>{fmtRial(h.realized)} ریال</td>
+                      <td style={{ ...td, color: pnlColor(h.realized), fontWeight: 600 }}>{fmtToman(h.realized)} تومان</td>
                     </tr>
                   ))}
                 </tbody>
@@ -828,14 +895,32 @@ ${txs.map(tx => row([
         {pieData.length > 0 && (
           <div style={card}>
             <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 4px' }}>ترکیب پورتفو</h2>
+            <p style={{ fontSize: 10.5, color: t.muted, margin: '0 0 6px' }}>روی هر برش کلیک کنید تا جزئیات دارایی باز شود</p>
             <div style={{ width: '100%', height: 230, direction: 'ltr' }}>
               <ResponsiveContainer>
                 <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2} stroke="none">
-                    {pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="55%"
+                    outerRadius="85%"
+                    paddingAngle={3}
+                    stroke="none"
+                    isAnimationActive
+                    animationDuration={900}
+                    animationEasing="ease-out"
+                    activeShape={renderActivePieShape}
+                    onMouseEnter={(_: any, idx: number) => setPieActiveIdx(idx)}
+                    onMouseLeave={() => setPieActiveIdx(undefined)}
+                    onClick={(entry: any) => setPieSelected(entry.holding ?? entry.payload?.holding ?? null)}
+                  >
+                    {pieData.map((_, idx) => (
+                      <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} style={{ cursor: 'pointer' }} />
+                    ))}
                   </Pie>
                   <ReTooltip
-                    formatter={(v: any, n: any) => [`${fmtRial(v)} ریال`, n]}
+                    formatter={(v: any, n: any) => [`${fmtToman(v)} تومان`, n]}
                     contentStyle={{ background: t.panelSolid, border: `1px solid ${t.borderStrong}`, borderRadius: 10, fontSize: 12, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}
                   />
                 </PieChart>
@@ -845,7 +930,18 @@ ${txs.map(tx => row([
               {pieData.map((p, idx) => {
                 const pct = totals.value > 0 ? (p.value / totals.value) * 100 : 0
                 return (
-                  <div key={p.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5 }}>
+                  <div
+                    key={p.name}
+                    onClick={() => setPieSelected(p.holding)}
+                    onMouseEnter={() => setPieActiveIdx(idx)}
+                    onMouseLeave={() => setPieActiveIdx(undefined)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5,
+                      cursor: 'pointer', borderRadius: 6, padding: '3px 6px', margin: '0 -6px',
+                      background: pieActiveIdx === idx ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') : 'transparent',
+                      transition: 'background 150ms ease',
+                    }}
+                  >
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: t.text }}>
                       <span style={{ width: 9, height: 9, borderRadius: 3, background: PIE_COLORS[idx % PIE_COLORS.length], display: 'inline-block' }} />
                       {p.name}
@@ -858,6 +954,145 @@ ${txs.map(tx => row([
           </div>
         )}
       </div>
+
+      {/* مودال جزئیات دارایی — با کلیک روی برش یا ردیف چارت ترکیب پورتفو */}
+      {pieSelected && (() => {
+        const h = pieSelected
+        const pct = totals.value > 0 ? ((h.value ?? 0) / totals.value) * 100 : 0
+        const rows: [string, string, React.CSSProperties?][] = [
+          ['تعداد', fmtNum(h.qty)],
+          ['میانگین خرید', `${fmtToman(h.avgCost)} تومان`],
+          ['سربه‌سر', `${fmtToman(h.breakEven)} تومان`],
+          ['قیمت روز', h.price != null ? `${fmtToman(h.price)} تومان` : '—'],
+          ['ارزش روز', h.value != null ? `${fmtToman(h.value)} تومان` : '—'],
+          ['سهم از پورتفو', `${pct.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪`],
+          ['سود/زیان باز', h.unrealized != null ? `${fmtToman(h.unrealized)} تومان (${fmtPct(h.unrealizedPct, 1)})` : '—', { color: pnlColor(h.unrealized), fontWeight: 700 }],
+        ]
+        return (
+          <div
+            onClick={() => setPieSelected(null)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16,
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                ...card, maxWidth: 380, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+                animation: 'portfolioPopIn 180ms ease-out',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800 }}>{h.type === 'stock' ? h.symbol : h.name}</div>
+                  <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>
+                    {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.name}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPieSelected(null)}
+                  aria-label="بستن"
+                  style={{
+                    width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 15,
+                    background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.muted, fontFamily: 'inherit',
+                  }}
+                >✕</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {rows.map(([k, v, extra]) => (
+                  <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5 }}>
+                    <span style={{ color: t.muted }}>{k}</span>
+                    <span style={{ direction: 'ltr', ...extra }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              {h.type === 'stock' && (
+                <Link href={`/stock/${encodeURIComponent(h.symbol)}`} style={{
+                  display: 'block', textAlign: 'center', marginTop: 16, padding: '9px 0', borderRadius: 10,
+                  fontSize: 12.5, fontWeight: 600, color: t.brand, textDecoration: 'none', border: `1px solid ${t.brand}`,
+                }}>مشاهده صفحه نماد ←</Link>
+              )}
+              {h.type === 'fund' && (
+                <Link href={`/fund/${encodeURIComponent(h.symbol)}`} style={{
+                  display: 'block', textAlign: 'center', marginTop: 16, padding: '9px 0', borderRadius: 10,
+                  fontSize: 12.5, fontWeight: 600, color: t.brand, textDecoration: 'none', border: `1px solid ${t.brand}`,
+                }}>مشاهده صفحه صندوق ←</Link>
+              )}
+            </div>
+            <style>{`@keyframes portfolioPopIn { from { opacity: 0; transform: scale(0.94) translateY(8px) } to { opacity: 1; transform: scale(1) translateY(0) } }`}</style>
+          </div>
+        )
+      })()}
+
+      {/* عملکرد دوره‌ای پورتفو */}
+      {active.length > 0 && (
+        <div style={{ ...card, marginTop: 16 }}>
+          <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 4px' }}>📊 عملکرد پورتفو</h2>
+          <p style={{ fontSize: 11, color: t.muted, margin: '0 0 14px' }}>
+            درصد تغییر ارزش پورتفو نسبت به هر بازه — بر پایه‌ی ثبت روزانه‌ی ارزش (از {firstSnapshotDate ? firstSnapshotDate : 'اولین ثبت روزانه'} به بعد)
+          </p>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)' }}>
+            {periodPerformance.map(p => (
+              <div key={p.key} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>{p.label}</div>
+                {p.pct == null ? (
+                  <div style={{ fontSize: 11, color: t.muted }}>داده کافی نیست</div>
+                ) : (
+                  <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: pnlColor(p.pct), direction: 'ltr' }}>
+                    {fmtPct(p.pct, 1)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* نمودار روند واقعی ارزش پورتفو — بر پایه‌ی snapshot روزانه (نه سرمایه‌ی سرمایه‌گذاری‌شده) */}
+      {active.length > 0 && (
+        <div style={{ ...card, marginTop: 16 }}>
+          <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 4px' }}>📉 روند واقعی ارزش پورتفو</h2>
+          {snapshots.length > 1 ? (
+            <>
+              <p style={{ fontSize: 11, color: t.muted, margin: '0 0 12px' }}>
+                ارزش روز پورتفو بر اساس ثبت‌های روزانه — برخلاف چارت «رشد سرمایه» زیر، این خط قیمت واقعی بازار را نشان می‌دهد
+              </p>
+              <div style={{ width: '100%', height: 260, direction: 'ltr' }}>
+                <ResponsiveContainer>
+                  <AreaChart data={snapshots} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+                    <defs>
+                      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={t.green} stopOpacity={0.35} />
+                        <stop offset="100%" stopColor={t.green} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke={t.border} strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="snap_date" tick={{ fontSize: 10, fill: t.muted, fontFamily: 'Vazirmatn, Arial, sans-serif' }} tickMargin={8} />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: t.muted }}
+                      tickFormatter={(v: number) => { const tm = v / RIAL_PER_TOMAN; return tm >= 1e9 ? `${(tm / 1e9).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} مـ` : tm >= 1e6 ? `${(tm / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 0 })} م` : fmtToman(v) }}
+                      width={70}
+                      orientation="right"
+                    />
+                    <ReTooltip
+                      formatter={(v: any) => [`${fmtToman(v)} تومان`, 'ارزش پورتفو']}
+                      labelFormatter={(l: any) => `تاریخ: ${l}`}
+                      contentStyle={{ background: t.panelSolid, border: `1px solid ${t.borderStrong}`, borderRadius: 10, fontSize: 12, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}
+                    />
+                    <Area type="monotone" dataKey="total_value" stroke={t.green} strokeWidth={2} fill="url(#trendFill)" isAnimationActive animationDuration={900} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          ) : (
+            <p style={{ fontSize: 12, color: t.muted, padding: '16px 0' }}>
+              این چارت بعد از ثبت روزانه‌ی چند روز ارزش پورتفو (کرون شبانه) تکمیل می‌شود — هنوز داده‌ی کافی ثبت نشده.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* نمودار رشد سرمایه */}
       {growthData.length > 1 && (
@@ -880,12 +1115,12 @@ ${txs.map(tx => row([
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: t.muted, fontFamily: 'Vazirmatn, Arial, sans-serif' }} tickMargin={8} />
                 <YAxis
                   tick={{ fontSize: 10, fill: t.muted }}
-                  tickFormatter={(v: number) => v >= 1e9 ? `${(v / 1e9).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} مـ` : v >= 1e6 ? `${(v / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 0 })} م` : fmtRial(v)}
+                  tickFormatter={(v: number) => { const tm = v / RIAL_PER_TOMAN; return tm >= 1e9 ? `${(tm / 1e9).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} مـ` : tm >= 1e6 ? `${(tm / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 0 })} م` : fmtToman(v) }}
                   width={70}
                   orientation="right"
                 />
                 <ReTooltip
-                  formatter={(v: any) => [`${fmtRial(v)} ریال`, 'سرمایه درگیر']}
+                  formatter={(v: any) => [`${fmtToman(v)} تومان`, 'سرمایه درگیر']}
                   labelFormatter={(l: any) => `تاریخ: ${l}`}
                   contentStyle={{ background: t.panelSolid, border: `1px solid ${t.borderStrong}`, borderRadius: 10, fontSize: 12, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}
                 />
@@ -928,9 +1163,9 @@ ${txs.map(tx => row([
                       {tx.side === 'buy' ? 'خرید' : 'فروش'}
                     </td>
                     <td style={td}>{fmtNum(tx.quantity)}</td>
-                    <td style={td}>{fmtRial(tx.price)}</td>
-                    <td style={{ ...td, color: t.muted }}>{fmtRial(tx.commission)}</td>
-                    <td style={td}>{fmtRial(total)}</td>
+                    <td style={td}>{fmtToman(tx.price)}</td>
+                    <td style={{ ...td, color: t.muted }}>{fmtToman(tx.commission)}</td>
+                    <td style={td}>{fmtToman(total)}</td>
                     <td style={td}>
                       <button type="button" onClick={() => removeTx(tx.id)} title="حذف" style={{
                         padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
