@@ -72,26 +72,13 @@ const UserIcon = () => (
 )
 
 const LogoMark = () => (
-  <svg {...pn} width="30" height="24" viewBox="0 0 30 24" fill="none">
-    <defs>
-      <linearGradient id="lgLine" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stopColor="#3b82f6"/>
-        <stop offset="100%" stopColor="#8b5cf6"/>
-      </linearGradient>
-      <linearGradient id="lgFill" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15"/>
-        <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.02"/>
-      </linearGradient>
-    </defs>
-    <path d="M2,22 L8,13 L14,16 L25,4 L25,22 Z" fill="url(#lgFill)"/>
-    <polyline
-      points="2,22 8,13 14,16 25,4"
-      stroke="url(#lgLine)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-      fill="none"
-    />
-    <circle cx="25" cy="4" r="3" fill="rgba(59,130,246,0.2)"/>
-    <circle cx="25" cy="4" r="1.8" fill="#3b82f6"/>
-  </svg>
+  <div style={{
+    width: 40, height: 40, borderRadius: 11, overflow: 'hidden', flexShrink: 0,
+    backgroundImage: 'url(/logo.jpeg)',
+    backgroundSize: '148% 148%',
+    backgroundPosition: '38% 15%',
+    backgroundRepeat: 'no-repeat',
+  }} />
 )
 
 export default function Header() {

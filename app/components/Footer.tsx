@@ -41,12 +41,13 @@ export default function Footer() {
         {/* Brand */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 18 L9 12 L13 15 L20 6"/>
-                <path d="M15 6 L20 6 L20 11"/>
-              </svg>
-            </div>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
+              backgroundImage: 'url(/logo.jpeg)',
+              backgroundSize: '148% 148%',
+              backgroundPosition: '38% 15%',
+              backgroundRepeat: 'no-repeat',
+            }} />
             <div style={{ fontWeight: 800, fontSize: 18, color: '#eef1f8' }}>بورس سنج</div>
           </div>
           <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.8, maxWidth: 300, margin: 0 }}>
@@ -105,7 +106,7 @@ export default function Footer() {
               </svg>
             </a>
             {/* Telegram */}
-            <a href="https://t.me/shagerdebazar" aria-label="کانال تلگرام بورس سنج" target="_blank" rel="noopener noreferrer" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
+            <a href="https://t.me/bourssanjj" aria-label="کانال تلگرام بورس سنج" target="_blank" rel="noopener noreferrer" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(42,171,238,0.15)')}
               onMouseLeave={e => (e.currentTarget.style.background = ICON_BG)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill={ICON_C}>
