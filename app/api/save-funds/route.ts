@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireAdmin } from '../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,9 @@ const sb = createClient(
 
 export async function POST(req: Request) {
   try {
+    if (!(await requireAdmin(req))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await req.json()
     const { rows, date, goldCache } = body as {
       rows: Record<string, unknown>[]

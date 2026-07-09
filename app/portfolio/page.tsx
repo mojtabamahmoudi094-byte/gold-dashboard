@@ -97,7 +97,7 @@ const normFa = (s: string) =>
 const MANUAL_PRICES_KEY = 'portfolio_manual_prices'
 
 const todayShamsi = () =>
-  new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' })
     .format(new Date())
 
 // همه‌ی مبالغ داخلی (تراکنش‌ها، محاسبات، دیتابیس) بر حسب ریال ذخیره/محاسبه می‌شوند؛

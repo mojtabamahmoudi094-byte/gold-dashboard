@@ -503,7 +503,7 @@ export default function FundDetailPage() {
                     fontSize: 12, padding: '6px 16px', borderRadius: 8, fontFamily: 'inherit',
                     background: historyPage === 1 ? 'transparent' : `${t.accent}1A`,
                     border: `0.5px solid ${historyPage === 1 ? t.border : `${t.accent}59`}`,
-                    color: historyPage === 1 ? t.faint : t.accent,
+                    color: historyPage === 1 ? t.muted : t.accent,
                     cursor: historyPage === 1 ? 'not-allowed' : 'pointer',
                   }}
                 >
@@ -519,7 +519,7 @@ export default function FundDetailPage() {
                     fontSize: 12, padding: '6px 16px', borderRadius: 8, fontFamily: 'inherit',
                     background: historyPage >= Math.ceil(history.length / historyPerPage) ? 'transparent' : `${t.accent}1A`,
                     border: `0.5px solid ${historyPage >= Math.ceil(history.length / historyPerPage) ? t.border : `${t.accent}59`}`,
-                    color: historyPage >= Math.ceil(history.length / historyPerPage) ? t.faint : t.accent,
+                    color: historyPage >= Math.ceil(history.length / historyPerPage) ? t.muted : t.accent,
                     cursor: historyPage >= Math.ceil(history.length / historyPerPage) ? 'not-allowed' : 'pointer',
                   }}
                 >

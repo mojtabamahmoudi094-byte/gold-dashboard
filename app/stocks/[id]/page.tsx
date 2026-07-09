@@ -140,7 +140,7 @@ export default function IndustryPage() {
                       >
                         <td style={{ padding: '10px 14px', borderBottom: `1px solid ${line}` }}>
                           <div style={{ fontWeight: 700, color: text }}>{s.l18}</div>
-                          {!isMobile && <div style={{ fontSize: 10, color: muted, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.l30}</div>}
+                          {!isMobile && <div style={{ fontSize: 10, color: muted, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.l30}</div>}
                         </td>
                         <td style={{ padding: '10px 14px', borderBottom: `1px solid ${line}` }}>
                           {s.pc === null ? '—' : s.pc.toLocaleString('fa-IR')}

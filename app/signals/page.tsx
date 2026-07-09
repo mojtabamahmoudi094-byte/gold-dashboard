@@ -891,9 +891,13 @@ export default function SignalsPage() {
         if (c.telegram) {
           const fundLine = (f: FundRow) =>
             f.bubbleVaqei != null ? `${f.name} (حباب واقعی ${f.bubbleVaqei >= 0 ? '+' : ''}${f.bubbleVaqei.toFixed(1)}٪)` : f.name
+          const { data: { session: notifySession } } = await supabase.auth.getSession()
           fetch('/api/telegram-notify', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(notifySession?.access_token ? { Authorization: `Bearer ${notifySession.access_token}` } : {}),
+            },
             body: JSON.stringify({
               signal_type: c.sig.type,
               date: c.date,

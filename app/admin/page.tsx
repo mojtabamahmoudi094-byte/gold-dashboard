@@ -152,9 +152,13 @@ async function runSync(addLog: (msg: string) => void): Promise<void> {
 
   // ── Step 5: POST everything to server route (Render → Supabase) ──────────
   addLog('ارسال به سرور برای ذخیره در دیتابیس...')
+  const { data: { session } } = await supabase.auth.getSession()
   const saveRes = await fetch('/api/save-funds', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify({ rows, date, goldCache }),
   })
   const result = await saveRes.json()

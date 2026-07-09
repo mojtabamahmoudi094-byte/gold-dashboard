@@ -547,7 +547,7 @@ export default function TerminalPage() {
                   fontSize: 12, padding: '6px 16px', borderRadius: 8, fontFamily: 'inherit',
                   background: page === 1 ? 'transparent' : `${t.accent}1A`,
                   border: `0.5px solid ${page === 1 ? t.border : `${t.accent}59`}`,
-                  color: page === 1 ? t.faint : t.accent,
+                  color: page === 1 ? t.muted : t.accent,
                   cursor: page === 1 ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -563,7 +563,7 @@ export default function TerminalPage() {
                   fontSize: 12, padding: '6px 16px', borderRadius: 8, fontFamily: 'inherit',
                   background: page >= Math.ceil(records.length / perPage) ? 'transparent' : `${t.accent}1A`,
                   border: `0.5px solid ${page >= Math.ceil(records.length / perPage) ? t.border : `${t.accent}59`}`,
-                  color: page >= Math.ceil(records.length / perPage) ? t.faint : t.accent,
+                  color: page >= Math.ceil(records.length / perPage) ? t.muted : t.accent,
                   cursor: page >= Math.ceil(records.length / perPage) ? 'not-allowed' : 'pointer',
                 }}
               >
