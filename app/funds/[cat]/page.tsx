@@ -14,6 +14,7 @@ const CAT_MAP: Record<string, { label: string; category: string; color: string }
   leveraged: { label: 'اهرمی', category: 'اهرمی', color: 'oklch(0.72 0.19 25)' },
   sector:    { label: 'بخشی',  category: 'بخشی',  color: 'oklch(0.76 0.14 210)' },
   equity:    { label: 'سهامی', category: 'سهامی', color: 'oklch(0.78 0.13 300)' },
+  'fixed-income': { label: 'درآمد ثابت', category: 'درآمد ثابت', color: 'oklch(0.70 0.12 165)' },
 }
 
 export default function FundsCatPage() {

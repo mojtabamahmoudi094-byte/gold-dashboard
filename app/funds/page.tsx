@@ -56,6 +56,24 @@ const CATS = [
   },
 ]
 
+const FIXED_INCOME = {
+  slug: 'fixed-income',
+  title: 'صندوق‌های درآمد ثابت',
+  desc: 'صندوق‌های سرمایه‌گذاری با درآمد ثابت قابل معامله — ریسک پایین، سود دوره‌ای',
+  color: 'oklch(0.70 0.12 165)',
+  borderColor: 'oklch(0.70 0.12 165 / 0.3)',
+  bgColor: 'oklch(0.70 0.12 165 / 0.07)',
+  tags: ['قیمت پایانی', 'جریان پول', 'رتبه‌بندی'],
+  icon: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.70 0.12 165)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="M3 10h18" />
+      <circle cx="7.5" cy="14.5" r="1.2" fill="oklch(0.70 0.12 165)" stroke="none" />
+      <path d="M12 14.5h6" />
+    </svg>
+  ),
+}
+
 const BOURSE = {
   title: 'صندوق‌های بورسی',
   desc: 'صندوق‌های سرمایه‌گذاری مبتنی بر سهام — اهرمی، بخشی و سهامی',
@@ -154,6 +172,56 @@ export default function FundsPage() {
               </div>
             </Link>
           ))}
+
+          <Link
+            href="/funds/fixed-income"
+            style={{
+              textDecoration: 'none',
+              display: 'block',
+              background: panel,
+              border: `0.5px solid ${FIXED_INCOME.borderColor}`,
+              borderRadius: 16,
+              padding: '24px',
+              transition: 'border-color 0.2s, background 0.2s, transform 0.15s',
+              cursor: 'pointer',
+              backdropFilter: 'blur(12px)',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = FIXED_INCOME.bgColor
+              ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = panel
+              ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 12,
+                background: FIXED_INCOME.bgColor,
+                border: `0.5px solid ${FIXED_INCOME.borderColor}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                {FIXED_INCOME.icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: text, marginBottom: 4 }}>{FIXED_INCOME.title}</div>
+                <div style={{ fontSize: 12, color: muted, lineHeight: 1.6 }}>{FIXED_INCOME.desc}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {FIXED_INCOME.tags.map(tag => (
+                <span key={tag} style={{
+                  fontSize: 10, padding: '3px 8px', borderRadius: 6,
+                  background: FIXED_INCOME.bgColor,
+                  border: `0.5px solid ${FIXED_INCOME.borderColor}`,
+                  color: FIXED_INCOME.color,
+                }}>{tag}</span>
+              ))}
+            </div>
+          </Link>
 
           <Link
             href="/funds/bourse"
