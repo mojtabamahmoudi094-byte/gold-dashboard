@@ -25,3 +25,8 @@ export const fmtPct = (n: number | null, decimals = 2) => {
   const sign = n > 0 ? '+' : ''
   return `${sign}${n.toLocaleString('fa-IR', { maximumFractionDigits: decimals })}٪`
 }
+
+/** تاریخ شمسی امروز به وقت تهران — قبلاً در چند صفحه جدا تعریف می‌شد */
+export const todayShamsi = () =>
+  new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' })
+    .format(new Date())

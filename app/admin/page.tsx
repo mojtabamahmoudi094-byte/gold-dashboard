@@ -2,43 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import { todayShamsi } from '../../lib/format'
 // supabase used only for auth (login/session), NOT for data queries (those go via /api/*)
 
 const BRSAPI_KEY = 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const BRSAPI_URL = `https://api.brsapi.ir/IME/Fund.php?key=${BRSAPI_KEY}`
-
-function toJalali(gy: number, gm: number, gd: number): [number, number, number] {
-  const g_y = gy - 1600
-  const g_m = gm - 1
-  const g_d = gd - 1
-  const isLeap = g_y % 4 === 0 && (g_y % 100 !== 0 || g_y % 400 === 0)
-  const g_days = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-  let g_day_no = 365 * g_y + Math.floor((g_y + 3) / 4) - Math.floor((g_y + 99) / 100) + Math.floor((g_y + 399) / 400)
-  for (let i = 0; i < g_m; i++) g_day_no += g_days[i]
-  g_day_no += g_d
-  let j_day_no = g_day_no - 79
-  const j_np = Math.floor(j_day_no / 12053)
-  j_day_no %= 12053
-  let jy = 979 + 33 * j_np + 4 * Math.floor(j_day_no / 1461)
-  j_day_no %= 1461
-  if (j_day_no >= 366) {
-    jy += Math.floor((j_day_no - 1) / 365)
-    j_day_no = (j_day_no - 1) % 365
-  }
-  const j_days = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29]
-  let jm = 0
-  for (; jm < 11; jm++) {
-    if (j_day_no < j_days[jm]) break
-    j_day_no -= j_days[jm]
-  }
-  return [jy, jm + 1, j_day_no + 1]
-}
-
-function todayShamsi(): string {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
-  const [y, m, d] = toJalali(now.getFullYear(), now.getMonth() + 1, now.getDate())
-  return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`
-}
 
 function pickStr(obj: Record<string, unknown>, ...keys: string[]): string | null {
   for (const k of keys) {

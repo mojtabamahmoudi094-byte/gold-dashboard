@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase as sb } from '../../../../lib/supabase'
 
 // ارزش کل معاملات بازار (سهام + صندوق‌های طلا/نقره/زعفران) — روزانه، از روی جدول market_watch
 // نکته: cat='stocks' از قبل شامل صندوق‌های اهرمی/بخشی/سهامی است (بورس سنج آن‌ها را همراه سهام
@@ -7,11 +7,6 @@ import { createClient } from '@supabase/supabase-js'
 // دوباره‌شماری ندارد.
 
 export const dynamic = 'force-dynamic'
-
-const sb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 const CATS = ['stocks', 'gold', 'silver', 'saffron'] as const
 const tehranDay = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' })

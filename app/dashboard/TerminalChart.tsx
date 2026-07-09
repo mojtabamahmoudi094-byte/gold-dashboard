@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { todayShamsi } from '../../lib/format'
 import {
   createChart,
   AreaSeries,
@@ -29,9 +30,6 @@ interface Props {
   isDark?: boolean
 }
 
-const todayShamsi = () =>
-  new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' })
-    .format(new Date())
 
 export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360, isDark = true }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)

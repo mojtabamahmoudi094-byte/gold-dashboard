@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase as sbClient } from '../../../lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,11 +10,6 @@ const CACHE_TTL     = 60_000
 
 let proCache:       { data: unknown; at: number } | null = null
 let commodityCache: { data: unknown; at: number } | null = null
-
-const sbClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 async function fetchWithCache(
   url: string,

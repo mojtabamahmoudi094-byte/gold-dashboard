@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase as sb } from '../../../lib/supabase'
 
 // سری زمانی سنجه‌های «رصد لحظه‌ای بازار» — ردیف‌های آخرین روز معاملاتی موجود
 // ?cat=stocks (پیش‌فرض) — خروجی: { cat, date, rows: [{ ts, ...d }] }
 
 export const dynamic = 'force-dynamic'
-
-const sb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 const tehranDay = (iso: string) =>
   new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' })

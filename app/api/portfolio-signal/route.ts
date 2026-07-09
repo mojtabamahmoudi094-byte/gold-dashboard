@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase as sb } from '../../../lib/supabase'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -76,10 +76,6 @@ export async function GET() {
   // قیمت روز سهام: اول Supabase (هر ۵ دقیقه بروز)، بعد fallback فایل استاتیک
   let industries: any = null
   try {
-    const sb = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
     const { data } = await sb.from('stock_industries').select('data').eq('id', 1).maybeSingle()
     if (data?.data) industries = data.data
   } catch { /* fallback پایین */ }

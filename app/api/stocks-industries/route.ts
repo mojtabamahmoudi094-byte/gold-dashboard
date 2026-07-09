@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase as sb } from '../../../lib/supabase'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -8,11 +8,6 @@ import path from 'path'
 // اگر Supabase در دسترس نبود، fallback به فایل استاتیک public/stocks/industries.json
 
 export const dynamic = 'force-dynamic'
-
-const sb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export async function GET() {
   try {

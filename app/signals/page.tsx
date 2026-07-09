@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
-import { safe } from '../../lib/format'
+import { safe, todayShamsi } from '../../lib/format'
 import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, computeSilverBubble, silverFundBubbleZati, SILVER_FUND_WEIGHTS, type MarketBubbles } from '../../lib/goldBubbles'
 import { computeStockSignal, type Reports } from '../../lib/stockInsights'
 
@@ -19,9 +19,6 @@ const fmtM = (v: number) => {
   const m = Math.round(v / 1e6)
   return `${m >= 0 ? '+' : ''}${m.toLocaleString('fa-IR')}M`
 }
-const todayShamsi = () =>
-  new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' })
-    .format(new Date())
 
 // روزهای بعد از سیگنال — برای چارت مستطیلی نتیجه ۱۰ روزه
 function getDailyOutcomes(signalDate: string, signalType: string, dts: string[], pm: Record<string, number>, maxN: number): (number | null)[] {
