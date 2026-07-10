@@ -22,9 +22,12 @@
 const path = require('path')
 const fs   = require('fs')
 
-const { buildSymbol, sbClient } = require('./codal-company-reports.js')
+const { buildSymbol, sbClient, OUT_DIR } = require('./codal-company-reports.js')
 
 const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHAT_ID
+const SITE = process.env.SITE_URL || 'https://bourssanj.ir'
 const DRY = process.argv.includes('--dry')
 const hoursIdx = process.argv.indexOf('--hours')
 const HOURS = hoursIdx !== -1 ? Number(process.argv[hoursIdx + 1]) : 36
@@ -46,12 +49,75 @@ const norm = (s) => String(s || '')
   .replace(/[‌‎‏‪-‮]/g, ' ').replace(/\s+/g, ' ').trim()
 
 // همان فیلترهای codal-company-reports.js — فقط گزارش‌هایی که واقعاً پارس می‌کنیم
+const isMonthlyTitle   = (t) => /گزارش فعالیت ماهانه/.test(t)
+const isQuarterlyTitle = (t) =>
+  (/میاندوره|میان دوره/.test(t.replace(/‌/g, '')) && /دوره (۳|۶|۹|3|6|9) ماهه/.test(t)) ||
+  /^صورت های مالی\s+سال مالی منتهی به/.test(t.replace(/‌/g, ' '))
 const isInteresting = (title) => {
   const t = norm(title)
-  if (/گزارش فعالیت ماهانه/.test(t)) return true
-  if (/میاندوره|میان دوره/.test(t.replace(/‌/g, '')) && /دوره (۳|۶|۹|3|6|9) ماهه/.test(t)) return true
-  if (/^صورت های مالی\s+سال مالی منتهی به/.test(t.replace(/‌/g, ' '))) return true
-  return false
+  return isMonthlyTitle(t) || isQuarterlyTitle(t)
+}
+
+// ═══ خلاصهٔ نکات مهم برای تلگرام — فقط از همان اعداد پارس‌شده، بدون LLM ═══
+const faNumFmt = (v, dec = 0) =>
+  v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toLocaleString('fa-IR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
+const pctChange = (cur, prev) => (cur == null || prev == null || prev === 0) ? null : ((cur - prev) / Math.abs(prev)) * 100
+
+function summarizeMonth(m) {
+  const lines = [`📦 فعالیت ماهانه ${m.period}`]
+  if (m.kind === 'portfolio') {
+    lines.push(`ارزش پرتفوی: ${faNumFmt(m.totalMv)} میلیون ریال`)
+    if (m.gain != null) lines.push(`${m.gain >= 0 ? '📈 سود' : '📉 زیان'} انباشته: ${faNumFmt(Math.abs(m.gain))} میلیون ریال`)
+  } else if (m.kind === 'bank') {
+    lines.push(`درآمد محقق‌شده ماه: ${faNumFmt(m.month)} میلیون ریال`)
+    lines.push(`هزینه محقق‌شده ماه: ${faNumFmt(m.expense_m)} میلیون ریال`)
+  } else {
+    lines.push(`فروش ماه: ${faNumFmt(m.month)} میلیون ریال`)
+    const pct = pctChange(m.cum, m.lastYearCum)
+    lines.push(`فروش تجمعی: ${faNumFmt(m.cum)} میلیون ریال${pct == null ? '' : ` (${pct >= 0 ? 'رشد' : 'کاهش'} ${faNumFmt(Math.abs(pct), 1)}٪ نسبت به سال قبل)`}`)
+  }
+  return lines.join('\n')
+}
+
+function summarizeQuarter(q) {
+  const lines = [`📊 صورت مالی ${q.period} (دوره ${q.months} ماهه${q.audited ? '، حسابرسی‌شده' : ''})`]
+  if (q.revenue != null) lines.push(`درآمد عملیاتی: ${faNumFmt(q.revenue)} میلیون ریال`)
+  if (q.net != null) {
+    const pct = pctChange(q.net, q.net_ly)
+    lines.push(`سود(زیان) خالص: ${faNumFmt(q.net)} میلیون ریال${pct == null ? '' : ` (${pct >= 0 ? 'رشد' : 'کاهش'} ${faNumFmt(Math.abs(pct), 1)}٪ نسبت به دورهٔ مشابه)`}`)
+  }
+  if (q.eps != null) lines.push(`سود هر سهم: ${faNumFmt(q.eps)} ریال`)
+  return lines.join('\n')
+}
+
+// symbol, و عناوین اطلاعیه‌هایی که برای همین اجرا «تازه» تشخیص داده شدند (تعیین می‌کند ماهانه/فصلی کدام‌یک واقعاً جدیدند)
+function buildKeyPoints(symbol, payload, freshTitles) {
+  const hasMonthly   = freshTitles.some(isMonthlyTitle)
+  const hasQuarterly = freshTitles.some(isQuarterlyTitle)
+  const blocks = []
+  if (hasMonthly && payload.months.length) blocks.push(summarizeMonth(payload.months[payload.months.length - 1]))
+  if (hasQuarterly && payload.quarters.length) blocks.push(summarizeQuarter(payload.quarters[payload.quarters.length - 1]))
+  if (!blocks.length) return null
+
+  return [
+    `🆕 گزارش جدید کدال — نماد ${symbol} — بورس سنج`,
+    ...blocks,
+    `${SITE}/stock/${encodeURIComponent(symbol)}`,
+    '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
+  ].join('\n\n')
+}
+
+async function sendTelegram(text) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — اعلان ارسال نشد'); return }
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }),
+    })
+    const data = await res.json()
+    if (!data.ok) log(`⚠️ ارسال تلگرام ناموفق: ${data.description || 'نامشخص'}`)
+  } catch (e) { log(`⚠️ ارسال تلگرام خطا داد: ${e.message}`) }
 }
 
 const toLatin = (s) => String(s || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
@@ -176,8 +242,16 @@ async function main() {
   for (const s of symbols) {
     try {
       const status = await buildSymbol(s, { force: true })
-      if (status === 'ok') built.add(s)
-      else { fail++; log(`⚠️ ${s}: ${status}`) }
+      if (status === 'ok') {
+        built.add(s)
+        try {
+          const outFile = path.join(OUT_DIR, `${s.replace(/\s+/g, '-')}.json`)
+          const payload = JSON.parse(fs.readFileSync(outFile, 'utf8'))
+          const freshTitles = fresh.filter(a => a.symbol === s).map(a => norm(a.title))
+          const text = buildKeyPoints(s, payload, freshTitles)
+          if (text) await sendTelegram(text)
+        } catch (e) { log(`⚠️ ${s}: ساخت/ارسال خلاصه تلگرام شکست خورد — ${e.message}`) }
+      } else { fail++; log(`⚠️ ${s}: ${status}`) }
     } catch (e) { fail++; log(`❌ ${s}: ${e.message}`) }
     await sleep(4000)
   }
