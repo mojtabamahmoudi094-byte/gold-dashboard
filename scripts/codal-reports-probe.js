@@ -41,8 +41,9 @@ async function dumpExcel(a, tag, XLSX) {
   console.log('  link_excel:', a.link_excel || '—')
 
   // اول link_excel اگر بود، وگرنه صفحه پیوست
+  // link_excel را unmask نکن — id در path است و %2f را IIS کدال ۴۰۴ می‌دهد
   const tryUrls = []
-  if (a.link_excel) tryUrls.push({ url: unmask(a.link_excel), ref: '' })
+  if (a.link_excel) tryUrls.push({ url: a.link_excel, ref: '' })
 
   const attUrl = a.link_attachment || a.link || ''
   let cookies = ''
