@@ -118,6 +118,13 @@ export default function Footer() {
 
       </div>
 
+      {/* سلب مسئولیت */}
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 6vw' }}>
+        <p style={{ fontSize: 12, lineHeight: 1.9, color: MUTED, margin: 0, paddingBottom: 20 }}>
+          تمامی داده‌ها، سیگنال‌ها و تحلیل‌های ارائه‌شده در بورس سنج صرفاً جنبه اطلاع‌رسانی دارند و توصیه سرمایه‌گذاری یا خرید و فروش محسوب نمی‌شوند. مسئولیت هرگونه تصمیم مالی بر عهده خود کاربر است.
+        </p>
+      </div>
+
       {/* Bottom bar */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', maxWidth: 1400, margin: '0 auto', padding: '20px 6vw', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 13, color: MUTED }}>ساخته‌شده برای فعالان بازار سرمایه ایران</span>
