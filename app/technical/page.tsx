@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { useIsMobile } from '../../lib/useIsMobile'
-import { GREEN, RED } from './TechnicalChart'
+import { GREEN, RED } from './colors'
 
 type IdxRow = { index_name: string; trade_date: string; trade_date_shamsi: string; value: number; change_pct: number | null }
 type SymRow = { l18: string; pcp: number | null }
