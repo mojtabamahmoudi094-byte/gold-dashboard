@@ -47,7 +47,13 @@ if (!PROBE && (!SUPABASE_URL || !SUPABASE_KEY)) {
 }
 
 const { createClient } = require('@supabase/supabase-js')
-const sb = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null
+
+// Node < 22 وب‌سوکت بومی ندارد — پکیج ws را صریح پاس می‌دهیم (الگوی backfill-bourse-history.js)
+let wsTransport
+try { wsTransport = require('ws') } catch { /* Node 22+ بدون ws هم کار می‌کند */ }
+const sb = (SUPABASE_URL && SUPABASE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_KEY, wsTransport ? { realtime: { transport: wsTransport } } : {})
+  : null
 
 const allSymbolsUrl = () => `https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${BRSAPI_KEY}`
 const indexUrl = (type) => `https://Api.BrsApi.ir/Tsetmc/Index.php?key=${BRSAPI_KEY}&type=${type}`
