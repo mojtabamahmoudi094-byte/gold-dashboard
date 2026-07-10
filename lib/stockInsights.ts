@@ -14,12 +14,13 @@ export type RHolding = {
   dq: number | null; dc: number | null; dmv: number | null
   own: number | null; c1: number | null; mv1: number | null
 }
-// سه فرم گزارش ماهانه کدال: تولیدی (محصولات)، پرتفوی (شرکت سرمایه‌گذاری)، بانک (اجزای درآمد)
-export type MonthKind = 'production' | 'portfolio' | 'bank'
+// فرم‌های گزارش ماهانه کدال: تولیدی (محصولات)، پرتفوی (شرکت سرمایه‌گذاری)،
+// بانک (درآمد + هزینه محقق‌شده)، خدماتی (فقط درآمد — مخابرات، پیمانکاری، انبوه‌سازی، بورس‌ها)
+export type MonthKind = 'production' | 'portfolio' | 'bank' | 'service'
 export type RMonth = {
   period: string; publish: string | null
   kind?: MonthKind
-  // تولیدی و بانک
+  // تولیدی، بانک و خدماتی
   month?: number | null; cum?: number | null; lastYearCum?: number | null
   products?: RProduct[]
   // بانک
@@ -48,6 +49,27 @@ export const monthLabel = (period: string) => {
 
 export const growth = (cur: number | null | undefined, prev: number | null | undefined) =>
   cur == null || prev == null || prev === 0 ? null : ((cur - prev) / Math.abs(prev)) * 100
+
+const periodParts = (p: string) => {
+  const m = p.match(/^(\d{4})\/(\d{2})/)
+  return m ? { y: Number(m[1]), mo: Number(m[2]) } : null
+}
+
+// رشد نسبت به سال قبل، با مبنایی که واقعاً در دسترس است.
+// فرم تولیدی ستون «تجمعی دوره مشابه سال قبل» دارد → مبنای «تجمعی».
+// فرم بانک/خدماتی ندارد → همان ماه در سال قبل را از سری ذخیره‌شدهٔ خودمان برمی‌داریم.
+export function monthlyYoY(months: RMonth[], m: RMonth): { pct: number; basis: 'cum' | 'month' } | null {
+  const cumYoY = growth(m.cum, m.lastYearCum)
+  if (cumYoY !== null) return { pct: cumYoY, basis: 'cum' }
+  const p = periodParts(m.period)
+  if (!p) return null
+  const ly = months.find(x => {
+    const q = periodParts(x.period)
+    return q && q.y === p.y - 1 && q.mo === p.mo
+  })
+  const pct = ly ? growth(m.month, ly.month) : null
+  return pct === null ? null : { pct, basis: 'month' }
+}
 
 // تحلیل قاعده‌محور از گزارش‌های هر سهم — همراه با score خام برای رتبه‌بندی/سیگنال
 export function buildInsights(months: RMonth[], quarters: RQuarter[]): { verdict: Insight; items: Insight[]; score: number } {
@@ -78,21 +100,41 @@ export function buildInsights(months: RMonth[], quarters: RQuarter[]): { verdict
     if (hs.length) items.push({ tone: 'neutral', text: `پرتفوی بورسی شامل ${hs.length.toLocaleString('fa-IR')} شرکت است.` })
   }
 
-  // ── تولیدی و بانک: فروش/درآمد ماهانه ──
+  // ── تولیدی، بانک و خدماتی: فروش/درآمد ماهانه ──
   if (kind !== 'portfolio' && months.length >= 2) {
-    const noun = kind === 'bank' ? 'درآمد' : 'فروش'
+    const noun = kind === 'production' ? 'فروش' : 'درآمد'
     const last = months[months.length - 1], prev = months[months.length - 2]
     const mom = growth(last.month, prev.month)
-    const yoy = growth(last.cum, last.lastYearCum)
+    const yoy = monthlyYoY(months, last)
     if (mom !== null) {
       items.push({ tone: mom >= 0 ? 'pos' : 'neg', text: `${noun} ${monthLabel(last.period)} نسبت به ماه قبل ${mom >= 0 ? 'رشد' : 'افت'} ${fa0(mom)}٪ داشته است.` })
       score += mom >= 0 ? 1 : -1
     }
     if (yoy !== null) {
-      items.push({ tone: yoy >= 0 ? 'pos' : 'neg', text: `${noun} تجمعی سال مالی نسبت به دوره مشابه سال قبل ${yoy >= 0 ? '+' : '−'}${fa0(yoy)}٪ تغییر کرده است.` })
-      score += yoy >= 0 ? 1 : -1
+      const subject = yoy.basis === 'cum' ? `${noun} تجمعی سال مالی` : `${noun} ${monthLabel(last.period)}`
+      items.push({ tone: yoy.pct >= 0 ? 'pos' : 'neg', text: `${subject} نسبت به دوره مشابه سال قبل ${yoy.pct >= 0 ? '+' : '−'}${fa0(yoy.pct)}٪ تغییر کرده است.` })
+      score += yoy.pct >= 0 ? 1 : -1
     }
-    // روند نرخ فروش محصول اصلی (بانک‌ها نرخ ندارند)
+    // بانک: تراز درآمد−هزینه، کارایی (Cost/Income) و ترکیب درآمد
+    if (kind === 'bank' && last.month != null && last.expense_m != null) {
+      const net = last.month - last.expense_m
+      items.push({ tone: net >= 0 ? 'pos' : 'neg', text: `تراز درآمد منهای هزینه در ${monthLabel(last.period)} ${net >= 0 ? 'مثبت' : 'منفی'} بوده است.` })
+      score += net >= 0 ? 1 : -1
+
+      if (last.month > 0) {
+        const ci = (last.expense_m / last.month) * 100
+        const tone: Tone = ci <= 70 ? 'pos' : ci <= 90 ? 'neutral' : 'neg'
+        items.push({ tone, text: `نسبت هزینه به درآمد ${fa0(ci)}٪ است${ci <= 70 ? ' که کارایی مطلوبی نشان می‌دهد' : ci > 90 ? ' که فشار هزینه‌ای بالایی است' : ''}.` })
+        if (tone !== 'neutral') score += tone === 'pos' ? 1 : -1
+
+        const facil = (last.products ?? []).find(p => /تسهیلات/.test(p.name))
+        if (facil?.amount_m != null) {
+          items.push({ tone: 'neutral', text: `${fa0((facil.amount_m / last.month) * 100)}٪ درآمد ماه از تسهیلات اعطایی بوده است.` })
+        }
+      }
+    }
+
+    // روند نرخ فروش محصول اصلی (بانک و خدماتی نرخ ندارند)
     const mainP = (last.products ?? []).filter(p => (p.amount_m ?? 0) > 0 && (p.rate_m ?? 0) > 0).sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))[0]
     if (mainP) {
       const ser = months.map(m => (m.products ?? []).find(x => x.name === mainP.name)?.rate_m ?? null).filter((v): v is number => v !== null && v > 0)

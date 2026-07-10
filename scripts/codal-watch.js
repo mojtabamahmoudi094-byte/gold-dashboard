@@ -93,14 +93,21 @@ function prevMonthEntry(months, cur) {
 // رشد فروشِ خودِ ماه نسبت به ماه مشابه سال قبل:
 //   اول سال مالی (cum == month): «تجمعی مشابه سال قبل» خودش همان یک ماه است
 //   وسط سال: تفاضل «تجمعی مشابه سال قبل» این ماه و ماه قبل = فروش ماه مشابه سال قبل
-function monthYoY(m, prev) {
-  if (m.month == null || m.lastYearCum == null) return null
-  if (m.cum != null && Math.abs(m.cum - m.month) <= Math.abs(m.cum) * 0.005) return pctChange(m.month, m.lastYearCum)
-  if (prev && prev.lastYearCum != null) {
-    const lastYearMonth = m.lastYearCum - prev.lastYearCum
-    if (lastYearMonth > 0) return pctChange(m.month, lastYearMonth)
+function monthYoY(months, m, prev) {
+  if (m.month == null) return null
+  if (m.lastYearCum != null) {
+    if (m.cum != null && Math.abs(m.cum - m.month) <= Math.abs(m.cum) * 0.005) return pctChange(m.month, m.lastYearCum)
+    if (prev && prev.lastYearCum != null) {
+      const lastYearMonth = m.lastYearCum - prev.lastYearCum
+      if (lastYearMonth > 0) return pctChange(m.month, lastYearMonth)
+    }
+    return null
   }
-  return null
+  // فرم بانک/خدماتی ستون سال قبل ندارد — همان ماه در سال قبل را از سری خودمان برمی‌داریم
+  const p = periodParts(m.period)
+  if (!p) return null
+  const ly = months.find(x => { const q = periodParts(x.period); return q && q.y === p.y - 1 && q.mo === p.mo })
+  return ly ? pctChange(m.month, ly.month) : null
 }
 
 // برچسب rule-based — فقط از روی رشد واقعی فروش، بدون قضاوت LLM
@@ -121,25 +128,43 @@ function summarizeMonth(symbol, months, m) {
     lines.push(`✅ ارزش پرتفوی: ${toman(m.totalMv)} میلیارد تومان`)
     if (m.gain != null) lines.push(`${m.gain >= 0 ? '📈 سود' : '📉 زیان'} انباشته پرتفوی: ${toman(Math.abs(m.gain))} میلیارد تومان`)
   } else if (m.kind === 'bank') {
-    lines.push(`✅ درآمد محقق‌شده ${monthName(m.period)}: ${toman(m.month)} میلیارد تومان`)
-    if (m.expense_m != null) lines.push(`💸 هزینه محقق‌شده ماه: ${toman(m.expense_m)} میلیارد تومان`)
-  } else {
     const prev = prevMonthEntry(months, m)
-    const yoy = monthYoY(m, prev)
+    const yoy = monthYoY(months, m, prev)
+    const mom = prev ? pctChange(m.month, prev.month) : null
+    lines.push(`✅ درآمد محقق‌شده ${monthName(m.period)}: ${toman(m.month)} میلیارد تومان`)
+    if (m.expense_m != null) {
+      lines.push(`💸 هزینه محقق‌شده ماه: ${toman(m.expense_m)} میلیارد تومان`)
+      const net = m.month - m.expense_m
+      lines.push(`${net >= 0 ? '💰' : '🔻'} تراز درآمد منهای هزینه: ${toman(Math.abs(net))} میلیارد تومان${net < 0 ? ' (منفی)' : ''}`)
+      if (m.month > 0) lines.push(`⚖️ نسبت هزینه به درآمد: ${faNumFmt((m.expense_m / m.month) * 100, 0)}٪`)
+    }
+    const facil = (m.products || []).find(p => /تسهیلات/.test(p.name))
+    if (facil?.amount_m != null && m.month > 0) lines.push(`🏦 سهم درآمد تسهیلات: ${faNumFmt((facil.amount_m / m.month) * 100, 0)}٪`)
+    if (yoy != null) lines.push(`🔝 رشد درآمد نسبت به ماه مشابه سال قبل: ${faNumFmt(yoy, 0)}٪`)
+    if (mom != null) lines.push(`⬆️ رشد درآمد نسبت به ماه قبل: ${faNumFmt(mom, 0)}٪`)
+    const pe = peOf(symbol)
+    if (pe != null) lines.push(`🔴 P/E ttm: ${faNumFmt(pe, 1)}`)
+    const v = verdict(yoy, false)
+    if (v?.tail) lines.push('', v.tail)
+  } else {
+    // خدماتی/پیمانکاری/انبوه‌سازی «درآمد» گزارش می‌کنند و ستون دوره مشابه سال قبل ندارند
+    const noun = m.kind === 'service' ? 'درآمد' : 'فروش'
+    const prev = prevMonthEntry(months, m)
+    const yoy = monthYoY(months, m, prev)
     const mom = prev ? pctChange(m.month, prev.month) : null
     const withMonth = months.filter(x => x.month != null)
     const isRecord = withMonth.length >= 4 && m.month != null && m.month >= Math.max(...withMonth.map(x => x.month))
     const v = verdict(yoy, isRecord)
 
     if (v?.head) lines.push(v.head, '')
-    if (isRecord) lines.push(`✅ بیشترین فروش ماهانه در بین ${faNumFmt(withMonth.length)} ماه اخیر`, '')
-    lines.push(`✅ مبلغ فروش ${monthName(m.period)}: ${toman(m.month)} میلیارد تومان`)
-    if (yoy != null) lines.push(`🔝 رشد فروش نسبت به ماه مشابه سال قبل: ${faNumFmt(yoy, 0)}٪`)
+    if (isRecord) lines.push(`✅ بیشترین ${noun} ماهانه در بین ${faNumFmt(withMonth.length)} ماه اخیر`, '')
+    lines.push(`✅ مبلغ ${noun} ${monthName(m.period)}: ${toman(m.month)} میلیارد تومان`)
+    if (yoy != null) lines.push(`🔝 رشد ${noun} نسبت به ماه مشابه سال قبل: ${faNumFmt(yoy, 0)}٪`)
     else {
       const cumYoY = pctChange(m.cum, m.lastYearCum)
-      if (cumYoY != null) lines.push(`🔝 رشد فروش تجمعی نسبت به سال قبل: ${faNumFmt(cumYoY, 0)}٪`)
+      if (cumYoY != null) lines.push(`🔝 رشد ${noun} تجمعی نسبت به سال قبل: ${faNumFmt(cumYoY, 0)}٪`)
     }
-    if (mom != null) lines.push(`⬆️ رشد فروش نسبت به ماه قبل: ${faNumFmt(mom, 0)}٪`)
+    if (mom != null) lines.push(`⬆️ رشد ${noun} نسبت به ماه قبل: ${faNumFmt(mom, 0)}٪`)
     const pe = peOf(symbol)
     if (pe != null) lines.push(`🔴 P/E ttm: ${faNumFmt(pe, 1)}`)
     if (v?.tail) lines.push('', v.tail)

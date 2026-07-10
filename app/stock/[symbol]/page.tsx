@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
-import { buildInsights, monthLabel, growth, type RMonth, type RQuarter, type RHolding, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
+import { buildInsights, monthLabel, growth, monthlyYoY, type RMonth, type RQuarter, type RHolding, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
 
 type Sym = {
   l18: string; l30: string
@@ -229,6 +229,14 @@ export default function StockPage() {
                 reports.months[reports.months.length - 1].kind === 'portfolio'
                   ? <PortfolioSection months={reports.months} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
                   : <MonthlySection months={reports.months} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
+              )}
+              {/* بعضی شرکت‌ها (باشگاه‌های ورزشی، برخی سرمایه‌گذاری‌ها) اصلاً گزارش ماهانه منتشر نمی‌کنند */}
+              {reports && reports.months.length === 0 && reports.quarters.length > 0 && (
+                <SectionCard title="گزارش فعالیت ماهانه" accent={M_ACCENT} t={{ panel, text, muted, line, isDark }}>
+                  <div style={{ fontSize: 12.5, color: muted, lineHeight: 1.9, padding: '6px 0' }}>
+                    این شرکت گزارش فعالیت ماهانه در کدال منتشر نمی‌کند؛ عملکرد آن در صورت‌های مالی دوره‌ای زیر بررسی شده است.
+                  </div>
+                </SectionCard>
               )}
               {reports && reports.quarters.length > 0 && (
                 <QuarterlyFinSection quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
@@ -521,15 +529,21 @@ function PortfolioSection({ months, t, isMobile }: { months: RMonth[]; t: Theme;
   )
 }
 
-// ═══ گزارش فعالیت ماهانه — فرم تولیدی (فروش محصولات) و بانک (اجزای درآمد) ═══
+// ═══ گزارش فعالیت ماهانه — تولیدی (فروش محصولات)، بانک (درآمد + هزینه)، خدماتی (فقط درآمد) ═══
 function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; isMobile: boolean }) {
   const last = months[months.length - 1]
   const prev = months.length > 1 ? months[months.length - 2] : null
   const isBank = last.kind === 'bank'
-  const noun = isBank ? 'درآمد' : 'فروش'
+  // فرم‌های بدون محصول (بانک/خدماتی) «درآمد» گزارش می‌کنند، نه «فروش»
+  const isProduction = (last.kind ?? 'production') === 'production'
+  const noun = isProduction ? 'فروش' : 'درآمد'
   const mom = growth(last.month, prev?.month ?? null)
-  const yoy = growth(last.cum, last.lastYearCum)
+  const yoy = monthlyYoY(months, last)
   const maxM = Math.max(...months.map(m => m.month ?? 0), 1)
+
+  // بانک: سود واقعی در تراز است، نه در «فروش» — تراز ماه و کارایی (Cost/Income)
+  const bankNet = isBank && last.month != null && last.expense_m != null ? last.month - last.expense_m : null
+  const costIncome = isBank && last.expense_m != null && last.month ? (last.expense_m / last.month) * 100 : null
 
   const topProducts = (last.products ?? [])
     .filter(p => (p.amount_m ?? 0) > 0)
@@ -560,9 +574,20 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
         <Chip t={t} label={`${noun} ${monthLabel(last.period)}`} value={mrial(last.month)} color={M_ACCENT} />
         <Chip t={t} label="نسبت به ماه قبل" value={gPct(mom)} color={mom === null ? undefined : mom >= 0 ? GREEN : RED} />
         <Chip t={t} label={`${noun} تجمعی سال مالی`} value={mrial(last.cum)} />
-        {isBank
-          ? <Chip t={t} label="هزینه محقق‌شده ماه" value={mrial(last.expense_m)} color={RED} />
-          : <Chip t={t} label="رشد نسبت به دوره مشابه سال قبل" value={gPct(yoy)} color={yoy === null ? undefined : yoy >= 0 ? GREEN : RED} />}
+        {/* فرم خدماتی ستون «تجمعی دوره مشابه سال قبل» ندارد → مقایسه با همان ماه سال قبل */}
+        {yoy !== null && (
+          <Chip
+            t={t}
+            label={yoy.basis === 'cum' ? 'رشد تجمعی نسبت به سال قبل' : 'رشد نسبت به ماه مشابه سال قبل'}
+            value={gPct(yoy.pct)}
+            color={yoy.pct >= 0 ? GREEN : RED}
+          />
+        )}
+        {isBank && <>
+          <Chip t={t} label="هزینه محقق‌شده ماه" value={mrial(last.expense_m)} color={RED} />
+          {bankNet !== null && <Chip t={t} label="تراز درآمد منهای هزینه" value={mrial(bankNet)} color={bankNet >= 0 ? GREEN : RED} />}
+          {costIncome !== null && <Chip t={t} label="نسبت هزینه به درآمد" value={`${costIncome.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}٪`} color={costIncome <= 70 ? GREEN : costIncome > 90 ? RED : undefined} />}
+        </>}
       </div>
 
       {/* روند فروش/درآمد ماهانه */}
@@ -599,7 +624,7 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
       {topProducts.length > 0 && (
         <>
           <div style={{ fontSize: 11, color: t.muted, margin: '20px 0 10px' }}>
-            {isBank ? 'اجزای درآمد' : 'محصولات برتر'} {monthLabel(last.period)}
+            {isProduction ? 'محصولات برتر' : 'اجزای درآمد'} {monthLabel(last.period)}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {topProducts.map(p => (

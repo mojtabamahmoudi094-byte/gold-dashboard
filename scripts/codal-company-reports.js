@@ -261,45 +261,79 @@ function parseMonthlyPortfolio(wb) {
   return null
 }
 
-// ═══ گزارش ماهانه بانک‌ها: اجزای درآمد و هزینه محقق‌شده ═══
-// شیت درآمد: شرح | درآمد محقق شده طی دوره | جمع درآمد محقق شده از ابتدای سال
-// شیت هزینه: شرح | هزینه محقق شده طی دوره | جمع هزینه محقق شده از ابتدای سال
-// روی همان شکل products/month/cum نگاشت می‌شود تا نمودار ماهانه مشترک بماند. میلیون ریال.
-// هدر و ستون «محقق شده طی دوره» را هر جای شیت پیدا می‌کند (عبارت بین ماه‌ها فرق دارد)
-function parseBankTable(wb, headRe) {
-  for (const sn of wb.SheetNames) {
-    const rows = sheetRows(wb, sn)
-    for (let hi = 0; hi < Math.min(rows.length, 4); hi++) {
-      const ci = rows[hi].findIndex(c => headRe.test(norm(c)))
-      if (ci < 1) continue                       // ستون ۰ همان «شرح» است
-      const items = []
-      for (const r of rows.slice(hi + 1)) {
-        const name = norm(r[0])
-        const amount_m = faNum(r[ci])
-        if (!name || amount_m === null) continue
-        if (name.startsWith('جمع') || name.startsWith('سرفصل')) continue
-        items.push({ name, unit: null, prod_m: null, qty_m: null, rate_m: null, amount_m, amount_cum: faNum(r[ci + 1]) })
-      }
-      if (items.length) return items
-    }
+// ═══ گزارش ماهانه بدون محصول: بانک، خدماتی/قراردادی، انبوه‌سازی ═══
+// هر سه یک شکل دارند — «شرح» در ستون ۰ و یک ستون «… طی دوره …» که مبلغ خودِ ماه است.
+// ستون‌ها را از متن هدر پیدا می‌کنیم، نه از جای ثابت: چند ستون «از ابتدای سال مالی تا …»
+// وجود دارد (تجمعی تا ماه قبل، اصلاح‌شده، تجمعی جاری) و انتخاب نادرست، تجمعیِ ماه قبل را
+// به‌جای فروش ماه می‌نشاند.
+//
+//   بانک/انبوه‌سازی: شرح | تجمعی تا ماه قبل | اصلاحات | اصلاح‌شده | ⟨طی دوره⟩ | ⟨جمع از ابتدای سال⟩
+//   خدماتی:        شرح | تاریخ عقد | مدت | تجمعی تا ماه قبل | اصلاحات | اصلاح‌شده | ⟨طی دوره⟩ | ⟨از اول سال⟩ | کل سال مالی قبل
+//
+// ستون آخرِ فرم خدماتی «تا پایان دوره مالی منتهی به ۱۴۰۴/۱۲/۲۹» است — کل سال مالی قبل،
+// نه دوره مشابه. پس lastYearCum را null می‌گذاریم؛ مقایسهٔ ۳ ماه با ۱۲ ماه معنا ندارد.
+const MONTH_COL_RE = /(طی|طي) (دوره|ماه)/
+const CUM_COL_RE   = /از (ابتدای|اول) سال مالی تا/
+
+function findRevenueCols(rows) {
+  for (let hi = 0; hi < Math.min(rows.length, 4); hi++) {
+    const cells = rows[hi].map(norm)
+    const mi = cells.findIndex(c => MONTH_COL_RE.test(c))
+    if (mi < 1) continue                          // ستون ۰ همان «شرح» است
+    const ci = cells.findIndex((c, j) => j > mi && CUM_COL_RE.test(c) && !/اصلاح/.test(c))
+    return { hi, mi, ci: ci === -1 ? null : ci, head: cells[mi] }
   }
   return null
 }
 
-function parseMonthlyBank(wb) {
-  const income = parseBankTable(wb, /^درآمد.*محقق شده/)
-  if (!income) return null
-  const expense = parseBankTable(wb, /^هزینه.*محقق شده/) || []
-  const sum = (a, k) => a.reduce((s, x) => s + (x[k] ?? 0), 0)
+// همهٔ جدول‌های «درآمد/هزینه طی دوره» در کل فایل
+function revenueTables(wb) {
+  const out = []
+  for (const sn of wb.SheetNames) {
+    const rows = sheetRows(wb, sn)
+    const f = findRevenueCols(rows)
+    if (!f) continue
+
+    const items = []
+    let total = null
+    for (const r of rows.slice(f.hi + 1)) {
+      const name = norm(r[0])
+      const amount_m = faNum(r[f.mi])
+      if (!name || amount_m === null) continue
+      const amount_cum = f.ci === null ? null : faNum(r[f.ci])
+      if (/^جمع/.test(name)) { total = { month: amount_m, cum: amount_cum }; continue }
+      if (/^سرفصل/.test(name)) continue
+      items.push({ name, unit: null, prod_m: null, qty_m: null, rate_m: null, amount_m, amount_cum })
+    }
+    if (!items.length) continue
+
+    const sum = (k) => items.reduce((s, x) => s + (x[k] ?? 0), 0)
+    out.push({
+      head: f.head,
+      items,
+      month: total?.month ?? sum('amount_m'),
+      cum: total?.cum ?? sum('amount_cum'),
+    })
+  }
+  return out
+}
+
+function parseMonthlyRevenue(wb) {
+  const tables = revenueTables(wb)
+  if (!tables.length) return null
+  const income  = tables.find(t => /^درآمد/.test(t.head)) ?? tables[0]
+  const expense = tables.find(t => /^هزینه/.test(t.head))
+
   return {
-    kind: 'bank',
-    products: income,
-    expenses: expense,
-    month: sum(income, 'amount_m'),
-    cum: sum(income, 'amount_cum'),
+    // بانک‌ها هم درآمد دارند هم هزینهٔ محقق‌شده؛ خدماتی/انبوه‌سازی فقط درآمد
+    kind: expense ? 'bank' : 'service',
+    products: income.items,
+    expenses: expense?.items ?? [],
+    month: income.month,
+    cum: income.cum,
     lastYearCum: null,
-    expense_m: sum(expense, 'amount_m'),
-    expense_cum: sum(expense, 'amount_cum'),
+    expense_m: expense?.month ?? null,
+    expense_cum: expense?.cum ?? null,
   }
 }
 
@@ -445,8 +479,8 @@ async function buildSymbol(symbol, opts = {}) {
   const { monthly, quarterly } = pickReports(list)
   console.log(`  فعالیت ماهانه: ${monthly.length} دوره | صورت مالی: ${quarterly.length} دوره`)
 
-  // فرم تولیدی (نام محصول) → پرتفوی (هلدینگ/سرمایه‌گذاری) → بانک (اجزای درآمد)
-  const parseAnyMonthly = (wb) => parseMonthly(wb) || parseMonthlyPortfolio(wb) || parseMonthlyBank(wb)
+  // فرم تولیدی (نام محصول) → پرتفوی (هلدینگ/سرمایه‌گذاری) → درآمدی (بانک/خدماتی/انبوه‌سازی)
+  const parseAnyMonthly = (wb) => parseMonthly(wb) || parseMonthlyPortfolio(wb) || parseMonthlyRevenue(wb)
 
   const months = []
   for (const g of monthly) {
