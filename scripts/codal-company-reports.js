@@ -55,8 +55,11 @@ diag(`▶ شروع اجرا — pid=${process.pid} node=${process.version} argv=
 // unmask فقط جای query string لازم است — نگاه کنید به codal-portfolio.js برای DownloadFile.aspx?id=
 
 const norm = (s) => String(s || '')
-  .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
+  .replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/ۀ|ة/g, 'ه')
   .replace(/[‌‎‏‪-‮]/g, ' ').replace(/\s+/g, ' ').trim()
+
+// برچسب صورت مالی: فاصله‌ها حذف می‌شوند — کدال بین فرم‌ها «سود(زیان)» و «سود (زیان)» را قاطی می‌کند
+const label = (s) => norm(s).replace(/\s+/g, '')
 
 // «۱۲۳,۴۵۶» یا «(۱۲۳)» → عدد؛ خالی/-- → null
 const faNum = (v) => {
@@ -174,15 +177,17 @@ function parseMonthly(wb) {
 }
 
 // ═══ پارس صورت سود و زیان میاندوره‌ای — سطرها با برچسب، ستون ۱=دوره جاری، ۲=مشابه سال قبل، ۳=سال مالی قبل ═══
+// روی برچسبِ بدون فاصله تطبیق می‌شوند (label())
+// «جمعدرآمدهایعملیاتی» فرم شرکت سرمایه‌گذاری است؛ «درآمدهایعملیاتی» فرم تولیدی.
 const PL_MAP = [
-  ['revenue',  /^درآمدهای عملیاتی/],
-  ['cogs',     /^بهای تمام شده/],
-  ['gross',    /^سود\(زیان\) ناخالص/],
-  ['sga',      /هزینه های فروش، اداری/],
-  ['op',       /^سود\(زیان\) عملیاتی/],
-  ['fin_cost', /^هزینه های مالی/],
-  ['net',      /^سود\(زیان\) خالص$/],
-  ['eps',      /^سود \(زیان\) خالص هر سهم|^سود\(زیان\) خالص هر سهم/],
+  ['revenue',  /^جمعدرآمدهایعملیاتی$|^درآمدهایعملیاتی$/],
+  ['cogs',     /^بهایتمامشده/],
+  ['gross',    /^سود\(زیان\)ناخالص/],
+  ['sga',      /^هزینههایفروش،اداری|^جمعهزینههایعملیاتی$/],
+  ['op',       /^سود\(زیان\)عملیاتی$/],
+  ['fin_cost', /^هزینههایمالی$/],
+  ['net',      /^سود\(زیان\)خالص$/],
+  ['eps',      /^سود\(زیان\)خالصهرسهم/],
   ['capital',  /^سرمایه$/],
 ]
 
@@ -238,22 +243,64 @@ function parseMonthlyPortfolio(wb) {
   return null
 }
 
+// ═══ گزارش ماهانه بانک‌ها: اجزای درآمد و هزینه محقق‌شده ═══
+// شیت درآمد: شرح | درآمد محقق شده طی دوره | جمع درآمد محقق شده از ابتدای سال
+// شیت هزینه: شرح | هزینه محقق شده طی دوره | جمع هزینه محقق شده از ابتدای سال
+// روی همان شکل products/month/cum نگاشت می‌شود تا نمودار ماهانه مشترک بماند. میلیون ریال.
+function parseBankTable(wb, kindRe) {
+  for (const sn of wb.SheetNames) {
+    const rows = sheetRows(wb, sn)
+    if (!rows.length) continue
+    const head = rows[0].map(norm)
+    if (!kindRe.test(head[1] || '')) continue
+    const items = []
+    for (const r of rows.slice(1)) {
+      const name = norm(r[0])
+      const amount_m = faNum(r[1])
+      if (!name || amount_m === null) continue
+      if (name.startsWith('جمع') || name.startsWith('سرفصل')) continue
+      items.push({ name, unit: null, prod_m: null, qty_m: null, rate_m: null, amount_m, amount_cum: faNum(r[2]) })
+    }
+    if (items.length) return items
+  }
+  return null
+}
+
+function parseMonthlyBank(wb) {
+  const income = parseBankTable(wb, /^درآمد محقق شده طی دوره/)
+  if (!income) return null
+  const expense = parseBankTable(wb, /^هزینه محقق شده طی دوره/) || []
+  const sum = (a, k) => a.reduce((s, x) => s + (x[k] ?? 0), 0)
+  return {
+    kind: 'bank',
+    products: income,
+    expenses: expense,
+    month: sum(income, 'amount_m'),
+    cum: sum(income, 'amount_cum'),
+    lastYearCum: null,
+    expense_m: sum(expense, 'amount_m'),
+    expense_cum: sum(expense, 'amount_cum'),
+  }
+}
+
 function parsePL(wb) {
   for (const sn of wb.SheetNames) {
     const rows = sheetRows(wb, sn)
-    const labels = rows.map(r => norm(r[0]).replace(/‏/g, ''))
-    if (!labels.some(l => /^درآمدهای عملیاتی/.test(l)) || !labels.some(l => /^سود\(زیان\) خالص$/.test(l))) continue
+    const labels = rows.map(r => label(r[0]))
+    if (!labels.some(l => /^سود\(زیان\)خالص$/.test(l))) continue
     const out = {}
     rows.forEach((r, i) => {
-      const label = labels[i]
+      const v = faNum(r[1])
+      // ردیف‌های سرفصل مقدار ندارند (مثلاً «درآمدهای عملیاتی» در فرم شرکت سرمایه‌گذاری)
+      if (v === null) return
       for (const [key, re] of PL_MAP) {
-        if (out[key] === undefined && re.test(label)) {
-          out[key] = faNum(r[1])
+        if (out[key] === undefined && re.test(labels[i])) {
+          out[key] = v
           out[key + '_ly'] = faNum(r[2])   // دوره مشابه سال قبل
         }
       }
     })
-    if (out.revenue !== undefined) return out
+    if (out.revenue !== undefined && out.net !== undefined) return out
   }
   return null
 }
@@ -344,8 +391,8 @@ async function buildSymbol(symbol) {
   const { monthly, quarterly } = pickReports(list)
   console.log(`  فعالیت ماهانه: ${monthly.length} دوره | صورت مالی: ${quarterly.length} دوره`)
 
-  // فرم تولیدی (نام محصول) وگرنه فرم پرتفوی (هلدینگ/سرمایه‌گذاری)
-  const parseAnyMonthly = (wb) => parseMonthly(wb) || parseMonthlyPortfolio(wb)
+  // فرم تولیدی (نام محصول) → پرتفوی (هلدینگ/سرمایه‌گذاری) → بانک (اجزای درآمد)
+  const parseAnyMonthly = (wb) => parseMonthly(wb) || parseMonthlyPortfolio(wb) || parseMonthlyBank(wb)
 
   const months = []
   for (const g of monthly) {
