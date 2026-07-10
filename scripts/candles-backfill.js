@@ -90,6 +90,8 @@ function mapCandle(item, symbol) {
   if (!greg) return null
   const close = num(item.pc)
   if (close === null || close === 0) return null
+  const volume = num(item.tvol)
+  if (volume === null || volume === 0) return null // روز بدون معامله — History.php کندل مصنوعی با tvol:0 می‌دهد
   return {
     symbol,
     trade_date: greg,
@@ -101,7 +103,7 @@ function mapCandle(item, symbol) {
     last: num(item.pl),
     yesterday: num(item.py),
     change_pct: num(item.pcp),
-    volume: num(item.tvol),
+    volume,
     value: num(item.tval),
     trades: num(item.tno),
   }

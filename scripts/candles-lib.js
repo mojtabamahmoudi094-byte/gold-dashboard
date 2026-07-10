@@ -94,9 +94,23 @@ function normalizeIndexName(raw) {
 
 // ───────────────────────── fetch ─────────────────────────
 
-// هدر فقط وقتی داده شود ارسال می‌شود — BrsApi به UA مرورگر ناقص ECONNRESET می‌دهد،
-// اسکریپت‌های قدیمی همین سرور بدون هدر کار می‌کنند؛ tsetmc برعکس UA می‌خواهد
 const TSETMC_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', Accept: 'application/json' }
+
+// BrsApi History.php به fetch نود ECONNRESET می‌دهد ولی به curl همان سرور HTTP 200 —
+// پس بعد از شکست fetch، خودکار با curl تلاش می‌کنیم
+const { execFile } = require('child_process')
+
+function curlJson(url, { timeout = 30_000, headers } = {}) {
+  const args = ['-s', '--max-time', String(Math.ceil(timeout / 1000)), '--fail']
+  for (const [k, v] of Object.entries(headers ?? {})) args.push('-H', `${k}: ${v}`)
+  args.push(url)
+  return new Promise((resolve, reject) => {
+    execFile('curl', args, { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
+      if (err) return reject(new Error(`curl: ${err.message}`))
+      try { resolve(JSON.parse(stdout)) } catch { reject(new Error('curl: پاسخ JSON نیست')) }
+    })
+  })
+}
 
 async function fetchJson(url, { retries = 2, timeout = 30_000, headers } = {}) {
   for (let i = 0; i <= retries; i++) {
@@ -108,6 +122,7 @@ async function fetchJson(url, { retries = 2, timeout = 30_000, headers } = {}) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return await res.json()
     } catch (e) {
+      try { return await curlJson(url, { timeout, headers }) } catch { /* خطای اصلی fetch گزارش شود */ }
       if (i === retries) throw e
       await new Promise(r => setTimeout(r, 1500 * (i + 1)))
     }
