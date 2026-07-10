@@ -79,6 +79,22 @@ async function main() {
 
   const today = tehranToday()
 
+  // ── گارد تعطیلی رسمی: Index.php type=2 فیلد date آخرین روز معاملاتی را دارد.
+  // اگر امروز نباشد یعنی بازار باز نشده (عید و…) — AllSymbols دیتای مانده جلسه قبل را
+  // می‌دهد و نباید به اسم امروز ثبت شود.
+  let faraData = null
+  try {
+    faraData = await fetchJson(indexUrl(2), { timeout: 30_000 })
+    const o = Array.isArray(faraData) ? faraData[0] : faraData
+    const marketDate = String(o?.date ?? '').replace(/-/g, '/')
+    if (!FORCE && !PROBE && marketDate && marketDate !== today.shamsi) {
+      console.log(`[candles-daily] آخرین روز معاملاتی ${marketDate} است نه امروز (${today.shamsi}) — تعطیلی رسمی، رد شد. با --force اجباری کنید.`)
+      return
+    }
+  } catch (e) {
+    console.warn('[candles-daily] گارد تعطیلی در دسترس نبود، ادامه می‌دهیم:', e.message)
+  }
+
   // ── کندل امروز همه نمادها — یک درخواست
   const data = await fetchJson(allSymbolsUrl(), { timeout: 120_000 })
   const arr = Array.isArray(data) ? data : (data?.symbols ?? data?.data ?? [])
@@ -114,44 +130,44 @@ async function main() {
     })
   }
 
-  // ── شاخص‌ها — دو درخواست
+  // ── شاخص‌ها — type=2 بالاتر برای گارد تعطیلی گرفته شده، فقط type=3 می‌ماند
   const idxRows = []
   try {
-    const [sel, fara] = await Promise.allSettled([
-      fetchJson(indexUrl(3), { timeout: 30_000 }),
-      fetchJson(indexUrl(2), { timeout: 30_000 }),
-    ])
-    if (sel.status === 'fulfilled') {
-      const items = Array.isArray(sel.value) ? sel.value : (sel.value?.data ?? [sel.value])
-      if (PROBE) { console.log('═══ Index.php type=3 ═══'); console.log(JSON.stringify(items, null, 2)) }
-      for (const it of items) {
-        const value = num(it?.index)
-        if (value === null) continue
-        idxRows.push({
-          index_name: normalizeIndexName(it?.name ?? 'شاخص کل'),
-          trade_date: today.gregorian,
-          trade_date_shamsi: today.shamsi,
-          value,
-          change_pct: num(it?.index_change_percent),
-        })
-      }
-    }
-    if (fara.status === 'fulfilled') {
-      const o = Array.isArray(fara.value) ? fara.value[0] : fara.value
-      if (PROBE) { console.log('═══ Index.php type=2 ═══'); console.log(JSON.stringify(o, null, 2)) }
-      const value = num(o?.index)
-      if (value !== null) {
-        idxRows.push({
-          index_name: 'شاخص کل فرابورس',
-          trade_date: today.gregorian,
-          trade_date_shamsi: today.shamsi,
-          value,
-          change_pct: num(o?.index_change_percent),
-        })
-      }
+    const sel = await fetchJson(indexUrl(3), { timeout: 30_000 })
+    const items = Array.isArray(sel) ? sel : (sel?.data ?? [sel])
+    if (PROBE) { console.log('═══ Index.php type=3 ═══'); console.log(JSON.stringify(items, null, 2)) }
+    for (const it of items) {
+      const value = num(it?.index)
+      if (value === null) continue
+      idxRows.push({
+        index_name: normalizeIndexName(it?.name ?? 'شاخص کل'),
+        trade_date: today.gregorian,
+        trade_date_shamsi: today.shamsi,
+        value,
+        change_pct: num(it?.index_change_percent),
+      })
     }
   } catch (e) {
-    console.error('[candles-daily] دریافت شاخص‌ها ناموفق:', e.message)
+    console.error('[candles-daily] دریافت شاخص‌های منتخب ناموفق:', e.message)
+  }
+  {
+    const o = Array.isArray(faraData) ? faraData[0] : faraData
+    if (PROBE) { console.log('═══ Index.php type=2 ═══'); console.log(JSON.stringify(o, null, 2)) }
+    const value = num(o?.index)
+    if (value !== null) {
+      // type=2 فیلد درصد ندارد — از index_change حساب می‌شود
+      const change = num(o?.index_change)
+      const pct = (change !== null && value - change !== 0)
+        ? +((change / (value - change)) * 100).toFixed(2)
+        : null
+      idxRows.push({
+        index_name: 'شاخص کل فرابورس',
+        trade_date: today.gregorian,
+        trade_date_shamsi: today.shamsi,
+        value,
+        change_pct: pct,
+      })
+    }
   }
 
   if (PROBE) {
