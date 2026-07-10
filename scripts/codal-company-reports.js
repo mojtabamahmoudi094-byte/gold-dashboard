@@ -51,7 +51,8 @@ for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP', 'SIGABRT']) {
 diag(`▶ شروع اجرا — pid=${process.pid} node=${process.version} argv=${process.argv.slice(2).join(' ')}`)
 
 // ماسک BrsAPI روی base64: QQQaQQQ = %2f و OOObOOO = %2b
-const unmask = (s) => String(s).replace(/QQQaQQQ/g, '%2f').replace(/OOObOOO/g, '%2b')
+// نکته: link_excel کدال نباید unmask شود (id در path است؛ %2f را IIS رد می‌کند).
+// unmask فقط جای query string لازم است — نگاه کنید به codal-portfolio.js برای DownloadFile.aspx?id=
 
 const norm = (s) => String(s || '')
   .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
@@ -109,7 +110,9 @@ async function fetchAnnouncements(symbol) {
 // ═══ دانلود اکسل-HTML کدال و پارس با XLSX (با retry برای throttle) ═══
 async function fetchWorkbookOnce(a) {
   if (!a.link_excel) return null
-  const url = unmask(a.link_excel)
+  // link_excel را unmask نکن: id در path است و IIS کدال %2f را ۴۰۴ می‌دهد.
+  // فرم ماسک‌شده (QQQaQQQ/OOObOOO) مستقیماً ۲۰۰ برمی‌گرداند. unmask فقط برای DownloadFile.aspx?id= (query string) درست است.
+  const url = a.link_excel
   const res = await fetch(url, {
     signal: AbortSignal.timeout(40_000),
     headers: { 'User-Agent': 'Mozilla/5.0' },
