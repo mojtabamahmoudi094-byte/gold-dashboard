@@ -7,10 +7,25 @@ export type RProduct = {
   prod_m: number | null; qty_m: number | null; rate_m: number | null
   amount_m: number | null; amount_cum: number | null
 }
+// یک شرکت در پرتفوی هلدینگ (میلیون ریال) — dq/dc/dmv = تغییرات طی ماه (خرید مثبت، فروش منفی)
+export type RHolding = {
+  name: string
+  q0: number | null; c0: number | null; mv0: number | null
+  dq: number | null; dc: number | null; dmv: number | null
+  own: number | null; c1: number | null; mv1: number | null
+}
+// سه فرم گزارش ماهانه کدال: تولیدی (محصولات)، پرتفوی (شرکت سرمایه‌گذاری)، بانک (اجزای درآمد)
+export type MonthKind = 'production' | 'portfolio' | 'bank'
 export type RMonth = {
   period: string; publish: string | null
-  month: number | null; cum: number | null; lastYearCum: number | null
-  products: RProduct[]
+  kind?: MonthKind
+  // تولیدی و بانک
+  month?: number | null; cum?: number | null; lastYearCum?: number | null
+  products?: RProduct[]
+  // بانک
+  expenses?: RProduct[]; expense_m?: number | null; expense_cum?: number | null
+  // شرکت سرمایه‌گذاری / هلدینگ
+  holdings?: RHolding[]; totalCost?: number | null; totalMv?: number | null; gain?: number | null
 }
 export type RQuarter = {
   period: string; months: number; audited: boolean; consolidated: boolean; publish: string | null
@@ -31,8 +46,8 @@ export const monthLabel = (period: string) => {
   return m ? `${MONTH_NAMES[Number(m[2])]} ${Number(m[1]).toLocaleString('fa-IR', { useGrouping: false })}` : period
 }
 
-export const growth = (cur: number | null, prev: number | null) =>
-  cur === null || prev === null || prev === 0 ? null : ((cur - prev) / Math.abs(prev)) * 100
+export const growth = (cur: number | null | undefined, prev: number | null | undefined) =>
+  cur == null || prev == null || prev === 0 ? null : ((cur - prev) / Math.abs(prev)) * 100
 
 // تحلیل قاعده‌محور از گزارش‌های هر سهم — همراه با score خام برای رتبه‌بندی/سیگنال
 export function buildInsights(months: RMonth[], quarters: RQuarter[]): { verdict: Insight; items: Insight[]; score: number } {
@@ -40,22 +55,47 @@ export function buildInsights(months: RMonth[], quarters: RQuarter[]): { verdict
   const fa0 = (v: number) => Math.abs(v).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
   let score = 0
 
-  if (months.length >= 2) {
+  const kind: MonthKind = months[months.length - 1]?.kind ?? 'production'
+
+  // ── شرکت سرمایه‌گذاری / هلدینگ: پرتفوی سهام ──
+  if (kind === 'portfolio' && months.length >= 1) {
+    const last = months[months.length - 1]
+    const prev = months.length > 1 ? months[months.length - 2] : null
+    const navChg = prev ? growth(last.totalMv, prev.totalMv) : null
+    if (navChg !== null) {
+      items.push({ tone: navChg >= 0 ? 'pos' : 'neg', text: `ارزش بازار پرتفوی در ${monthLabel(last.period)} نسبت به ماه قبل ${navChg >= 0 ? 'رشد' : 'افت'} ${fa0(navChg)}٪ داشته است.` })
+      score += navChg >= 0 ? 1 : -1
+    }
+    if (last.totalCost && last.gain != null) {
+      const gp = (last.gain / last.totalCost) * 100
+      items.push({ tone: gp >= 0 ? 'pos' : 'neg', text: `سود تحقق‌نیافته پرتفوی ${fa0(gp)}٪ بهای تمام‌شده است.` })
+    }
+    const hs = last.holdings ?? []
+    const buys = hs.filter(h => (h.dq ?? 0) > 0).sort((a, b) => (b.dc ?? 0) - (a.dc ?? 0))
+    const sells = hs.filter(h => (h.dq ?? 0) < 0).sort((a, b) => (a.dc ?? 0) - (b.dc ?? 0))
+    if (buys.length) items.push({ tone: 'neutral', text: `طی ماه در ${buys.length.toLocaleString('fa-IR')} شرکت خرید انجام شده؛ بیشترین: «${buys[0].name}».` })
+    if (sells.length) items.push({ tone: 'neutral', text: `طی ماه در ${sells.length.toLocaleString('fa-IR')} شرکت فروش انجام شده؛ بیشترین: «${sells[0].name}».` })
+    if (hs.length) items.push({ tone: 'neutral', text: `پرتفوی بورسی شامل ${hs.length.toLocaleString('fa-IR')} شرکت است.` })
+  }
+
+  // ── تولیدی و بانک: فروش/درآمد ماهانه ──
+  if (kind !== 'portfolio' && months.length >= 2) {
+    const noun = kind === 'bank' ? 'درآمد' : 'فروش'
     const last = months[months.length - 1], prev = months[months.length - 2]
     const mom = growth(last.month, prev.month)
     const yoy = growth(last.cum, last.lastYearCum)
     if (mom !== null) {
-      items.push({ tone: mom >= 0 ? 'pos' : 'neg', text: `فروش ${monthLabel(last.period)} نسبت به ماه قبل ${mom >= 0 ? 'رشد' : 'افت'} ${fa0(mom)}٪ داشته است.` })
+      items.push({ tone: mom >= 0 ? 'pos' : 'neg', text: `${noun} ${monthLabel(last.period)} نسبت به ماه قبل ${mom >= 0 ? 'رشد' : 'افت'} ${fa0(mom)}٪ داشته است.` })
       score += mom >= 0 ? 1 : -1
     }
     if (yoy !== null) {
-      items.push({ tone: yoy >= 0 ? 'pos' : 'neg', text: `فروش تجمعی سال مالی نسبت به دوره مشابه سال قبل ${yoy >= 0 ? '+' : '−'}${fa0(yoy)}٪ تغییر کرده است.` })
+      items.push({ tone: yoy >= 0 ? 'pos' : 'neg', text: `${noun} تجمعی سال مالی نسبت به دوره مشابه سال قبل ${yoy >= 0 ? '+' : '−'}${fa0(yoy)}٪ تغییر کرده است.` })
       score += yoy >= 0 ? 1 : -1
     }
-    // روند نرخ فروش محصول اصلی
-    const mainP = [...last.products].filter(p => (p.amount_m ?? 0) > 0 && (p.rate_m ?? 0) > 0).sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))[0]
+    // روند نرخ فروش محصول اصلی (بانک‌ها نرخ ندارند)
+    const mainP = (last.products ?? []).filter(p => (p.amount_m ?? 0) > 0 && (p.rate_m ?? 0) > 0).sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))[0]
     if (mainP) {
-      const ser = months.map(m => m.products.find(x => x.name === mainP.name)?.rate_m ?? null).filter((v): v is number => v !== null && v > 0)
+      const ser = months.map(m => (m.products ?? []).find(x => x.name === mainP.name)?.rate_m ?? null).filter((v): v is number => v !== null && v > 0)
       if (ser.length >= 2) {
         const g = growth(ser[ser.length - 1], ser[0])
         if (g !== null && Math.abs(g) >= 1) {

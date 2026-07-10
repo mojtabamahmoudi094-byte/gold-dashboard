@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
-import { buildInsights, monthLabel, growth, type RMonth, type RQuarter, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
+import { buildInsights, monthLabel, growth, type RMonth, type RQuarter, type RHolding, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
 
 type Sym = {
   l18: string; l30: string
@@ -27,7 +27,7 @@ const hemat = (rial: number) =>
     : `${Math.round(rial / 1e10).toLocaleString('fa-IR')} میلیارد ت`
 
 // مقادیر گزارش‌های کدال به میلیون ریال هستند
-const mrial = (v: number | null) => (v === null ? '—' : hemat(v * 1e6))
+const mrial = (v: number | null | undefined) => (v == null ? '—' : hemat(v * 1e6))
 
 const gPct = (v: number | null) =>
   v === null ? '—' : `${v > 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}٪`
@@ -226,7 +226,9 @@ export default function StockPage() {
                 <AnalysisSection months={reports.months} quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
               )}
               {reports && reports.months.length > 0 && (
-                <MonthlySection months={reports.months} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
+                reports.months[reports.months.length - 1].kind === 'portfolio'
+                  ? <PortfolioSection months={reports.months} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
+                  : <MonthlySection months={reports.months} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
               )}
               {reports && reports.quarters.length > 0 && (
                 <QuarterlyFinSection quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
@@ -390,29 +392,160 @@ function Sparkline({ values, periods, color, w, h, t }: {
   )
 }
 
-// ═══ گزارش فعالیت ماهانه ═══
+// ═══ پرتفوی شرکت سرمایه‌گذاری/هلدینگ — ترکیب دارایی، ارزش بازار (NAV)، خرید و فروش ماه ═══
+const PIE_COLORS = ['#FACC15', '#38BDF8', '#A78BFA', '#34D399', '#F472B6', '#FB923C', '#60A5FA', '#F87171', '#94A3B8']
+
+function PortfolioSection({ months, t, isMobile }: { months: RMonth[]; t: Theme; isMobile: boolean }) {
+  const last = months[months.length - 1]
+  const prev = months.length > 1 ? months[months.length - 2] : null
+  const navChg = growth(last.totalMv, prev?.totalMv ?? null)
+  const gainPct = last.totalCost ? ((last.gain ?? 0) / last.totalCost) * 100 : null
+  const maxNav = Math.max(...months.map(m => m.totalMv ?? 0), 1)
+
+  const hs = (last.holdings ?? []).filter(h => (h.mv1 ?? 0) > 0).sort((a, b) => (b.mv1 ?? 0) - (a.mv1 ?? 0))
+  const total = hs.reduce((s, h) => s + (h.mv1 ?? 0), 0) || 1
+  const TOP = 8
+  const slices = hs.length > TOP
+    ? [...hs.slice(0, TOP).map(h => ({ name: h.name, v: h.mv1 ?? 0 })),
+       { name: 'سایر دارایی‌ها', v: hs.slice(TOP).reduce((s, h) => s + (h.mv1 ?? 0), 0) }]
+    : hs.map(h => ({ name: h.name, v: h.mv1 ?? 0 }))
+
+  // خرید و فروش طی ماه — تغییرات تعداد سهام
+  const all = last.holdings ?? []
+  const buys = all.filter(h => (h.dq ?? 0) > 0).sort((a, b) => (b.dc ?? 0) - (a.dc ?? 0)).slice(0, 5)
+  const sells = all.filter(h => (h.dq ?? 0) < 0).sort((a, b) => (a.dc ?? 0) - (b.dc ?? 0)).slice(0, 5)
+
+  // دونات
+  const R = isMobile ? 62 : 78, SW = isMobile ? 22 : 28, C = R + SW / 2 + 2
+  const circ = 2 * Math.PI * R
+  let acc = 0
+
+  return (
+    <SectionCard title="پرتفوی سرمایه‌گذاری" badge={`${months.length.toLocaleString('fa-IR')} ماه`} accent={M_ACCENT} t={t}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+        <Chip t={t} label={`ارزش بازار پرتفوی ${monthLabel(last.period)}`} value={mrial(last.totalMv)} color={M_ACCENT} />
+        <Chip t={t} label="نسبت به ماه قبل" value={gPct(navChg)} color={navChg === null ? undefined : navChg >= 0 ? GREEN : RED} />
+        <Chip t={t} label="بهای تمام‌شده" value={mrial(last.totalCost)} />
+        <Chip t={t} label="سود تحقق‌نیافته" value={mrial(last.gain)} color={(last.gain ?? 0) >= 0 ? GREEN : RED} />
+        <Chip t={t} label="بازده پرتفوی" value={gainPct === null ? '—' : `${gainPct.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}٪`} color={(gainPct ?? 0) >= 0 ? GREEN : RED} />
+      </div>
+
+      {/* روند ارزش بازار پرتفوی */}
+      <div style={{ fontSize: 11, color: t.muted, marginBottom: 10 }}>روند ارزش بازار پرتفوی (میلیارد تومان)</div>
+      <div style={{ display: 'flex', direction: 'ltr', alignItems: 'flex-end', gap: isMobile ? 3 : 6, height: 110, minWidth: 0, marginBottom: 6 }}>
+        {months.map((m, i) => {
+          const h = Math.max(((m.totalMv ?? 0) / maxNav) * 100, 2)
+          const isLast = i === months.length - 1
+          return (
+            <div key={m.period} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
+              <div title={`${monthLabel(m.period)}: ${mrial(m.totalMv)}`} style={{
+                width: '100%', maxWidth: 34, height: `${h}%`, borderRadius: '4px 4px 2px 2px',
+                background: isLast ? M_ACCENT : `${M_ACCENT}55`,
+              }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.25 }}>
+                <div style={{ fontSize: isMobile ? 7.5 : 9, color: isLast ? t.text : t.muted, whiteSpace: 'nowrap' }}>
+                  {monthLabel(m.period).split(' ')[0].slice(0, isMobile ? 3 : 8)}
+                </div>
+                <div style={{ fontSize: isMobile ? 6.5 : 8, color: isLast ? M_ACCENT : t.muted, opacity: isLast ? 1 : 0.65 }}>
+                  {(monthLabel(m.period).split(' ')[1] || '').slice(-2)}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ترکیب پرتفوی */}
+      {slices.length > 0 && (
+        <>
+          <div style={{ fontSize: 11, color: t.muted, margin: '20px 0 12px' }}>ترکیب پرتفوی بورسی</div>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 16 : 26 }}>
+            <svg width={C * 2} height={C * 2} style={{ flexShrink: 0, transform: 'rotate(-90deg)' }}>
+              {slices.map((s, i) => {
+                const frac = s.v / total
+                const dash = frac * circ
+                const el = (
+                  <circle key={s.name} cx={C} cy={C} r={R} fill="none"
+                    stroke={PIE_COLORS[i % PIE_COLORS.length]} strokeWidth={SW}
+                    strokeDasharray={`${dash} ${circ - dash}`} strokeDashoffset={-acc} />
+                )
+                acc += dash
+                return el
+              })}
+            </svg>
+            <div style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {slices.map((s, i) => (
+                <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 3, background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
+                  <span style={{ fontSize: 11.5, color: t.text, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                  <span style={{ fontSize: 10.5, color: t.muted, flexShrink: 0 }}>{mrial(s.v)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0, minWidth: 40, textAlign: 'left' }}>
+                    {((s.v / total) * 100).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* خرید و فروش طی ماه */}
+      {(buys.length > 0 || sells.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14, marginTop: 22 }}>
+          {[['خرید طی ماه', buys, GREEN], ['فروش طی ماه', sells, RED]].map(([title, list, color]) => {
+            const rows = list as RHolding[]
+            if (!rows.length) return null
+            return (
+              <div key={title as string} style={{
+                background: t.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,30,46,0.03)',
+                border: `0.5px solid ${t.line}`, borderRadius: 12, padding: '12px 14px', minWidth: 0,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: color as string, marginBottom: 9 }}>{title as string}</div>
+                {rows.map(h => (
+                  <div key={h.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, minWidth: 0 }}>
+                    <span style={{ fontSize: 11, color: t.text, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.name}</span>
+                    <span style={{ fontSize: 10, color: t.muted, flexShrink: 0 }}>
+                      {Math.abs(h.dq ?? 0).toLocaleString('fa-IR')} سهم
+                    </span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: color as string, flexShrink: 0, minWidth: 66, textAlign: 'left' }}>
+                      {mrial(Math.abs(h.dc ?? 0))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
+// ═══ گزارش فعالیت ماهانه — فرم تولیدی (فروش محصولات) و بانک (اجزای درآمد) ═══
 function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; isMobile: boolean }) {
   const last = months[months.length - 1]
   const prev = months.length > 1 ? months[months.length - 2] : null
+  const isBank = last.kind === 'bank'
+  const noun = isBank ? 'درآمد' : 'فروش'
   const mom = growth(last.month, prev?.month ?? null)
   const yoy = growth(last.cum, last.lastYearCum)
   const maxM = Math.max(...months.map(m => m.month ?? 0), 1)
 
-  const topProducts = [...last.products]
+  const topProducts = (last.products ?? [])
     .filter(p => (p.amount_m ?? 0) > 0)
     .sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))
     .slice(0, 5)
   const maxP = Math.max(...topProducts.map(p => p.amount_m ?? 0), 1)
 
-  // روند نرخ فروش ۳ محصول اصلی در طول ماه‌ها
-  const rateNames = [...last.products]
+  // روند نرخ فروش ۳ محصول اصلی در طول ماه‌ها (بانک‌ها نرخ ندارند → خالی و مخفی)
+  const rateNames = (last.products ?? [])
     .filter(p => (p.amount_m ?? 0) > 0 && (p.rate_m ?? 0) > 0)
     .sort((a, b) => (b.amount_m ?? 0) - (a.amount_m ?? 0))
     .slice(0, 3)
     .map(p => p.name)
   const rateSeries = rateNames.map(name => {
     const vals = months.map(m => {
-      const pr = m.products.find(x => x.name === name)
+      const pr = (m.products ?? []).find(x => x.name === name)
       return pr && pr.rate_m ? pr.rate_m : null
     })
     const nums = vals.filter((v): v is number => v !== null && v > 0)
@@ -424,14 +557,16 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
   return (
     <SectionCard title="گزارش فعالیت ماهانه" badge={`${months.length.toLocaleString('fa-IR')} ماه`} accent={M_ACCENT} t={t}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-        <Chip t={t} label={`فروش ${monthLabel(last.period)}`} value={mrial(last.month)} color={M_ACCENT} />
+        <Chip t={t} label={`${noun} ${monthLabel(last.period)}`} value={mrial(last.month)} color={M_ACCENT} />
         <Chip t={t} label="نسبت به ماه قبل" value={gPct(mom)} color={mom === null ? undefined : mom >= 0 ? GREEN : RED} />
-        <Chip t={t} label="فروش تجمعی سال مالی" value={mrial(last.cum)} />
-        <Chip t={t} label="رشد نسبت به دوره مشابه سال قبل" value={gPct(yoy)} color={yoy === null ? undefined : yoy >= 0 ? GREEN : RED} />
+        <Chip t={t} label={`${noun} تجمعی سال مالی`} value={mrial(last.cum)} />
+        {isBank
+          ? <Chip t={t} label="هزینه محقق‌شده ماه" value={mrial(last.expense_m)} color={RED} />
+          : <Chip t={t} label="رشد نسبت به دوره مشابه سال قبل" value={gPct(yoy)} color={yoy === null ? undefined : yoy >= 0 ? GREEN : RED} />}
       </div>
 
-      {/* روند فروش ماهانه */}
-      <div style={{ fontSize: 11, color: t.muted, marginBottom: 10 }}>روند فروش ماهانه (میلیارد تومان)</div>
+      {/* روند فروش/درآمد ماهانه */}
+      <div style={{ fontSize: 11, color: t.muted, marginBottom: 10 }}>روند {noun} ماهانه (میلیارد تومان)</div>
       <div style={{ display: 'flex', direction: 'ltr', alignItems: 'flex-end', gap: isMobile ? 3 : 6, height: 120, minWidth: 0 }}>
         {months.map((m, i) => {
           const h = Math.max(((m.month ?? 0) / maxM) * 100, 2)
@@ -464,7 +599,7 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
       {topProducts.length > 0 && (
         <>
           <div style={{ fontSize: 11, color: t.muted, margin: '20px 0 10px' }}>
-            محصولات برتر {monthLabel(last.period)}
+            {isBank ? 'اجزای درآمد' : 'محصولات برتر'} {monthLabel(last.period)}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {topProducts.map(p => (
