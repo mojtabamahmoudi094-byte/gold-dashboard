@@ -247,30 +247,31 @@ function parseMonthlyPortfolio(wb) {
 // شیت درآمد: شرح | درآمد محقق شده طی دوره | جمع درآمد محقق شده از ابتدای سال
 // شیت هزینه: شرح | هزینه محقق شده طی دوره | جمع هزینه محقق شده از ابتدای سال
 // روی همان شکل products/month/cum نگاشت می‌شود تا نمودار ماهانه مشترک بماند. میلیون ریال.
-function parseBankTable(wb, kindRe) {
+// هدر و ستون «محقق شده طی دوره» را هر جای شیت پیدا می‌کند (عبارت بین ماه‌ها فرق دارد)
+function parseBankTable(wb, headRe) {
   for (const sn of wb.SheetNames) {
     const rows = sheetRows(wb, sn)
-    if (!rows.length) continue
-    // ردیف هدر ممکن است اولین ردیف نباشد
-    const hi = rows.findIndex(r => kindRe.test(norm(r[1] || '')))
-    if (hi === -1) continue
-    const items = []
-    for (const r of rows.slice(hi + 1)) {
-      const name = norm(r[0])
-      const amount_m = faNum(r[1])
-      if (!name || amount_m === null) continue
-      if (name.startsWith('جمع') || name.startsWith('سرفصل')) continue
-      items.push({ name, unit: null, prod_m: null, qty_m: null, rate_m: null, amount_m, amount_cum: faNum(r[2]) })
+    for (let hi = 0; hi < Math.min(rows.length, 4); hi++) {
+      const ci = rows[hi].findIndex(c => headRe.test(norm(c)))
+      if (ci < 1) continue                       // ستون ۰ همان «شرح» است
+      const items = []
+      for (const r of rows.slice(hi + 1)) {
+        const name = norm(r[0])
+        const amount_m = faNum(r[ci])
+        if (!name || amount_m === null) continue
+        if (name.startsWith('جمع') || name.startsWith('سرفصل')) continue
+        items.push({ name, unit: null, prod_m: null, qty_m: null, rate_m: null, amount_m, amount_cum: faNum(r[ci + 1]) })
+      }
+      if (items.length) return items
     }
-    if (items.length) return items
   }
   return null
 }
 
 function parseMonthlyBank(wb) {
-  const income = parseBankTable(wb, /^درآمد محقق شده طی دوره/)
+  const income = parseBankTable(wb, /^درآمد.*محقق شده/)
   if (!income) return null
-  const expense = parseBankTable(wb, /^هزینه محقق شده طی دوره/) || []
+  const expense = parseBankTable(wb, /^هزینه.*محقق شده/) || []
   const sum = (a, k) => a.reduce((s, x) => s + (x[k] ?? 0), 0)
   return {
     kind: 'bank',
@@ -301,7 +302,14 @@ function parsePL(wb) {
         }
       }
     })
-    if (out.revenue !== undefined && out.net !== undefined) return out
+    // بانک‌ها ردیف «درآمدهای عملیاتی» استاندارد ندارند — سود خالص کافی است
+    if (out.net !== undefined) {
+      // کلیدهای غایب باید null باشند نه undefined (وگرنه در JSON حذف و در UI به NaN تبدیل می‌شوند)
+      for (const [key] of PL_MAP) {
+        if (out[key] === undefined) { out[key] = null; out[key + '_ly'] = null }
+      }
+      return out
+    }
   }
   return null
 }
