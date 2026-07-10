@@ -1,0 +1,49 @@
+#!/bin/bash
+# نصب cron کندل روزانه روی سرور ایرانی — با root/sudo اجرا شود
+# پیش‌نیاز: جدول‌ها با scripts/sql/stock-candles.sql در سوپابیس ساخته شده باشند
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NODE_BIN="$(which node)"
+LOG_FILE="/var/log/candles-daily.log"
+
+if [ -z "$NODE_BIN" ]; then
+  echo "❌ Node.js یافت نشد."
+  exit 1
+fi
+
+echo "📦 نصب وابستگی‌ها…"
+cd "$SCRIPT_DIR" && npm install @supabase/supabase-js jalaali-js 2>/dev/null || \
+  (cd .. && npm install @supabase/supabase-js jalaali-js)
+
+echo "🔍 تست probe (فرمت AllSymbols + Index)…"
+"$NODE_BIN" "$SCRIPT_DIR/candles-daily.js" --probe
+
+echo ""
+read -p "فرمت درست است و cron نصب شود؟ (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  echo "نصب لغو شد."
+  exit 0
+fi
+
+CRON_FILE="/etc/cron.d/candles-daily"
+
+cat > "$CRON_FILE" << EOF
+# بورس سنج — کندل روزانه؛ همه زمان‌ها UTC (تهران = UTC+3:30)
+# ۱۷:۴۵ تهران = ۱۴:۱۵ UTC — شنبه تا چهارشنبه = 6,0-3
+SHELL=/bin/bash
+MAILTO=""
+
+15 14 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh candles-daily $NODE_BIN $SCRIPT_DIR/candles-daily.js >> $LOG_FILE 2>&1
+EOF
+
+chmod 644 "$CRON_FILE"
+echo ""
+echo "✅ Cron نصب شد: $CRON_FILE (روزانه ۱۷:۴۵ تهران، شنبه–چهارشنبه)"
+echo "   لاگ: tail -f $LOG_FILE"
+echo ""
+echo "🧪 بک‌فیل ۳ سال (یک‌باره — بودجه BrsApi روزانه ۱۰۰۰ درخواست):"
+echo "   node $SCRIPT_DIR/candles-backfill.js --probe        # اول فرمت را ببینید"
+echo "   node $SCRIPT_DIR/candles-backfill.js --probe-index  # فرمت تاریخچه شاخص tsetmc"
+echo "   node $SCRIPT_DIR/candles-backfill.js --limit=900    # روز اول"
+echo "   node $SCRIPT_DIR/candles-backfill.js                # روز بعد — از همان‌جا ادامه می‌دهد"
