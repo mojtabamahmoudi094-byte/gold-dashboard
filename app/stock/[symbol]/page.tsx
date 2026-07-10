@@ -68,7 +68,7 @@ export default function StockPage() {
   const [reports, setReports] = useState<Reports | null>(null)
   useEffect(() => {
     if (!symbol) return
-    fetch(`/reports/${encodeURIComponent(symbol.replace(/\s+/g, '-'))}.json`)
+    fetch(`/api/stock-reports/${encodeURIComponent(symbol.replace(/\s+/g, '-'))}`)
       .then(r => { if (!r.ok) throw new Error(); return r.json() })
       .then(setReports)
       .catch(() => setReports(null))

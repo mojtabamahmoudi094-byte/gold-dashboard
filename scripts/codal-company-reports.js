@@ -24,6 +24,11 @@ const KEY   = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const FORCE = process.argv.includes('--force')
 const OUT_DIR = path.join(__dirname, 'reports-out')
 
+// خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
+// SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+
 let XLSX
 try { XLSX = require('xlsx') } catch { console.error('npm install xlsx لازم است'); process.exit(1) }
 
@@ -389,11 +394,29 @@ async function firstParsable(candidates, parse) {
   return { reason }
 }
 
+// ═══ Supabase ═══ (lazy — اگر کلید نبود، فقط فایل نوشته می‌شود)
+let _sb = null
+function sbClient() {
+  if (_sb !== null) return _sb
+  if (!SUPABASE_URL || !SUPABASE_KEY) { _sb = false; return false }
+  const { createClient } = require('@supabase/supabase-js')
+  _sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
+  return _sb
+}
+
+async function upsertReport(row) {
+  const sb = sbClient()
+  if (!sb) return
+  const { error } = await sb.from('stock_reports').upsert(row, { onConflict: 'symbol' })
+  if (error) throw new Error(`Supabase upsert «${row.symbol}»: ${error.message}`)
+}
+
 // ═══ پردازش یک نماد ═══
 // خروجی: 'skip' | 'throttle' | 'empty' | 'ok'
-async function buildSymbol(symbol) {
+async function buildSymbol(symbol, opts = {}) {
+  const force = opts.force ?? FORCE
   const outFile = path.join(OUT_DIR, `${symbol.replace(/\s+/g, '-')}.json`)
-  if (!FORCE && fs.existsSync(outFile)) { console.log(`⏭ ${symbol} — موجود است`); return 'skip' }
+  if (!force && fs.existsSync(outFile)) { console.log(`⏭ ${symbol} — موجود است`); return 'skip' }
 
   console.log(`\n═══ ${symbol} ═══`)
   const list = await fetchAnnouncements(symbol)
@@ -435,8 +458,23 @@ async function buildSymbol(symbol) {
     console.log(`  ❌ ${symbol}: هیچ گزارشی پارس نشد`)
     return 'empty'
   }
-  fs.writeFileSync(outFile, JSON.stringify({ symbol, updated: new Date().toISOString(), months, quarters }))
-  console.log(`  ✅ ${symbol}: ${months.length} ماه + ${quarters.length} دوره → ${path.basename(outFile)}`)
+  const payload = { symbol, updated: new Date().toISOString(), months, quarters }
+  fs.mkdirSync(OUT_DIR, { recursive: true })
+  fs.writeFileSync(outFile, JSON.stringify(payload))
+
+  let sbNote = ''
+  try {
+    await upsertReport({
+      symbol,
+      data: payload,
+      months: months.length,
+      quarters: quarters.length,
+      updated: payload.updated,
+    })
+    if (sbClient()) sbNote = ' → Supabase'
+  } catch (e) { diag(`⚠️ ${symbol}: ${e.message}`) }
+
+  console.log(`  ✅ ${symbol}: ${months.length} ماه + ${quarters.length} دوره → ${path.basename(outFile)}${sbNote}`)
   return 'ok'
 }
 
@@ -492,4 +530,9 @@ async function main() {
   diag(`✔ تمام شد. ✅${stat.ok} جدید | ⏭${stat.skip} موجود | ❌${stat.empty} بدون‌گزارش | ⛔${stat.fail} ناموفق`)
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+// codal-watch.js این ماژول را require می‌کند و فقط buildSymbol را صدا می‌زند
+module.exports = { buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR }
+
+if (require.main === module) {
+  main().catch(e => { console.error(e); process.exit(1) })
+}
