@@ -163,14 +163,24 @@ export default function StockPage() {
                       }}>{s.l18}</span>
                       <span style={{ fontSize: 12.5, color: muted, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.l30}</span>
                     </div>
-                    <Link href={`/stocks/${ind.id}`} style={{
-                      display: 'inline-block', marginTop: 10,
-                      fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
-                      padding: '4px 11px', borderRadius: 8,
-                      background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.28)',
-                    }}>
-                      {ind.name}
-                    </Link>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                      <Link href={`/stocks/${ind.id}`} style={{
+                        display: 'inline-block',
+                        fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
+                        padding: '4px 11px', borderRadius: 8,
+                        background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.28)',
+                      }}>
+                        {ind.name}
+                      </Link>
+                      <Link href={`/technical/${encodeURIComponent(symbol.replace(/\s+/g, '-'))}`} style={{
+                        display: 'inline-block',
+                        fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
+                        padding: '4px 11px', borderRadius: 8,
+                        background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.28)',
+                      }}>
+                        نمودار تکنیکال
+                      </Link>
+                    </div>
                   </div>
                   {/* پیل قیمت پایانی */}
                   <div style={{
