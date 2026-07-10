@@ -178,8 +178,19 @@ export default function TechnicalIndexPage() {
           )}
         </div>
 
-        {/* نمادهای پرطرفدار */}
+        {/* نمادهای پرطرفدار + دیده‌بان */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 30 }}>
+          <Link href="/technical/screener" style={{
+            fontSize: 13, fontWeight: 700, padding: '8px 16px', borderRadius: 10, minHeight: 34,
+            textDecoration: 'none', color: '#fff', fontFamily: 'inherit',
+            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" style={{ pointerEvents: 'none' }}>
+              <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" />
+            </svg>
+            دیده‌بان تکنیکال — فیلتر سیگنال‌ها
+          </Link>
           {POPULAR.map(s => (
             <Link key={s} href={`/technical/${toSlug(s)}`} style={{
               fontSize: 13, padding: '8px 16px', borderRadius: 10, minHeight: 34,

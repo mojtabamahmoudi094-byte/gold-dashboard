@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
   { label: 'تحلیل',         href: '/analysis', menu: [
     { label: 'تحلیل بازارها', href: '/analysis' },
     { label: 'تحلیل تکنیکال', href: '/technical' },
+    { label: 'دیده‌بان تکنیکال', href: '/technical/screener' },
     { label: 'ماشین‌حساب ارزش‌گذاری', href: '/valuation' },
   ] },
   { label: 'ارزش معاملات',  href: '/trade-value' },

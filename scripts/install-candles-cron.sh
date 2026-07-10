@@ -29,12 +29,15 @@ fi
 CRON_FILE="/etc/cron.d/candles-daily"
 
 cat > "$CRON_FILE" << EOF
-# بورس سنج — کندل روزانه؛ همه زمان‌ها UTC (تهران = UTC+3:30)
-# ۱۷:۴۵ تهران = ۱۴:۱۵ UTC — شنبه تا چهارشنبه = 6,0-3
+# بورس سنج — کندل روزانه + دیده‌بان تکنیکال؛ همه زمان‌ها UTC (تهران = UTC+3:30)
+# شنبه تا چهارشنبه = 6,0-3
 SHELL=/bin/bash
 MAILTO=""
 
+# کندل روزانه — ۱۷:۴۵ تهران
 15 14 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh candles-daily $NODE_BIN $SCRIPT_DIR/candles-daily.js >> $LOG_FILE 2>&1
+# دیده‌بان تکنیکال — ۱۸:۱۵ تهران (نیم ساعت بعد از کندل‌ها)
+45 14 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh screener-daily $NODE_BIN $SCRIPT_DIR/screener-daily.js >> /var/log/screener-daily.log 2>&1
 EOF
 
 chmod 644 "$CRON_FILE"
