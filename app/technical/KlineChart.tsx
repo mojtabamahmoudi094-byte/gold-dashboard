@@ -5,8 +5,9 @@
 // تاریخ‌ها شمسی (formatter)، اعداد fa-IR
 
 import { useEffect, useRef, useState } from 'react'
-import { init, dispose, registerLocale, type Chart, type KLineData } from 'klinecharts'
+import { init, dispose, registerLocale, registerOverlay, type Chart, type KLineData, type OverlayCreate } from 'klinecharts'
 import type { Candle } from '../../lib/indicators'
+import { swingHighsLows, fvg, bosChoch, orderBlocks, liquidity } from '../../lib/smc'
 import { GREEN, RED } from './colors'
 
 type PeriodType = 'day' | 'week' | 'month'
@@ -86,6 +87,187 @@ const shamsiFmt = typeof Intl !== 'undefined'
   : null
 const toShamsi = (ts: number) => shamsiFmt ? shamsiFmt.format(new Date(ts)) : String(ts)
 
+// ── اسمارت مانی — گزینه‌های منو + overlay های سفارشی رسم ناحیه/خط
+const SMC_ITEMS = [
+  { name: 'fvg',       label: 'گپ ارزش منصفانه (FVG)' },
+  { name: 'ob',        label: 'اردر بلاک' },
+  { name: 'structure', label: 'شکست ساختار (BOS/CHoCH)' },
+  { name: 'liquidity', label: 'نقدینگی' },
+  { name: 'swings',    label: 'سقف/کف سوئینگ' },
+]
+
+type SmcExtend = { color: string; border?: string; label?: string; textColor?: string; dashed?: boolean }
+
+let overlaysRegistered = false
+function ensureOverlays() {
+  if (overlaysRegistered) return
+  overlaysRegistered = true
+  // ناحیه (مستطیل) — FVG و اردر بلاک
+  registerOverlay({
+    name: 'smcZone',
+    lock: true,
+    createPointFigures: ({ coordinates, overlay }) => {
+      if (coordinates.length < 2) return []
+      const d = (overlay.extendData ?? {}) as SmcExtend
+      const [a, b] = coordinates
+      const x = Math.min(a.x, b.x)
+      const y = Math.min(a.y, b.y)
+      const w = Math.max(Math.abs(b.x - a.x), 1)
+      const h = Math.max(Math.abs(b.y - a.y), 1)
+      const figs = [{
+        type: 'rect',
+        attrs: { x, y, width: w, height: h },
+        styles: { style: 'stroke_fill', color: d.color, borderColor: d.border ?? d.color, borderSize: 1 },
+        ignoreEvent: true,
+      }]
+      if (d.label) {
+        figs.push({
+          type: 'text',
+          attrs: { x: x + 4, y: y + h / 2, text: d.label, baseline: 'middle' },
+          styles: { color: d.textColor ?? '#8b93a7', size: 10, backgroundColor: 'transparent' },
+          ignoreEvent: true,
+        } as never)
+      }
+      return figs
+    },
+  })
+  // خط سطح — BOS/CHoCH و نقدینگی
+  registerOverlay({
+    name: 'smcLine',
+    lock: true,
+    createPointFigures: ({ coordinates, overlay }) => {
+      if (coordinates.length < 2) return []
+      const d = (overlay.extendData ?? {}) as SmcExtend
+      const figs = [{
+        type: 'line',
+        attrs: { coordinates },
+        styles: { color: d.color, size: 1, style: d.dashed ? 'dashed' : 'solid' },
+        ignoreEvent: true,
+      }]
+      if (d.label) {
+        figs.push({
+          type: 'text',
+          attrs: { x: coordinates[0].x, y: coordinates[0].y, text: d.label, align: 'left', baseline: 'bottom' },
+          styles: { color: d.color, size: 10, backgroundColor: 'transparent' },
+          ignoreEvent: true,
+        } as never)
+      }
+      return figs
+    },
+  })
+  // نشانگر سوئینگ — متن تکی
+  registerOverlay({
+    name: 'smcMark',
+    lock: true,
+    createPointFigures: ({ coordinates, overlay }) => {
+      if (coordinates.length < 1) return []
+      const d = (overlay.extendData ?? {}) as SmcExtend
+      return [{
+        type: 'text',
+        attrs: { x: coordinates[0].x, y: coordinates[0].y, text: d.label ?? '', align: 'center', baseline: d.dashed ? 'top' : 'bottom' },
+        styles: { color: d.color, size: 10, backgroundColor: 'transparent' },
+        ignoreEvent: true,
+      }]
+    },
+  })
+}
+
+/** ساخت overlay های یک لایه SMC روی کندل‌های تجمیع‌شده فعلی */
+function buildSmcOverlays(kind: string, candles: Candle[]): OverlayCreate[] {
+  const n = candles.length
+  if (n < 30) return []
+  const ts = (i: number) => Date.parse(candles[i].time)
+  const lastTs = ts(n - 1)
+  const swings = swingHighsLows(candles, 10)
+  const out: OverlayCreate[] = []
+  const base = { groupId: `smc-${kind}`, paneId: 'candle_pane', lock: true }
+
+  if (kind === 'fvg') {
+    const f = fvg(candles)
+    const idx: number[] = []
+    for (let i = 0; i < n; i++) if (!Number.isNaN(f.fvg[i]) && f.mitigatedIndex[i] === 0) idx.push(i)
+    for (const i of idx.slice(-15)) {
+      const bull = f.fvg[i] === 1
+      out.push({
+        ...base, name: 'smcZone',
+        points: [{ timestamp: ts(i), value: f.top[i] }, { timestamp: lastTs, value: f.bottom[i] }],
+        extendData: {
+          color: bull ? 'rgba(38,166,154,0.14)' : 'rgba(239,83,80,0.14)',
+          border: bull ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
+          label: 'FVG', textColor: bull ? GREEN : RED,
+        } satisfies SmcExtend,
+      })
+    }
+  }
+
+  if (kind === 'ob') {
+    const ob = orderBlocks(candles, swings)
+    const idx: number[] = []
+    for (let i = 0; i < n; i++) if (!Number.isNaN(ob.ob[i]) && ob.mitigatedIndex[i] === 0) idx.push(i)
+    for (const i of idx.slice(-10)) {
+      const bull = ob.ob[i] === 1
+      out.push({
+        ...base, name: 'smcZone',
+        points: [{ timestamp: ts(i), value: ob.top[i] }, { timestamp: lastTs, value: ob.bottom[i] }],
+        extendData: {
+          color: bull ? 'rgba(38,166,154,0.22)' : 'rgba(239,83,80,0.22)',
+          border: bull ? 'rgba(38,166,154,0.55)' : 'rgba(239,83,80,0.55)',
+          label: `OB ${Math.round(ob.percentage[i])}٪`, textColor: bull ? GREEN : RED,
+        } satisfies SmcExtend,
+      })
+    }
+  }
+
+  if (kind === 'structure') {
+    const bc = bosChoch(candles, swings)
+    const idx: number[] = []
+    for (let i = 0; i < n; i++) if (!Number.isNaN(bc.bos[i]) || !Number.isNaN(bc.choch[i])) idx.push(i)
+    for (const i of idx.slice(-12)) {
+      const isBos = !Number.isNaN(bc.bos[i])
+      const dir = isBos ? bc.bos[i] : bc.choch[i]
+      const j = Number.isNaN(bc.brokenIndex[i]) ? n - 1 : bc.brokenIndex[i]
+      out.push({
+        ...base, name: 'smcLine',
+        points: [{ timestamp: ts(i), value: bc.level[i] }, { timestamp: ts(j), value: bc.level[i] }],
+        extendData: { color: dir === 1 ? GREEN : RED, label: isBos ? 'BOS' : 'CHoCH' } satisfies SmcExtend,
+      })
+    }
+  }
+
+  if (kind === 'liquidity') {
+    const liq = liquidity(candles, swings)
+    const idx: number[] = []
+    for (let i = 0; i < n; i++) if (!Number.isNaN(liq.liquidity[i])) idx.push(i)
+    for (const i of idx.slice(-8)) {
+      const endIdx = liq.swept[i] > 0 ? liq.swept[i] : (liq.end[i] > 0 ? liq.end[i] : n - 1)
+      out.push({
+        ...base, name: 'smcLine',
+        points: [{ timestamp: ts(i), value: liq.level[i] }, { timestamp: ts(endIdx), value: liq.level[i] }],
+        extendData: {
+          color: liq.liquidity[i] === 1 ? 'rgba(38,166,154,0.8)' : 'rgba(239,83,80,0.8)',
+          label: liq.swept[i] > 0 ? 'نقدینگی (جمع شد)' : 'نقدینگی',
+          dashed: true,
+        } satisfies SmcExtend,
+      })
+    }
+  }
+
+  if (kind === 'swings') {
+    for (let i = 0; i < n; i++) {
+      if (Number.isNaN(swings.highLow[i])) continue
+      const high = swings.highLow[i] === 1
+      out.push({
+        ...base, name: 'smcMark',
+        points: [{ timestamp: ts(i), value: swings.level[i] }],
+        // dashed اینجا یعنی برچسب زیر نقطه بنشیند (کف سوئینگ)
+        extendData: { color: high ? RED : GREEN, label: high ? 'سقف' : 'کف', dashed: !high } satisfies SmcExtend,
+      })
+    }
+  }
+
+  return out
+}
+
 // برچسب‌های فارسی تولتیپ
 let localeRegistered = false
 function ensureLocale() {
@@ -149,14 +331,19 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
   const [period, setPeriod] = useState<PeriodType>('day')
   const [mainInds, setMainInds] = useState<string[]>(['MA'])
   const [subInds, setSubInds] = useState<string[]>(['VOL', 'MACD'])
-  const [openMenu, setOpenMenu] = useState<'main' | 'sub' | 'draw' | null>(null)
+  const [smcActive, setSmcActive] = useState<string[]>([])
+  const [openMenu, setOpenMenu] = useState<'main' | 'sub' | 'draw' | 'smc' | null>(null)
   const [isFull, setIsFull] = useState(false)
+  const aggregatedRef = useRef<Candle[]>([])
+  const smcRef = useRef<string[]>([])
+  smcRef.current = smcActive
 
   // ساخت نمودار + دیتا — با تغییر دیتا/تم/تایم‌فریم از نو
   useEffect(() => {
     const el = containerRef.current
     if (!el || candles.length === 0) return
     ensureLocale()
+    ensureOverlays()
 
     const chart = init(el, {
       locale: localeRegistered ? 'fa-IR' : 'en-US',
@@ -172,7 +359,9 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     chart.setSymbol({ ticker: symbol, pricePrecision: 0, volumePrecision: 0 })
     chart.setPeriod({ type: period, span: 1 })
 
-    const data: KLineData[] = aggregate(candles, period).map(c => ({
+    const aggregated = aggregate(candles, period)
+    aggregatedRef.current = aggregated
+    const data: KLineData[] = aggregated.map(c => ({
       timestamp: Date.parse(c.time),
       open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume,
     }))
@@ -182,6 +371,10 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
 
     for (const name of mainInds) chart.createIndicator({ name, paneId: 'candle_pane' }, true)
     for (const name of subInds) chart.createIndicator(name)
+    for (const kind of smcRef.current) {
+      const ovs = buildSmcOverlays(kind, aggregated)
+      if (ovs.length) chart.createOverlay(ovs)
+    }
 
     const ro = new ResizeObserver(() => chart.resize())
     ro.observe(el)
@@ -215,6 +408,19 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     } else {
       chart.createIndicator(name)
       setSubInds(v => [...v, name])
+    }
+  }
+
+  const toggleSmc = (kind: string) => {
+    const chart = chartRef.current
+    if (!chart) return
+    if (smcActive.includes(kind)) {
+      chart.removeOverlay({ groupId: `smc-${kind}` })
+      setSmcActive(v => v.filter(x => x !== kind))
+    } else {
+      const ovs = buildSmcOverlays(kind, aggregatedRef.current)
+      if (ovs.length) chart.createOverlay(ovs)
+      setSmcActive(v => [...v, kind])
     }
   }
 
@@ -283,7 +489,7 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
   )
 
   const dropdown = (
-    key: 'main' | 'sub' | 'draw',
+    key: 'main' | 'sub' | 'draw' | 'smc',
     label: string,
     items: { name: string; label: string }[],
     activeSet: string[] | null,
@@ -343,6 +549,7 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
         <div style={{ width: 1, height: 20, background: line }} />
         {dropdown('main', 'اندیکاتور', MAIN_INDICATORS, mainInds, toggleMain)}
         {dropdown('sub', 'اسیلاتور', SUB_INDICATORS, subInds, toggleSub)}
+        {dropdown('smc', 'اسمارت مانی', SMC_ITEMS, smcActive, toggleSmc)}
         {dropdown('draw', 'ابزار رسم', DRAW_TOOLS, null, startDraw)}
         <button onClick={toggleFullscreen} style={{ ...btn(isFull), marginInlineStart: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}
           aria-label={isFull ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}>
