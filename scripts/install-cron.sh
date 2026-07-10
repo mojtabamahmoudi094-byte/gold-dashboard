@@ -62,21 +62,23 @@ SHELL=/bin/bash
 MAILTO=""
 
 # کالایی (طلا/نقره/زعفران) + بورس کالا + جهانی + NAV — هر ۵ دقیقه، ۱۲:۰۰–۱۷:۰۵ تهران (گارد داخل اسکریپت)
-30-55/5 8 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-funds.js >> $LOG_FILE 2>&1
-*/5 9-13 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-funds.js >> $LOG_FILE 2>&1
+30-55/5 8 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh sync-funds $NODE_BIN $SCRIPT_DIR/sync-funds.js >> $LOG_FILE 2>&1
+*/5 9-13 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh sync-funds $NODE_BIN $SCRIPT_DIR/sync-funds.js >> $LOG_FILE 2>&1
 # اسنپ‌شات نهایی ۱۷:۰۶ تهران
-36 13 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-funds.js --force >> $LOG_FILE 2>&1
+36 13 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh sync-funds-force $NODE_BIN $SCRIPT_DIR/sync-funds.js --force >> $LOG_FILE 2>&1
 
 # صندوق‌های بورسی (اهرمی/بخشی/سهامی) — هر ۵ دقیقه، ۹:۰۰–۱۲:۳۰ تهران
-30-55/5 5 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
-*/5 6-8 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
-0 9 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
+30-55/5 5 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh sync-bourse $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
+*/5 6-8 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh sync-bourse $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
+0 9 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh sync-bourse $NODE_BIN $SCRIPT_DIR/sync-bourse.js >> $BOURSE_LOG_FILE 2>&1
 
 # سهام (۹:۰۰–۱۲:۳۰) + رصد صندوق‌های کالایی (۱۲:۰۰–۱۷:۳۰) — هر ۵ دقیقه، گارد پر-دسته داخل اسکریپت
-30-55/5 5 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
-*/5 6-13 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
-0 14 * * 6,0-3 root $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
+30-55/5 5 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh stocks-industries $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
+*/5 6-13 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh stocks-industries $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
+0 14 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh stocks-industries $NODE_BIN $SCRIPT_DIR/stocks-industries.js >> /var/log/stocks-industries.log 2>&1
 EOF
+
+chmod +x "$SCRIPT_DIR/run-with-alert.sh"
 
 chmod 644 "$CRON_FILE"
 echo ""
