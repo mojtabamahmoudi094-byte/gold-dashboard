@@ -63,45 +63,117 @@ const faNumFmt = (v, dec = 0) =>
   v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toLocaleString('fa-IR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
 const pctChange = (cur, prev) => (cur == null || prev == null || prev === 0) ? null : ((cur - prev) / Math.abs(prev)) * 100
 
-function summarizeMonth(m) {
-  const lines = [`📦 فعالیت ماهانه ${m.period}`]
-  if (m.kind === 'portfolio') {
-    lines.push(`ارزش پرتفوی: ${faNumFmt(m.totalMv)} میلیون ریال`)
-    if (m.gain != null) lines.push(`${m.gain >= 0 ? '📈 سود' : '📉 زیان'} انباشته: ${faNumFmt(Math.abs(m.gain))} میلیون ریال`)
-  } else if (m.kind === 'bank') {
-    lines.push(`درآمد محقق‌شده ماه: ${faNumFmt(m.month)} میلیون ریال`)
-    lines.push(`هزینه محقق‌شده ماه: ${faNumFmt(m.expense_m)} میلیون ریال`)
-  } else {
-    lines.push(`فروش ماه: ${faNumFmt(m.month)} میلیون ریال`)
-    const pct = pctChange(m.cum, m.lastYearCum)
-    lines.push(`فروش تجمعی: ${faNumFmt(m.cum)} میلیون ریال${pct == null ? '' : ` (${pct >= 0 ? 'رشد' : 'کاهش'} ${faNumFmt(Math.abs(pct), 1)}٪ نسبت به سال قبل)`}`)
+const J_MONTHS = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
+const periodParts = (p) => { const m = String(p || '').match(/^(\d{4})\/(\d{2})/); return m ? { y: +m[1], mo: +m[2] } : null }
+const monthName = (p) => { const pp = periodParts(p); return pp ? J_MONTHS[pp.mo] : p }
+// میلیون ریال → میلیارد تومان (÷۱۰٬۰۰۰)
+const toman = (v) => v == null ? '—' : faNumFmt(v / 1e4, Math.abs(v / 1e4) < 100 ? 1 : 0)
+
+// P/E ttm از فید BrsAPI (stocks-industries.json — هر ۵ دقیقه در ساعات بازار تازه می‌شود)
+let _peMap = null
+function peOf(symbol) {
+  if (_peMap === null) {
+    _peMap = new Map()
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'stocks-industries.json'), 'utf8'))
+      for (const ind of data.industries) for (const s of ind.symbols) if (s.pe != null && s.pe > 0) _peMap.set(s.l18, s.pe)
+    } catch {}
   }
-  return lines.join('\n')
+  return _peMap.get(symbol) ?? null
 }
 
-function summarizeQuarter(q) {
-  const lines = [`📊 صورت مالی ${q.period} (دوره ${q.months} ماهه${q.audited ? '، حسابرسی‌شده' : ''})`]
-  if (q.revenue != null) lines.push(`درآمد عملیاتی: ${faNumFmt(q.revenue)} میلیون ریال`)
-  if (q.net != null) {
-    const pct = pctChange(q.net, q.net_ly)
-    lines.push(`سود(زیان) خالص: ${faNumFmt(q.net)} میلیون ریال${pct == null ? '' : ` (${pct >= 0 ? 'رشد' : 'کاهش'} ${faNumFmt(Math.abs(pct), 1)}٪ نسبت به دورهٔ مشابه)`}`)
+// ورودی ماه قبلِ تقویمی (نه صرفاً عنصر قبلی آرایه)
+function prevMonthEntry(months, cur) {
+  const c = periodParts(cur.period)
+  if (!c) return null
+  const want = c.mo === 1 ? { y: c.y - 1, mo: 12 } : { y: c.y, mo: c.mo - 1 }
+  return months.find(m => { const p = periodParts(m.period); return p && p.y === want.y && p.mo === want.mo }) || null
+}
+
+// رشد فروشِ خودِ ماه نسبت به ماه مشابه سال قبل:
+//   اول سال مالی (cum == month): «تجمعی مشابه سال قبل» خودش همان یک ماه است
+//   وسط سال: تفاضل «تجمعی مشابه سال قبل» این ماه و ماه قبل = فروش ماه مشابه سال قبل
+function monthYoY(m, prev) {
+  if (m.month == null || m.lastYearCum == null) return null
+  if (m.cum != null && Math.abs(m.cum - m.month) <= Math.abs(m.cum) * 0.005) return pctChange(m.month, m.lastYearCum)
+  if (prev && prev.lastYearCum != null) {
+    const lastYearMonth = m.lastYearCum - prev.lastYearCum
+    if (lastYearMonth > 0) return pctChange(m.month, lastYearMonth)
   }
-  if (q.eps != null) lines.push(`سود هر سهم: ${faNumFmt(q.eps)} ریال`)
-  return lines.join('\n')
+  return null
+}
+
+// برچسب rule-based — فقط از روی رشد واقعی فروش، بدون قضاوت LLM
+function verdict(yoy, isRecord) {
+  if (yoy == null) return null
+  if (yoy >= 100) return { head: '🌟 رشد چشمگیر فروش نسبت به سال قبل', tail: 'گزارش عالی' }
+  if (yoy >= 50) return { head: null, tail: 'گزارش خیلی خوب' }
+  if (yoy >= 20) return { head: null, tail: 'گزارش خوب' }
+  if (yoy >= 0) return { head: null, tail: 'گزارش متوسط' }
+  return { head: null, tail: 'گزارش ضعیف' }
+}
+
+function summarizeMonth(symbol, months, m) {
+  const tag = `#گزارش_عملکرد_${monthName(m.period)}_${periodParts(m.period)?.y ?? ''}`
+  const lines = []
+
+  if (m.kind === 'portfolio') {
+    lines.push(`✅ ارزش پرتفوی: ${toman(m.totalMv)} میلیارد تومان`)
+    if (m.gain != null) lines.push(`${m.gain >= 0 ? '📈 سود' : '📉 زیان'} انباشته پرتفوی: ${toman(Math.abs(m.gain))} میلیارد تومان`)
+  } else if (m.kind === 'bank') {
+    lines.push(`✅ درآمد محقق‌شده ${monthName(m.period)}: ${toman(m.month)} میلیارد تومان`)
+    if (m.expense_m != null) lines.push(`💸 هزینه محقق‌شده ماه: ${toman(m.expense_m)} میلیارد تومان`)
+  } else {
+    const prev = prevMonthEntry(months, m)
+    const yoy = monthYoY(m, prev)
+    const mom = prev ? pctChange(m.month, prev.month) : null
+    const withMonth = months.filter(x => x.month != null)
+    const isRecord = withMonth.length >= 4 && m.month != null && m.month >= Math.max(...withMonth.map(x => x.month))
+    const v = verdict(yoy, isRecord)
+
+    if (v?.head) lines.push(v.head, '')
+    if (isRecord) lines.push(`✅ بیشترین فروش ماهانه در بین ${faNumFmt(withMonth.length)} ماه اخیر`, '')
+    lines.push(`✅ مبلغ فروش ${monthName(m.period)}: ${toman(m.month)} میلیارد تومان`)
+    if (yoy != null) lines.push(`🔝 رشد فروش نسبت به ماه مشابه سال قبل: ${faNumFmt(yoy, 0)}٪`)
+    else {
+      const cumYoY = pctChange(m.cum, m.lastYearCum)
+      if (cumYoY != null) lines.push(`🔝 رشد فروش تجمعی نسبت به سال قبل: ${faNumFmt(cumYoY, 0)}٪`)
+    }
+    if (mom != null) lines.push(`⬆️ رشد فروش نسبت به ماه قبل: ${faNumFmt(mom, 0)}٪`)
+    const pe = peOf(symbol)
+    if (pe != null) lines.push(`🔴 P/E ttm: ${faNumFmt(pe, 1)}`)
+    if (v?.tail) lines.push('', v.tail)
+  }
+  return { tag, body: lines.join('\n') }
+}
+
+function summarizeQuarter(symbol, q) {
+  const tag = `#صورت_مالی_${faNumFmt(q.months)}ماهه_${periodParts(q.period)?.y ?? ''}${q.audited ? '_حسابرسی‌شده' : ''}`
+  const lines = []
+  if (q.revenue != null) lines.push(`✅ درآمد عملیاتی: ${toman(q.revenue)} میلیارد تومان`)
+  const pct = pctChange(q.net, q.net_ly)
+  if (q.net != null) lines.push(`${q.net >= 0 ? '💰 سود' : '🔻 زیان'} خالص: ${toman(Math.abs(q.net))} میلیارد تومان${pct == null ? '' : ` (${pct >= 0 ? 'رشد' : 'کاهش'} ${faNumFmt(Math.abs(pct), 0)}٪ نسبت به دورهٔ مشابه)`}`)
+  if (q.eps != null) lines.push(`📌 سود هر سهم دوره: ${faNumFmt(q.eps)} ریال`)
+  const pe = peOf(symbol)
+  if (pe != null) lines.push(`🔴 P/E ttm: ${faNumFmt(pe, 1)}`)
+  const v = verdict(pct, false)
+  if (v?.tail) lines.push('', v.tail)
+  return { tag, body: lines.join('\n') }
 }
 
 // symbol, و عناوین اطلاعیه‌هایی که برای همین اجرا «تازه» تشخیص داده شدند (تعیین می‌کند ماهانه/فصلی کدام‌یک واقعاً جدیدند)
 function buildKeyPoints(symbol, payload, freshTitles) {
   const hasMonthly   = freshTitles.some(isMonthlyTitle)
   const hasQuarterly = freshTitles.some(isQuarterlyTitle)
-  const blocks = []
-  if (hasMonthly && payload.months.length) blocks.push(summarizeMonth(payload.months[payload.months.length - 1]))
-  if (hasQuarterly && payload.quarters.length) blocks.push(summarizeQuarter(payload.quarters[payload.quarters.length - 1]))
-  if (!blocks.length) return null
+  const parts = []
+  if (hasMonthly && payload.months.length) parts.push(summarizeMonth(symbol, payload.months, payload.months[payload.months.length - 1]))
+  if (hasQuarterly && payload.quarters.length) parts.push(summarizeQuarter(symbol, payload.quarters[payload.quarters.length - 1]))
+  if (!parts.length) return null
 
+  const hashtags = [`#${symbol.replace(/\s+/g, '_')}`, ...parts.map(p => p.tag)].join('\n')
   return [
-    `🆕 گزارش جدید کدال — نماد ${symbol} — بورس سنج`,
-    ...blocks,
+    hashtags,
+    ...parts.map(p => p.body),
     `${SITE}/stock/${encodeURIComponent(symbol)}`,
     '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
   ].join('\n\n')
