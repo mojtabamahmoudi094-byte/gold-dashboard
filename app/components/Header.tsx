@@ -2,10 +2,22 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 
 type NavItem = { label: string; href: string; menu?: { label: string; href: string }[] }
+
+type IdxItem = { name: string; value: number; change: number | null; pct: number | null }
+
+const BRSAPI_KEY = process.env.NEXT_PUBLIC_BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+
+const idxNum = (v: unknown): number | null => {
+  const x = parseFloat(String(v ?? '').replace(/,/g, ''))
+  return Number.isFinite(x) ? x : null
+}
+
+const faInt = (v: number) => Math.round(v).toLocaleString('fa-IR')
+const faPct = (v: number) => Math.abs(v).toLocaleString('fa-IR', { maximumFractionDigits: 2 })
 
 const NAV: NavItem[] = [
   { label: 'خانه',          href: '/' },
@@ -90,6 +102,65 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false)
   const [openDrop, setOpenDrop] = useState<string | null>(null) // href آیتم بازشوی فعال
 
+  // شاخص‌های بازار — BrsApi فقط از IP ایران جواب می‌دهد، پس فچ سمت کلاینت انجام می‌شود (همان الگوی صفحه ادمین)
+  const [idxItems, setIdxItems]     = useState<IdxItem[] | null>(null)
+  const [idxLoading, setIdxLoading] = useState(false)
+  const [idxError, setIdxError]     = useState(false)
+  const idxFetchedAt = useRef(0)
+
+  const fetchIndices = async () => {
+    if (idxLoading) return
+    if (idxItems && Date.now() - idxFetchedAt.current < 60_000) return
+    setIdxLoading(true)
+    try {
+      const [selRes, faraRes] = await Promise.allSettled([
+        fetch(`https://Api.BrsApi.ir/Tsetmc/Index.php?key=${BRSAPI_KEY}&type=3`, { cache: 'no-store', signal: AbortSignal.timeout(8_000) }),
+        fetch(`https://Api.BrsApi.ir/Tsetmc/Index.php?key=${BRSAPI_KEY}&type=2`, { cache: 'no-store', signal: AbortSignal.timeout(8_000) }),
+      ])
+      const items: IdxItem[] = []
+
+      // type=3 — شاخص‌های منتخب: کل، هم‌وزن، قیمت (وزنی-ارزشی)، قیمت (هم‌وزن)، آزاد شناور، بازار اول و دوم
+      if (selRes.status === 'fulfilled' && selRes.value.ok) {
+        const d = await selRes.value.json()
+        const arr = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [d]
+        for (const it of arr) {
+          const value = idxNum(it?.index)
+          if (value === null) continue
+          items.push({
+            name: String(it?.name ?? '').trim() || 'شاخص',
+            value,
+            change: idxNum(it?.index_change),
+            pct: idxNum(it?.index_change_percent),
+          })
+        }
+      }
+
+      // type=2 — شاخص کل فرابورس
+      if (faraRes.status === 'fulfilled' && faraRes.value.ok) {
+        const d = await faraRes.value.json()
+        const o = Array.isArray(d) ? d[0] : d
+        const v = idxNum(o?.index)
+        if (v !== null) {
+          items.push({ name: 'شاخص کل فرابورس', value: v, change: idxNum(o?.index_change), pct: idxNum(o?.index_change_percent) })
+          const ew = idxNum(o?.index_equalWeight)
+          if (ew !== null) items.push({ name: 'فرابورس هم‌وزن', value: ew, change: idxNum(o?.index_equalWeight_change), pct: null })
+        }
+      }
+
+      if (items.length) {
+        setIdxItems(items)
+        idxFetchedAt.current = Date.now()
+        setIdxError(false)
+      } else {
+        setIdxError(true)
+      }
+    } catch {
+      setIdxError(true)
+    } finally {
+      setIdxLoading(false)
+    }
+  }
+
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
     if (saved === 'light') setIsDark(false)
@@ -109,6 +180,8 @@ export default function Header() {
   }, [])
 
   useEffect(() => { setMenuOpen(false) }, [pathname])
+
+  useEffect(() => { if (menuOpen) fetchIndices() }, [menuOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleTheme = () => {
     const next = !isDark
@@ -132,6 +205,50 @@ export default function Header() {
     : 'none'
   const TEXT_NAV   = isDark ? '#6b7280' : '#7A6A50'
   const MOBILE_BG  = isDark ? 'rgba(8,10,16,0.99)' : 'rgba(252,249,242,0.99)'
+
+  const renderIdxRows = (compact = false) => {
+    if (idxLoading && !idxItems) {
+      return <div style={{ padding: '14px 16px', fontSize: 12.5, color: isDark ? '#ddd5bd' : '#7A6A50' }}>در حال دریافت…</div>
+    }
+    if (idxError && !idxItems) {
+      return <div style={{ padding: '14px 16px', fontSize: 12.5, color: '#EF4444' }}>دریافت شاخص‌ها ناموفق بود</div>
+    }
+    if (!idxItems) return null
+    return idxItems.map((it, i) => {
+      const up = (it.pct ?? it.change ?? 0) >= 0
+      const clr = up ? 'oklch(0.74 0.17 155)' : '#EF4444'
+      return (
+        <div key={i} style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: compact ? '9px 16px' : '10px 14px',
+          borderRadius: 9,
+          borderBottom: i < idxItems.length - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(59,130,246,0.08)'}` : 'none',
+        }}>
+          <span style={{
+            flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontSize: 12.5, fontWeight: 500,
+            color: isDark ? '#ddd5bd' : '#5A4A30',
+          }}>
+            {it.name}
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#eef1f8' : '#2A2A2A', direction: 'ltr' }}>
+            {faInt(it.value)}
+          </span>
+          {it.pct !== null ? (
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: clr, minWidth: 52, textAlign: 'left' }}>
+              {up ? '▲' : '▼'} {faPct(it.pct)}٪
+            </span>
+          ) : it.change !== null ? (
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: clr, minWidth: 52, textAlign: 'left' }}>
+              {up ? '▲' : '▼'} {faInt(Math.abs(it.change))}
+            </span>
+          ) : (
+            <span style={{ minWidth: 52 }} />
+          )}
+        </div>
+      )
+    })
+  }
 
   const navLink = (active: boolean): React.CSSProperties => ({
     textDecoration: 'none',
@@ -283,6 +400,44 @@ export default function Header() {
                 )
               })}
             </nav>
+
+            {/* کارت شاخص — با هاور باز می‌شود، دیتا مستقیم از BrsApi سمت کلاینت */}
+            <div style={{ position: 'relative' }}
+              onMouseEnter={() => { setOpenDrop('__idx__'); fetchIndices() }}
+              onMouseLeave={() => setOpenDrop(null)}>
+              <button
+                aria-expanded={openDrop === '__idx__'}
+                onClick={() => { setOpenDrop(openDrop === '__idx__' ? null : '__idx__'); fetchIndices() }}
+                style={{
+                  ...navLink(false),
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  border: 'none', borderBottom: '1.5px solid transparent',
+                  background: openDrop === '__idx__' ? 'rgba(59,130,246,0.08)' : 'transparent',
+                  color: openDrop === '__idx__' ? '#3b82f6' : TEXT_NAV,
+                  cursor: 'pointer',
+                }}
+              >
+                شاخص
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: openDrop === '__idx__' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', pointerEvents: 'none' }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {openDrop === '__idx__' && (
+                <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, paddingTop: 10 }}>
+                  <div style={{
+                    minWidth: 300,
+                    background: isDark ? '#12161f' : '#fffdf8',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(59,130,246,0.15)'}`,
+                    borderRadius: 14, padding: 6,
+                    boxShadow: isDark ? '0 18px 50px rgba(0,0,0,0.6)' : '0 14px 40px rgba(0,0,0,0.14)',
+                    direction: 'rtl',
+                  }}>
+                    {renderIdxRows()}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div style={{
               width: 1, height: 22,
@@ -466,6 +621,12 @@ export default function Header() {
             )
           })}
           </nav>
+
+          <div style={{ height: 1, background: BORDER, margin: '10px 0' }} />
+
+          {/* شاخص‌های بازار در منوی موبایل — هاور وجود ندارد، همیشه نمایش داده می‌شود */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6', padding: '4px 16px 6px' }}>شاخص‌های بازار</div>
+          <div>{renderIdxRows(true)}</div>
 
           <div style={{ height: 1, background: BORDER, margin: '10px 0' }} />
 
