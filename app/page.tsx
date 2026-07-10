@@ -1,11 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useIsMobile } from '../lib/useIsMobile'
 import { safe, fmtCompact as fmtVal } from '../lib/format'
+import { darkTheme, lightTheme } from '../lib/theme'
 
 type TickerItem = { name: string; slug: string; price: number; changePct: number }
+type StockRow = { l18: string; l30: string; pl: number; plp: number; tval: number; industry: string }
+type IndustryRow = { id: number; name: string; tval: number; up: number; down: number; count: number }
+type MarketStats = { tval: number; up: number; down: number; count: number; updated: string | null }
+
+// همت = هزار میلیارد تومان (۱e13 ریال)
+const fmtRial = (rial: number) =>
+  rial >= 1e13
+    ? `${(rial / 1e13).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} همت`
+    : `${Math.round(rial / 1e10).toLocaleString('fa-IR')} میلیارد ت`
+
+const faTime = (iso: string | null) => {
+  if (!iso) return ''
+  try {
+    return new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran' }).format(new Date(iso))
+  } catch { return '' }
+}
 
 /* شمارنده‌ی نرم اعداد — با احترام به prefers-reduced-motion */
 function CountUp({ value, format, duration = 900 }: { value: number; format: (n: number) => string; duration?: number }) {
@@ -29,112 +46,185 @@ function CountUp({ value, format, duration = 900 }: { value: number; format: (n:
   return <>{format(display)}</>
 }
 
-const FEATURES = [
+const ICON = {
+  chart: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
+    </svg>
+  ),
+  bars: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="7" height="18" rx="1" /><rect x="9.5" y="8" width="5" height="13" rx="1" /><rect x="17" y="5" width="5" height="16" rx="1" />
+    </svg>
+  ),
+  saffron: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a4 4 0 0 0 0 8" /><path d="M12 2a4 4 0 0 1 0 8" /><path d="M12 10v12" /><path d="M8 14s1 1 4 1 4-1 4-1" />
+    </svg>
+  ),
+  signal: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 2 L4 14 L11 14 L10 22 L20 9 L13 9 Z" />
+    </svg>
+  ),
+  candles: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="6" y1="4" x2="6" y2="20" /><rect x="4" y="8" width="4" height="7" rx="1" />
+      <line x1="12" y1="2" x2="12" y2="22" /><rect x="10" y="6" width="4" height="8" rx="1" />
+      <line x1="18" y1="5" x2="18" y2="19" /><rect x="16" y="9" width="4" height="6" rx="1" />
+    </svg>
+  ),
+  doc: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+      <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" />
+    </svg>
+  ),
+  radar: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /><path d="M12 12 L18 5" />
+    </svg>
+  ),
+  search: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="22" y2="22" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
+    </svg>
+  ),
+  calc: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="8" y1="6" x2="16" y2="6" />
+      <line x1="8" y1="11" x2="8" y2="11.01" /><line x1="12" y1="11" x2="12" y2="11.01" /><line x1="16" y1="11" x2="16" y2="11.01" />
+      <line x1="8" y1="15" x2="8" y2="15.01" /><line x1="12" y1="15" x2="12" y2="15.01" /><line x1="16" y1="15" x2="16" y2="18" />
+    </svg>
+  ),
+  briefcase: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  ),
+  monitor: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+      <polyline points="6 12 9 9 12 11 17 6" />
+    </svg>
+  ),
+  compare: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="2" x2="12" y2="22" /><polyline points="3 7 7 3 11 7" /><line x1="7" y1="3" x2="7" y2="17" />
+      <polyline points="13 17 17 21 21 17" /><line x1="17" y1="21" x2="17" y2="7" />
+    </svg>
+  ),
+}
+
+const FEATURES: { href: string; title: string; desc: string; color: string; icon: (c: string) => ReactNode; badge?: string }[] = [
   {
-    href: '/funds',
-    title: 'صندوق‌های طلا',
-    desc: 'قیمت، حجم و ارزش معاملات صندوق‌های مبتنی بر طلا',
-    color: 'oklch(0.82 0.15 70)',
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.82 0.15 70)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-        <polyline points="16 7 22 7 22 13" />
-      </svg>
-    ),
+    href: '/stocks',
+    title: 'سهام بازار',
+    desc: 'قیمت لحظه‌ای بیش از ۶۰۰ نماد در ۴۵ صنعت — هر ۵ دقیقه در ساعت بازار به‌روز می‌شود',
+    color: '#3b82f6',
+    icon: ICON.candles,
+    badge: 'جدید',
   },
   {
-    href: '/funds',
-    title: 'صندوق‌های نقره',
-    desc: 'دیدبان جامع صندوق‌های سرمایه‌گذاری مبتنی بر نقره',
-    color: 'oklch(0.84 0.03 240)',
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.84 0.03 240)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="3" width="7" height="18" rx="1" />
-        <rect x="9.5" y="8" width="5" height="13" rx="1" />
-        <rect x="17" y="5" width="5" height="16" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    href: '/funds',
-    title: 'صندوق‌های زعفران',
-    desc: 'رصد صندوق‌های کالایی مبتنی بر زعفران و کالاهای کشاورزی',
-    color: 'oklch(0.70 0.19 40)',
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.70 0.19 40)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2a4 4 0 0 0 0 8" />
-        <path d="M12 2a4 4 0 0 1 0 8" />
-        <path d="M12 10v12" />
-        <path d="M8 14s1 1 4 1 4-1 4-1" />
-      </svg>
-    ),
+    href: '/stocks',
+    title: 'گزارش‌های کدال',
+    desc: 'گزارش ماهانه و صورت‌های مالی ناشران، خودکار از کدال — با خلاصه‌ی تحلیلی هر گزارش',
+    color: 'oklch(0.78 0.14 200)',
+    icon: ICON.doc,
+    badge: 'جدید',
   },
   {
     href: '/signals',
     title: 'سیگنال‌های بازار',
-    desc: 'سیگنال‌های هوشمند خرید و فروش بر اساس تحلیل داده‌های بازار',
+    desc: 'سیگنال‌های هوشمند خرید و فروش بر اساس تحلیل داده‌های بازار و گزارش‌های کدال',
     color: 'oklch(0.74 0.17 155)',
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.74 0.17 155)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
-        <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
-        <line x1="6" y1="1" x2="6" y2="4" />
-        <line x1="10" y1="1" x2="10" y2="4" />
-        <line x1="14" y1="1" x2="14" y2="4" />
-      </svg>
-    ),
+    icon: ICON.signal,
   },
   {
-    href: '/analysis/gold',
-    title: 'تحلیل طلا',
-    desc: 'قیمت لحظه‌ای طلا، سکه، دلار و محاسبه‌ی حباب سکه',
-    color: '#3b82f6',
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="11" cy="11" r="7" />
-        <line x1="16.5" y1="16.5" x2="22" y2="22" />
-        <line x1="11" y1="8" x2="11" y2="14" />
-        <line x1="8" y1="11" x2="14" y2="11" />
-      </svg>
-    ),
+    href: '/funds/gold',
+    title: 'صندوق‌های طلا',
+    desc: 'قیمت، NAV، حباب و ارزش معاملات صندوق‌های مبتنی بر طلا',
+    color: 'oklch(0.82 0.15 70)',
+    icon: ICON.chart,
   },
   {
-    href: '/trade-value',
-    title: 'ارزش معاملات',
-    desc: 'ارزش کل معاملات روزانه طلا، نقره و زعفران با نمودار تاریخی',
-    color: 'oklch(0.74 0.17 155)',
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.74 0.17 155)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="3" width="7" height="18" rx="1" />
-        <rect x="9.5" y="8" width="5" height="13" rx="1" />
-        <rect x="17" y="5" width="5" height="16" rx="1" />
-      </svg>
-    ),
+    href: '/funds/silver',
+    title: 'صندوق‌های نقره',
+    desc: 'دیدبان جامع صندوق‌های سرمایه‌گذاری مبتنی بر نقره',
+    color: 'oklch(0.84 0.03 240)',
+    icon: ICON.bars,
+  },
+  {
+    href: '/funds/saffron',
+    title: 'صندوق‌های زعفران',
+    desc: 'رصد صندوق‌های کالایی مبتنی بر زعفران و کالاهای کشاورزی',
+    color: 'oklch(0.70 0.19 40)',
+    icon: ICON.saffron,
+  },
+  {
+    href: '/funds/radar',
+    title: 'رادار پول هوشمند',
+    desc: 'ردیابی ورود و خروج پول حقیقی به صندوق‌های کالایی',
+    color: '#f472b6',
+    icon: ICON.radar,
+  },
+  {
+    href: '/analysis',
+    title: 'تحلیل طلا و نقره',
+    desc: 'قیمت لحظه‌ای طلا، نقره، سکه و دلار به‌همراه محاسبه‌ی حباب سکه',
+    color: '#60a5fa',
+    icon: ICON.search,
+  },
+  {
+    href: '/valuation',
+    title: 'ماشین‌حساب ارزش‌گذاری',
+    desc: 'ارزش‌گذاری سریع سهام با روش‌های P/E، P/S و نسبت‌های بنیادی',
+    color: '#a78bfa',
+    icon: ICON.calc,
+  },
+  {
+    href: '/portfolio',
+    title: 'پورتفوی من',
+    desc: 'ثبت دارایی‌ها و رصد سود و زیان سبد شخصی به‌صورت زنده',
+    color: 'oklch(0.8 0.14 120)',
+    icon: ICON.briefcase,
+  },
+  {
+    href: '/monitor',
+    title: 'نمودار رصد بازارها',
+    desc: 'نمودار لحظه‌ای سهام، طلا و نقره در طول ساعت معاملات',
+    color: 'oklch(0.78 0.15 300)',
+    icon: ICON.monitor,
   },
   {
     href: '/compare',
     title: 'مقایسه صندوق‌ها',
     desc: 'مقایسه‌ی عملکرد دو تا پنج صندوق کنار هم به صورت بصری',
     color: '#8b5cf6',
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="2" x2="12" y2="22" />
-        <polyline points="3 7 7 3 11 7" />
-        <line x1="7" y1="3" x2="7" y2="17" />
-        <polyline points="13 17 17 21 21 17" />
-        <line x1="17" y1="21" x2="17" y2="7" />
-      </svg>
-    ),
+    icon: ICON.compare,
   },
 ]
 
 export default function HomePage() {
   const isMobile = useIsMobile()
-  const [stats, setStats] = useState<{ totalTV: number; fundCount: number; avgChange: number; positiveCount: number } | null>(null)
+  const [isDark, setIsDark] = useState(true)
+  const [stats, setStats] = useState<{ totalTV: number; fundCount: number } | null>(null)
   const [ticker, setTicker] = useState<TickerItem[]>([])
+  const [market, setMarket] = useState<MarketStats | null>(null)
+  const [gainers, setGainers] = useState<StockRow[]>([])
+  const [liquid, setLiquid] = useState<StockRow[]>([])
+  const [industries, setIndustries] = useState<IndustryRow[]>([])
 
   useEffect(() => {
-    const load = async () => {
+    const saved = window.localStorage.getItem('theme')
+    if (saved === 'light') setIsDark(false)
+    const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
+    window.addEventListener('themechange', handler)
+    return () => window.removeEventListener('themechange', handler)
+  }, [])
+
+  useEffect(() => {
+    const loadFunds = async () => {
       try {
         const res = await fetch('/api/funds', { cache: 'no-store' })
         if (!res.ok) return
@@ -159,27 +249,69 @@ export default function HomePage() {
             .map((f: any) => ({ name: f.name, slug: f.slug, price: f.price, changePct: f.changePct }))
         )
         const totalTV = combined.reduce((s: number, f: any) => s + f.tradeValue, 0)
-        const avgChange = combined.length > 0 ? combined.reduce((s: number, f: any) => s + f.changePct, 0) / combined.length : 0
-        const positiveCount = combined.filter((f: any) => f.changePct > 0).length
-        setStats({ totalTV, fundCount: combined.length, avgChange, positiveCount })
+        setStats({ totalTV, fundCount: combined.length })
       } catch {}
     }
-    load()
+    const loadStocks = async () => {
+      try {
+        const res = await fetch('/api/stocks-industries', { cache: 'no-store' })
+        if (!res.ok) return
+        const json = await res.json()
+        const inds: any[] = json?.industries || []
+        if (!inds.length) return
+        const all: StockRow[] = inds.flatMap((ind: any) =>
+          (ind.symbols || []).map((s: any) => ({
+            l18: String(s.l18 || ''), l30: String(s.l30 || ''),
+            pl: safe(s.pl), plp: safe(s.plp), tval: safe(s.tval),
+            industry: String(ind.name || ''),
+          }))
+        )
+        // فقط نمادهای نقدشونده (ارزش معاملات بالای ~۱ میلیارد تومان) در برترین‌ها بیایند
+        const tradable = all.filter(s => s.l18 && s.tval > 1e10)
+        setGainers([...tradable].sort((a, b) => b.plp - a.plp).slice(0, 5))
+        setLiquid([...tradable].sort((a, b) => b.tval - a.tval).slice(0, 5))
+        setIndustries(
+          inds
+            .map((i: any) => ({ id: safe(i.id), name: String(i.name || ''), tval: safe(i.tval), up: safe(i.up), down: safe(i.down), count: safe(i.count) }))
+            .sort((a, b) => b.tval - a.tval)
+            .slice(0, 5)
+        )
+        setMarket({
+          tval: inds.reduce((s: number, i: any) => s + safe(i.tval), 0),
+          up: inds.reduce((s: number, i: any) => s + safe(i.up), 0),
+          down: inds.reduce((s: number, i: any) => s + safe(i.down), 0),
+          count: inds.reduce((s: number, i: any) => s + safe(i.count), 0),
+          updated: json?.updated ?? null,
+        })
+      } catch {}
+    }
+    loadFunds()
+    loadStocks()
   }, [])
+
+  const t = isDark ? darkTheme : lightTheme
+  // قانون خوانایی تم تیره: متن ثانویه کرم، نه خاکستری کم‌کنتراست
+  const muted = isDark ? '#ddd5bd' : '#6B5A3A'
+  const softMuted = isDark ? 'rgba(221,213,189,0.75)' : '#7a6845'
+  const cardBg = isDark ? 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))' : t.panel
+  const cardBorder = isDark ? '1px solid rgba(255,255,255,0.08)' : `1px solid ${t.border}`
+  const rowBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(59,130,246,0.05)'
+  const divider = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(59,130,246,0.1)'
 
   return (
     <main style={{
       minHeight: '100vh',
-      background: '#0a0d14',
-      color: '#eef1f8',
+      background: t.bg,
+      color: t.text,
       fontFamily: 'Vazirmatn, Arial, sans-serif',
       direction: 'rtl',
+      transition: 'background 0.3s, color 0.3s',
     }}>
 
-      {/* ═══════ TICKER TAPE (داده‌ی زنده) ═══════ */}
+      {/* ═══════ TICKER TAPE (داده‌ی زنده صندوق‌ها) ═══════ */}
       <div style={{
-        background: 'rgba(59,130,246,0.05)',
-        borderBottom: '1px solid rgba(59,130,246,0.12)',
+        background: isDark ? 'rgba(59,130,246,0.05)' : 'rgba(37,99,235,0.05)',
+        borderBottom: `1px solid ${isDark ? 'rgba(59,130,246,0.12)' : 'rgba(37,99,235,0.14)'}`,
         height: 36, overflow: 'hidden', display: 'flex', alignItems: 'center',
       }}>
         {ticker.length === 0 ? (
@@ -201,12 +333,12 @@ export default function HomePage() {
                 <Link key={i} href={item.slug ? `/fund/${item.slug}` : '/funds'} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   padding: '0 24px', fontSize: 11.5, fontFamily: 'system-ui, sans-serif',
-                  borderLeft: '1px solid rgba(255,255,255,0.06)',
-                  textDecoration: 'none', lineHeight: '36px',
+                  borderLeft: `1px solid ${divider}`,
+                  textDecoration: 'none', lineHeight: '36px', cursor: 'pointer',
                 }}>
-                  <span style={{ color: '#a9b0c2', fontWeight: 500, fontFamily: 'Vazirmatn, inherit' }}>{item.name}</span>
-                  <span style={{ color: '#eef1f8', fontWeight: 700 }}>{item.price.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}</span>
-                  <span style={{ fontWeight: 700, color: pos ? 'oklch(0.74 0.17 155)' : 'oklch(0.68 0.2 25)' }}>
+                  <span style={{ color: muted, fontWeight: 500, fontFamily: 'Vazirmatn, inherit' }}>{item.name}</span>
+                  <span style={{ color: t.text, fontWeight: 700 }}>{item.price.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}</span>
+                  <span style={{ fontWeight: 700, color: pos ? t.green : t.red }}>
                     {pos ? '▲' : '▼'} {Math.abs(item.changePct).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪
                   </span>
                 </Link>
@@ -222,8 +354,8 @@ export default function HomePage() {
         padding: isMobile ? '48px 20px 40px' : '56px 6vw 40px',
         direction: 'rtl',
       }}>
-        <div style={{ position: 'absolute', top: -220, right: -140, width: 640, height: 640, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 65%)', filter: 'blur(40px)', pointerEvents: 'none', animation: 'bs-glow 9s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', top: 280, left: -180, width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 65%)', filter: 'blur(46px)', pointerEvents: 'none', animation: 'bs-glow 11s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: -220, right: -140, width: 640, height: 640, borderRadius: '50%', background: `radial-gradient(circle, rgba(59,130,246,${isDark ? 0.2 : 0.1}) 0%, transparent 65%)`, filter: 'blur(40px)', pointerEvents: 'none', animation: 'bs-glow 9s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: 280, left: -180, width: 560, height: 560, borderRadius: '50%', background: `radial-gradient(circle, rgba(139,92,246,${isDark ? 0.18 : 0.09}) 0%, transparent 65%)`, filter: 'blur(46px)', pointerEvents: 'none', animation: 'bs-glow 11s ease-in-out infinite' }} />
 
         <div style={{
           maxWidth: 1400, margin: '0 auto', position: 'relative',
@@ -235,68 +367,72 @@ export default function HomePage() {
         }}>
           {/* ── Text (RTL: right side) ── */}
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '7px 14px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', fontSize: 13, fontWeight: 600, color: '#c7cddb', marginBottom: 24 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'oklch(0.74 0.17 155)', display: 'inline-block', animation: 'bs-pulse 2s infinite' }} />
-              داده‌های زنده بورس و فرابورس
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '7px 14px', borderRadius: 999, background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(37,99,235,0.06)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(37,99,235,0.16)'}`, fontSize: 13, fontWeight: 600, color: muted, marginBottom: 24 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.green, display: 'inline-block', animation: 'bs-pulse 2s infinite' }} />
+              سهام لحظه‌ای + صندوق‌های کالایی + گزارش‌های کدال
             </div>
 
-            <h1 style={{ fontSize: isMobile ? 32 : 'clamp(38px,5vw,64px)', fontWeight: 900, lineHeight: 1.12, letterSpacing: '-0.5px', margin: '0 0 22px', color: '#eef1f8' }}>
+            <h1 style={{ fontSize: isMobile ? 32 : 'clamp(38px,5vw,64px)', fontWeight: 900, lineHeight: 1.12, letterSpacing: '-0.5px', margin: '0 0 22px', color: t.text }}>
               بازار بورس را<br />
-              <span style={{ background: 'linear-gradient(120deg, #3b82f6, #8b5cf6 55%, oklch(0.74 0.17 155))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              <span style={{ background: `linear-gradient(120deg, ${t.brand}, ${t.brand2} 55%, ${t.green})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
                 هوشمندانه بسنجید
               </span>
             </h1>
 
-            <p style={{ fontSize: isMobile ? 15 : 'clamp(16px,1.6vw,20px)', color: '#a9b0c2', maxWidth: 520, marginBottom: 34, lineHeight: 1.75 }}>
-              رصد لحظه‌ای صندوق‌های طلا، نقره و زعفران، محاسبه آنلاین حباب، تحلیل الگوریتمی و سیگنال بازار — همه در یک سامانه‌ی تحت‌وب، سریع و ساده.
+            <p style={{ fontSize: isMobile ? 15 : 'clamp(16px,1.6vw,20px)', color: muted, maxWidth: 520, marginBottom: 34, lineHeight: 1.75 }}>
+              قیمت لحظه‌ای بیش از ۶۰۰ سهم در ۴۵ صنعت، گزارش‌های کدال با خلاصه‌ی تحلیلی، رصد صندوق‌های طلا و نقره و زعفران، محاسبه آنلاین حباب و سیگنال بازار — همه در یک سامانه‌ی تحت‌وب، سریع و ساده.
             </p>
 
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 34, justifyContent: isMobile ? 'center' : 'flex-start' }}>
-              <Link href="/funds" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 17, padding: '15px 28px', borderRadius: 15, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', boxShadow: '0 16px 40px rgba(59,130,246,0.42)', cursor: 'pointer', fontFamily: 'Vazirmatn, inherit', transition: 'transform 0.2s' }}
+              <Link href="/funds" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 17, padding: '15px 28px', borderRadius: 15, background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, boxShadow: '0 16px 40px rgba(59,130,246,0.42)', cursor: 'pointer', fontFamily: 'Vazirmatn, inherit', transition: 'transform 0.2s' }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8 L12 16 M9 12 L15 12"/></svg>
                 حباب صندوق‌ها را ببینید
               </Link>
-              <Link href="/funds" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#eef1f8', textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '15px 26px', borderRadius: 15, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', fontFamily: 'Vazirmatn, inherit', transition: 'background 0.2s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}>
-                مشاهده نقشه بازار
+              <Link href="/stocks" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: t.text, textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '15px 26px', borderRadius: 15, border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : t.borderStrong}`, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(37,99,235,0.04)', cursor: 'pointer', fontFamily: 'Vazirmatn, inherit', transition: 'background 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(37,99,235,0.09)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(37,99,235,0.04)' }}>
+                نبض بازار سهام
               </Link>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', color: '#8b93a7', fontSize: 14, fontWeight: 500, justifyContent: isMobile ? 'center' : 'flex-start' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', color: softMuted, fontSize: 14, fontWeight: 500, justifyContent: isMobile ? 'center' : 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'oklch(0.74 0.17 155)', display: 'inline-block' }} />
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.green, display: 'inline-block' }} />
                 کاملاً تحت‌وب، بدون نیاز به نصب
               </div>
-              <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.14)' }} />
-              <div>داده‌ها هم‌سو با NAV رسمی صندوق‌ها</div>
+              <div style={{ width: 1, height: 16, background: divider }} />
+              <div>داده‌ها هم‌سو با NAV رسمی صندوق‌ها و کدال</div>
             </div>
           </div>
 
-          {/* ── Mock Dashboard Card (RTL: left side) ── */}
+          {/* ── Live Dashboard Card (RTL: left side) ── */}
           {!isMobile && (
             <div style={{ position: 'relative' }}>
-              <div style={{ position: 'relative', borderRadius: 26, padding: 22, background: 'linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 90px rgba(0,0,0,0.55)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', animation: 'bs-float 7s ease-in-out infinite' }}>
+              <div style={{ position: 'relative', borderRadius: 26, padding: 22, background: cardBg, border: cardBorder, boxShadow: t.cardShadow, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', animation: 'bs-float 7s ease-in-out infinite' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12 S5 4 12 4 22 12 22 12 19 20 12 20 2 12 2 12 Z"/><circle cx="12" cy="12" r="3"/></svg>
                     </div>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>دیدبان من</div>
                   </div>
-                  <div style={{ fontSize: 12, color: 'oklch(0.74 0.17 155)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'oklch(0.74 0.17 155)', display: 'inline-block', animation: 'bs-pulse 2s infinite' }} />
+                  <div style={{ fontSize: 12, color: t.green, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.green, display: 'inline-block', animation: 'bs-pulse 2s infinite' }} />
                     زنده
                   </div>
                 </div>
 
-                <div style={{ position: 'relative', borderRadius: 16, background: 'rgba(0,0,0,0.25)', padding: '14px 8px 6px', marginBottom: 16, overflow: 'hidden' }}>
+                <div style={{ position: 'relative', borderRadius: 16, background: isDark ? 'rgba(0,0,0,0.25)' : 'rgba(37,99,235,0.06)', padding: '14px 8px 6px', marginBottom: 16, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '0 10px 6px' }}>
-                    <span style={{ fontSize: 24, fontWeight: 800 }}>۲٬۴۸۰٬۱۲۰</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.74 0.17 155)' }}>▲ ۱٫۱٪</span>
-                    <span style={{ fontSize: 12, color: '#8b93a7', marginInlineStart: 'auto' }}>شاخص کل</span>
+                    <span style={{ fontSize: 22, fontWeight: 800 }}>{market ? fmtRial(market.tval) : '—'}</span>
+                    {market && (
+                      <span style={{ fontSize: 13, fontWeight: 700, color: market.up >= market.down ? t.green : t.red }}>
+                        {market.up >= market.down ? '▲' : '▼'} {market.up.toLocaleString('fa-IR')} نماد مثبت
+                      </span>
+                    )}
+                    <span style={{ fontSize: 12, color: softMuted, marginInlineStart: 'auto' }}>ارزش معاملات سهام</span>
                   </div>
                   <svg viewBox="0 0 600 200" width="100%" height="120" preserveAspectRatio="none" style={{ display: 'block' }}>
                     <defs>
@@ -316,45 +452,45 @@ export default function HomePage() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                  {[
-                    { icon: 'ط', iconColor: 'oklch(0.82 0.15 70)', iconBg: 'oklch(0.78 0.15 70 / 0.2)', name: 'صندوق طلا', price: '۴۲٬۵۸۰', bubble: 'حباب ۲٫۳٪', pos: true, bars: [40, 70, 55, 100] },
-                    { icon: 'ن', iconColor: 'oklch(0.86 0.03 240)', iconBg: 'oklch(0.8 0.03 240 / 0.28)', name: 'صندوق نقره', price: '۳۱٬۲۴۰', bubble: 'حباب ۰٫۸٪-', pos: false, bars: [90, 60, 75, 45] },
-                    { icon: 'ز', iconColor: 'oklch(0.74 0.19 40)', iconBg: 'oklch(0.68 0.19 40 / 0.22)', name: 'صندوق زعفران', price: '۲۸٬۹۷۰', bubble: 'حباب ۱٫۴٪', pos: true, bars: [50, 65, 80, 100] },
-                  ].map((row, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 13, background: 'rgba(255,255,255,0.04)' }}>
-                      <div style={{ width: 30, height: 30, borderRadius: 8, background: row.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: row.iconColor, flexShrink: 0 }}>{row.icon}</div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{row.name}</div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 22, marginInlineStart: 6 }}>
-                        {row.bars.map((h, j) => (
-                          <span key={j} style={{ width: 3, height: `${h * 0.22}px`, background: row.pos ? 'oklch(0.74 0.17 155)' : 'oklch(0.68 0.2 25)', borderRadius: 2, display: 'inline-block' }} />
-                        ))}
-                      </div>
-                      <div style={{ marginInlineStart: 'auto', textAlign: 'left' }}>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{row.price}</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: row.pos ? 'oklch(0.74 0.17 155)' : 'oklch(0.72 0.2 25)' }}>{row.bubble}</div>
-                      </div>
-                    </div>
+                  {(ticker.length >= 3 ? ticker.slice(0, 3) : []).map((row, i) => {
+                    const pos = row.changePct >= 0
+                    const iconColors = ['oklch(0.82 0.15 70)', 'oklch(0.86 0.03 240)', 'oklch(0.74 0.19 40)']
+                    return (
+                      <Link key={i} href={row.slug ? `/fund/${row.slug}` : '/funds'} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 13, background: rowBg, textDecoration: 'none', color: t.text, cursor: 'pointer' }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 8, background: `${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(37,99,235,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: iconColors[i], flexShrink: 0 }}>{row.name.slice(0, 1)}</div>
+                        <div style={{ fontWeight: 700, fontSize: 14, flexShrink: 0 }}>{row.name}</div>
+                        <div style={{ marginInlineStart: 'auto', textAlign: 'left' }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, fontFamily: 'system-ui, sans-serif' }}>{row.price.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: pos ? t.green : t.red }}>
+                            {pos ? '▲' : '▼'} {Math.abs(row.changePct).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪
+                          </div>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                  {ticker.length < 3 && Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="skeleton" style={{ height: 52, borderRadius: 13 }} />
                   ))}
                 </div>
               </div>
 
-              {/* Floating signal badge */}
+              {/* Floating badge — گزارش کدال */}
               <div style={{ position: 'absolute', top: -22, left: -26, padding: '12px 16px', borderRadius: 16, background: 'linear-gradient(135deg, oklch(0.72 0.17 155), oklch(0.7 0.15 165))', boxShadow: '0 18px 40px oklch(0.72 0.17 155 / 0.4)', display: 'flex', alignItems: 'center', gap: 10, animation: 'bs-float2 6s ease-in-out infinite' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#04140b" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 L4 14 L11 14 L10 22 L20 9 L13 9 Z"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#04140b" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 <div style={{ lineHeight: 1.2 }}>
-                  <div style={{ fontSize: 11, color: '#04321d', fontWeight: 600 }}>سیگنال جدید</div>
-                  <div style={{ fontSize: 14, color: '#052c19', fontWeight: 800 }}>خرید صندوق طلا</div>
+                  <div style={{ fontSize: 11, color: '#04321d', fontWeight: 600 }}>کدال</div>
+                  <div style={{ fontSize: 14, color: '#052c19', fontWeight: 800 }}>گزارش تازه رسید</div>
                 </div>
               </div>
 
               {/* Floating alert badge */}
-              <div style={{ position: 'absolute', bottom: -18, right: -22, padding: '12px 15px', borderRadius: 16, background: 'rgba(20,24,36,0.92)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 18px 40px rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: 10, backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', animation: 'bs-float 8s ease-in-out infinite' }}>
+              <div style={{ position: 'absolute', bottom: -18, right: -22, padding: '12px 15px', borderRadius: 16, background: isDark ? 'rgba(20,24,36,0.92)' : 'rgba(255,252,244,0.96)', border: cardBorder, boxShadow: t.cardShadow, display: 'flex', alignItems: 'center', gap: 10, backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', animation: 'bs-float 8s ease-in-out infinite' }}>
                 <div style={{ width: 34, height: 34, borderRadius: 10, background: 'oklch(0.78 0.15 70 / 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.82 0.15 70)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4 C8 4 7 8 7 11 C7 15 5 16 5 17 L19 17 C19 16 17 15 17 11 C17 8 16 4 12 4 Z"/><path d="M10 20 L14 20"/></svg>
                 </div>
                 <div style={{ lineHeight: 1.2 }}>
-                  <div style={{ fontSize: 11, color: '#8b93a7', fontWeight: 600 }}>هشدار حباب</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.68 0.2 25)' }}>حباب طلا منفی شد</div>
+                  <div style={{ fontSize: 11, color: softMuted, fontWeight: 600 }}>هشدار حباب</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: t.red }}>حباب طلا منفی شد</div>
                 </div>
               </div>
             </div>
@@ -367,8 +503,8 @@ export default function HomePage() {
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14 }}>
           {[
             {
-              label: 'ارزش کل معاملات',
-              render: stats ? () => <><CountUp value={stats.totalTV / 1e10} format={fmtVal} /> م.ت</> : null,
+              label: 'ارزش معاملات بازار سهام',
+              render: market ? () => <CountUp value={market.tval / 1e13} format={n => `${n.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} همت`} /> : null,
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/>
@@ -377,8 +513,18 @@ export default function HomePage() {
               color: '#3b82f6',
             },
             {
-              label: 'صندوق‌های فعال',
-              render: stats ? () => <CountUp value={stats.fundCount} format={n => Math.round(n).toLocaleString('fa-IR')} /> : null,
+              label: 'نمادهای مثبت بازار',
+              render: market ? () => <><CountUp value={market.up} format={n => Math.round(n).toLocaleString('fa-IR')} /> از {market.count.toLocaleString('fa-IR')}</> : null,
+              icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.74 0.17 155)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+                </svg>
+              ),
+              color: 'oklch(0.74 0.17 155)',
+            },
+            {
+              label: 'ارزش معاملات صندوق‌های کالایی',
+              render: stats ? () => <><CountUp value={stats.totalTV / 1e10} format={fmtVal} /> م.ت</> : null,
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
@@ -387,18 +533,8 @@ export default function HomePage() {
               color: '#8b5cf6',
             },
             {
-              label: 'میانگین تغییر روز',
-              render: stats ? () => <CountUp value={stats.avgChange} format={n => `${stats.avgChange >= 0 ? '+' : ''}${n.toFixed(2)}٪`} /> : null,
-              icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={stats && stats.avgChange >= 0 ? 'oklch(0.74 0.17 155)' : 'oklch(0.68 0.2 25)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
-                </svg>
-              ),
-              color: stats && stats.avgChange >= 0 ? 'oklch(0.74 0.17 155)' : 'oklch(0.68 0.2 25)',
-            },
-            {
-              label: 'صندوق‌های مثبت',
-              render: stats ? () => <><CountUp value={stats.positiveCount} format={n => String(Math.round(n))} /> از {stats.fundCount}</> : null,
+              label: 'صندوق‌های فعال',
+              render: stats ? () => <CountUp value={stats.fundCount} format={n => Math.round(n).toLocaleString('fa-IR')} /> : null,
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.82 0.15 70)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
@@ -408,8 +544,8 @@ export default function HomePage() {
             },
           ].map((item, i) => (
             <div key={i} style={{
-              background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-              border: '1px solid rgba(255,255,255,0.08)',
+              background: cardBg,
+              border: cardBorder,
               borderRadius: 16, padding: '18px 20px',
               display: 'flex', flexDirection: 'column', gap: 10,
             }}>
@@ -417,7 +553,7 @@ export default function HomePage() {
                 <div style={{ width: 34, height: 34, borderRadius: 10, background: `${item.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {item.icon}
                 </div>
-                <span style={{ fontSize: 12, color: '#8b93a7', fontWeight: 500 }}>{item.label}</span>
+                <span style={{ fontSize: 12, color: softMuted, fontWeight: 500 }}>{item.label}</span>
               </div>
               {item.render ? (
                 <div className="animate-fade-in" style={{ fontSize: 22, fontWeight: 800, color: item.color, fontFamily: 'system-ui, sans-serif' }}>
@@ -431,12 +567,130 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* ═══════ نبض بازار سهام (داده‌ی زنده) ═══════ */}
+      <section style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '8px 20px 48px' : '10px 6vw 60px', direction: 'rtl' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 22 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h2 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 900, margin: 0, color: t.text }}>نبض بازار سهام</h2>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: t.green, padding: '4px 10px', borderRadius: 999, background: isDark ? 'oklch(0.74 0.17 155 / 0.12)' : 'rgba(5,150,105,0.1)' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.green, display: 'inline-block', animation: 'bs-pulse 2s infinite' }} />
+              زنده
+            </span>
+            {market?.updated && (
+              <span style={{ fontSize: 12, color: softMuted }}>به‌روزرسانی {faTime(market.updated)}</span>
+            )}
+          </div>
+          <Link href="/stocks" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 700, color: t.brand, textDecoration: 'none', cursor: 'pointer' }}>
+            مشاهده همه‌ی صنایع
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.brand} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18 L9 12 L15 6"/></svg>
+          </Link>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: isMobile ? 12 : 18 }}>
+          {/* برترین رشد روز */}
+          <div style={{ background: cardBg, border: cardBorder, borderRadius: 18, padding: '18px 18px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: isDark ? 'oklch(0.74 0.17 155 / 0.15)' : 'rgba(5,150,105,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              </span>
+              <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: 0, color: t.text }}>برترین رشد روز</h3>
+            </div>
+            {gainers.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 6 }}>
+                {Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 44, borderRadius: 11 }} />)}
+              </div>
+            ) : gainers.map((s, i) => (
+              <Link key={s.l18} href={`/stock/${encodeURIComponent(s.l18)}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, textDecoration: 'none', color: t.text, cursor: 'pointer', marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent', overflow: 'hidden', transition: 'background 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.1)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
+                <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.l18}</span>
+                <span style={{ fontSize: 11.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
+                <span style={{ marginInlineStart: 'auto', flexShrink: 0, textAlign: 'left' }}>
+                  <span style={{ display: 'block', fontWeight: 700, fontSize: 13, fontFamily: 'system-ui, sans-serif' }}>{s.pl.toLocaleString('fa-IR')}</span>
+                  <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: t.green }}>▲ {s.plp.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+
+          {/* بیشترین ارزش معاملات */}
+          <div style={{ background: cardBg, border: cardBorder, borderRadius: 18, padding: '18px 18px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: isDark ? 'rgba(59,130,246,0.15)' : 'rgba(37,99,235,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.brand} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>
+              </span>
+              <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: 0, color: t.text }}>بیشترین ارزش معاملات</h3>
+            </div>
+            {liquid.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 6 }}>
+                {Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 44, borderRadius: 11 }} />)}
+              </div>
+            ) : liquid.map((s, i) => {
+              const pos = s.plp >= 0
+              return (
+                <Link key={s.l18} href={`/stock/${encodeURIComponent(s.l18)}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, textDecoration: 'none', color: t.text, cursor: 'pointer', marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent', overflow: 'hidden', transition: 'background 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.1)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
+                  <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.l18}</span>
+                  <span style={{ fontSize: 11.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
+                  <span style={{ marginInlineStart: 'auto', flexShrink: 0, textAlign: 'left' }}>
+                    <span style={{ display: 'block', fontWeight: 700, fontSize: 13, fontFamily: 'system-ui, sans-serif' }}>{fmtRial(s.tval)}</span>
+                    <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: pos ? t.green : t.red }}>{pos ? '▲' : '▼'} {Math.abs(s.plp).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪</span>
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+
+          {/* صنایع پیشرو */}
+          <div style={{ background: cardBg, border: cardBorder, borderRadius: 18, padding: '18px 18px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: isDark ? 'rgba(139,92,246,0.15)' : 'rgba(124,58,237,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.brand2} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="7" height="18" rx="1"/><rect x="9.5" y="8" width="5" height="13" rx="1"/><rect x="17" y="5" width="5" height="16" rx="1"/></svg>
+              </span>
+              <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: 0, color: t.text }}>صنایع پیشروی امروز</h3>
+            </div>
+            {industries.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 6 }}>
+                {Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 44, borderRadius: 11 }} />)}
+              </div>
+            ) : industries.map((ind, i) => {
+              const total = ind.up + ind.down
+              const upRatio = total > 0 ? ind.up / total : 0.5
+              return (
+                <Link key={ind.id || ind.name} href={`/stocks/${ind.id ?? encodeURIComponent(ind.name)}`} style={{ display: 'block', padding: '9px 10px', borderRadius: 11, textDecoration: 'none', color: t.text, cursor: 'pointer', marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent', transition: 'background 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.1)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                    <span style={{ fontWeight: 700, fontSize: 13.5, flexShrink: 0 }}>{ind.name}</span>
+                    <span style={{ marginInlineStart: 'auto', flexShrink: 0, fontWeight: 700, fontSize: 12.5, fontFamily: 'system-ui, sans-serif', color: softMuted }}>{fmtRial(ind.tval)}</span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 7 }}>
+                    <span style={{ flex: 1, height: 5, borderRadius: 3, background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', overflow: 'hidden', display: 'flex' }}>
+                      <span style={{ width: `${upRatio * 100}%`, background: t.green, display: 'block' }} />
+                      <span style={{ width: `${(1 - upRatio) * 100}%`, background: t.red, display: 'block', opacity: 0.75 }} />
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>
+                      <span style={{ color: t.green }}>{ind.up.toLocaleString('fa-IR')}</span>
+                      <span style={{ color: softMuted }}> / </span>
+                      <span style={{ color: t.red }}>{ind.down.toLocaleString('fa-IR')}</span>
+                    </span>
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* ═══════ FEATURES ═══════ */}
-      <section style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '48px 20px' : '60px 6vw', direction: 'rtl' }}>
+      <section style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '0 20px 48px' : '0 6vw 60px', direction: 'rtl' }}>
         <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto 50px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6', marginBottom: 12, letterSpacing: '0.04em' }}>امکانات بورس سنج</div>
-          <h2 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4vw,46px)', fontWeight: 900, letterSpacing: '-0.5px', margin: '0 0 16px', color: '#eef1f8' }}>هرآنچه یک معامله‌گر حرفه‌ای نیاز دارد</h2>
-          <p style={{ color: '#a9b0c2', fontSize: 18 }}>ابزارهای قدرتمند برای تصمیم‌گیری سریع‌تر و دقیق‌تر در بازار سرمایه.</p>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.brand, marginBottom: 12, letterSpacing: '0.04em' }}>امکانات بورس سنج</div>
+          <h2 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4vw,46px)', fontWeight: 900, letterSpacing: '-0.5px', margin: '0 0 16px', color: t.text }}>هرآنچه یک معامله‌گر حرفه‌ای نیاز دارد</h2>
+          <p style={{ color: muted, fontSize: 18 }}>از سهام لحظه‌ای و گزارش‌های کدال تا حباب صندوق‌ها — ابزارهای قدرتمند برای تصمیم‌گیری سریع‌تر و دقیق‌تر.</p>
         </div>
 
         <div style={{
@@ -446,57 +700,61 @@ export default function HomePage() {
         }}>
           {FEATURES.map((feat, i) => (
             <Link key={i} href={feat.href} className="animate-rise" style={{
+              position: 'relative',
               textDecoration: 'none', display: 'flex', flexDirection: 'column', gap: 0,
-              background: 'linear-gradient(165deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 22, padding: isMobile ? '22px 18px' : '30px',
+              background: cardBg,
+              border: cardBorder,
+              borderRadius: 22, padding: isMobile ? '22px 18px' : '28px',
               transition: 'transform 0.3s, border-color 0.3s',
               cursor: 'pointer',
-              animationDelay: `${i * 70}ms`,
+              animationDelay: `${i * 60}ms`,
             }}
             onMouseEnter={e => {
               e.currentTarget.style.transform = 'translateY(-6px)'
-              e.currentTarget.style.borderColor = `${feat.color}66`
+              e.currentTarget.style.borderColor = `${feat.color.startsWith('#') ? feat.color + '66' : feat.color}`
             }}
             onMouseLeave={e => {
               e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+              e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(59,130,246,0.14)'
             }}>
+              {feat.badge && (
+                <span style={{ position: 'absolute', top: 16, left: 16, fontSize: 11, fontWeight: 800, color: '#04140b', background: `linear-gradient(135deg, oklch(0.78 0.16 155), oklch(0.85 0.14 150))`, padding: '3px 10px', borderRadius: 999 }}>{feat.badge}</span>
+              )}
               <div style={{
                 width: 52, height: 52, borderRadius: 15,
-                background: `${feat.color}28`,
+                background: feat.color.startsWith('#') ? `${feat.color}28` : `color-mix(in oklab, ${feat.color} 16%, transparent)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 marginBottom: 20, flexShrink: 0,
               }}>
-                {feat.icon}
+                {feat.icon(feat.color)}
               </div>
-              <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 10px', color: '#eef1f8' }}>{feat.title}</h3>
-              <p style={{ color: '#a9b0c2', fontSize: 15, lineHeight: 1.7, margin: 0 }}>{feat.desc}</p>
+              <h3 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 10px', color: t.text }}>{feat.title}</h3>
+              <p style={{ color: muted, fontSize: 14.5, lineHeight: 1.7, margin: 0 }}>{feat.desc}</p>
             </Link>
           ))}
         </div>
       </section>
 
       {/* ═══════ CTA ═══════ */}
-      <section style={{ maxWidth: 1120, margin: '0 auto', padding: isMobile ? '60px 20px 70px' : '80px 6vw 90px', textAlign: 'center', direction: 'rtl' }}>
-        <h2 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4.4vw,52px)', fontWeight: 900, letterSpacing: '-0.6px', margin: '0 0 18px', color: '#eef1f8' }}>
+      <section style={{ maxWidth: 1120, margin: '0 auto', padding: isMobile ? '40px 20px 70px' : '50px 6vw 90px', textAlign: 'center', direction: 'rtl' }}>
+        <h2 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4.4vw,52px)', fontWeight: 900, letterSpacing: '-0.6px', margin: '0 0 18px', color: t.text }}>
           همین حالا رایگان با{' '}
-          <span style={{ background: 'linear-gradient(120deg, #3b82f6, oklch(0.74 0.17 155))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>بورس سنج</span>
+          <span style={{ background: `linear-gradient(120deg, ${t.brand}, ${t.green})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>بورس سنج</span>
           {' '}شروع کنید
         </h2>
-        <p style={{ color: '#a9b0c2', fontSize: 19, maxWidth: 560, margin: '0 auto 38px', lineHeight: 1.7 }}>
-          کاملاً تحت‌وب و بدون نصب. حساب بسازید و همین حالا حباب و NAV صندوق‌ها را زیر نظر بگیرید.
+        <p style={{ color: muted, fontSize: 19, maxWidth: 560, margin: '0 auto 38px', lineHeight: 1.7 }}>
+          کاملاً تحت‌وب و بدون نصب. حساب بسازید و همین حالا سهام، گزارش‌های کدال و حباب صندوق‌ها را زیر نظر بگیرید.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 17, padding: '16px 32px', borderRadius: 15, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', boxShadow: '0 16px 42px rgba(59,130,246,0.42)', fontFamily: 'Vazirmatn, inherit', cursor: 'pointer', transition: 'transform 0.2s' }}
+          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 17, padding: '16px 32px', borderRadius: 15, background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, boxShadow: '0 16px 42px rgba(59,130,246,0.42)', fontFamily: 'Vazirmatn, inherit', cursor: 'pointer', transition: 'transform 0.2s' }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)' }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5 L12 19 M5 12 L19 12"/></svg>
             ثبت‌نام رایگان
           </Link>
-          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#eef1f8', textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '16px 30px', borderRadius: 15, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', fontFamily: 'Vazirmatn, inherit', cursor: 'pointer', transition: 'background 0.2s' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}>
+          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: t.text, textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '16px 30px', borderRadius: 15, border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : t.borderStrong}`, background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(37,99,235,0.04)', fontFamily: 'Vazirmatn, inherit', cursor: 'pointer', transition: 'background 0.2s' }}
+          onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.09)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(37,99,235,0.04)' }}>
             ورود به حساب کاربری
           </Link>
         </div>
