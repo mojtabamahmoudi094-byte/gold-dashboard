@@ -15,6 +15,19 @@
 const path = require('path')
 const fs   = require('fs')
 
+// همان الگوی stocks-industries.js — کلیدها از فایل کنار اسکریپت خوانده می‌شوند
+function loadEnv(file) {
+  const p = path.resolve(__dirname, file)
+  if (!fs.existsSync(p)) return
+  fs.readFileSync(p, 'utf8').split('\n').forEach(line => {
+    const m = line.match(/^([^#=\s]+)\s*=\s*(.+)$/)
+    if (m) process.env[m[1]] = m[2].trim()
+  })
+}
+loadEnv('../.env.local')
+loadEnv('.env.sync')
+loadEnv('.env')
+
 const URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!URL || !KEY) { console.error('SUPABASE_URL و SUPABASE_KEY (service-role) لازم است'); process.exit(1) }
@@ -23,7 +36,13 @@ const DIR = process.argv[2] || path.join(__dirname, 'reports-out')
 const BATCH = 25
 
 const { createClient } = require('@supabase/supabase-js')
-const sb = createClient(URL, KEY, { auth: { persistSession: false } })
+// Node < 22 بدون WebSocket بومی — پکیج ws را صریح پاس می‌دهیم (مثل stocks-industries.js)
+let wsTransport
+try { wsTransport = require('ws') } catch { /* Node 22+ نیازی ندارد */ }
+const sb = createClient(URL, KEY, {
+  auth: { persistSession: false },
+  ...(wsTransport ? { realtime: { transport: wsTransport } } : {}),
+})
 
 async function main() {
   const files = fs.readdirSync(DIR).filter(f => f.endsWith('.json'))

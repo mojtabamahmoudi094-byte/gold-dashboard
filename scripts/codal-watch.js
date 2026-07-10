@@ -54,17 +54,57 @@ const isInteresting = (title) => {
   return false
 }
 
-// تاریخ شمسی امروز و n روز قبل — YYYY-MM-DD (فرمت date_start/date_end برای BrsAPI)
-function jalali(d = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', {
-    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran',
-  }).formatToParts(d)
-  const g = (t) => parts.find(p => p.type === t).value
-  return `${String(Number(g('year'))).padStart(4, '0')}-${g('month')}-${g('day')}`
-}
-const daysAgo = (n) => jalali(new Date(Date.now() - n * 86_400_000))
+const toLatin = (s) => String(s || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+// «۱۴۰۵/۰۴/۱۹ ۱۱:۴۰:۳۰» → «1405/04/19 11:40:30» — عرض ثابت، پس مقایسهٔ رشته‌ای = مقایسهٔ زمانی
+const pdt = (s) => toLatin(s).replace(/\s+/g, ' ').trim()
 
-// ═══ منبع ۱: BrsAPI بدون l18 (کل بازار در یک بازه) ═══
+// تاریخ‌ساعت شمسی تهران با همان قالب کدال
+function jNow(d = new Date()) {
+  const p = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, timeZone: 'Asia/Tehran',
+  }).formatToParts(d)
+  const g = (t) => p.find(x => x.type === t).value
+  return `${g('year')}/${g('month')}/${g('day')} ${g('hour')}:${g('minute')}:${g('second')}`
+}
+// فرمت YYYY-MM-DD برای date_start/date_end در BrsAPI
+const jDate = (d = new Date()) => jNow(d).slice(0, 10).replace(/\//g, '-')
+
+// ═══ منبع اصلی: API عمومی کدال (بدون auth، صفحه‌بندی دارد) ═══
+// نزولی بر اساس زمان انتشار؛ تا رسیدن به cutoff صفحه می‌زنیم.
+const MAX_PAGES = 40 // ۸۰۰ اطلاعیه — بیش از هر روز شلوغ کدال
+async function fromCodal(since) {
+  const out = []
+  for (let p = 1; p <= MAX_PAGES; p++) {
+    const url = 'https://search.codal.ir/api/search/v2/q'
+      + '?Audited=true&AuditorRef=-1&Category=-1&Childs=false&CompanyState=-1&CompanyType=-1'
+      + '&Consolidatable=true&IsNotAudited=false&Length=-1&LetterType=-1&Mains=true'
+      + '&NotAudited=true&NotConsolidatable=true&Publisher=false&TracingNo=-1&search=true'
+      + `&PageNumber=${p}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: { 'User-Agent': 'Mozilla/5.0' } })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const letters = (await res.json())?.Letters ?? []
+    if (!letters.length) break
+
+    let reachedCutoff = false
+    for (const l of letters) {
+      const publish = pdt(l.PublishDateTime ?? l.SentDateTime)
+      if (publish && publish < since) { reachedCutoff = true; continue }
+      out.push({
+        symbol: l.Symbol,
+        title: l.Title,
+        publish,
+        key: String(l.TracingNo ?? `${l.Symbol}|${l.Title}|${publish}`),
+      })
+    }
+    if (reachedCutoff) break
+    await sleep(1200)
+  }
+  return out
+}
+
+// ═══ پشتیبان: BrsAPI بدون l18 — سقف ۲۰ ردیف دارد، پس فقط وقتی کدال نمی‌آید ═══
 async function fromBrsApi(ds, de) {
   const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}&date_start=${ds}&date_end=${de}`
   const res = await fetch(url, { signal: AbortSignal.timeout(60_000) })
@@ -74,49 +114,22 @@ async function fromBrsApi(ds, de) {
   return list.map(a => ({
     symbol: a.l18,
     title: a.title,
-    publish: a.date_publish ?? a.date_send ?? null,
+    publish: pdt(a.date_publish ?? a.date_send),
     key: String(a.tracing_no ?? `${a.l18}|${a.title}|${a.date_publish}`),
   }))
 }
 
-// ═══ منبع ۲: API عمومی خود کدال (بدون auth) ═══
-async function fromCodal(pages = 3) {
-  const out = []
-  for (let p = 1; p <= pages; p++) {
-    const url = 'https://search.codal.ir/api/search/v2/q'
-      + '?Audited=true&AuditorRef=-1&Category=-1&Childs=false&CompanyState=-1&CompanyType=-1'
-      + '&Consolidatable=true&IsNotAudited=false&Length=-1&LetterType=-1&Mains=true'
-      + '&NotAudited=true&NotConsolidatable=true&Publisher=false&TracingNo=-1&search=true'
-      + `&PageNumber=${p}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: { 'User-Agent': 'Mozilla/5.0' } })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    const letters = data?.Letters ?? []
-    if (!letters.length) break
-    for (const l of letters) {
-      out.push({
-        symbol: l.Symbol,
-        title: l.Title,
-        publish: l.PublishDateTime ?? l.SentDateTime ?? null,
-        key: String(l.TracingNo ?? `${l.Symbol}|${l.Title}|${l.PublishDateTime}`),
-      })
-    }
-    await sleep(1500)
-  }
-  return out
-}
-
-// BrsAPI اول (بازهٔ تاریخی دقیق دارد)؛ اگر خالی/خطا بود، از API کدال
 async function fetchRecent() {
-  const days = Math.max(1, Math.ceil(HOURS / 24))
+  const since = jNow(new Date(Date.now() - HOURS * 3_600_000))
   try {
-    const list = await fromBrsApi(daysAgo(days), jalali())
-    if (list.length) { log(`منبع: BrsApi — ${list.length} اطلاعیه در ${days} روز اخیر`); return list }
-    log('BrsApi بدون l18 چیزی برنگرداند — سراغ API کدال')
-  } catch (e) { log(`BrsApi ناموفق (${e.message}) — سراغ API کدال`) }
+    const list = await fromCodal(since)
+    if (list.length) { log(`منبع: search.codal.ir — ${list.length} اطلاعیه از ${since}`); return list }
+    log('کدال چیزی برنگرداند — پشتیبان BrsApi')
+  } catch (e) { log(`کدال ناموفق (${e.message}) — پشتیبان BrsApi`) }
 
-  const list = await fromCodal()
-  log(`منبع: search.codal.ir — ${list.length} اطلاعیه`)
+  const days = Math.max(1, Math.ceil(HOURS / 24))
+  const list = await fromBrsApi(jDate(new Date(Date.now() - days * 86_400_000)), jDate())
+  log(`منبع: BrsApi (سقف ۲۰ ردیف) — ${list.length} اطلاعیه`)
   return list
 }
 

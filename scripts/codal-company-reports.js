@@ -20,6 +20,19 @@
 const path = require('path')
 const fs   = require('fs')
 
+// همان الگوی stocks-industries.js — cron هیچ env نمی‌دهد، اسکریپت خودش می‌خواند
+function loadEnv(file) {
+  const p = path.resolve(__dirname, file)
+  if (!fs.existsSync(p)) return
+  fs.readFileSync(p, 'utf8').split('\n').forEach(line => {
+    const m = line.match(/^([^#=\s]+)\s*=\s*(.+)$/)
+    if (m) process.env[m[1]] = m[2].trim()
+  })
+}
+loadEnv('../.env.local')
+loadEnv('.env.sync')
+loadEnv('.env')
+
 const KEY   = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const FORCE = process.argv.includes('--force')
 const OUT_DIR = path.join(__dirname, 'reports-out')
@@ -400,7 +413,13 @@ function sbClient() {
   if (_sb !== null) return _sb
   if (!SUPABASE_URL || !SUPABASE_KEY) { _sb = false; return false }
   const { createClient } = require('@supabase/supabase-js')
-  _sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
+  // Node < 22 بدون WebSocket بومی — پکیج ws را صریح پاس می‌دهیم (مثل stocks-industries.js)
+  let wsTransport
+  try { wsTransport = require('ws') } catch { /* Node 22+ نیازی ندارد */ }
+  _sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: false },
+    ...(wsTransport ? { realtime: { transport: wsTransport } } : {}),
+  })
   return _sb
 }
 
