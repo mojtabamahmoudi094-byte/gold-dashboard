@@ -186,6 +186,58 @@ const PL_MAP = [
   ['capital',  /^سرمایه$/],
 ]
 
+// ═══ گزارش ماهانه شرکت‌های سرمایه‌گذاری/هلدینگ: صورت وضعیت پرتفوی ═══
+// شیت «سهام پذیرفته‌شده در بورس» — هدر دو ردیفه:
+//   نام شرکت | سرمایه | ارزش اسمی | [ابتدای دوره: تعداد، بهای تمام‌شده، ارزش بازار]
+//   | [تغییرات: تعداد، بهای، ارزش بازار] | [انتهای دوره: درصد مالکیت، بهای، ارزش بازار] | …
+// همه مبالغ میلیون ریال. «تغییرات تعداد سهام» = خرید (مثبت) / فروش (منفی) طی ماه.
+function parseMonthlyPortfolio(wb) {
+  for (const sn of wb.SheetNames) {
+    const rows = sheetRows(wb, sn)
+    // ردیف زیرعنوان که ستون‌های واقعی را دارد
+    const hi = rows.findIndex(r => {
+      const cells = r.map(norm)
+      return cells.filter(c => c === 'تعداد سهام').length >= 2
+        && cells.includes('ارزش بازار') && cells.includes('بهای تمام شده')
+    })
+    if (hi === -1) continue
+    const sub = rows[hi].map(norm)
+    // گروه‌ها را از روی ترتیب «تعداد سهام» پیدا کن
+    const qIdx = sub.reduce((a, c, i) => (c === 'تعداد سهام' ? [...a, i] : a), [])
+    const ownIdx = sub.indexOf('درصد مالکیت')
+    if (qIdx.length < 2 || ownIdx === -1) continue
+    const [i0, i1] = qIdx           // ابتدای دوره، تغییرات
+    const col = { q0: i0, c0: i0 + 1, mv0: i0 + 2, dq: i1, dc: i1 + 1, dmv: i1 + 2, own: ownIdx, c1: ownIdx + 1, mv1: ownIdx + 2 }
+
+    const holdings = []
+    let totals = null
+    for (let i = hi + 1; i < rows.length; i++) {
+      const r = rows[i]
+      const name = norm(r[0])
+      if (name.startsWith('جمع')) {
+        // «جمع» نهایی — جمع‌های میانی (جمع سهام پذیرفته‌شده…) را رد نکن، آخری برنده است
+        totals = { totalCost: faNum(r[col.c1]), totalMv: faNum(r[col.mv1]) }
+        continue
+      }
+      if (!name || name.endsWith(':')) continue
+      const mv1 = faNum(r[col.mv1])
+      const c1  = faNum(r[col.c1])
+      if (mv1 === null && c1 === null) continue
+      holdings.push({
+        name,
+        q0: faNum(r[col.q0]), c0: faNum(r[col.c0]), mv0: faNum(r[col.mv0]),
+        dq: faNum(r[col.dq]), dc: faNum(r[col.dc]), dmv: faNum(r[col.dmv]),
+        own: faNum(r[col.own]), c1, mv1,
+      })
+    }
+    if (holdings.length && totals && totals.totalMv !== null) {
+      const gain = (totals.totalMv ?? 0) - (totals.totalCost ?? 0)
+      return { kind: 'portfolio', holdings, ...totals, gain }
+    }
+  }
+  return null
+}
+
 function parsePL(wb) {
   for (const sn of wb.SheetNames) {
     const rows = sheetRows(wb, sn)
@@ -292,11 +344,14 @@ async function buildSymbol(symbol) {
   const { monthly, quarterly } = pickReports(list)
   console.log(`  فعالیت ماهانه: ${monthly.length} دوره | صورت مالی: ${quarterly.length} دوره`)
 
+  // فرم تولیدی (نام محصول) وگرنه فرم پرتفوی (هلدینگ/سرمایه‌گذاری)
+  const parseAnyMonthly = (wb) => parseMonthly(wb) || parseMonthlyPortfolio(wb)
+
   const months = []
   for (const g of monthly) {
-    const r = await firstParsable(g.candidates, parseMonthly)
+    const r = await firstParsable(g.candidates, parseAnyMonthly)
     if (!r) { console.log(`    ⚠️ ماهانه ${g.key}: نیامد/پارس نشد (${g.candidates.length} نسخه)`); continue }
-    months.push({ period: faDate(r.a.title), publish: faDate(r.a.date_publish), ...r.p })
+    months.push({ period: faDate(r.a.title), publish: faDate(r.a.date_publish), kind: 'production', ...r.p })
   }
   months.sort((a, b) => a.period.localeCompare(b.period))
 
