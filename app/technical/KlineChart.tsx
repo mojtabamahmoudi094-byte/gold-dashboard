@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { init, dispose, registerLocale, registerOverlay, type Chart, type KLineData, type OverlayCreate } from 'klinecharts'
 import type { Candle } from '../../lib/indicators'
 import { swingHighsLows, fvg, bosChoch, orderBlocks, liquidity } from '../../lib/smc'
+import { registerCustomIndicators } from '../../lib/klineIndicators'
 import { GREEN, RED } from './colors'
 
 type PeriodType = 'day' | 'week' | 'month'
@@ -18,24 +19,30 @@ const PERIODS: { type: PeriodType; label: string }[] = [
   { type: 'month', label: 'ماهانه' },
 ]
 
-// اندیکاتورهای روی نمودار اصلی
+// اندیکاتورهای روی نمودار اصلی (ICHIMOKU/SUPERTREND/VWAP سفارشی — lib/klineIndicators)
 const MAIN_INDICATORS = [
-  { name: 'MA',   label: 'میانگین متحرک (MA)' },
-  { name: 'EMA',  label: 'میانگین نمایی (EMA)' },
-  { name: 'BOLL', label: 'باند بولینگر' },
-  { name: 'SAR',  label: 'پارابولیک سار' },
-  { name: 'BBI',  label: 'BBI' },
+  { name: 'MA',        label: 'میانگین متحرک (MA)' },
+  { name: 'EMA',       label: 'میانگین نمایی (EMA)' },
+  { name: 'BOLL',      label: 'باند بولینگر' },
+  { name: 'ICHIMOKU',  label: 'ابر ایچیموکو' },
+  { name: 'SUPERTREND', label: 'سوپرترند' },
+  { name: 'VWAP',      label: 'VWAP' },
+  { name: 'SAR',       label: 'پارابولیک سار' },
+  { name: 'BBI',       label: 'BBI' },
 ]
 
-// اسیلاتورها — pane جدا
+// اسیلاتورها — pane جدا (ATR/MFI سفارشی)
 const SUB_INDICATORS = [
   { name: 'VOL',  label: 'حجم معاملات' },
   { name: 'MACD', label: 'مکدی (MACD)' },
   { name: 'RSI',  label: 'شاخص قدرت نسبی (RSI)' },
   { name: 'KDJ',  label: 'استوکاستیک (KDJ)' },
+  { name: 'ATR',  label: 'میانگین دامنه (ATR)' },
+  { name: 'MFI',  label: 'جریان نقدینگی (MFI)' },
   { name: 'CCI',  label: 'CCI' },
   { name: 'WR',   label: 'ویلیامز (W%R)' },
   { name: 'OBV',  label: 'حجم تعادلی (OBV)' },
+  { name: 'DMI',  label: 'ADX / DMI' },
 ]
 
 // ابزارهای رسم — نام‌های آماده کتابخانه
@@ -344,6 +351,7 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     if (!el || candles.length === 0) return
     ensureLocale()
     ensureOverlays()
+    registerCustomIndicators()
 
     const chart = init(el, {
       locale: localeRegistered ? 'fa-IR' : 'en-US',
