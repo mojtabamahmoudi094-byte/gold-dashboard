@@ -365,7 +365,9 @@ function pickReports(list) {
 }
 
 // اولین نسخه‌ای که اکسلش می‌آید و پارس می‌شود؛ در غیر این صورت null
-async function firstParsable(candidates, parse, label) {
+// خروجی: { a, p } یا { reason: 'دانلود' | 'پارس' }
+async function firstParsable(candidates, parse) {
+  let reason = 'دانلود'
   for (const a of candidates) {
     try {
       const wb = await fetchWorkbook(a)
@@ -373,9 +375,10 @@ async function firstParsable(candidates, parse, label) {
       if (!wb) continue
       const p = parse(wb)
       if (p) return { a, p }
+      reason = 'پارس'   // اکسل آمد ولی فرم شناخته نشد
     } catch { await sleep(1500) }
   }
-  return null
+  return { reason }
 }
 
 // ═══ پردازش یک نماد ═══
@@ -398,7 +401,7 @@ async function buildSymbol(symbol) {
   const months = []
   for (const g of monthly) {
     const r = await firstParsable(g.candidates, parseAnyMonthly)
-    if (!r) { console.log(`    ⚠️ ماهانه ${g.key}: نیامد/پارس نشد (${g.candidates.length} نسخه)`); continue }
+    if (r.reason) { console.log(`    ⚠️ ماهانه ${g.key}: ${r.reason} ناموفق (${g.candidates.length} نسخه)`); continue }
     months.push({ period: faDate(r.a.title), publish: faDate(r.a.date_publish), kind: 'production', ...r.p })
   }
   months.sort((a, b) => a.period.localeCompare(b.period))
@@ -406,7 +409,7 @@ async function buildSymbol(symbol) {
   const quarters = []
   for (const g of quarterly) {
     const r = await firstParsable(g.candidates, parsePL)
-    if (!r) { console.log(`    ⚠️ فصلی ${g.key}: نیامد/پارس نشد (${g.candidates.length} نسخه)`); continue }
+    if (r.reason) { console.log(`    ⚠️ فصلی ${g.key}: ${r.reason} ناموفق (${g.candidates.length} نسخه)`); continue }
     const t = norm(r.a.title)
     const dur = t.match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
     quarters.push({
