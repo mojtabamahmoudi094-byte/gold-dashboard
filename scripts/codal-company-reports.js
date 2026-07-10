@@ -251,10 +251,11 @@ function parseBankTable(wb, kindRe) {
   for (const sn of wb.SheetNames) {
     const rows = sheetRows(wb, sn)
     if (!rows.length) continue
-    const head = rows[0].map(norm)
-    if (!kindRe.test(head[1] || '')) continue
+    // ردیف هدر ممکن است اولین ردیف نباشد
+    const hi = rows.findIndex(r => kindRe.test(norm(r[1] || '')))
+    if (hi === -1) continue
     const items = []
-    for (const r of rows.slice(1)) {
+    for (const r of rows.slice(hi + 1)) {
       const name = norm(r[0])
       const amount_m = faNum(r[1])
       if (!name || amount_m === null) continue
