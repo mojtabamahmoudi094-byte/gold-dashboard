@@ -5,7 +5,9 @@ import { useIsMobile } from '../../lib/useIsMobile'
 
 // ————— چت‌باکس شناور سراسری (مثل Chatwoot) — دستیار هوشمند بورس سنج —————
 
-const AI_API = 'https://newbot.dadashchekhabare.qzz.io/ai/ask'
+// از سمت کلاینت به‌جای زدن مستقیم به بات خارجی، از پروکسی خودمان عبور می‌کند
+// تا rate limit و اعتبارسنجی ورودی سمت سرور اعمال شود
+const AI_API = '/api/chat'
 const ACCENT = '#3b82f6'
 const ACCENT2 = '#8b5cf6'
 const GRAD = `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})`
