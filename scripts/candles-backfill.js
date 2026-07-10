@@ -25,7 +25,7 @@ const path = require('path')
 const fs = require('fs')
 const {
   shamsiToGregorian, gregorianToShamsi, tehranToday,
-  clean, num, fetchJson, mapLimit,
+  clean, num, fetchJson, mapLimit, TSETMC_HEADERS,
   INDEX_CODES, normalizeIndexName, isCandleSymbol,
 } = require('./candles-lib')
 
@@ -146,7 +146,7 @@ async function backfillIndices() {
   let total = 0
   for (const [name, code] of Object.entries(INDEX_CODES)) {
     try {
-      const data = await fetchJson(indexHistoryUrl(code), { timeout: 60_000 })
+      const data = await fetchJson(indexHistoryUrl(code), { timeout: 60_000, headers: TSETMC_HEADERS })
       const arr = data?.indexB2 ?? data?.data ?? (Array.isArray(data) ? data : [])
       if (!Array.isArray(arr) || arr.length === 0) {
         console.warn(`[candles-backfill] تاریخچه شاخص «${name}» خالی بود`)
@@ -250,7 +250,7 @@ async function main() {
   }
   if (PROBE_INDEX) {
     console.log('═══ RAW GetIndexB2History برای شاخص کل ═══')
-    const data = await fetchJson(indexHistoryUrl(INDEX_CODES['شاخص کل']), { timeout: 60_000 })
+    const data = await fetchJson(indexHistoryUrl(INDEX_CODES['شاخص کل']), { timeout: 60_000, headers: TSETMC_HEADERS })
     const arr = data?.indexB2 ?? data?.data ?? (Array.isArray(data) ? data : data)
     console.log(JSON.stringify(Array.isArray(arr) ? arr.slice(0, 3) : arr, null, 2))
     console.log(`\nتعداد رکوردها: ${Array.isArray(arr) ? arr.length : '؟'}`)

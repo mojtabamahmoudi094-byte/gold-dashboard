@@ -94,12 +94,16 @@ function normalizeIndexName(raw) {
 
 // ───────────────────────── fetch ─────────────────────────
 
+// هدر فقط وقتی داده شود ارسال می‌شود — BrsApi به UA مرورگر ناقص ECONNRESET می‌دهد،
+// اسکریپت‌های قدیمی همین سرور بدون هدر کار می‌کنند؛ tsetmc برعکس UA می‌خواهد
+const TSETMC_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', Accept: 'application/json' }
+
 async function fetchJson(url, { retries = 2, timeout = 30_000, headers } = {}) {
   for (let i = 0; i <= retries; i++) {
     try {
       const res = await fetch(url, {
         signal: AbortSignal.timeout(timeout),
-        headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json', ...headers },
+        ...(headers ? { headers } : {}),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return await res.json()
@@ -136,6 +140,6 @@ function isCandleSymbol(it, allL18) {
 
 module.exports = {
   shamsiToGregorian, gregorianToShamsi, tehranToday, tehranDay,
-  clean, num, fetchJson, mapLimit,
+  clean, num, fetchJson, mapLimit, TSETMC_HEADERS,
   INDEX_CODES, normalizeIndexName, isCandleSymbol,
 }
