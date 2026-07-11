@@ -10,6 +10,7 @@ import { rsi, macd, type Candle } from '../../../lib/indicators'
 import { GREEN, RED } from '../colors'
 
 const KlineChart = dynamic(() => import('../KlineChart'), { ssr: false })
+const TechnicalSummary = dynamic(() => import('../TechnicalSummary'), { ssr: false })
 
 type Row = {
   trade_date: string
@@ -259,7 +260,10 @@ export default function TechnicalSymbolPage() {
           </div>
         )}
         {!failed && candles.length > 0 && (
-          <KlineChart symbol={symbol} candles={candles} isDark={isDark} />
+          <>
+            <KlineChart symbol={symbol} candles={candles} isDark={isDark} />
+            <TechnicalSummary symbol={symbol} candles={candles} isDark={isDark} />
+          </>
         )}
 
         <p style={{ fontSize: 11, color: muted, lineHeight: 1.9, marginTop: 12 }}>
