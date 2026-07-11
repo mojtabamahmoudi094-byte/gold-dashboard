@@ -1,10 +1,12 @@
 'use client'
 
 // ترمینال تحلیل تکنیکال به سبک TradingView — KLineChart v10
-// نوار ابزار بالا (نوع کندل، تایم‌فریم، اندیکاتورها، اسمارت مانی، مقایسه، undo/redo،
-// قالب، ذخیره نما، اسکرین‌شات، تمام‌صفحه) + ریل عمودی ابزار رسم در کنار نمودار
+// چیدمان مثل TradingView: ریل ابزار رسم سمت چپ، محور قیمت سمت راست،
+// هدر بالایی (جست‌وجوی نماد، تعدیل، منبع قیمت، تایم‌فریم، اندیکاتور، بازپخش، AutoSave،
+// تنظیمات، تم، اشتراک‌گذاری، تمام‌صفحه) و نوار پایینی (بازه‌ها، ٪/لگاریتمی، ساعت تهران)
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   init, dispose, registerLocale, registerOverlay, registerIndicator,
   type Chart, type KLineData, type OverlayCreate, type CandleType,
@@ -55,18 +57,24 @@ const SUB_INDICATORS = [
   { name: 'DMI', label: 'ADX / DMI' },
 ]
 
-// ابزارهای رسم — ریل عمودی سمت راست (RTL) با آیکون
-const DRAW_TOOLS: { name: string; label: string; icon: string }[] = [
-  { name: 'segment', label: 'خط روند', icon: 'M4 20 L20 4' },
-  { name: 'straightLine', label: 'خط نامحدود', icon: 'M2 22 L22 2 M5 22 L2 19 M22 5 L19 2' },
+// ابزارهای رسم — ریل عمودی سمت چپ (مثل TradingView)
+const DRAW_TOOLS: { name: string; label: string; icon: string; fill?: boolean }[] = [
+  { name: 'segment', label: 'خط روند', icon: 'M4 20 L20 4 M4 20 l0.01 0 M20 4 l0.01 0' },
   { name: 'rayLine', label: 'نیم‌خط', icon: 'M4 20 L20 4 L20 9 M20 4 L15 4' },
+  { name: 'straightLine', label: 'خط نامحدود', icon: 'M2 22 L22 2 M5 22 L2 19 M22 5 L19 2' },
   { name: 'horizontalStraightLine', label: 'خط افقی', icon: 'M3 12 L21 12' },
   { name: 'verticalStraightLine', label: 'خط عمودی', icon: 'M12 3 L12 21' },
   { name: 'priceLine', label: 'خط قیمت', icon: 'M3 14 L21 14 M4 8 L8 8' },
   { name: 'priceChannelLine', label: 'کانال قیمت', icon: 'M3 16 L17 4 M7 20 L21 8' },
   { name: 'parallelStraightLine', label: 'خطوط موازی', icon: 'M3 15 L15 3 M9 21 L21 9' },
-  { name: 'fibonacciLine', label: 'فیبوناچی', icon: 'M4 6 L20 6 M4 12 L20 12 M4 18 L20 18' },
+  { name: 'fibonacciLine', label: 'فیبوناچی', icon: 'M4 5 L20 5 M4 10 L20 10 M4 15 L20 15 M4 20 L20 20' },
+  { name: 'drawRect', label: 'مستطیل', icon: 'M4 6 L20 6 L20 18 L4 18 Z' },
+  { name: 'drawCircle', label: 'دایره', icon: 'M12 4 A8 8 0 1 0 12 20 A8 8 0 1 0 12 4' },
+  { name: 'drawArrow', label: 'پیکان', icon: 'M4 20 L18 6 M18 6 L11 7 M18 6 L17 13' },
+  { name: 'brush', label: 'قلم آزاد', icon: 'M4 20 C7 12 10 18 13 10 C15 5 18 8 20 4' },
   { name: 'simpleAnnotation', label: 'یادداشت', icon: 'M5 19 L19 19 M12 5 L12 15 M8 8 L12 5 L16 8' },
+  { name: 'simpleTag', label: 'برچسب قیمت', icon: 'M3 12 L21 12 M17 8 L21 12 L17 16' },
+  { name: 'measureRuler', label: 'خط‌کش (اندازه‌گیری)', icon: 'M3 17 L17 3 L21 7 L7 21 Z M7 13 L9 15 M10 10 L12 12 M13 7 L15 9' },
 ]
 const DRAW_TOOL_NAMES = new Set(DRAW_TOOLS.map(t => t.name))
 
@@ -79,6 +87,26 @@ const SMC_ITEMS = [
 ]
 
 const CMP_COLORS = ['#3b82f6', '#d97706', '#ec4899', '#0891b2', '#8b5cf6']
+
+// سرعت‌های بازپخش — فاصله هر کندل به میلی‌ثانیه
+const REPLAY_SPEEDS = [
+  { label: '۰٫۵×', ms: 1200 },
+  { label: '۱×', ms: 650 },
+  { label: '۲×', ms: 320 },
+  { label: '۴×', ms: 150 },
+]
+
+// بازه‌های نوار پایین — ماه شمسی حدودی
+const RANGES: { label: string; months: number | 'all' }[] = [
+  { label: 'همه', months: 'all' },
+  { label: '۳س', months: 36 },
+  { label: '۱س', months: 12 },
+  { label: '۶م', months: 6 },
+  { label: '۳م', months: 3 },
+  { label: '۱م', months: 1 },
+]
+
+const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
 
 // ── تجمیع کندل روزانه به هفتگی (شنبه‌مبنا) / ماهانه (ماه شمسی)
 function aggregate(candles: Candle[], period: PeriodType): Candle[] {
@@ -184,6 +212,89 @@ function ensureOverlays() {
         styles: { color: d.color, size: 10, backgroundColor: 'transparent' },
         ignoreEvent: true,
       }]
+    },
+  })
+
+  // ── ابزارهای رسمی که کتابخانه ندارد — مستطیل، دایره، پیکان، خط‌کش
+  registerOverlay({
+    name: 'drawRect',
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    needDefaultXAxisFigure: true,
+    needDefaultYAxisFigure: true,
+    createPointFigures: ({ coordinates }) => {
+      if (coordinates.length < 2) return []
+      const [a, b] = coordinates
+      return [{
+        type: 'rect',
+        attrs: { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) },
+        styles: { style: 'stroke_fill', color: 'rgba(59,130,246,0.12)', borderColor: '#3b82f6', borderSize: 1 },
+      }]
+    },
+  })
+  registerOverlay({
+    name: 'drawCircle',
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    createPointFigures: ({ coordinates }) => {
+      if (coordinates.length < 2) return []
+      const [a, b] = coordinates
+      const r = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2)
+      return [{
+        type: 'circle',
+        attrs: { x: a.x, y: a.y, r },
+        styles: { style: 'stroke_fill', color: 'rgba(139,92,246,0.12)', borderColor: '#8b5cf6', borderSize: 1 },
+      }]
+    },
+  })
+  registerOverlay({
+    name: 'drawArrow',
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    createPointFigures: ({ coordinates }) => {
+      if (coordinates.length < 2) return []
+      const [a, b] = coordinates
+      const ang = Math.atan2(b.y - a.y, b.x - a.x)
+      const L = 13
+      const p1 = { x: b.x - L * Math.cos(ang - Math.PI / 7), y: b.y - L * Math.sin(ang - Math.PI / 7) }
+      const p2 = { x: b.x - L * Math.cos(ang + Math.PI / 7), y: b.y - L * Math.sin(ang + Math.PI / 7) }
+      return [
+        { type: 'line', attrs: { coordinates: [a, b] }, styles: { color: '#3b82f6', size: 2 } },
+        { type: 'polygon', attrs: { coordinates: [b, p1, p2] }, styles: { style: 'fill', color: '#3b82f6' } },
+      ]
+    },
+  })
+  registerOverlay({
+    name: 'measureRuler',
+    totalStep: 3,
+    needDefaultPointFigure: false,
+    createPointFigures: ({ coordinates, overlay }) => {
+      if (coordinates.length < 2) return []
+      const [a, b] = coordinates
+      const [pa, pb] = overlay.points
+      const v1 = pa?.value ?? 0
+      const v2 = pb?.value ?? 0
+      const diff = v2 - v1
+      const pct = v1 !== 0 ? (diff / v1) * 100 : 0
+      const bars = Math.abs((pb?.dataIndex ?? 0) - (pa?.dataIndex ?? 0))
+      const up = diff >= 0
+      const rgb = up ? '38,166,154' : '239,83,80'
+      const txt = `${diff >= 0 ? '+' : '−'}${fa(Math.abs(Math.round(diff)))} (${fa(Math.abs(pct), 2)}٪) · ${fa(bars)} کندل`
+      return [
+        {
+          type: 'rect',
+          attrs: { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) },
+          styles: { style: 'stroke_fill', color: `rgba(${rgb},0.12)`, borderColor: `rgba(${rgb},0.55)`, borderSize: 1 },
+        },
+        {
+          type: 'text',
+          attrs: { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - 6, text: txt, align: 'center', baseline: 'bottom' },
+          styles: {
+            color: '#fff', backgroundColor: up ? '#26a69a' : '#ef5350', size: 11,
+            paddingLeft: 7, paddingRight: 7, paddingTop: 4, paddingBottom: 4, borderRadius: 4,
+          },
+        },
+      ]
     },
   })
 }
@@ -327,12 +438,15 @@ function ensureLocale() {
 // پس‌زمینه نمودار مطابق TradingView: تیره #131722 / روشن #ffffff
 export const CHART_BG = { dark: '#131722', light: '#ffffff' }
 
-function chartStyles(isDark: boolean, candleType: CandleType) {
+type ChartSettings = { grid: boolean; lastLine: boolean; hilo: boolean }
+const DEFAULT_SETTINGS: ChartSettings = { grid: true, lastLine: true, hilo: true }
+
+function chartStyles(isDark: boolean, candleType: CandleType, s: ChartSettings) {
   const grid = isDark ? 'rgba(255,255,255,0.06)' : '#f0f3fa'
   const text = isDark ? '#8b93a7' : '#787b86'
   const axis = isDark ? 'rgba(255,255,255,0.12)' : '#e0e3eb'
   return {
-    grid: { horizontal: { color: grid }, vertical: { color: grid } },
+    grid: { show: s.grid, horizontal: { color: grid }, vertical: { color: grid } },
     candle: {
       type: candleType,
       bar: {
@@ -348,9 +462,9 @@ function chartStyles(isDark: boolean, candleType: CandleType) {
         ],
       },
       priceMark: {
-        high: { color: text },
-        low: { color: text },
-        last: { upColor: GREEN, downColor: RED, noChangeColor: text },
+        high: { show: s.hilo, color: text },
+        low: { show: s.hilo, color: text },
+        last: { show: s.lastLine, upColor: GREEN, downColor: RED, noChangeColor: text },
       },
       tooltip: {
         title: { color: isDark ? '#E8F4FF' : '#131722' },
@@ -397,24 +511,51 @@ type ChartConfig = {
 type DrawingSave = { name: string; points: { timestamp?: number; value?: number }[] }
 type SavedLayout = { id?: string; name: string; config: ChartConfig }
 type SavedSnapshot = { id?: string; name: string; symbol: string; config: ChartConfig; drawings: DrawingSave[] }
+type AutoSaveData = { config: ChartConfig; drawings: DrawingSave[] }
+
+type ScaleMode = 'normal' | 'percentage' | 'logarithm'
+
+type SymItem = { l18: string; pcp: number | null }
 
 type Props = {
   symbol: string
   candles: Candle[]
   isDark: boolean
+  symbols?: SymItem[]
+  livePrice?: { pl: number; plp: number } | null
 }
 
-export default function KlineChart({ symbol, candles, isDark }: Props) {
+const readAuto = (symbol: string): AutoSaveData | null => {
+  try {
+    const raw = localStorage.getItem(`ta-auto-${symbol}`)
+    return raw ? JSON.parse(raw) as AutoSaveData : null
+  } catch { return null }
+}
+
+const toSlug = (s: string) => encodeURIComponent(s.replace(/\s+/g, '-'))
+
+export default function KlineChart({ symbol, candles, isDark, symbols = [], livePrice = null }: Props) {
+  const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<Chart | null>(null)
 
-  const [period, setPeriod] = useState<PeriodType>('day')
-  const [candleType, setCandleType] = useState<CandleType>('candle_solid')
+  // AutoSave مثل TradingView — روشن به‌صورت پیش‌فرض؛ نمای هر نماد خودکار برمی‌گردد
+  const [autoSave, setAutoSave] = useState(() => {
+    try { return localStorage.getItem('ta-autosave') !== 'off' } catch { return true }
+  })
+  const initialAuto = useRef<AutoSaveData | null>(null)
+  if (initialAuto.current === null && typeof window !== 'undefined') {
+    initialAuto.current = readAuto(symbol)
+  }
+  const savedCfg = autoSave ? initialAuto.current?.config : undefined
+
+  const [period, setPeriod] = useState<PeriodType>(savedCfg?.period ?? 'day')
+  const [candleType, setCandleType] = useState<CandleType>(savedCfg?.candleType ?? 'candle_solid')
   // چارت خام باز می‌شود — فقط کندل + حجم؛ اندیکاتور با انتخاب خود کاربر اضافه می‌شود
-  const [mainInds, setMainInds] = useState<string[]>([])
-  const [subInds, setSubInds] = useState<string[]>(['VOL'])
-  const [smcActive, setSmcActive] = useState<string[]>([])
+  const [mainInds, setMainInds] = useState<string[]>(savedCfg?.mainInds ?? [])
+  const [subInds, setSubInds] = useState<string[]>(savedCfg?.subInds ?? ['VOL'])
+  const [smcActive, setSmcActive] = useState<string[]>(savedCfg?.smcActive ?? [])
   const [compares, setCompares] = useState<string[]>([])
   const [cmpInput, setCmpInput] = useState('')
   const [openMenu, setOpenMenu] = useState<string | null>(null)
@@ -426,14 +567,50 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
   const [, setStackVersion] = useState(0)
   const [rebuildKey, setRebuildKey] = useState(0)
 
+  // ابزار فعال + مگنت + قفل/نمایش رسم‌ها
+  const [activeTool, setActiveTool] = useState<string | null>(null)
+  const [magnetOn, setMagnetOn] = useState(false)
+  const [locked, setLocked] = useState(false)
+  const [drawingsHidden, setDrawingsHidden] = useState(false)
+
+  // منبع قیمت (پایانی / آخرین) + مقیاس محور + تنظیمات نمایش
+  const [priceSrc, setPriceSrc] = useState<'close' | 'last'>(() => {
+    try { return localStorage.getItem('ta-price-src') === 'last' ? 'last' : 'close' } catch { return 'close' }
+  })
+  const [scaleMode, setScaleMode] = useState<ScaleMode>('normal')
+  const [settings, setSettings] = useState<ChartSettings>(() => {
+    try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('ta-settings') ?? '{}') } } catch { return DEFAULT_SETTINGS }
+  })
+
+  // بازپخش
+  const [replayOn, setReplayOn] = useState(false)
+  const [replayPlaying, setReplayPlaying] = useState(false)
+  const [replaySpeed, setReplaySpeed] = useState(1)
+  const [replayIdx, setReplayIdx] = useState(0)
+  const replayCutRef = useRef<number | null>(null)
+  const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // جست‌وجوی نماد داخل هدر نمودار
+  const [searchQ, setSearchQ] = useState('')
+
+  // ساعت تهران — نوار پایین
+  const [clock, setClock] = useState('')
+
   const aggregatedRef = useRef<Candle[]>([])
+  const dataFullRef = useRef<KLineData[]>([])
   const stateRef = useRef({ mainInds, subInds, smcActive, compares })
   stateRef.current = { mainInds, subInds, smcActive, compares }
   const undoStack = useRef<Array<DrawingSave & { id: string }>>([])
   const redoStack = useRef<Array<DrawingSave & { id: string }>>([])
-  const pendingDrawings = useRef<DrawingSave[] | null>(null)
+  const pendingDrawings = useRef<DrawingSave[] | null>(
+    autoSave && initialAuto.current?.drawings?.length ? initialAuto.current.drawings : null
+  )
+  // رسم‌های نگه‌داشته‌شده فقط به نماد خودشان برمی‌گردند
+  const pendingSymbol = useRef(symbol)
+  const pendingDrawId = useRef<string | null>(null)
   const cmpCandles = useRef<Map<string, Candle[]>>(new Map())
   const userId = useRef<string | null>(null)
+  const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const bump = () => setStackVersion(v => v + 1)
   const notify = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2600) }
@@ -463,10 +640,32 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     })
   }, [])
 
+  // ── ساعت زنده تهران
+  useEffect(() => {
+    const fmt = new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Tehran' })
+    const tick = () => setClock(fmt.format(new Date()))
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  // ── منبع قیمت «آخرین» — کندل امروز با آخرین معامله لحظه‌ای جایگزین می‌شود
+  const livePl = livePrice?.pl ?? null
+  const effCandles = useMemo(() => {
+    if (priceSrc !== 'last' || livePl == null || candles.length === 0) return candles
+    const out = candles.slice()
+    const l = { ...out[out.length - 1] }
+    l.close = livePl
+    l.high = Math.max(l.high, livePl)
+    l.low = Math.min(l.low, livePl)
+    out[out.length - 1] = l
+    return out
+  }, [candles, priceSrc, livePl])
+
   // ── ساخت نمودار
   useEffect(() => {
     const el = containerRef.current
-    if (!el || candles.length === 0) return
+    if (!el || effCandles.length === 0) return
     ensureLocale()
     ensureOverlays()
     registerCustomIndicators()
@@ -474,7 +673,7 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     const chart = init(el, {
       locale: localeRegistered ? 'fa-IR' : 'en-US',
       timezone: 'UTC',
-      styles: chartStyles(isDark, candleType) as never,
+      styles: chartStyles(isDark, candleType, settings) as never,
       formatter: {
         formatDate: ({ timestamp }: { timestamp: number }) => toShamsi(timestamp),
       },
@@ -485,15 +684,24 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     chart.setSymbol({ ticker: symbol, pricePrecision: 0, volumePrecision: 0 })
     chart.setPeriod({ type: period, span: 1 })
 
-    const aggregated = aggregate(candles, period)
+    const aggregated = aggregate(effCandles, period)
     aggregatedRef.current = aggregated
-    const data: KLineData[] = aggregated.map(c => ({
+    dataFullRef.current = aggregated.map(c => ({
       timestamp: Date.parse(c.time),
       open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume,
     }))
+    // بازپخش با برش دادن همین آرایه کار می‌کند — resetData دوباره getBars را صدا می‌زند
     chart.setDataLoader({
-      getBars: ({ callback }) => callback(data, { backward: false, forward: false }),
+      getBars: ({ callback }) => {
+        const cut = replayCutRef.current
+        const arr = cut == null ? dataFullRef.current : dataFullRef.current.slice(0, cut)
+        callback(arr, { backward: false, forward: false })
+      },
     })
+
+    if (scaleMode !== 'normal') {
+      chart.overrideYAxis({ name: scaleMode, paneId: 'candle_pane' })
+    }
 
     const st = stateRef.current
     for (const name of st.mainInds) chart.createIndicator({ name, paneId: 'candle_pane' }, true)
@@ -518,31 +726,84 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
       }
     })
 
-    // بازگردانی رسم‌های نمای ذخیره‌شده
-    if (pendingDrawings.current) {
+    // بازگردانی رسم‌ها (نمای ذخیره‌شده، AutoSave، یا بازسازی‌های داخلی)
+    if (pendingDrawings.current && pendingSymbol.current === symbol) {
       for (const dr of pendingDrawings.current) {
         chart.createOverlay({ name: dr.name, points: dr.points })
       }
-      pendingDrawings.current = null
     }
+    pendingDrawings.current = null
 
     const ro = new ResizeObserver(() => chart.resize())
     ro.observe(el)
     return () => {
+      // رسم‌های کاربر بین بازسازی‌ها (تغییر تم/تایم‌فریم/منبع قیمت) حفظ می‌شوند
+      pendingDrawings.current = chart.getOverlays({})
+        .filter(o => DRAW_TOOL_NAMES.has(o.name))
+        .map(o => ({ name: o.name, points: o.points.map(p => ({ timestamp: p.timestamp, value: p.value })) }))
+      pendingSymbol.current = symbol
       ro.disconnect()
       dispose(el)
       chartRef.current = null
       undoStack.current = []
       redoStack.current = []
+      pendingDrawId.current = null
     }
     // اندیکاتور/رسم‌ها جدا مدیریت می‌شوند تا toggle باعث پاک‌شدن بقیه نشود
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, isDark, period, symbol, rebuildKey])
+  }, [effCandles, isDark, period, symbol, rebuildKey])
 
   // نوع کندل بدون بازسازی
   useEffect(() => {
     chartRef.current?.setStyles({ candle: { type: candleType } })
   }, [candleType])
+
+  // ── AutoSave — نما و رسم‌های هر نماد خودکار ذخیره می‌شود (با debounce)
+  const collectDrawings = useCallback((): DrawingSave[] => {
+    const chart = chartRef.current
+    if (!chart) return []
+    return chart.getOverlays({})
+      .filter(o => DRAW_TOOL_NAMES.has(o.name))
+      .map(o => ({ name: o.name, points: o.points.map(p => ({ timestamp: p.timestamp, value: p.value })) }))
+  }, [])
+
+  const scheduleAutoSave = useCallback(() => {
+    if (!autoSave) return
+    if (autoTimer.current) clearTimeout(autoTimer.current)
+    autoTimer.current = setTimeout(() => {
+      try {
+        const data: AutoSaveData = {
+          config: { candleType, period, mainInds, subInds, smcActive, compares },
+          drawings: collectDrawings(),
+        }
+        localStorage.setItem(`ta-auto-${symbol}`, JSON.stringify(data))
+      } catch { /* حافظه پر — بی‌خیال */ }
+    }, 700)
+  }, [autoSave, candleType, period, mainInds, subInds, smcActive, compares, symbol, collectDrawings])
+
+  useEffect(() => { scheduleAutoSave() }, [scheduleAutoSave])
+
+  // سوییچ نماد بدون خروج از صفحه — نمای ذخیره‌شدهٔ نماد جدید برمی‌گردد
+  const prevSymbol = useRef(symbol)
+  useEffect(() => {
+    if (prevSymbol.current === symbol) return
+    prevSymbol.current = symbol
+    if (!autoSave) return
+    const saved = readAuto(symbol)
+    if (saved) {
+      pendingSymbol.current = symbol
+      applyConfig(saved.config, saved.drawings)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol])
+
+  const toggleAutoSave = () => {
+    const next = !autoSave
+    setAutoSave(next)
+    try { localStorage.setItem('ta-autosave', next ? 'on' : 'off') } catch { /* — */ }
+    if (!next) { try { localStorage.removeItem(`ta-auto-${symbol}`) } catch { /* — */ } }
+    notify(next ? 'ذخیره خودکار روشن شد' : 'ذخیره خودکار خاموش شد')
+  }
 
   // ── مقایسه
   const rebaseCompare = (sym: string, aggregated: Candle[]) => {
@@ -639,16 +900,38 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
 
   // ── رسم + undo/redo بی‌نهایت
   const startDraw = (name: string) => {
-    chartRef.current?.createOverlay({
+    const chart = chartRef.current
+    if (!chart) return
+    // شروع ابزار جدید = لغو ابزار نیمه‌کاره قبلی
+    if (pendingDrawId.current) {
+      chart.removeOverlay({ id: pendingDrawId.current })
+      pendingDrawId.current = null
+    }
+    setActiveTool(name)
+    const id = chart.createOverlay({
       name,
+      mode: magnetOn ? 'weak_magnet' : 'normal',
       onDrawEnd: (e: unknown) => {
         const o = (e as { overlay?: { id: string; name: string; points: DrawingSave['points'] } }).overlay
+        pendingDrawId.current = null
+        setActiveTool(null)
         if (!o) return
         undoStack.current.push({ id: o.id, name: o.name, points: o.points.map(p => ({ ...p })) })
         redoStack.current = []
         bump()
+        scheduleAutoSave()
       },
     })
+    if (typeof id === 'string') pendingDrawId.current = id
+  }
+  // دکمه نشانگر (cursor) — لغو رسم فعال، مثل Esc در TradingView
+  const cancelDraw = () => {
+    const chart = chartRef.current
+    if (chart && pendingDrawId.current) {
+      chart.removeOverlay({ id: pendingDrawId.current })
+      pendingDrawId.current = null
+    }
+    setActiveTool(null)
   }
   const undo = () => {
     const it = undoStack.current.pop()
@@ -656,6 +939,7 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     chartRef.current?.removeOverlay({ id: it.id })
     redoStack.current.push(it)
     bump()
+    scheduleAutoSave()
   }
   const redo = () => {
     const it = redoStack.current.pop()
@@ -664,6 +948,7 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     if (typeof id === 'string') it.id = id
     undoStack.current.push(it)
     bump()
+    scheduleAutoSave()
   }
   const clearDrawings = () => {
     const chart = chartRef.current
@@ -674,6 +959,121 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     undoStack.current = []
     redoStack.current = []
     bump()
+    scheduleAutoSave()
+  }
+
+  // قفل / پنهان‌سازی همه رسم‌ها — مثل TradingView
+  const toggleLockAll = () => {
+    const chart = chartRef.current
+    if (!chart) return
+    const next = !locked
+    setLocked(next)
+    for (const o of chart.getOverlays({})) {
+      if (DRAW_TOOL_NAMES.has(o.name)) chart.overrideOverlay({ id: o.id, lock: next } as never)
+    }
+  }
+  const toggleHideAll = () => {
+    const chart = chartRef.current
+    if (!chart) return
+    const next = !drawingsHidden
+    setDrawingsHidden(next)
+    for (const o of chart.getOverlays({})) {
+      if (DRAW_TOOL_NAMES.has(o.name)) chart.overrideOverlay({ id: o.id, visible: !next } as never)
+    }
+  }
+
+  // ── بازپخش (Replay) — پخش کندل‌به‌کندل تاریخچه
+  const stopReplayTimer = () => {
+    if (replayTimer.current) { clearInterval(replayTimer.current); replayTimer.current = null }
+    setReplayPlaying(false)
+  }
+  const stepReplay = useCallback(() => {
+    const n = dataFullRef.current.length
+    if (replayCutRef.current == null) return
+    if (replayCutRef.current >= n) { stopReplayTimer(); return }
+    replayCutRef.current += 1
+    setReplayIdx(replayCutRef.current)
+    chartRef.current?.resetData()
+  }, [])
+  const enterReplay = () => {
+    const n = dataFullRef.current.length
+    if (n < 30) { notify('داده برای بازپخش کافی نیست'); return }
+    replayCutRef.current = Math.max(25, Math.floor(n * 0.35))
+    setReplayIdx(replayCutRef.current)
+    setReplayOn(true)
+    setOpenMenu(null)
+    chartRef.current?.resetData()
+  }
+  const exitReplay = () => {
+    stopReplayTimer()
+    replayCutRef.current = null
+    setReplayOn(false)
+    chartRef.current?.resetData()
+  }
+  const toggleReplayPlay = () => {
+    if (replayPlaying) { stopReplayTimer(); return }
+    setReplayPlaying(true)
+    replayTimer.current = setInterval(stepReplay, REPLAY_SPEEDS[replaySpeed].ms)
+  }
+  const changeReplaySpeed = () => {
+    const next = (replaySpeed + 1) % REPLAY_SPEEDS.length
+    setReplaySpeed(next)
+    if (replayTimer.current) {
+      clearInterval(replayTimer.current)
+      replayTimer.current = setInterval(stepReplay, REPLAY_SPEEDS[next].ms)
+    }
+  }
+  const scrubReplay = (v: number) => {
+    replayCutRef.current = v
+    setReplayIdx(v)
+    chartRef.current?.resetData()
+  }
+  // تغییر تایم‌فریم/نماد = خروج از بازپخش (داده عوض می‌شود)
+  useEffect(() => {
+    stopReplayTimer()
+    replayCutRef.current = null
+    setReplayOn(false)
+  }, [period, symbol, effCandles])
+  useEffect(() => () => stopReplayTimer(), [])
+
+  // ── مقیاس محور قیمت: عادی / درصدی / لگاریتمی
+  const applyScale = (m: ScaleMode) => {
+    setScaleMode(m)
+    chartRef.current?.overrideYAxis({ name: m, paneId: 'candle_pane' })
+  }
+
+  // ── بازه‌های نوار پایین — فاصله کندل‌ها طوری تنظیم می‌شود که بازه در قاب جا شود
+  const applyRange = (months: number | 'all') => {
+    const chart = chartRef.current
+    if (!chart) return
+    const agg = aggregatedRef.current
+    if (agg.length === 0) return
+    let count = agg.length
+    if (months !== 'all') {
+      const cutoff = Date.now() - months * 30.44 * 86_400_000
+      count = Math.max(agg.filter(c => Date.parse(c.time) >= cutoff).length, 5)
+    }
+    const width = chart.getSize('candle_pane', 'main')?.width ?? 800
+    const space = Math.min(50, Math.max(1, Math.floor(width / count)))
+    chart.setBarSpace(space)
+    chart.scrollToRealTime()
+  }
+
+  // ── تنظیمات نمایش (چرخ‌دنده)
+  const updateSetting = (key: keyof ChartSettings) => {
+    const next = { ...settings, [key]: !settings[key] }
+    setSettings(next)
+    try { localStorage.setItem('ta-settings', JSON.stringify(next)) } catch { /* — */ }
+    chartRef.current?.setStyles(chartStyles(isDark, candleType, next) as never)
+  }
+
+  // ── تم — همان مکانیزم سراسری سایت (هدر گوش می‌دهد)
+  const toggleTheme = () => {
+    const next = isDark ? 'light' : 'dark'
+    try {
+      window.localStorage.setItem('theme', next)
+      window.dispatchEvent(new Event('themechange'))
+    } catch { /* — */ }
   }
 
   // ── قالب و نمای ذخیره‌شده
@@ -718,13 +1118,6 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     await persistLayouts(layouts.filter((_, k) => k !== i))
   }
 
-  const collectDrawings = (): DrawingSave[] => {
-    const chart = chartRef.current
-    if (!chart) return []
-    return chart.getOverlays({})
-      .filter(o => DRAW_TOOL_NAMES.has(o.name))
-      .map(o => ({ name: o.name, points: o.points.map(p => ({ timestamp: p.timestamp, value: p.value })) }))
-  }
   const saveSnapshot = async () => {
     const now = new Date()
     const name = `${symbol} ${toShamsi(now.getTime())} ${now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}`
@@ -748,7 +1141,7 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     if (!userId.current) localStorage.setItem('ta-snapshots', JSON.stringify(next))
   }
 
-  // ── اسکرین‌شات
+  // ── اسکرین‌شات و اشتراک‌گذاری
   const screenshotUrl = () =>
     chartRef.current?.getConvertPictureUrl(true, 'png', isDark ? CHART_BG.dark : CHART_BG.light) ?? ''
   const shotFileName = () => `${symbol}-${toShamsi(Date.now()).replace(/\//g, '-')}.png`
@@ -788,6 +1181,13 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     }
     setOpenMenu(null)
   }
+  const copyPageLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      notify('لینک صفحه کپی شد')
+    } catch { notify('کپی لینک ممکن نشد') }
+    setOpenMenu(null)
+  }
 
   const toggleFullscreen = () => {
     const el = wrapperRef.current
@@ -800,6 +1200,19 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     document.addEventListener('fullscreenchange', h)
     return () => document.removeEventListener('fullscreenchange', h)
   }, [])
+
+  // ── جست‌وجوی نماد
+  const symMatches = useMemo(() => {
+    const q = searchQ.trim()
+    if (!q) return []
+    return symbols.filter(s => s.l18.includes(q) && s.l18 !== symbol).slice(0, 8)
+  }, [searchQ, symbols, symbol])
+
+  const gotoSymbol = (l18: string) => {
+    setSearchQ('')
+    setOpenMenu(null)
+    router.push(`/technical/${toSlug(l18)}`)
+  }
 
   // ── استایل‌ها — زبان شیشه‌ای ۲۰۲۶ (هماهنگ با uiTokens.ts)
   const glassBg = isDark ? 'rgba(19,23,34,0.72)' : 'rgba(255,255,255,0.82)'
@@ -816,6 +1229,12 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     background: active ? 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(139,92,246,0.18))' : 'transparent',
     color: active ? '#3b82f6' : muted,
     transition: 'all 0.15s',
+  })
+
+  const iconBtn = (active: boolean): React.CSSProperties => ({
+    ...btn(active),
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: 32, padding: 0,
   })
 
   const menuBox: React.CSSProperties = {
@@ -838,6 +1257,15 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
   const sectionTitle: React.CSSProperties = {
     fontSize: 10.5, fontWeight: 700, color: muted, padding: '7px 11px 4px',
   }
+
+  const railBtn = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
+    background: active ? 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(139,92,246,0.18))' : 'transparent',
+    border: '1px solid transparent',
+    color: active ? '#3b82f6' : muted,
+    transition: 'all 0.15s', flexShrink: 0,
+  })
 
   const Check = () => (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none', flexShrink: 0 }}>
@@ -872,8 +1300,12 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     </button>
   )
 
+  const hoverBg = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(19,23,34,0.05)' }
+  const leaveBg = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent' }
+
   const canUndo = undoStack.current.length > 0
   const canRedo = redoStack.current.length > 0
+  const totalBars = dataFullRef.current.length
 
   return (
     <div ref={wrapperRef} style={{
@@ -883,7 +1315,7 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
       border: `1px solid ${line}`, borderRadius: isFull ? 0 : 16, overflow: 'hidden',
       boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.35)' : '0 8px 24px rgba(59,130,246,0.08)',
     }}>
-      {/* ── نوار ابزار بالا — شیشه‌ای */}
+      {/* ── هدر بالا — مثل TradingView */}
       <div style={{
         display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center',
         padding: '8px 12px', background: glassBg,
@@ -891,19 +1323,92 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
         borderBottom: `1px solid ${line}`,
         position: 'relative', zIndex: 40,
       }}>
-        {/* نوع کندل */}
+        {/* جست‌وجوی نماد */}
         <div style={{ position: 'relative' }}>
-          {menuBtn('ctype', CANDLE_TYPES.find(c => c.name === candleType)?.label ?? 'شمعی')}
-          {openMenu === 'ctype' && (
-            <div style={menuBox}>
-              {CANDLE_TYPES.map(c => (
-                <button key={c.name} onClick={() => { setCandleType(c.name); setOpenMenu(null) }} style={menuItem(candleType === c.name)}
-                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(19,23,34,0.05)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                  <span>{c.label}</span>
-                  {candleType === c.name && <Check />}
+          <button onClick={() => setOpenMenu(openMenu === 'sym' ? null : 'sym')} aria-expanded={openMenu === 'sym'}
+            style={{
+              ...btn(openMenu === 'sym'), display: 'inline-flex', alignItems: 'center', gap: 7,
+              border: `1px solid ${line}`, fontWeight: 700, color: text, minWidth: 96, justifyContent: 'center',
+            }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ pointerEvents: 'none', opacity: 0.7 }}>
+              <circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" />
+            </svg>
+            {symbol}
+          </button>
+          {openMenu === 'sym' && (
+            <div style={{ ...menuBox, minWidth: 250 }}>
+              <div style={{ padding: 6 }}>
+                <input
+                  autoFocus
+                  value={searchQ}
+                  onChange={e => setSearchQ(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && symMatches.length > 0) gotoSymbol(symMatches[0].l18) }}
+                  placeholder="جست‌وجوی نماد…"
+                  style={{
+                    width: '100%', boxSizing: 'border-box', fontSize: 12.5, fontFamily: 'inherit',
+                    padding: '9px 11px', borderRadius: 6, outline: 'none', background: 'transparent',
+                    color: text, border: `1px solid ${line}`,
+                  }}
+                />
+              </div>
+              {symMatches.map(m => (
+                <button key={m.l18} onClick={() => gotoSymbol(m.l18)} style={menuItem(false)}
+                  onMouseEnter={hoverBg} onMouseLeave={leaveBg}>
+                  <span style={{ fontWeight: 700 }}>{m.l18}</span>
+                  {m.pcp !== null && (
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: m.pcp >= 0 ? GREEN : RED }}>
+                      {m.pcp >= 0 ? '▲' : '▼'} {fa(Math.abs(m.pcp), 2)}٪
+                    </span>
+                  )}
                 </button>
               ))}
+              {searchQ.trim() && symMatches.length === 0 && (
+                <div style={{ fontSize: 11.5, color: muted, padding: '4px 11px 8px' }}>نمادی پیدا نشد</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* تعدیل قیمت */}
+        <div style={{ position: 'relative' }}>
+          {menuBtn('adj', 'بدون تعدیل')}
+          {openMenu === 'adj' && (
+            <div style={{ ...menuBox, minWidth: 210 }}>
+              <button onClick={() => setOpenMenu(null)} style={menuItem(true)}>
+                <span>بدون تعدیل</span>
+                <Check />
+              </button>
+              <div style={{ ...menuItem(false), cursor: 'default', opacity: 0.45 }}>
+                <span>تعدیل‌شده (افزایش سرمایه/سود)</span>
+                <span style={{ fontSize: 10 }}>به‌زودی</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* منبع قیمت */}
+        <div style={{ position: 'relative' }}>
+          {menuBtn('psrc', priceSrc === 'last' ? 'آخرین قیمت' : 'قیمت پایانی', priceSrc === 'last')}
+          {openMenu === 'psrc' && (
+            <div style={{ ...menuBox, minWidth: 220 }}>
+              {([
+                { key: 'close', label: 'قیمت پایانی' },
+                { key: 'last', label: 'آخرین قیمت' },
+              ] as const).map(o => (
+                <button key={o.key}
+                  onClick={() => {
+                    setPriceSrc(o.key)
+                    try { localStorage.setItem('ta-price-src', o.key) } catch { /* — */ }
+                    setOpenMenu(null)
+                  }}
+                  style={menuItem(priceSrc === o.key)} onMouseEnter={hoverBg} onMouseLeave={leaveBg}>
+                  <span>{o.label}</span>
+                  {priceSrc === o.key && <Check />}
+                </button>
+              ))}
+              <div style={{ fontSize: 10.5, color: muted, padding: '4px 11px 8px', lineHeight: 1.8 }}>
+                «آخرین قیمت» فقط کندل امروز را در ساعت بازار با آخرین معامله به‌روز می‌کند؛ تاریخچه بر اساس پایانی است.
+              </div>
             </div>
           )}
         </div>
@@ -917,6 +1422,22 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
         ))}
 
         <div style={{ width: 1, height: 18, background: line, margin: '0 4px' }} />
+
+        {/* نوع کندل */}
+        <div style={{ position: 'relative' }}>
+          {menuBtn('ctype', CANDLE_TYPES.find(c => c.name === candleType)?.label ?? 'شمعی')}
+          {openMenu === 'ctype' && (
+            <div style={menuBox}>
+              {CANDLE_TYPES.map(c => (
+                <button key={c.name} onClick={() => { setCandleType(c.name); setOpenMenu(null) }} style={menuItem(candleType === c.name)}
+                  onMouseEnter={hoverBg} onMouseLeave={leaveBg}>
+                  <span>{c.label}</span>
+                  {candleType === c.name && <Check />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* اندیکاتورها — یک دکمه مثل TradingView */}
         <div style={{ position: 'relative' }}>
@@ -998,21 +1519,36 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
 
         <div style={{ width: 1, height: 18, background: line, margin: '0 4px' }} />
 
+        {/* بازپخش */}
+        <button onClick={replayOn ? exitReplay : enterReplay} style={{ ...btn(replayOn), display: 'inline-flex', alignItems: 'center', gap: 5 }} title="بازپخش تاریخچه">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+            <polygon points="11 5 2 12 11 19" /><polygon points="22 5 13 12 22 19" />
+          </svg>
+          بازپخش
+        </button>
+
         {/* undo / redo */}
         <button onClick={undo} disabled={!canUndo} aria-label="واگرد" title="واگرد رسم"
-          style={{ ...btn(false), opacity: canUndo ? 1 : 0.35, cursor: canUndo ? 'pointer' : 'default' }}>
+          style={{ ...iconBtn(false), opacity: canUndo ? 1 : 0.35, cursor: canUndo ? 'pointer' : 'default' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
             <polyline points="9 14 4 9 9 4" /><path d="M4 9 H15 a5 5 0 0 1 0 10 H12" />
           </svg>
         </button>
         <button onClick={redo} disabled={!canRedo} aria-label="ازنو" title="ازنو"
-          style={{ ...btn(false), opacity: canRedo ? 1 : 0.35, cursor: canRedo ? 'pointer' : 'default' }}>
+          style={{ ...iconBtn(false), opacity: canRedo ? 1 : 0.35, cursor: canRedo ? 'pointer' : 'default' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none', transform: 'scaleX(-1)' }}>
             <polyline points="9 14 4 9 9 4" /><path d="M4 9 H15 a5 5 0 0 1 0 10 H12" />
           </svg>
         </button>
 
         <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 2, alignItems: 'center' }}>
+          {/* AutoSave — مثل TradingView */}
+          <button onClick={toggleAutoSave} title="ذخیره خودکار نما و رسم‌ها"
+            style={{ ...btn(autoSave), display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            {autoSave && <Check />}
+            ذخیره خودکار
+          </button>
+
           {/* قالب‌ها */}
           <div style={{ position: 'relative' }}>
             {menuBtn('layout', 'قالب')}
@@ -1075,23 +1611,65 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
             )}
           </div>
 
-          {/* اسکرین‌شات */}
+          {/* تنظیمات نمودار */}
           <div style={{ position: 'relative' }}>
-            {menuBtn('shot', (
+            <button onClick={() => setOpenMenu(openMenu === 'cfg' ? null : 'cfg')} aria-label="تنظیمات نمودار" title="تنظیمات نمودار"
+              style={iconBtn(openMenu === 'cfg')}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
-            ))}
-            {openMenu === 'shot' && (
-              <div style={{ ...menuBox, right: 'auto', left: 0, minWidth: 200 }}>
-                <button onClick={downloadShot} style={menuItem(false)}>دانلود تصویر (PNG)</button>
-                <button onClick={copyShot} style={menuItem(false)}>کپی تصویر</button>
-                <button onClick={copyShotLink} style={menuItem(false)}>کپی لینک تصویر</button>
+            </button>
+            {openMenu === 'cfg' && (
+              <div style={{ ...menuBox, right: 'auto', left: 0, minWidth: 230 }}>
+                {([
+                  { key: 'grid', label: 'خطوط شبکه' },
+                  { key: 'lastLine', label: 'خط آخرین قیمت' },
+                  { key: 'hilo', label: 'برچسب سقف و کف' },
+                ] as const).map(o => (
+                  <button key={o.key} onClick={() => updateSetting(o.key)} style={menuItem(settings[o.key])}
+                    onMouseEnter={hoverBg} onMouseLeave={leaveBg}>
+                    <span>{o.label}</span>
+                    {settings[o.key] && <Check />}
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
-          <button onClick={toggleFullscreen} style={btn(isFull)} aria-label={isFull ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'} title="تمام‌صفحه">
+          {/* تم روز/شب */}
+          <button onClick={toggleTheme} aria-label={isDark ? 'حالت روز' : 'حالت شب'} title={isDark ? 'حالت روز' : 'حالت شب'} style={iconBtn(false)}>
+            {isDark ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+          </button>
+
+          {/* اشتراک‌گذاری */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setOpenMenu(openMenu === 'share' ? null : 'share')} aria-label="اشتراک‌گذاری" title="اشتراک‌گذاری" style={iconBtn(openMenu === 'share')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+                <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                <line x1="8.6" y1="10.5" x2="15.4" y2="6.5" /><line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
+              </svg>
+            </button>
+            {openMenu === 'share' && (
+              <div style={{ ...menuBox, right: 'auto', left: 0, minWidth: 210 }}>
+                <button onClick={copyPageLink} style={menuItem(false)} onMouseEnter={hoverBg} onMouseLeave={leaveBg}>کپی لینک صفحه</button>
+                <button onClick={downloadShot} style={menuItem(false)} onMouseEnter={hoverBg} onMouseLeave={leaveBg}>دانلود تصویر (PNG)</button>
+                <button onClick={copyShot} style={menuItem(false)} onMouseEnter={hoverBg} onMouseLeave={leaveBg}>کپی تصویر</button>
+                <button onClick={copyShotLink} style={menuItem(false)} onMouseEnter={hoverBg} onMouseLeave={leaveBg}>کپی لینک تصویر</button>
+              </div>
+            )}
+          </div>
+
+          <button onClick={toggleFullscreen} style={iconBtn(isFull)} aria-label={isFull ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'} title="تمام‌صفحه">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
               {isFull
                 ? <><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path d="M16 21v-3a2 2 0 0 1 2-2h3" /></>
@@ -1101,47 +1679,126 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
         </div>
       </div>
 
-      {/* ── بدنه: ریل ابزار رسم (راست در RTL) + نمودار */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      {/* ── نوار کنترل بازپخش */}
+      {replayOn && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
+          background: glassBg, borderBottom: `1px solid ${line}`,
+          backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+        }}>
+          <button onClick={exitReplay} aria-label="خروج از بازپخش" title="خروج از بازپخش" style={iconBtn(false)}>
+            <XIcon />
+          </button>
+          <button onClick={toggleReplayPlay} aria-label={replayPlaying ? 'توقف' : 'پخش'} title={replayPlaying ? 'توقف' : 'پخش'} style={iconBtn(replayPlaying)}>
+            {replayPlaying ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ pointerEvents: 'none' }}>
+                <rect x="5" y="4" width="5" height="16" rx="1" /><rect x="14" y="4" width="5" height="16" rx="1" />
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ pointerEvents: 'none', transform: 'scaleX(-1)' }}>
+                <polygon points="6 4 20 12 6 20" />
+              </svg>
+            )}
+          </button>
+          <button onClick={stepReplay} aria-label="کندل بعدی" title="کندل بعدی" style={iconBtn(false)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ pointerEvents: 'none', transform: 'scaleX(-1)' }}>
+              <polygon points="5 4 15 12 5 20" /><rect x="17" y="4" width="3" height="16" rx="1" />
+            </svg>
+          </button>
+          <button onClick={changeReplaySpeed} title="سرعت پخش" style={{ ...btn(false), fontWeight: 700, minWidth: 44 }}>
+            {REPLAY_SPEEDS[replaySpeed].label}
+          </button>
+          <input
+            type="range"
+            min={25}
+            max={Math.max(totalBars, 26)}
+            value={replayIdx}
+            onChange={e => scrubReplay(Number(e.target.value))}
+            aria-label="پیمایش بازپخش"
+            style={{ flex: 1, accentColor: '#3b82f6', cursor: 'pointer' }}
+          />
+          <span style={{ fontSize: 11, color: muted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+            {fa(replayIdx)} / {fa(totalBars)}
+          </span>
+        </div>
+      )}
+
+      {/* ── بدنه: ریل ابزار رسم سمت چپ + نمودار (محور قیمت سمت راست) */}
+      {/* ارتفاع روی همین ردیف است تا ریلِ بلند، ستون نمودار را کش ندهد */}
+      <div style={{ display: 'flex', flex: isFull ? 1 : undefined, minHeight: 0, direction: 'ltr', height: isFull ? undefined : 560 }}>
         <div style={{
           display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center',
-          padding: '10px 6px', borderInlineEnd: `1px solid ${line}`,
+          padding: '10px 6px', borderRight: `1px solid ${line}`,
           background: glassBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-          overflowY: 'auto', flexShrink: 0,
+          overflowY: 'auto', flexShrink: 0, direction: 'rtl',
         }}>
+          {/* نشانگر — لغو ابزار فعال */}
+          <button onClick={cancelDraw} title="نشانگر (لغو ابزار)" aria-label="نشانگر"
+            style={railBtn(activeTool === null)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+              <path d="M4 3 L11 21 L13.5 13.5 L21 11 Z" />
+            </svg>
+          </button>
+          <div style={{ height: 1, alignSelf: 'stretch', background: line, margin: '5px 4px' }} />
+
           {DRAW_TOOLS.map(t => (
             <button key={t.name} onClick={() => startDraw(t.name)} title={t.label} aria-label={t.label}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
-                background: 'transparent', border: '1px solid transparent', color: muted, transition: 'all 0.15s',
-              }}
+              style={railBtn(activeTool === t.name)}
               onMouseEnter={e => {
+                if (activeTool === t.name) return
                 e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59,130,246,0.16), rgba(139,92,246,0.12))'
-                e.currentTarget.style.borderColor = isDark ? 'rgba(148,163,184,0.18)' : 'rgba(15,23,42,0.1)'
                 e.currentTarget.style.color = '#3b82f6'
-                e.currentTarget.style.transform = 'translateY(-1px)'
               }}
               onMouseLeave={e => {
+                if (activeTool === t.name) return
                 e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.borderColor = 'transparent'
                 e.currentTarget.style.color = muted
-                e.currentTarget.style.transform = 'translateY(0)'
               }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
                 <path d={t.icon} />
               </svg>
             </button>
           ))}
-          <div style={{ height: 1, alignSelf: 'stretch', background: line, margin: '6px 4px' }} />
+
+          <div style={{ height: 1, alignSelf: 'stretch', background: line, margin: '5px 4px' }} />
+
+          {/* مگنت — چسبیدن نقاط رسم به OHLC کندل */}
+          <button onClick={() => setMagnetOn(v => !v)} title={magnetOn ? 'مگنت روشن' : 'مگنت خاموش'} aria-label="مگنت"
+            style={railBtn(magnetOn)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+              <path d="M5 4 L5 12 a7 7 0 0 0 14 0 L19 4" /><path d="M5 4 L9 4 L9 11 M19 4 L15 4 L15 11" />
+            </svg>
+          </button>
+
+          {/* قفل همه رسم‌ها */}
+          <button onClick={toggleLockAll} title={locked ? 'باز کردن قفل رسم‌ها' : 'قفل همه رسم‌ها'} aria-label="قفل رسم‌ها"
+            style={railBtn(locked)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              {locked ? <path d="M8 11 V7 a4 4 0 0 1 8 0 v4" /> : <path d="M8 11 V7 a4 4 0 0 1 7.7 -1.5" />}
+            </svg>
+          </button>
+
+          {/* نمایش/پنهان‌سازی رسم‌ها */}
+          <button onClick={toggleHideAll} title={drawingsHidden ? 'نمایش رسم‌ها' : 'پنهان‌کردن رسم‌ها'} aria-label="نمایش/پنهان رسم‌ها"
+            style={railBtn(drawingsHidden)}>
+            {drawingsHidden ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+                <path d="M17.94 17.94 A10.07 10.07 0 0 1 12 20 c-7 0-10-8-10-8 a18.45 18.45 0 0 1 5.06-5.94" />
+                <path d="M9.9 4.24 A9.12 9.12 0 0 1 12 4 c7 0 10 8 10 8 a18.5 18.5 0 0 1-2.16 3.19" />
+                <line x1="2" y1="2" x2="22" y2="22" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+                <path d="M2 12 S5 4 12 4 22 12 22 12 19 20 12 20 2 12 2 12 Z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
+
           <button onClick={clearDrawings} title="حذف همه رسم‌ها" aria-label="حذف همه رسم‌ها"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
-              background: 'transparent', border: '1px solid transparent', color: muted, transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = RED; e.currentTarget.style.background = 'rgba(239,83,80,0.1)'; e.currentTarget.style.borderColor = 'rgba(239,83,80,0.25)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = muted; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}>
+            style={railBtn(false)}
+            onMouseEnter={e => { e.currentTarget.style.color = RED; e.currentTarget.style.background = 'rgba(239,83,80,0.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = muted; e.currentTarget.style.background = 'transparent' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
               <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
             </svg>
@@ -1149,10 +1806,44 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
         </div>
 
         <div ref={containerRef} style={{
-          direction: 'ltr', flex: 1, minWidth: 0,
-          height: isFull ? 'auto' : 560, minHeight: 320,
+          direction: 'ltr', flex: 1, minWidth: 0, minHeight: 320,
           background: chartBg,
         }} />
+      </div>
+
+      {/* ── نوار پایین — بازه‌ها + مقیاس + ساعت تهران (مثل TradingView) */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+        padding: '5px 12px', background: glassBg,
+        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+        borderTop: `1px solid ${line}`,
+      }}>
+        {RANGES.map(r => (
+          <button key={r.label} onClick={() => applyRange(r.months)} style={{ ...btn(false), padding: '4px 9px', minHeight: 26 }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#3b82f6' }}
+            onMouseLeave={e => { e.currentTarget.style.color = muted }}>
+            {r.label}
+          </button>
+        ))}
+
+        <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 2, alignItems: 'center' }}>
+          <span style={{ fontSize: 11.5, color: muted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', padding: '0 6px' }}>
+            {clock} (UTC+3:30)
+          </span>
+          <div style={{ width: 1, height: 14, background: line, margin: '0 5px' }} />
+          <button onClick={() => applyScale(scaleMode === 'percentage' ? 'normal' : 'percentage')}
+            title="مقیاس درصدی" style={{ ...btn(scaleMode === 'percentage'), padding: '4px 9px', minHeight: 26 }}>
+            ٪
+          </button>
+          <button onClick={() => applyScale(scaleMode === 'logarithm' ? 'normal' : 'logarithm')}
+            title="مقیاس لگاریتمی" style={{ ...btn(scaleMode === 'logarithm'), padding: '4px 9px', minHeight: 26 }}>
+            لگاریتمی
+          </button>
+          <button onClick={() => applyScale('normal')}
+            title="مقیاس خودکار" style={{ ...btn(scaleMode === 'normal'), padding: '4px 9px', minHeight: 26 }}>
+            خودکار
+          </button>
+        </div>
       </div>
 
       {/* توست */}
