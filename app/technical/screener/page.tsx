@@ -1,12 +1,14 @@
 'use client'
 
 // دیده‌بان تکنیکال — فیلتر سیگنال‌های محاسبه‌شده شبانه (جدول stock_screener)
+// زبان طراحی ۲۰۲۶ یکسان با هاب و صفحه نماد — شیشه‌ای + aurora + چیپ ضربان بازار
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { GREEN, RED } from '../colors'
+import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
 
 type Row = {
   symbol: string
@@ -73,6 +75,7 @@ export default function ScreenerPage() {
   const [sortKey, setSortKey] = useState<SortKey>('change_pct')
   const [sortDesc, setSortDesc] = useState(true)
   const [q, setQ] = useState('')
+  const isOpen = marketOpen()
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -116,17 +119,17 @@ export default function ScreenerPage() {
     setActive(v => (v.includes(key) ? v.filter(x => x !== key) : [...v, key]))
 
   const bg    = isDark ? '#060B14' : '#F4F7FB'
-  const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
   const text  = isDark ? '#E8F4FF' : '#0F1E2E'
-  const muted = isDark ? '#ddd5bd' : '#6B7F90'
+  const muted = isDark ? '#ddd5bd' : '#475569'
   const line  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.08)'
+  const glass = glassStyle(isDark)
 
   const chip = (active: boolean, tone?: 'pos' | 'neg'): React.CSSProperties => {
     const clr = tone === 'pos' ? GREEN : tone === 'neg' ? RED : '#3b82f6'
     return {
       fontSize: 12, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-      padding: '7px 14px', borderRadius: 9, minHeight: 34,
-      border: `1px solid ${active ? clr : line}`,
+      padding: '7px 14px', borderRadius: 99, minHeight: 34,
+      border: `1px solid ${active ? clr : (isDark ? 'rgba(148,163,184,0.14)' : 'rgba(15,23,42,0.09)')}`,
       background: active ? `color-mix(in srgb, ${clr} 14%, transparent)` : 'transparent',
       color: active ? clr : muted,
       transition: 'all 0.2s',
@@ -181,21 +184,54 @@ export default function ScreenerPage() {
     <main style={{
       minHeight: '100vh', background: bg, color: text,
       fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      position: 'relative', overflow: 'hidden',
     }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '28px 14px' : '40px 24px' }}>
+      <style>{TA_KEYFRAMES}</style>
+
+      {/* aurora پس‌زمینه — همان زبان طراحی هاب */}
+      <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
+        <div style={{ position: 'absolute', top: '3%', left: '10%', width: 460, height: 460, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
+        <div style={{ position: 'absolute', bottom: '5%', right: '8%', width: 400, height: 400, borderRadius: '50%', background: '#8b5cf6', opacity: 0.11, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
+      </div>
+
+      <div className="ta-anim" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '28px 14px' : '40px 24px', position: 'relative' }}>
 
         <Link href="/technical" style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
           ← تحلیل تکنیکال
         </Link>
 
-        <h1 style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, margin: '12px 0 6px' }}>دیده‌بان تکنیکال</h1>
-        <p style={{ fontSize: 13, color: muted, margin: '0 0 20px', lineHeight: 1.8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', margin: '12px 0 6px', ...enterAnim(0) }}>
+          <h1 style={{
+            fontSize: isMobile ? 23 : 28, fontWeight: 800, margin: 0,
+            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+          }}>
+            دیده‌بان تکنیکال
+          </h1>
+
+          {/* چیپ ضربان بازار */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            fontSize: 11.5, fontWeight: 700, padding: '6px 13px',
+            ...glass, borderRadius: 99,
+            color: isOpen ? GREEN : muted,
+          }}>
+            <span style={{ position: 'relative', width: 8, height: 8, flexShrink: 0 }}>
+              <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: isOpen ? GREEN : (isDark ? '#4b5563' : '#9ca3af') }} />
+              {isOpen && <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: GREEN, animation: 'taPing 2s ease-out infinite' }} />}
+            </span>
+            {isOpen ? 'بازار باز' : 'بازار بسته'}
+          </span>
+        </div>
+
+        <p style={{ fontSize: 13, color: muted, margin: '0 0 20px', lineHeight: 1.8, ...enterAnim(1) }}>
           سیگنال‌های محاسبه‌شده روی همه نمادها — به‌روزرسانی هر روز پس از پایان بازار
           {rows && rows[0] ? ` · آخرین به‌روزرسانی: ${rows[0].trade_date_shamsi}` : ''}
+          {rows && ` · ${fa(rows.length)} نماد`}
         </p>
 
         {/* فیلترها — قابل ترکیب (AND) */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8, ...enterAnim(2) }}>
           <button onClick={() => setActive([])} style={chip(active.length === 0)}>
             همه
           </button>
@@ -219,16 +255,16 @@ export default function ScreenerPage() {
           aria-label="جست‌وجوی نماد"
           style={{
             width: '100%', boxSizing: 'border-box', fontSize: 13.5, fontFamily: 'inherit',
-            padding: '11px 16px', borderRadius: 12, outline: 'none', marginBottom: 14,
-            background: panel, color: text, border: `1px solid ${line}`,
+            padding: '12px 16px', outline: 'none', marginBottom: 14,
+            ...glass, borderRadius: 99, color: text, transition: 'border-color 0.2s',
+            ...enterAnim(3),
           }}
+          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.55)' }}
+          onBlur={e => { e.currentTarget.style.borderColor = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.08)' }}
         />
 
         {/* جدول */}
-        <div style={{
-          background: panel, border: `1px solid ${line}`, borderRadius: 16,
-          overflowX: 'auto',
-        }}>
+        <div style={{ ...glass, borderRadius: 20, overflowX: 'auto', ...enterAnim(4) }}>
           {rows === null ? (
             <div style={{ color: muted, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>در حال بارگذاری…</div>
           ) : visible.length === 0 ? (
@@ -250,26 +286,28 @@ export default function ScreenerPage() {
               </thead>
               <tbody>
                 {visible.slice(0, 300).map(r => (
-                  <tr key={r.symbol} style={{ borderBottom: `1px solid ${line}` }}>
+                  <tr key={r.symbol} style={{ borderBottom: `1px solid ${line}`, transition: 'background 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
                     <td style={{ padding: '9px 12px' }}>
                       <Link href={`/technical/${toSlug(r.symbol)}`} style={{ color: '#3b82f6', textDecoration: 'none', fontSize: 13.5, fontWeight: 700 }}>
                         {r.symbol}
                       </Link>
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 13, whiteSpace: 'nowrap' }}>{fa(r.close)}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 13, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fa(r.close)}</td>
                     <td style={{
-                      padding: '9px 12px', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap',
+                      padding: '9px 12px', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
                       color: r.change_pct === null ? muted : r.change_pct >= 0 ? GREEN : RED,
                     }}>
                       {r.change_pct === null ? '—' : `${r.change_pct >= 0 ? '▲' : '▼'} ${fa(Math.abs(r.change_pct), 2)}٪`}
                     </td>
                     <td style={{
-                      padding: '9px 12px', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap',
+                      padding: '9px 12px', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
                       color: r.rsi === null ? muted : r.rsi >= 70 ? RED : r.rsi <= 30 ? GREEN : text,
                     }}>
                       {r.rsi === null ? '—' : fa(r.rsi, 1)}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12.5, whiteSpace: 'nowrap', color: (r.vol_ratio ?? 0) >= 2.5 ? '#d97706' : text }}>
+                    <td style={{ padding: '9px 12px', fontSize: 12.5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: (r.vol_ratio ?? 0) >= 2.5 ? '#d97706' : text }}>
                       {r.vol_ratio === null ? '—' : `${fa(r.vol_ratio, 1)}×`}
                     </td>
                     <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap', color: r.trend === 'up' ? GREEN : r.trend === 'down' ? RED : muted }}>
