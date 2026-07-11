@@ -38,7 +38,7 @@ type Datum = Row & {
   tvalB: number; tval5m: number
   indBuyM: number; indSellM: number; legBuyM: number; legSellM: number
   ordDB: number; ordSB: number; ordxDB: number; ordxSB: number; moneyB: number
-  bigBuyB: number; bigSellB: number
+  bigBuyB: number; bigSellB: number; bigNetB: number
 }
 
 const CATS: Record<string, { title: string; hours: string }> = {
@@ -164,15 +164,12 @@ const DEFS: ChartDef[] = [
   },
   {
     // کدهای حقیقی با سرانه خرید/فروش بالای ۵۰ میلیون تومان — نشانه ورود سرمایه‌گذار درشت/آگاه
-    id: 'bigmoney', title: 'ورود و خروج پول درشت', unit: ' میلیارد تومان',
-    series: [
-      { key: 'bigBuyB', name: 'ورود پول درشت', color: C.green, kind: 'line' },
-      { key: 'bigSellB', name: 'خروج پول درشت', color: C.red, kind: 'line' },
-    ],
+    id: 'bigmoney', title: 'ورود و خروج پول درشت', unit: ' میلیارد تومان', refZero: true,
+    series: [{ key: 'bigNetB', name: 'خالص پول درشت', color: C.green, kind: 'area' }],
     sub: l => [
+      { txt: `خالص ${fa(l.bigNetB)} میلیارد تومان`, color: l.bigNetB >= 0 ? C.green : C.red }, { txt: ' | ' },
       { txt: `ورود ${fa(l.bigBuyB)}`, color: C.green }, { txt: ' | ' },
-      { txt: `خروج ${fa(l.bigSellB)} میلیارد تومان`, color: C.red },
-      ...(l.bigSellB > 0 ? [{ txt: ` | خالص ${fa(l.bigBuyB - l.bigSellB)}`, color: l.bigBuyB - l.bigSellB >= 0 ? C.green : C.red }] : []),
+      { txt: `خروج ${fa(l.bigSellB)}`, color: C.red },
     ],
   },
 ]
@@ -244,7 +241,7 @@ export default function MarketMonitorPage() {
     ordDB: r.ord_demand / 1e10, ordSB: r.ord_supply / 1e10,
     ordxDB: r.ordx_demand / 1e10, ordxSB: r.ordx_supply / 1e10,
     moneyB: r.money_in / 1e10,
-    bigBuyB: r.big_buy / 1e10, bigSellB: r.big_sell / 1e10,
+    bigBuyB: r.big_buy / 1e10, bigSellB: r.big_sell / 1e10, bigNetB: (r.big_buy - r.big_sell) / 1e10,
   })), [rows])
 
   const last = data.length > 0 ? data[data.length - 1] : null
@@ -285,7 +282,7 @@ export default function MarketMonitorPage() {
             )
             if (s.kind === 'area') {
               // ورود پول: رنگ خط بر اساس آخرین مقدار (سبز/قرمز)
-              const col = def.id === 'money' && last && last.moneyB < 0 ? C.red : s.color
+              const col = last && ((def.id === 'money' && last.moneyB < 0) || (def.id === 'bigmoney' && last.bigNetB < 0)) ? C.red : s.color
               return (
                 <Area key={s.key} type="monotone" dataKey={s.key} name={s.name}
                   stroke={col} strokeWidth={2.6} strokeLinecap="round"
