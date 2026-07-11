@@ -32,6 +32,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABAS
 const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 const PROBE = process.argv.includes('--probe')
 
+const { swingHighsLows, fvg, bosChoch, orderBlocks } = require('./smc-lib')
+
 let sb = null
 function initClient() {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
@@ -151,6 +153,49 @@ function computeRow(symbol, rows) {
     : null
   const volRatio = avgVol20 && avgVol20 > 0 ? vols[n - 1] / avgVol20 : null
 
+  // ── اسمارت مانی روی ~۲۶۰ کندل آخر (همان الگوریتم‌های نمودار سایت)
+  let structureBreak = null
+  let fvgBullNear = false, fvgBearNear = false
+  let obBullNear = false, obBearNear = false
+  try {
+    const smcRows = rows.slice(-260).map(r => ({
+      open: Number(r.open ?? r.close), high: Number(r.high ?? r.close),
+      low: Number(r.low ?? r.close), close: Number(r.close), volume: Number(r.volume) || 0,
+    }))
+    const m = smcRows.length
+    const swings = swingHighsLows(smcRows, 10)
+    const NEAR = 0.03 // فاصله ≤۳٪ قیمت
+
+    // شکست ساختار که در ۵ کندل اخیر رخ داده (brokenIndex نزدیک انتها)
+    const bc = bosChoch(smcRows, swings)
+    for (let i = 0; i < m; i++) {
+      const br = bc.brokenIndex[i]
+      if (Number.isNaN(br) || br < m - 5) continue
+      if (!Number.isNaN(bc.bos[i])) structureBreak = bc.bos[i] === 1 ? 'bos_up' : 'bos_down'
+      else if (!Number.isNaN(bc.choch[i])) structureBreak = bc.choch[i] === 1 ? 'choch_up' : 'choch_down'
+    }
+
+    // FVG باز (بدون mitigation) که لبه‌اش ≤۳٪ با قیمت فاصله دارد
+    const f = fvg(smcRows)
+    for (let i = 0; i < m; i++) {
+      if (Number.isNaN(f.fvg[i]) || f.mitigatedIndex[i] !== 0) continue
+      const near = lastClose >= f.bottom[i] * (1 - NEAR) && lastClose <= f.top[i] * (1 + NEAR)
+      if (!near) continue
+      if (f.fvg[i] === 1) fvgBullNear = true
+      else fvgBearNear = true
+    }
+
+    // اردر بلاک فعال (بدون mitigation) که قیمت داخل یا ≤۳٪ لبه‌اش است
+    const ob = orderBlocks(smcRows, swings)
+    for (let i = 0; i < m; i++) {
+      if (Number.isNaN(ob.ob[i]) || ob.mitigatedIndex[i] !== 0) continue
+      const near = lastClose >= ob.bottom[i] * (1 - NEAR) && lastClose <= ob.top[i] * (1 + NEAR)
+      if (!near) continue
+      if (ob.ob[i] === 1) obBullNear = true
+      else obBearNear = true
+    }
+  } catch { /* SMC اختیاری است — خطای آن نباید اسکرینر را بیندازد */ }
+
   return {
     symbol,
     trade_date: last.trade_date,
@@ -171,6 +216,11 @@ function computeRow(symbol, rows) {
     new_high_52w: lastClose > maxClose,
     new_low_52w: lastClose < minClose,
     vol_spike: volRatio !== null && volRatio >= 2.5,
+    structure_break: structureBreak,
+    fvg_bull_near: fvgBullNear,
+    fvg_bear_near: fvgBearNear,
+    ob_bull_near: obBullNear,
+    ob_bear_near: obBearNear,
     updated: new Date().toISOString(),
   }
 }
@@ -189,7 +239,7 @@ async function main() {
   for (;;) {
     const { data, error } = await sb
       .from('stock_candles')
-      .select('symbol, trade_date, trade_date_shamsi, close, volume, change_pct')
+      .select('symbol, trade_date, trade_date_shamsi, open, high, low, close, volume, change_pct')
       .gte('trade_date', since)
       .order('symbol', { ascending: true })
       .order('trade_date', { ascending: true })
@@ -225,6 +275,9 @@ async function main() {
       'کراس طلایی': out.filter(x => x.golden_cross).length,
       'سقف ۵۲ هفته': out.filter(x => x.new_high_52w).length,
       'حجم مشکوک': out.filter(x => x.vol_spike).length,
+      'شکست ساختار': out.filter(x => x.structure_break !== null).length,
+      'FVG نزدیک': out.filter(x => x.fvg_bull_near || x.fvg_bear_near).length,
+      'اردر بلاک نزدیک': out.filter(x => x.ob_bull_near || x.ob_bear_near).length,
     }
     console.log(stats)
     return

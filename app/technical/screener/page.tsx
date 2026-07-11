@@ -27,10 +27,15 @@ type Row = {
   new_high_52w: boolean
   new_low_52w: boolean
   vol_spike: boolean
+  structure_break?: string | null
+  fvg_bull_near?: boolean
+  fvg_bear_near?: boolean
+  ob_bull_near?: boolean
+  ob_bear_near?: boolean
 }
 
-const FILTERS: { key: keyof Row | 'all'; label: string; tone?: 'pos' | 'neg' }[] = [
-  { key: 'all', label: 'همه' },
+// فیلترها با هم AND می‌شوند — چند چیپ فعال یعنی نمادهایی که همه شرط‌ها را دارند
+const FILTERS: { key: string; label: string; tone?: 'pos' | 'neg' }[] = [
   { key: 'rsi_oversold', label: 'اشباع فروش (RSI≤۳۰)', tone: 'pos' },
   { key: 'rsi_overbought', label: 'اشباع خرید (RSI≥۷۰)', tone: 'neg' },
   { key: 'golden_cross', label: 'کراس طلایی', tone: 'pos' },
@@ -41,7 +46,19 @@ const FILTERS: { key: keyof Row | 'all'; label: string; tone?: 'pos' | 'neg' }[]
   { key: 'near_high_52w', label: 'نزدیک سقف ۵۲ هفته' },
   { key: 'near_low_52w', label: 'نزدیک کف ۵۲ هفته' },
   { key: 'vol_spike', label: 'حجم مشکوک' },
+  { key: 'structure_up', label: 'شکست ساختار صعودی', tone: 'pos' },
+  { key: 'structure_down', label: 'شکست ساختار نزولی', tone: 'neg' },
+  { key: 'fvg_bull_near', label: 'FVG صعودی نزدیک قیمت', tone: 'pos' },
+  { key: 'fvg_bear_near', label: 'FVG نزولی نزدیک قیمت', tone: 'neg' },
+  { key: 'ob_bull_near', label: 'اردر بلاک حمایتی', tone: 'pos' },
+  { key: 'ob_bear_near', label: 'اردر بلاک مقاومتی', tone: 'neg' },
 ]
+
+function passes(r: Row, key: string): boolean {
+  if (key === 'structure_up') return r.structure_break === 'bos_up' || r.structure_break === 'choch_up'
+  if (key === 'structure_down') return r.structure_break === 'bos_down' || r.structure_break === 'choch_down'
+  return r[key as keyof Row] === true
+}
 
 type SortKey = 'change_pct' | 'rsi' | 'vol_ratio'
 
@@ -52,7 +69,7 @@ export default function ScreenerPage() {
   const isMobile = useIsMobile()
   const [isDark, setIsDark] = useState(true)
   const [rows, setRows] = useState<Row[] | null>(null)
-  const [filter, setFilter] = useState<string>('all')
+  const [active, setActive] = useState<string[]>([])
   const [sortKey, setSortKey] = useState<SortKey>('change_pct')
   const [sortDesc, setSortDesc] = useState(true)
   const [q, setQ] = useState('')
@@ -85,7 +102,7 @@ export default function ScreenerPage() {
   const visible = useMemo(() => {
     if (!rows) return []
     let out = rows
-    if (filter !== 'all') out = out.filter(r => r[filter as keyof Row] === true)
+    if (active.length > 0) out = out.filter(r => active.every(k => passes(r, k)))
     const query = q.trim()
     if (query) out = out.filter(r => r.symbol.includes(query))
     return [...out].sort((a, b) => {
@@ -93,7 +110,10 @@ export default function ScreenerPage() {
       const bv = (b[sortKey] ?? -Infinity) as number
       return sortDesc ? bv - av : av - bv
     })
-  }, [rows, filter, q, sortKey, sortDesc])
+  }, [rows, active, q, sortKey, sortDesc])
+
+  const toggleFilter = (key: string) =>
+    setActive(v => (v.includes(key) ? v.filter(x => x !== key) : [...v, key]))
 
   const bg    = isDark ? '#060B14' : '#F4F7FB'
   const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
@@ -146,6 +166,14 @@ export default function ScreenerPage() {
     if (r.new_low_52w) out.push(badge('کف ۵۲هفته', 'neg'))
     else if (r.near_low_52w) out.push(badge('نزدیک کف', 'mid'))
     if (r.vol_spike) out.push(badge('حجم مشکوک', 'mid'))
+    if (r.structure_break === 'bos_up') out.push(badge('BOS صعودی', 'pos'))
+    if (r.structure_break === 'bos_down') out.push(badge('BOS نزولی', 'neg'))
+    if (r.structure_break === 'choch_up') out.push(badge('CHoCH صعودی', 'pos'))
+    if (r.structure_break === 'choch_down') out.push(badge('CHoCH نزولی', 'neg'))
+    if (r.fvg_bull_near) out.push(badge('FVG صعودی', 'pos'))
+    if (r.fvg_bear_near) out.push(badge('FVG نزولی', 'neg'))
+    if (r.ob_bull_near) out.push(badge('OB حمایتی', 'pos'))
+    if (r.ob_bear_near) out.push(badge('OB مقاومتی', 'neg'))
     return out
   }
 
@@ -166,14 +194,23 @@ export default function ScreenerPage() {
           {rows && rows[0] ? ` · آخرین به‌روزرسانی: ${rows[0].trade_date_shamsi}` : ''}
         </p>
 
-        {/* فیلترها */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        {/* فیلترها — قابل ترکیب (AND) */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          <button onClick={() => setActive([])} style={chip(active.length === 0)}>
+            همه
+          </button>
           {FILTERS.map(f => (
-            <button key={f.key as string} onClick={() => setFilter(f.key as string)} style={chip(filter === f.key, f.tone)}>
+            <button key={f.key} onClick={() => toggleFilter(f.key)} aria-pressed={active.includes(f.key)}
+              style={chip(active.includes(f.key), f.tone)}>
               {f.label}
             </button>
           ))}
         </div>
+        {active.length > 1 && (
+          <p style={{ fontSize: 11, color: muted, margin: '0 0 12px' }}>
+            {fa(active.length)} فیلتر فعال — نمادهایی که «همه» شرط‌ها را دارند
+          </p>
+        )}
 
         <input
           value={q}
