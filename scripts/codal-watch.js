@@ -206,15 +206,30 @@ function buildKeyPoints(symbol, payload, freshTitles) {
 
 async function sendTelegram(text) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — اعلان ارسال نشد'); return }
+  // مستقیم — از داخل ایران معمولاً فیلتر است، ولی اگر باز بود سریع‌ترین راه است
   try {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }),
+      signal: AbortSignal.timeout(20_000),
     })
     const data = await res.json()
-    if (!data.ok) log(`⚠️ ارسال تلگرام ناموفق: ${data.description || 'نامشخص'}`)
-  } catch (e) { log(`⚠️ ارسال تلگرام خطا داد: ${e.message}`) }
+    if (data.ok) return
+    log(`⚠️ ارسال مستقیم تلگرام ناموفق: ${data.description || 'نامشخص'} — تلاش از راه رله`)
+  } catch (e) { log(`⚠️ ارسال مستقیم تلگرام خطا داد (${e.message}) — تلاش از راه رله`) }
+
+  // رلهٔ سایت (Render — خارج از ایران): /api/telegram-relay
+  try {
+    const res = await fetch(`${SITE}/api/telegram-relay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, text }),
+      signal: AbortSignal.timeout(90_000), // کلد-استارت Render
+    })
+    const data = await res.json()
+    if (!data.ok) log(`⚠️ رله تلگرام هم ناموفق: ${data.error || res.status}`)
+  } catch (e) { log(`⚠️ رله تلگرام هم خطا داد: ${e.message}`) }
 }
 
 const toLatin = (s) => String(s || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
