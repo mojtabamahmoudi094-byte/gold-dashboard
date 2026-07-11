@@ -6,6 +6,7 @@ import { useMemo } from 'react'
 import { buildTechnicalSummary, type SummaryTone } from '../../lib/technicalSummary'
 import type { Candle } from '../../lib/indicators'
 import { GREEN, RED } from './colors'
+import { glassStyle } from './uiTokens'
 
 const toneColor = (t: SummaryTone) => (t === 'pos' ? GREEN : t === 'neg' ? RED : '#3b82f6')
 const fa = (v: number) => v.toLocaleString('fa-IR')
@@ -16,17 +17,15 @@ export default function TechnicalSummary({ symbol, candles, isDark }: Props) {
   const summary = useMemo(() => buildTechnicalSummary(candles), [candles])
   if (!summary) return null
 
-  const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
   const text  = isDark ? '#E8F4FF' : '#0F1E2E'
-  const muted = isDark ? '#ddd5bd' : '#6B7F90'
-  const line  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.08)'
+  const muted = isDark ? '#ddd5bd' : '#475569'
 
   const biasLabel = summary.bias === 'pos' ? 'مثبت' : summary.bias === 'neg' ? 'منفی' : 'خنثی'
   const biasClr = toneColor(summary.bias)
 
   return (
     <section aria-label={`جمع‌بندی تکنیکال ${symbol}`} style={{
-      background: panel, border: `1px solid ${line}`, borderRadius: 16,
+      ...glassStyle(isDark),
       padding: '16px 18px', marginTop: 14,
       fontFamily: 'inherit', color: text,
     }}>

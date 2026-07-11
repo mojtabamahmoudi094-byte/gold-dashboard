@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { rsi, macd, type Candle } from '../../../lib/indicators'
 import { GREEN, RED } from '../colors'
+import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
 
 const KlineChart = dynamic(() => import('../KlineChart'), { ssr: false })
 const TechnicalSummary = dynamic(() => import('../TechnicalSummary'), { ssr: false })
@@ -21,7 +22,7 @@ type Row = {
   close: number
   volume: number | null
 }
-type SymRow = { l18: string; pcp: number | null }
+type SymRow = { l18: string; pcp: number | null; pl?: number | null; plp?: number | null; pc?: number | null }
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
 const toSlug = (s: string) => encodeURIComponent(s.replace(/\s+/g, '-'))
@@ -61,15 +62,25 @@ export default function TechnicalSymbolPage() {
       })
   }, [symbol])
 
-  // فهرست نمادها برای سوییچ سریع
+  // فهرست نمادها برای سوییچ سریع + قیمت زنده — در ساعت بازار هر ۶۰ ثانیه تازه می‌شود
+  // (منبع: /api/stocks-industries که cron سرور ایرانی هر ۵ دقیقه پر می‌کند — بدون مصرف بودجه BrsApi)
+  const isOpen = marketOpen()
   useEffect(() => {
-    fetch('/api/stocks-industries')
-      .then(r => r.json())
-      .then((d: { industries?: { symbols: SymRow[] }[] }) => {
-        setSymbols((d.industries ?? []).flatMap(i => i.symbols))
-      })
-      .catch(() => {})
+    let stop = false
+    const load = () =>
+      fetch('/api/stocks-industries')
+        .then(r => r.json())
+        .then((d: { industries?: { symbols: SymRow[] }[] }) => {
+          if (!stop) setSymbols((d.industries ?? []).flatMap(i => i.symbols))
+        })
+        .catch(() => {})
+    load()
+    const t = isOpen ? setInterval(load, 60_000) : null
+    return () => { stop = true; if (t) clearInterval(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const liveRow = useMemo(() => symbols.find(s => s.l18 === symbol) ?? null, [symbols, symbol])
 
   const candles: Candle[] = useMemo(() => {
     if (!rows) return []
@@ -110,20 +121,37 @@ export default function TechnicalSymbolPage() {
   const bg    = isDark ? '#060B14' : '#F4F7FB'
   const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
   const text  = isDark ? '#E8F4FF' : '#0F1E2E'
-  const muted = isDark ? '#ddd5bd' : '#6B7F90'
+  const muted = isDark ? '#ddd5bd' : '#475569'
   const line  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.08)'
+  const glass = glassStyle(isDark)
+
+  // قیمت نمایشی: در ساعت بازار آخرین معامله زنده، وگرنه پایانی آخرین کندل
+  const showLive = isOpen && liveRow?.pl != null
+  const shownPrice = showLive ? (liveRow!.pl as number) : summary?.last.close ?? null
+  const shownPct = showLive ? (liveRow!.plp ?? null) : summary?.chg ?? null
 
   return (
     <main style={{
       minHeight: '100vh', background: bg, color: text,
       fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      position: 'relative', overflow: 'hidden',
     }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '20px 12px' : '28px 24px' }}>
+      <style>{TA_KEYFRAMES}</style>
 
-        {/* هدر: نماد + قیمت + سوییچ سریع */}
+      {/* aurora پس‌زمینه — همان زبان طراحی هاب */}
+      <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
+        <div style={{ position: 'absolute', top: '2%', right: '6%', width: 440, height: 440, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
+        <div style={{ position: 'absolute', top: '38%', left: '14%', width: 380, height: 380, borderRadius: '50%', background: '#8b5cf6', opacity: 0.1, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
+      </div>
+
+      <div className="ta-anim" style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '20px 12px' : '28px 24px', position: 'relative' }}>
+
+        {/* هدر شیشه‌ای: نماد + قیمت زنده + سوییچ سریع */}
         <div style={{
+          ...glass,
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-          marginBottom: 12,
+          marginBottom: 12, padding: isMobile ? '12px 14px' : '14px 18px',
+          ...enterAnim(0),
         }}>
           <Link href="/technical" aria-label="بازگشت به تحلیل تکنیکال" style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -143,36 +171,57 @@ export default function TechnicalSymbolPage() {
             {symbol}
           </h1>
 
-          {summary && (
+          {/* چیپ ضربان بازار */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            fontSize: 11, fontWeight: 700, padding: '4px 11px', borderRadius: 99,
+            border: `1px solid ${line}`,
+            color: isOpen ? GREEN : muted, flexShrink: 0,
+          }}>
+            <span style={{ position: 'relative', width: 7, height: 7, flexShrink: 0 }}>
+              <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: isOpen ? GREEN : (isDark ? '#4b5563' : '#9ca3af') }} />
+              {isOpen && <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: GREEN, animation: 'taPing 2s ease-out infinite' }} />}
+            </span>
+            {isOpen ? 'زنده' : 'بازار بسته'}
+          </span>
+
+          {shownPrice !== null && (
             <>
-              <span style={{ fontSize: isMobile ? 17 : 21, fontWeight: 700 }}>
-                {fa(summary.last.close)}
+              <span style={{ fontSize: isMobile ? 17 : 21, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {fa(shownPrice)}
                 <span style={{ fontSize: 11, color: muted, marginRight: 4 }}>ریال</span>
               </span>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: summary.chg >= 0 ? GREEN : RED }}>
-                {summary.chg >= 0 ? '▲' : '▼'} {fa(Math.abs(summary.chg), 2)}٪
-              </span>
-              {summary.rsi !== null && (
+              {shownPct !== null && (
+                <span style={{
+                  fontSize: 12.5, fontWeight: 700, padding: '3px 10px', borderRadius: 7,
+                  color: shownPct >= 0 ? GREEN : RED,
+                  background: shownPct >= 0 ? 'rgba(38,166,154,0.12)' : 'rgba(239,83,80,0.12)',
+                }}>
+                  {shownPct >= 0 ? '▲' : '▼'} {fa(Math.abs(shownPct), 2)}٪
+                </span>
+              )}
+              {showLive && <span style={{ fontSize: 10, color: muted }}>آخرین معامله لحظه‌ای</span>}
+              {summary && summary.rsi !== null && (
                 <span style={{
                   fontSize: 11.5, padding: '4px 10px', borderRadius: 8,
                   background: panel, border: `1px solid ${line}`, color: muted,
                 }}>
                   RSI{' '}
-                  <b style={{ color: summary.rsi >= 70 ? RED : summary.rsi <= 30 ? GREEN : text }}>
-                    {fa(summary.rsi, 1)}
+                  <b style={{ color: summary!.rsi! >= 70 ? RED : summary!.rsi! <= 30 ? GREEN : text }}>
+                    {fa(summary!.rsi!, 1)}
                   </b>
-                  {summary.rsi >= 70 ? ' اشباع خرید' : summary.rsi <= 30 ? ' اشباع فروش' : ''}
+                  {summary!.rsi! >= 70 ? ' اشباع خرید' : summary!.rsi! <= 30 ? ' اشباع فروش' : ''}
                 </span>
               )}
-              {summary.macdHist !== null && (
+              {summary && summary.macdHist !== null && (
                 <span style={{
                   fontSize: 11.5, padding: '4px 10px', borderRadius: 8,
                   background: panel, border: `1px solid ${line}`, color: muted,
                 }}>
-                  MACD <b style={{ color: summary.macdHist >= 0 ? GREEN : RED }}>{summary.macdHist >= 0 ? 'مثبت' : 'منفی'}</b>
+                  MACD <b style={{ color: summary!.macdHist! >= 0 ? GREEN : RED }}>{summary!.macdHist! >= 0 ? 'مثبت' : 'منفی'}</b>
                 </span>
               )}
-              <span style={{ fontSize: 11, color: muted }}>{summary.last.shamsi}</span>
+              {summary && <span style={{ fontSize: 11, color: muted }}>{summary.last.shamsi}</span>}
             </>
           )}
 
@@ -238,7 +287,7 @@ export default function TechnicalSymbolPage() {
         {failed && (
           <div style={{
             color: muted, fontSize: 13, padding: '70px 0', textAlign: 'center',
-            background: panel, border: `1px solid ${line}`, borderRadius: 16,
+            ...glass,
           }}>
             دریافت داده‌های «{symbol}» ناموفق بود
           </div>
@@ -246,7 +295,7 @@ export default function TechnicalSymbolPage() {
         {!failed && rows === null && (
           <div style={{
             color: muted, fontSize: 13, padding: '70px 0', textAlign: 'center',
-            background: panel, border: `1px solid ${line}`, borderRadius: 16,
+            ...glass,
           }}>
             در حال بارگذاری…
           </div>
@@ -254,15 +303,19 @@ export default function TechnicalSymbolPage() {
         {!failed && rows !== null && candles.length === 0 && (
           <div style={{
             color: muted, fontSize: 13, padding: '70px 0', textAlign: 'center',
-            background: panel, border: `1px solid ${line}`, borderRadius: 16,
+            ...glass,
           }}>
             داده‌ای برای «{symbol}» ثبت نشده — نماد دیگری جست‌وجو کنید
           </div>
         )}
         {!failed && candles.length > 0 && (
           <>
-            <KlineChart symbol={symbol} candles={candles} isDark={isDark} />
-            <TechnicalSummary symbol={symbol} candles={candles} isDark={isDark} />
+            <div style={enterAnim(1)}>
+              <KlineChart symbol={symbol} candles={candles} isDark={isDark} />
+            </div>
+            <div style={enterAnim(2)}>
+              <TechnicalSummary symbol={symbol} candles={candles} isDark={isDark} />
+            </div>
           </>
         )}
 
