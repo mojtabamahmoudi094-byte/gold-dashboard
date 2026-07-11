@@ -411,8 +411,9 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
 
   const [period, setPeriod] = useState<PeriodType>('day')
   const [candleType, setCandleType] = useState<CandleType>('candle_solid')
-  const [mainInds, setMainInds] = useState<string[]>(['MA'])
-  const [subInds, setSubInds] = useState<string[]>(['VOL', 'MACD'])
+  // چارت خام باز می‌شود — فقط کندل + حجم؛ اندیکاتور با انتخاب خود کاربر اضافه می‌شود
+  const [mainInds, setMainInds] = useState<string[]>([])
+  const [subInds, setSubInds] = useState<string[]>(['VOL'])
   const [smcActive, setSmcActive] = useState<string[]>([])
   const [compares, setCompares] = useState<string[]>([])
   const [cmpInput, setCmpInput] = useState('')
@@ -800,28 +801,30 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
     return () => document.removeEventListener('fullscreenchange', h)
   }, [])
 
-  // ── استایل‌ها
-  const panel = isDark ? '#1e222d' : '#ffffff'
+  // ── استایل‌ها — زبان شیشه‌ای ۲۰۲۶ (هماهنگ با uiTokens.ts)
+  const glassBg = isDark ? 'rgba(19,23,34,0.72)' : 'rgba(255,255,255,0.82)'
+  const panel = isDark ? 'rgba(19,23,34,0.96)' : 'rgba(255,255,255,0.97)'
   const text  = isDark ? '#d1d4dc' : '#131722'
   const muted = isDark ? '#8b93a7' : '#787b86'
-  const line  = isDark ? '#2a2e39' : '#e0e3eb'
+  const line  = isDark ? 'rgba(148,163,184,0.14)' : 'rgba(15,23,42,0.08)'
   const chartBg = isDark ? CHART_BG.dark : CHART_BG.light
 
   const btn = (active: boolean): React.CSSProperties => ({
     fontSize: 12, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-    padding: '6px 10px', borderRadius: 6, minHeight: 32,
+    padding: '7px 12px', borderRadius: 9, minHeight: 32,
     border: '1px solid transparent',
-    background: active ? (isDark ? 'rgba(59,130,246,0.18)' : 'rgba(59,130,246,0.12)') : 'transparent',
+    background: active ? 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(139,92,246,0.18))' : 'transparent',
     color: active ? '#3b82f6' : muted,
     transition: 'all 0.15s',
   })
 
   const menuBox: React.CSSProperties = {
-    position: 'absolute', top: '100%', right: 0, zIndex: 80, marginTop: 4,
+    position: 'absolute', top: '100%', right: 0, zIndex: 80, marginTop: 6,
     minWidth: 230, maxHeight: 340, overflowY: 'auto',
-    background: panel, borderRadius: 8, padding: 5,
+    background: panel, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+    borderRadius: 12, padding: 5,
     border: `1px solid ${line}`,
-    boxShadow: isDark ? '0 12px 40px rgba(0,0,0,0.6)' : '0 8px 30px rgba(0,0,0,0.14)',
+    boxShadow: isDark ? '0 16px 48px rgba(0,0,0,0.55)' : '0 10px 32px rgba(15,23,42,0.14)',
   }
 
   const menuItem = (active: boolean): React.CSSProperties => ({
@@ -877,12 +880,15 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
       display: 'flex', flexDirection: 'column', position: 'relative',
       height: isFull ? '100vh' : undefined,
       background: chartBg,
-      border: `1px solid ${line}`, borderRadius: isFull ? 0 : 10, overflow: 'hidden',
+      border: `1px solid ${line}`, borderRadius: isFull ? 0 : 16, overflow: 'hidden',
+      boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.35)' : '0 8px 24px rgba(59,130,246,0.08)',
     }}>
-      {/* ── نوار ابزار بالا */}
+      {/* ── نوار ابزار بالا — شیشه‌ای */}
       <div style={{
-        display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center',
-        padding: '6px 10px', background: panel, borderBottom: `1px solid ${line}`,
+        display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center',
+        padding: '8px 12px', background: glassBg,
+        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: `1px solid ${line}`,
         position: 'relative', zIndex: 40,
       }}>
         {/* نوع کندل */}
@@ -1099,32 +1105,43 @@ export default function KlineChart({ symbol, candles, isDark }: Props) {
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <div style={{
           display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center',
-          padding: '8px 4px', borderInlineEnd: `1px solid ${line}`, background: panel,
+          padding: '10px 6px', borderInlineEnd: `1px solid ${line}`,
+          background: glassBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
           overflowY: 'auto', flexShrink: 0,
         }}>
           {DRAW_TOOLS.map(t => (
             <button key={t.name} onClick={() => startDraw(t.name)} title={t.label} aria-label={t.label}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 32, height: 32, borderRadius: 6, cursor: 'pointer',
-                background: 'transparent', border: 'none', color: muted, transition: 'all 0.15s',
+                width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
+                background: 'transparent', border: '1px solid transparent', color: muted, transition: 'all 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(19,23,34,0.06)'; e.currentTarget.style.color = '#3b82f6' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = muted }}>
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59,130,246,0.16), rgba(139,92,246,0.12))'
+                e.currentTarget.style.borderColor = isDark ? 'rgba(148,163,184,0.18)' : 'rgba(15,23,42,0.1)'
+                e.currentTarget.style.color = '#3b82f6'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.borderColor = 'transparent'
+                e.currentTarget.style.color = muted
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
                 <path d={t.icon} />
               </svg>
             </button>
           ))}
-          <div style={{ height: 1, alignSelf: 'stretch', background: line, margin: '4px 2px' }} />
+          <div style={{ height: 1, alignSelf: 'stretch', background: line, margin: '6px 4px' }} />
           <button onClick={clearDrawings} title="حذف همه رسم‌ها" aria-label="حذف همه رسم‌ها"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 32, height: 32, borderRadius: 6, cursor: 'pointer',
-              background: 'transparent', border: 'none', color: muted, transition: 'all 0.15s',
+              width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
+              background: 'transparent', border: '1px solid transparent', color: muted, transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.color = RED }}
-            onMouseLeave={e => { e.currentTarget.style.color = muted }}>
+            onMouseEnter={e => { e.currentTarget.style.color = RED; e.currentTarget.style.background = 'rgba(239,83,80,0.1)'; e.currentTarget.style.borderColor = 'rgba(239,83,80,0.25)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = muted; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
               <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
             </svg>
