@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Telegram env vars not set' }, { status: 500 })
   }
 
-  let body: { token?: string; text?: string }
+  let body: { token?: string; text?: string; chat_id?: string }
   try {
     body = await req.json()
   } catch {
@@ -28,12 +28,15 @@ export async function POST(req: NextRequest) {
   if (!text) {
     return NextResponse.json({ ok: false, error: 'text required' }, { status: 400 })
   }
+  // مقصد از فرستنده (مثلاً کانال عمومی)؛ پیش‌فرض همان چت env سایت.
+  // دارندهٔ توکن به‌هرحال اختیار کامل ربات را دارد، پس chat_id دلخواه خطر تازه‌ای نیست.
+  const target = body.chat_id && /^-?\d+$/.test(body.chat_id) ? body.chat_id : chatId
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({ chat_id: target, text }),
     })
     const data = await res.json()
     if (!data.ok) {

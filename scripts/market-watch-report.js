@@ -98,7 +98,7 @@ async function sendTelegram(text) {
   try {
     const res = await fetch(`${SITE}/api/telegram-relay`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TOKEN, text }),
+      body: JSON.stringify({ token: TOKEN, chat_id: CHAT_ID, text }),
       signal: AbortSignal.timeout(90_000),
     })
     const data = await res.json()
