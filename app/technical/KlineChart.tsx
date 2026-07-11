@@ -523,6 +523,8 @@ type Props = {
   isDark: boolean
   symbols?: SymItem[]
   livePrice?: { pl: number; plp: number } | null
+  /** سری تعدیل‌شده (adj_* از stock_candles) — undefined یعنی هنوز داده‌ای نیست */
+  candlesAdj?: Candle[]
 }
 
 const readAuto = (symbol: string): AutoSaveData | null => {
@@ -534,7 +536,7 @@ const readAuto = (symbol: string): AutoSaveData | null => {
 
 const toSlug = (s: string) => encodeURIComponent(s.replace(/\s+/g, '-'))
 
-export default function KlineChart({ symbol, candles, isDark, symbols = [], livePrice = null }: Props) {
+export default function KlineChart({ symbol, candles, isDark, symbols = [], livePrice = null, candlesAdj }: Props) {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -573,9 +575,12 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
   const [locked, setLocked] = useState(false)
   const [drawingsHidden, setDrawingsHidden] = useState(false)
 
-  // منبع قیمت (پایانی / آخرین) + مقیاس محور + تنظیمات نمایش
+  // منبع قیمت (پایانی / آخرین) + تعدیل + مقیاس محور + تنظیمات نمایش
   const [priceSrc, setPriceSrc] = useState<'close' | 'last'>(() => {
     try { return localStorage.getItem('ta-price-src') === 'last' ? 'last' : 'close' } catch { return 'close' }
+  })
+  const [adjMode, setAdjMode] = useState<'raw' | 'adj'>(() => {
+    try { return localStorage.getItem('ta-adj') === 'adj' ? 'adj' : 'raw' } catch { return 'raw' }
   })
   const [scaleMode, setScaleMode] = useState<ScaleMode>('normal')
   const [settings, setSettings] = useState<ChartSettings>(() => {
@@ -649,18 +654,22 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
     return () => clearInterval(t)
   }, [])
 
+  // ── تعدیل: سری adj اگر انتخاب شده و موجود است؛ وگرنه خام
+  const hasAdj = Boolean(candlesAdj && candlesAdj.length > 0)
+  const baseCandles = adjMode === 'adj' && hasAdj ? (candlesAdj as Candle[]) : candles
+
   // ── منبع قیمت «آخرین» — کندل امروز با آخرین معامله لحظه‌ای جایگزین می‌شود
   const livePl = livePrice?.pl ?? null
   const effCandles = useMemo(() => {
-    if (priceSrc !== 'last' || livePl == null || candles.length === 0) return candles
-    const out = candles.slice()
+    if (priceSrc !== 'last' || livePl == null || baseCandles.length === 0) return baseCandles
+    const out = baseCandles.slice()
     const l = { ...out[out.length - 1] }
     l.close = livePl
     l.high = Math.max(l.high, livePl)
     l.low = Math.min(l.low, livePl)
     out[out.length - 1] = l
     return out
-  }, [candles, priceSrc, livePl])
+  }, [baseCandles, priceSrc, livePl])
 
   // ── ساخت نمودار
   useEffect(() => {
@@ -1371,16 +1380,32 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
 
         {/* تعدیل قیمت */}
         <div style={{ position: 'relative' }}>
-          {menuBtn('adj', 'بدون تعدیل')}
+          {menuBtn('adj', adjMode === 'adj' && hasAdj ? 'تعدیل‌شده' : 'بدون تعدیل', adjMode === 'adj' && hasAdj)}
           {openMenu === 'adj' && (
-            <div style={{ ...menuBox, minWidth: 210 }}>
-              <button onClick={() => setOpenMenu(null)} style={menuItem(true)}>
-                <span>بدون تعدیل</span>
-                <Check />
-              </button>
-              <div style={{ ...menuItem(false), cursor: 'default', opacity: 0.45 }}>
-                <span>تعدیل‌شده (افزایش سرمایه/سود)</span>
-                <span style={{ fontSize: 10 }}>به‌زودی</span>
+            <div style={{ ...menuBox, minWidth: 230 }}>
+              {([
+                { key: 'raw', label: 'بدون تعدیل' },
+                { key: 'adj', label: 'تعدیل‌شده (افزایش سرمایه/سود)' },
+              ] as const).map(o => (
+                <button key={o.key}
+                  onClick={() => {
+                    if (o.key === 'adj' && !hasAdj) {
+                      notify('داده تعدیل‌شده برای این نماد هنوز آماده نیست')
+                      setOpenMenu(null)
+                      return
+                    }
+                    setAdjMode(o.key)
+                    try { localStorage.setItem('ta-adj', o.key) } catch { /* — */ }
+                    setOpenMenu(null)
+                  }}
+                  style={{ ...menuItem(adjMode === o.key), ...(o.key === 'adj' && !hasAdj ? { opacity: 0.45 } : {}) }}
+                  onMouseEnter={hoverBg} onMouseLeave={leaveBg}>
+                  <span>{o.label}</span>
+                  {adjMode === o.key && (o.key !== 'adj' || hasAdj) && <Check />}
+                </button>
+              ))}
+              <div style={{ fontSize: 10.5, color: muted, padding: '4px 11px 8px', lineHeight: 1.8 }}>
+                تعدیل بابت افزایش سرمایه و سود نقدی — منبع tsetmc، هر شب به‌روز می‌شود.
               </div>
             </div>
           )}

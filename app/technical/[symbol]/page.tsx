@@ -21,6 +21,10 @@ type Row = {
   low: number | null
   close: number
   volume: number | null
+  adj_open: number | null
+  adj_high: number | null
+  adj_low: number | null
+  adj_close: number | null
 }
 type SymRow = { l18: string; pcp: number | null; pl?: number | null; plp?: number | null; pc?: number | null }
 
@@ -51,12 +55,23 @@ export default function TechnicalSymbolPage() {
     setFailed(false)
     supabase
       .from('stock_candles')
-      .select('trade_date, trade_date_shamsi, open, high, low, close, volume')
+      .select('trade_date, trade_date_shamsi, open, high, low, close, volume, adj_open, adj_high, adj_low, adj_close')
       .eq('symbol', symbol)
       .order('trade_date', { ascending: true })
       .then(({ data, error }) => {
-        if (error || !data) setFailed(true)
-        else setRows(data as Row[])
+        if (!error && data) { setRows(data as Row[]); return }
+        // ستون‌های adj هنوز ساخته نشده (migration اجرا نشده) — بدون تعدیل ادامه بده
+        supabase
+          .from('stock_candles')
+          .select('trade_date, trade_date_shamsi, open, high, low, close, volume')
+          .eq('symbol', symbol)
+          .order('trade_date', { ascending: true })
+          .then(({ data: d2, error: e2 }) => {
+            if (e2 || !d2) setFailed(true)
+            else setRows((d2 as Omit<Row, 'adj_open' | 'adj_high' | 'adj_low' | 'adj_close'>[]).map(r => ({
+              ...r, adj_open: null, adj_high: null, adj_low: null, adj_close: null,
+            })))
+          })
       })
   }, [symbol])
 
@@ -93,6 +108,25 @@ export default function TechnicalSymbolPage() {
         close: r.close,
         volume: r.volume ?? 0,
       }))
+  }, [rows])
+
+  // سری تعدیل‌شده — ردیف‌های بدون adj (مثل کندل امروز تا اجرای cron شب) به خام برمی‌گردند
+  const candlesAdj: Candle[] | undefined = useMemo(() => {
+    if (!rows || !rows.some(r => r.adj_close != null && r.adj_close > 0)) return undefined
+    return rows
+      .filter(r => r.close != null && r.close > 0)
+      .map(r => {
+        const c = (r.adj_close != null && r.adj_close > 0) ? r.adj_close : r.close
+        return {
+          time: r.trade_date,
+          shamsi: r.trade_date_shamsi,
+          open: r.adj_open ?? r.open ?? c,
+          high: r.adj_high ?? r.high ?? c,
+          low: r.adj_low ?? r.low ?? c,
+          close: c,
+          volume: r.volume ?? 0,
+        }
+      })
   }, [rows])
 
   const summary = useMemo(() => {
@@ -258,6 +292,7 @@ export default function TechnicalSymbolPage() {
               <KlineChart
                 symbol={symbol}
                 candles={candles}
+                candlesAdj={candlesAdj}
                 isDark={isDark}
                 symbols={symbols}
                 livePrice={showLive && liveRow?.pl != null ? { pl: liveRow.pl, plp: liveRow.plp ?? 0 } : null}
