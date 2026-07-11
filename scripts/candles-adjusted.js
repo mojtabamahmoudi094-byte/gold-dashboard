@@ -226,20 +226,21 @@ async function updateSymbol(symbol, insCode, cutoff) {
   if (adj.length === 0) return { symbol, rows: 0, note: 'تاریخچه تعدیل خالی' }
 
   // تاریخ‌های موجود همین نماد در DB — فقط همان‌ها آپدیت می‌شوند (upsert ردیف ناقص نسازد)
+  // trade_date_shamsi هم می‌آید چون NOT NULL است و باید در payload upsert باشد
   const { data: existing, error } = await sb
     .from('stock_candles')
-    .select('trade_date, close')
+    .select('trade_date, trade_date_shamsi, close')
     .eq('symbol', symbol)
     .gte('trade_date', cutoff)
   if (error) throw new Error(`select: ${error.message}`)
   if (!existing?.length) return { symbol, rows: 0, note: 'کندل خام ندارد' }
-  const dbDates = new Map(existing.map(r => [r.trade_date, r.close]))
+  const dbDates = new Map(existing.map(r => [r.trade_date, r]))
 
   // ضریب تعدیل روی آخرین روزِ مشترک باید ۱ باشد — وگرنه چیزی غلط است
   const adjSorted = adj.filter(r => dbDates.has(r.trade_date)).sort((a, b) => a.trade_date < b.trade_date ? 1 : -1)
   if (adjSorted.length === 0) return { symbol, rows: 0, note: 'تاریخ مشترک ندارد' }
   const newest = adjSorted[0]
-  const rawClose = dbDates.get(newest.trade_date)
+  const rawClose = dbDates.get(newest.trade_date)?.close
   if (rawClose && Math.abs(newest.close - rawClose) / rawClose > 0.01) {
     return { symbol, rows: 0, note: `آخرین کندل تعدیلی (${newest.close}) با خام (${rawClose}) نمی‌خواند — skip` }
   }
@@ -247,6 +248,7 @@ async function updateSymbol(symbol, insCode, cutoff) {
   const rows = adjSorted.map(r => ({
     symbol,
     trade_date: r.trade_date,
+    trade_date_shamsi: dbDates.get(r.trade_date).trade_date_shamsi,
     adj_open: r.open,
     adj_high: r.high,
     adj_low: r.low,
