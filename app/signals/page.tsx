@@ -1503,6 +1503,12 @@ export default function SignalsPage() {
           ))}
         </div>
 
+        <div style={{ marginTop: 10, textAlign: 'center' }}>
+          <Link href="/track-record" style={{ fontSize: 11.5, color: t.accent, textDecoration: 'none' }}>
+            رکورد کامل عملکرد همه سیگنال‌ها ←
+          </Link>
+        </div>
+
         {/* ── نتیجه ۱۰ روزه سیگنال‌ها — چارت مستطیلی ── */}
         {trading.length > 0 && (
           <div style={{
