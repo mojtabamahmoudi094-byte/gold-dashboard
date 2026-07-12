@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { darkTheme, lightTheme } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
@@ -23,10 +23,13 @@ type Payload = {
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
 
+type Narrative = { loading: boolean; text?: string; error?: string }
+
 export default function TrackRecordPage() {
   const [isDark, setIsDark] = useState(true)
   const [data, setData] = useState<Payload | null>(null)
   const [failed, setFailed] = useState(false)
+  const [narratives, setNarratives] = useState<Record<number, Narrative>>({})
   const isMobile = useIsMobile()
   const t: any = isDark ? darkTheme : lightTheme
   const cream = isDark ? '#ddd5bd' : '#6B5A3A'
@@ -52,6 +55,33 @@ export default function TrackRecordPage() {
     borderRadius: 14, padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
     boxShadow: t.cardShadow,
   })
+
+  const narrate = async (i: number, r: Row) => {
+    if (narratives[i]?.text || narratives[i]?.loading) {
+      // اگر قبلاً باز شده، دوباره تاگل کن (بستن)
+      setNarratives(prev => {
+        const cur = prev[i]
+        if (!cur || cur.loading) return prev
+        const { [i]: _drop, ...rest } = prev
+        return rest
+      })
+      return
+    }
+    if (!r.reason) return
+    setNarratives(prev => ({ ...prev, [i]: { loading: true } }))
+    try {
+      const res = await fetch('/api/signal-narrative', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: r.type, category: r.categoryLabel, symbol: r.symbol, reason: r.reason, confidence: r.confidence }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.error || 'خطا')
+      setNarratives(prev => ({ ...prev, [i]: { loading: false, text: json.text } }))
+    } catch (e) {
+      setNarratives(prev => ({ ...prev, [i]: { loading: false, error: e instanceof Error ? e.message : 'خطا' } }))
+    }
+  }
 
   const stat = (label: string, value: string, color: string) => (
     <div style={{ ...panelStyle(color), padding: '14px 16px' }}>
@@ -148,22 +178,50 @@ export default function TrackRecordPage() {
                       <th style={{ padding: '6px 8px', fontWeight: 600 }}>نوع</th>
                       <th style={{ padding: '6px 8px', fontWeight: 600 }}>اطمینان</th>
                       <th style={{ padding: '6px 8px', fontWeight: 600 }}>نتیجه ۱۰ روزه</th>
+                      <th style={{ padding: '6px 8px', fontWeight: 600 }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.recent.map((r, i) => (
-                      <tr key={i} style={{ borderTop: `0.5px solid ${t.border}` }}>
-                        <td style={{ padding: '7px 8px', color: t.muted }}>{r.date}</td>
-                        <td style={{ padding: '7px 8px' }}>{r.categoryLabel}{r.symbol ? ` · ${r.symbol}` : ''}</td>
-                        <td style={{ padding: '7px 8px', fontWeight: 700, color: r.type === 'خرید' ? t.green : t.red }}>{r.type}</td>
-                        <td style={{ padding: '7px 8px', fontFamily: 'system-ui, sans-serif' }}>{fa(r.confidence)}٪</td>
-                        <td style={{
-                          padding: '7px 8px', fontFamily: 'system-ui, sans-serif', fontWeight: 700,
-                          color: r.outcomePct === null ? t.muted : r.outcomePct > 0 ? t.green : r.outcomePct < 0 ? t.red : t.muted,
-                        }}>
-                          {r.outcomePct === null ? 'در انتظار' : `${r.outcomePct >= 0 ? '+' : ''}${fa(r.outcomePct, 1)}٪`}
-                        </td>
-                      </tr>
+                      <Fragment key={i}>
+                        <tr style={{ borderTop: `0.5px solid ${t.border}` }}>
+                          <td style={{ padding: '7px 8px', color: t.muted }}>{r.date}</td>
+                          <td style={{ padding: '7px 8px' }}>{r.categoryLabel}{r.symbol ? ` · ${r.symbol}` : ''}</td>
+                          <td style={{ padding: '7px 8px', fontWeight: 700, color: r.type === 'خرید' ? t.green : t.red }}>{r.type}</td>
+                          <td style={{ padding: '7px 8px', fontFamily: 'system-ui, sans-serif' }}>{fa(r.confidence)}٪</td>
+                          <td style={{
+                            padding: '7px 8px', fontFamily: 'system-ui, sans-serif', fontWeight: 700,
+                            color: r.outcomePct === null ? t.muted : r.outcomePct > 0 ? t.green : r.outcomePct < 0 ? t.red : t.muted,
+                          }}>
+                            {r.outcomePct === null ? 'در انتظار' : `${r.outcomePct >= 0 ? '+' : ''}${fa(r.outcomePct, 1)}٪`}
+                          </td>
+                          <td style={{ padding: '7px 8px' }}>
+                            {r.reason && (
+                              <button
+                                type="button"
+                                onClick={() => narrate(i, r)}
+                                style={{
+                                  all: 'unset', cursor: 'pointer', fontSize: 10.5, color: t.brand2,
+                                  border: `0.5px solid ${t.brand2}55`, borderRadius: 7, padding: '3px 9px',
+                                }}
+                              >
+                                {narratives[i]?.loading ? 'در حال روایت…' : narratives[i]?.text ? 'بستن ▲' : '📝 روایت کن'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        {(narratives[i]?.text || narratives[i]?.error) && (
+                          <tr>
+                            <td colSpan={6} style={{
+                              padding: '10px 14px', whiteSpace: 'normal', fontSize: 12,
+                              color: narratives[i]?.error ? t.red : cream, lineHeight: 2,
+                              background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,30,46,0.02)',
+                            }}>
+                              {narratives[i]?.error ? `خطا: ${narratives[i]?.error}` : narratives[i]?.text}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
