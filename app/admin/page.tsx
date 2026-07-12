@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { todayShamsi } from '../../lib/format'
+import { darkTheme as t } from '../../lib/theme'
 // supabase used only for auth (login/session), NOT for data queries (those go via /api/*)
 
 const BRSAPI_KEY = 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
@@ -204,15 +205,15 @@ export default function AdminPage() {
   }, [autoSync, session])
 
   if (loading) return (
-    <main className="min-h-screen bg-slate-950 flex items-center justify-center">
-      <div className="text-slate-500 text-sm">...</div>
+    <main className="min-h-screen flex items-center justify-center" style={{ background: t.bg }}>
+      <div className="text-sm" style={{ color: t.muted }}>...</div>
     </main>
   )
 
   if (!session) return (
-    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center" dir="rtl">
-      <div className="bg-slate-900 p-8 rounded-3xl w-full max-w-md border border-slate-800">
-        <h1 className="text-2xl font-bold text-center mb-8">ورود مدیر</h1>
+    <main className="min-h-screen flex items-center justify-center" style={{ background: t.bg, color: t.text }} dir="rtl">
+      <div className="p-8 rounded-3xl w-full max-w-md border" style={{ background: t.surface, borderColor: t.border }}>
+        <h1 className="text-2xl font-bold text-center mb-8" style={{ color: t.textBright }}>ورود مدیر</h1>
         <div className="space-y-4">
           <input
             type="email"
@@ -220,7 +221,8 @@ export default function AdminPage() {
             value={email}
             onChange={e => setEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && login()}
-            className="w-full bg-slate-800 p-3 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500"
+            className="w-full p-3 rounded-xl outline-none focus:ring-2"
+            style={{ background: t.inputBg, color: t.text, ['--tw-ring-color' as string]: t.brand }}
           />
           <input
             type="password"
@@ -228,13 +230,15 @@ export default function AdminPage() {
             value={password}
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && login()}
-            className="w-full bg-slate-800 p-3 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500"
+            className="w-full p-3 rounded-xl outline-none focus:ring-2"
+            style={{ background: t.inputBg, color: t.text, ['--tw-ring-color' as string]: t.brand }}
           />
           <button
             type="button"
             onClick={login}
             disabled={loading}
-            className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-bold py-3 rounded-xl transition-colors"
+            className="w-full disabled:opacity-50 font-bold py-3 rounded-xl transition-opacity"
+            style={{ background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff' }}
           >
             {loading ? 'در حال ورود...' : 'ورود'}
           </button>
@@ -244,22 +248,22 @@ export default function AdminPage() {
   )
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6" dir="rtl">
+    <main className="min-h-screen p-6" style={{ background: t.bg, color: t.text }} dir="rtl">
       <div className="max-w-2xl mx-auto">
 
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-xl font-bold text-white">پنل مدیریت بورس سنج</h1>
-          <button type="button" onClick={logout} className="text-slate-500 hover:text-white text-sm transition-colors">
+          <h1 className="text-xl font-bold" style={{ color: t.textBright }}>پنل مدیریت بورس سنج</h1>
+          <button type="button" onClick={logout} className="text-sm transition-colors hover:opacity-80" style={{ color: t.muted }}>
             خروج
           </button>
         </div>
 
         {/* Sync card */}
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 mb-4">
+        <div className="rounded-2xl border p-6 mb-4" style={{ background: t.surface, borderColor: t.border }}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="font-bold text-white mb-1">بروزرسانی صندوق‌های کالایی</h2>
-              <p className="text-slate-400 text-sm">
+              <h2 className="font-bold mb-1" style={{ color: t.textBright }}>بروزرسانی صندوق‌های کالایی</h2>
+              <p className="text-sm" style={{ color: t.muted }}>
                 دریافت از BrsAPI و ذخیره در Supabase.
                 باید از IP ایران اجرا شود.
               </p>
@@ -268,11 +272,10 @@ export default function AdminPage() {
               <button
                 onClick={() => setAutoSync(v => !v)}
                 type="button"
-                className={`text-xs px-3 py-2 rounded-xl border transition-colors font-medium ${
-                  autoSync
-                    ? 'bg-green-500/20 border-green-500/50 text-green-400'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
-                }`}
+                className="text-xs px-3 py-2 rounded-xl border transition-colors font-medium"
+                style={autoSync
+                  ? { background: 'rgba(16,185,129,0.15)', borderColor: 'rgba(16,185,129,0.4)', color: t.green }
+                  : { background: t.inputBg, borderColor: t.border, color: t.muted }}
               >
                 {autoSync ? '⏱ خودکار روشن' : '⏱ خودکار'}
               </button>
@@ -280,7 +283,8 @@ export default function AdminPage() {
                 onClick={syncFunds}
                 disabled={syncing}
                 type="button"
-                className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-5 py-2 rounded-xl text-sm transition-colors"
+                className="disabled:opacity-50 disabled:cursor-not-allowed font-bold px-5 py-2 rounded-xl text-sm transition-opacity"
+                style={{ background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff' }}
               >
                 {syncing ? '⏳ در حال sync...' : 'Sync Now'}
               </button>
@@ -290,16 +294,16 @@ export default function AdminPage() {
 
         {/* Log output */}
         {log.length > 0 && (
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs space-y-1 max-h-96 overflow-y-auto">
+          <div className="border rounded-2xl p-4 font-mono text-xs space-y-1 max-h-96 overflow-y-auto" style={{ background: t.bg, borderColor: t.border }}>
             {log.map((line, i) => (
               <div
                 key={i}
-                className={
-                  line.includes('❌') ? 'text-red-400' :
-                  line.includes('✅') ? 'text-green-400' :
-                  line.includes('⚠️') ? 'text-yellow-400' :
-                  'text-slate-400'
-                }
+                style={{
+                  color: line.includes('❌') ? t.red :
+                    line.includes('✅') ? t.green :
+                    line.includes('⚠️') ? '#f59e0b' :
+                    t.muted,
+                }}
               >
                 {line}
               </div>

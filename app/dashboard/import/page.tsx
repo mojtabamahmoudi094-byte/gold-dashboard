@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Papa from 'papaparse'
 import { supabase } from '../../../lib/supabase'
+import { darkTheme as t } from '../../../lib/theme'
 
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null)
@@ -51,10 +52,10 @@ export default function ImportPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-      <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 w-full max-w-md">
+    <main className="min-h-screen flex items-center justify-center" style={{ background: t.bg, color: t.text }}>
+      <div className="p-8 rounded-2xl border w-full max-w-md" style={{ background: t.surface, borderColor: t.border }}>
 
-        <h1 className="text-2xl font-bold mb-6 text-center">
+        <h1 className="text-2xl font-bold mb-6 text-center" style={{ color: t.textBright }}>
           Import CSV
         </h1>
 
@@ -68,7 +69,8 @@ export default function ImportPage() {
         <button
           onClick={upload}
           disabled={loading}
-          className="w-full bg-yellow-500 text-black font-bold py-3 rounded-xl"
+          className="w-full disabled:opacity-50 font-bold py-3 rounded-xl transition-opacity"
+          style={{ background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff' }}
         >
           {loading ? 'در حال آپلود...' : 'ایمپورت'}
         </button>
