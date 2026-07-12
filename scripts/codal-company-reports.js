@@ -40,7 +40,7 @@ const OUT_DIR = path.join(__dirname, 'reports-out')
 // نسخهٔ پارسر — با هر تغییر منطق پارس یکی بالا برود.
 // خروجی قدیمی‌تر از این نسخه دوباره ساخته می‌شود، حتی بدون --force؛ وگرنه بعد از
 // اصلاح پارسر، نمادهایی که فایل کهنه دارند برای همیشه skip می‌شوند.
-const PARSER_VERSION = 3
+const PARSER_VERSION = 4
 
 // خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
 // SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
@@ -166,14 +166,63 @@ async function fetchWorkbook(a) {
 
 const sheetRows = (wb, sn) => XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' })
 
-// ═══ پارس گزارش فعالیت ماهانه — فرم استاندارد، ستون‌های موقعیتی ═══
-// name(0) unit(1) | تجمعی قبل 2-5 | اصلاحات 6-8 | تجمعی اصلاح‌شده 9-12 |
-// ماه 13-16 (تولید،فروش،نرخ،مبلغ) | تجمعی فعلی 17-20 | مشابه سال قبل 21-24
+// ═══ پارس گزارش فعالیت ماهانه — فرم استاندارد ═══
+// چیدمان ستون‌ها ثابت نیست و نباید hardcode شود:
+//   اولین ماهِ سال مالی → «دوره یک ماهه» | «تجمعی» | «تجمعی سال قبل»           (مبلغ در ۵/۹/۱۳)
+//   ماه‌های بعد        → تجمعی قبل | اصلاحات | تجمعی اصلاح‌شده | «دوره یک ماهه» | … (مبلغ در ۱۶/۲۰/۲۴)
+// پس بلوک‌ها را از ردیف سرگروه (بالای «نام محصول») پیدا می‌کنیم و ستون هر بلوک را از عنوانش.
+
+// مرزهای بلوک‌ها از ردیف سرگروه: هر سلول پرشده شروع یک بلوک است تا سلول پرشدهٔ بعدی
+function headerBlocks(groupRow, width) {
+  const starts = []
+  for (let i = 0; i < width; i++) if (norm(groupRow[i])) starts.push(i)
+  return starts.map((s, k) => ({
+    label: norm(groupRow[s]),
+    from: s,
+    to: (k + 1 < starts.length ? starts[k + 1] : width) - 1,
+  }))
+}
+
+// ستونِ یک عنوان مشخص داخل بازهٔ یک بلوک
+const colIn = (headRow, blk, re) => {
+  if (!blk) return -1
+  for (let i = blk.from; i <= blk.to; i++) if (re.test(norm(headRow[i]))) return i
+  return -1
+}
+
+function monthlyCols(rows, hi) {
+  const groupRow = rows[hi - 1] ?? []
+  const headRow  = rows[hi]
+  const width    = Math.max(groupRow.length, headRow.length)
+  const blocks   = headerBlocks(groupRow, width)
+
+  // بلوک ماه جاری: «دوره ... ماهه منتهی به»
+  const mi = blocks.findIndex(b => /^دوره .* ماهه/.test(b.label))
+  if (mi === -1) return null
+  // دو بلوک «از ابتدای سال مالی» بعد از آن: اولی تجمعی امسال، دومی مشابه سال قبل
+  const cums = blocks.slice(mi + 1).filter(b => /^از ابتدای سال مالی/.test(b.label))
+
+  const AMOUNT = /^مبلغ فروش/
+  const cols = {
+    prod_m:  colIn(headRow, blocks[mi], /^تعداد تولید/),
+    qty_m:   colIn(headRow, blocks[mi], /^تعداد فروش/),
+    rate_m:  colIn(headRow, blocks[mi], /^نرخ فروش/),
+    month:   colIn(headRow, blocks[mi], AMOUNT),
+    cum:     colIn(headRow, cums[0], AMOUNT),
+    lastCum: colIn(headRow, cums[1], AMOUNT),
+  }
+  return cols.month === -1 ? null : cols
+}
+
 function parseMonthly(wb) {
   for (const sn of wb.SheetNames) {
     const rows = sheetRows(wb, sn)
     const hi = rows.findIndex(r => r.some(c => norm(c) === 'نام محصول'))
-    if (hi === -1) continue
+    if (hi < 1) continue
+    const c = monthlyCols(rows, hi)
+    if (!c) continue
+
+    const at = (r, i) => (i === -1 ? null : faNum(r[i]))
     const products = []
     let totals = null
     for (let i = hi + 1; i < rows.length; i++) {
@@ -181,17 +230,17 @@ function parseMonthly(wb) {
       const name = norm(r[0])
       if (!name) continue
       if (name === 'جمع') {
-        totals = { month: faNum(r[16]), cum: faNum(r[20]), lastYearCum: faNum(r[24]) }
+        totals = { month: at(r, c.month), cum: at(r, c.cum), lastYearCum: at(r, c.lastCum) }
         break
       }
       if (name.endsWith(':') || name.startsWith('جمع')) continue
-      const amount_m = faNum(r[16])
-      const qty_m    = faNum(r[14])
+      const amount_m = at(r, c.month)
+      const qty_m    = at(r, c.qty_m)
       if (amount_m === null && qty_m === null) continue
       products.push({
         name, unit: norm(r[1]) || null,
-        prod_m: faNum(r[13]), qty_m, rate_m: faNum(r[15]), amount_m,
-        amount_cum: faNum(r[20]),
+        prod_m: at(r, c.prod_m), qty_m, rate_m: at(r, c.rate_m), amount_m,
+        amount_cum: at(r, c.cum),
       })
     }
     if (totals) return { products, ...totals }
