@@ -218,8 +218,13 @@ export default function ValuationCalculatorPage() {
             border: '0.5px solid #F5B93E4d', borderRadius: 999, padding: '3px 11px',
           }}>مدل‌های تنزیل سود نقدی</span>
         </div>
-        <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 22 }}>
+        <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 10 }}>
           ارزش ذاتی سهم را با مدل رشد گوردون، مدل چندمرحله‌ای و NPVGO تخمین بزنید — EPS از گزارش‌های واقعی کدال، فرضیات رشد و بازده با اسلایدر
+        </div>
+        <div style={{ marginBottom: 22 }}>
+          <Link href="/valuation/screener" style={{ fontSize: 11.5, color: t.accent, textDecoration: 'none' }}>
+            اسکرینر همه نمادها با این مدل ←
+          </Link>
         </div>
 
         {/* ── آموزش استفاده ── */}
