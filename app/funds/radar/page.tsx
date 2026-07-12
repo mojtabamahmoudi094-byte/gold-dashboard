@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { darkTheme, lightTheme } from '../../../lib/theme'
 import { Skeleton, SkeletonBlock } from '../../components/ui/Skeleton'
+import { TutorialPanel } from '../../components/ui/TutorialPanel'
 import { useIsMobile } from '../../../lib/useIsMobile'
 
 type Holder = [number, number, number]   // [ایندکس صندوق، ارزش م.ت، درصد از NAV]
@@ -207,6 +208,13 @@ export default function SmartMoneyRadarPage() {
         <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 22 }}>
           صندوق‌های سهامی، اهرمی و بخشی این ماه چه خریدند و چه فروختند؟ — تجمیع پرتفوی ماهانه {fa(data.funds.length)} صندوق از گزارش‌های رسمی کدال
         </div>
+
+        <TutorialPanel t={t} isDark={isDark} storageKey="radar_tutorial_open" title="چطور از رادار پول هوشمند استفاده کنم؟">
+          هر ماه، صندوق‌های سهامی/اهرمی/بخشی صورت‌وضعیت پرتفوی‌شان را در کدال منتشر می‌کنند — این صفحه آن گزارش‌ها را
+          کنار هم می‌گذارد تا ببینید «پول هوشمند» (صندوق‌های حرفه‌ای) این ماه کدام سهم‌ها را خریده یا فروخته‌اند.
+          نام یا نماد سهم را در کادر جستجو بزنید تا ببینید کدام صندوق‌ها آن را دارند و چند درصد پرتفویشان است؛
+          یا از جدول‌های «بیشترین خرید/فروش خالص» و «محبوب‌ترین سهم‌ها» برای کشف روند کلی بازار استفاده کنید.
+        </TutorialPanel>
 
         {/* ── آمار کلی ── */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>

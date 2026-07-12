@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useIsMobile } from '../../lib/useIsMobile'
+import type { Theme } from '../../lib/theme'
+import { TutorialPanel } from '../components/ui/TutorialPanel'
 
 type Sym = {
   l18: string; l30: string
@@ -63,6 +65,19 @@ export default function StocksPage() {
   const text  = isDark ? '#E8F4FF' : '#0F1E2E'
   const muted = isDark ? '#ddd5bd' : '#6B7F90'
   const line  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.08)'
+  const green = 'oklch(0.74 0.16 150)'
+  const red   = 'oklch(0.68 0.19 25)'
+  const accent = isDark ? '#7FB5E8' : '#2563EB'
+
+  // شکل سازگار با Theme برای استفاده در کامپوننت‌های مشترک (این صفحه پالت رنگی خودش را دارد، نه lib/theme)
+  const t: Theme = {
+    bg, surface: panel, panel, panelSolid: panel,
+    border: line, borderStrong: line, borderData: line,
+    text, textBright: text, muted, faint: muted,
+    brand: accent, brand2: accent, accent,
+    green, red, inputBg: panel, headerBg: panel,
+    cardShadow: '0 4px 24px rgba(0,0,0,0.3)',
+  }
 
   const industries = useMemo(() => {
     const list = data?.industries ?? []
@@ -95,6 +110,12 @@ export default function StocksPage() {
             )}
           </div>
         </div>
+
+        <TutorialPanel t={t} isDark={isDark} storageKey="stocks_tutorial_open" title="چطور از این صفحه استفاده کنم؟">
+          صنایع بر اساس ارزش معاملات امروز مرتب شده‌اند — کارت هر صنعت را بزنید تا لیست نمادهای همان صنعت با
+          قیمت، درصد تغییر، ارزش معاملات و P/E را ببینید. نوار رنگی زیر هر کارت سهم نمادهای مثبت (سبز) و
+          منفی (قرمز) آن صنعت را نشان می‌دهد. برای پیدا کردن سریع یک صنعت از کادر جستجو استفاده کنید.
+        </TutorialPanel>
 
         {/* جستجوی صنعت */}
         {data && (

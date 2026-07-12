@@ -7,6 +7,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../lib/format'
 import { darkTheme, lightTheme } from '../../lib/theme'
+import { TutorialPanel } from '../components/ui/TutorialPanel'
 
 
 export default function ComparePage() {
@@ -102,6 +103,12 @@ export default function ComparePage() {
         <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: t.textBright }}>
           مقایسه‌ی صندوق‌ها
         </div>
+
+        <TutorialPanel t={t} isDark={isDark} storageKey="compare_tutorial_open" title="چطور از این صفحه استفاده کنم؟">
+          دو صندوق را از دو لیست پایین انتخاب کنید تا آخرین آمار روزانه‌شان (قیمت، ارزش معاملات، جریان پول،
+          قدرت خریدار و…) کنار هم چیده شود. معیاری که یک صندوق در آن برتری دارد با تیک سبز مشخص می‌شود؛
+          پایین صفحه هم یک جمع‌بندی خودکار از ۵ معیار کلیدی می‌بینید.
+        </TutorialPanel>
 
         {/* انتخاب دو صندوق */}
         {loading ? (
