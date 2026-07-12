@@ -196,12 +196,32 @@ function buildKeyPoints(symbol, payload, freshTitles) {
   if (!parts.length) return null
 
   const hashtags = [`#${symbol.replace(/\s+/g, '_')}`, ...parts.map(p => p.tag)].join('\n')
-  return [
-    hashtags,
-    ...parts.map(p => p.body),
-    `${SITE}/stock/${encodeURIComponent(symbol)}`,
-    '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
-  ].join('\n\n')
+  const facts = parts.map(p => p.body).join('\n\n')
+  return {
+    facts,
+    text: [
+      hashtags,
+      facts,
+      `${SITE}/stock/${encodeURIComponent(symbol)}`,
+      '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
+    ].join('\n\n'),
+  }
+}
+
+// روایت روان Gemini روی همان اعداد قاعده‌محور — از endpoint موجود سایت (بدون کلید جدا اینجا)
+// اگر شکست بخورد، پیام قاعده‌محور خام بدون تغییر ارسال می‌شود
+async function narrate(symbol, facts) {
+  try {
+    const res = await fetch(`${SITE}/api/signal-narrative`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'گزارش عملکرد/صورت مالی نماد', symbol, reason: facts }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    const data = await res.json()
+    if (data.ok && data.text) return data.text
+  } catch (e) { log(`⚠️ ${symbol}: روایت Gemini شکست خورد — ${e.message}`) }
+  return null
 }
 
 async function sendTelegram(text) {
@@ -360,8 +380,11 @@ async function main() {
           const outFile = path.join(OUT_DIR, `${s.replace(/\s+/g, '-')}.json`)
           const payload = JSON.parse(fs.readFileSync(outFile, 'utf8'))
           const freshTitles = fresh.filter(a => a.symbol === s).map(a => norm(a.title))
-          const text = buildKeyPoints(s, payload, freshTitles)
-          if (text) await sendTelegram(text)
+          const kp = buildKeyPoints(s, payload, freshTitles)
+          if (kp) {
+            const narrated = await narrate(s, kp.facts)
+            await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text)
+          }
         } catch (e) { log(`⚠️ ${s}: ساخت/ارسال خلاصه تلگرام شکست خورد — ${e.message}`) }
       } else { fail++; log(`⚠️ ${s}: ${status}`) }
     } catch (e) { fail++; log(`❌ ${s}: ${e.message}`) }
