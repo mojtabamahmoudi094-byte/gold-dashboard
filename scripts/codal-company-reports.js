@@ -37,6 +37,11 @@ const KEY   = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const FORCE = process.argv.includes('--force')
 const OUT_DIR = path.join(__dirname, 'reports-out')
 
+// نسخهٔ پارسر — با هر تغییر منطق پارس یکی بالا برود.
+// خروجی قدیمی‌تر از این نسخه دوباره ساخته می‌شود، حتی بدون --force؛ وگرنه بعد از
+// اصلاح پارسر، نمادهایی که فایل کهنه دارند برای همیشه skip می‌شوند.
+const PARSER_VERSION = 3
+
 // خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
 // SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -469,7 +474,13 @@ async function upsertReport(row) {
 async function buildSymbol(symbol, opts = {}) {
   const force = opts.force ?? FORCE
   const outFile = path.join(OUT_DIR, `${symbol.replace(/\s+/g, '-')}.json`)
-  if (!force && fs.existsSync(outFile)) { console.log(`⏭ ${symbol} — موجود است`); return 'skip' }
+  // skip فقط وقتی خروجی با همین نسخهٔ پارسر ساخته شده باشد
+  if (!force && fs.existsSync(outFile)) {
+    let v = 0
+    try { v = JSON.parse(fs.readFileSync(outFile, 'utf8')).parser ?? 0 } catch { v = 0 }
+    if (v >= PARSER_VERSION) { console.log(`⏭ ${symbol} — موجود است (پارسر ${v})`); return 'skip' }
+    console.log(`♻️ ${symbol} — خروجی با پارسر قدیمی (${v} < ${PARSER_VERSION})، بازسازی`)
+  }
 
   console.log(`\n═══ ${symbol} ═══`)
   const list = await fetchAnnouncements(symbol)
@@ -511,7 +522,7 @@ async function buildSymbol(symbol, opts = {}) {
     console.log(`  ❌ ${symbol}: هیچ گزارشی پارس نشد`)
     return 'empty'
   }
-  const payload = { symbol, updated: new Date().toISOString(), months, quarters }
+  const payload = { symbol, updated: new Date().toISOString(), parser: PARSER_VERSION, months, quarters }
   fs.mkdirSync(OUT_DIR, { recursive: true })
   fs.writeFileSync(outFile, JSON.stringify(payload))
 
