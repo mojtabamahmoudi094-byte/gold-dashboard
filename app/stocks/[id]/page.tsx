@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
+import { Skeleton, SkeletonRows } from '../../components/ui/Skeleton'
 
 type Sym = {
   l18: string; l30: string
@@ -59,6 +60,31 @@ export default function IndustryPage() {
     return data.industries.find(x => String(x.id) === rawId || x.name === rawId) ?? null
   }, [data, rawId])
 
+  type SortKey = 'l18' | 'pc' | 'pcp' | 'pl' | 'plp' | 'tval' | 'mv' | 'pe'
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => (d === 'desc' ? 'asc' : 'desc'))
+    else { setSortKey(key); setSortDir('desc') }
+  }
+
+  const sortedSymbols = useMemo(() => {
+    if (!ind) return []
+    if (!sortKey) return ind.symbols
+    const dir = sortDir === 'desc' ? -1 : 1
+    return [...ind.symbols].sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey]
+      if (av === null && bv === null) return 0
+      if (av === null) return 1
+      if (bv === null) return -1
+      if (typeof av === 'string' || typeof bv === 'string') {
+        return dir * String(av).localeCompare(String(bv), 'fa')
+      }
+      return dir * ((av as number) - (bv as number))
+    })
+  }, [ind, sortKey, sortDir])
+
   const bg    = isDark ? '#060B14' : '#F4F7FB'
   const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
   const text  = isDark ? '#E8F4FF' : '#0F1E2E'
@@ -83,8 +109,12 @@ export default function IndustryPage() {
         )}
 
         {!data && !failed && (
-          <div style={{ color: muted, fontSize: 13, padding: '50px 0', textAlign: 'center' }}>
-            در حال بارگذاری…
+          <div style={{ margin: '12px 0 20px' }}>
+            <Skeleton width={180} height={22} style={{ marginBottom: 12 }} />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} width={100} height={26} radius={9} />)}
+            </div>
+            <SkeletonRows rows={8} height={44} />
           </div>
         )}
 
@@ -121,13 +151,23 @@ export default function IndustryPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? 11.5 : 12.5, whiteSpace: 'nowrap' }}>
                   <thead>
                     <tr style={{ color: muted, fontSize: 10.5 }}>
-                      {['نماد', 'قیمت پایانی', '٪ پایانی', 'آخرین', '٪ آخرین', 'ارزش معاملات', ...(isMobile ? [] : ['ارزش بازار', 'P/E'])].map(h => (
-                        <th key={h} style={{ textAlign: 'right', padding: '12px 14px', fontWeight: 500, borderBottom: `1px solid ${line}` }}>{h}</th>
+                      {([
+                        ['نماد', 'l18'], ['قیمت پایانی', 'pc'], ['٪ پایانی', 'pcp'],
+                        ['آخرین', 'pl'], ['٪ آخرین', 'plp'], ['ارزش معاملات', 'tval'],
+                        ...(isMobile ? [] : [['ارزش بازار', 'mv'], ['P/E', 'pe']]),
+                      ] as [string, SortKey][]).map(([h, key]) => (
+                        <th
+                          key={h}
+                          onClick={() => toggleSort(key)}
+                          style={{ textAlign: 'right', padding: '12px 14px', fontWeight: 500, borderBottom: `1px solid ${line}`, cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          {h}{sortKey === key ? (sortDir === 'desc' ? ' ▾' : ' ▴') : ''}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {ind.symbols.map((s, i) => (
+                    {sortedSymbols.map((s, i) => (
                       <tr
                         key={s.l18}
                         onClick={() => router.push(`/stock/${encodeURIComponent(s.l18)}`)}
