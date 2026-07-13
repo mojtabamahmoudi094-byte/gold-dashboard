@@ -59,6 +59,10 @@ const MAX_PER_RUN = Number(process.env.ANOMALY_MAX_PER_RUN || 4)
 const STATE_FILE = path.join(__dirname, 'anomaly-watch-state.json')
 const LOG_FILE = path.join(__dirname, 'anomaly-watch.log')
 
+// تلگرام کپشن عکس را حداکثر ۱۰۲۴ کاراکتر می‌پذیرد (نه ۴۰۹۶ مثل پیام متنی معمولی)
+const CAPTION_LIMIT = 1024
+const capCaption = (s) => (s.length > CAPTION_LIMIT ? s.slice(0, CAPTION_LIMIT - 1) + '…' : s)
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const log = (msg) => {
   const line = `[${new Date().toISOString()}] ${msg}\n`
@@ -192,15 +196,16 @@ async function main() {
         const narrative = await narrate(c, facts)
         const head = `🚨 رصد لحظه‌ای — ${c.symbol} — بورس سنج`
         const when = `🕘 ${faTime()}`
-        const body = narrative || facts
-        const caption = [
-          head, when, '',
-          body, '',
-          facts, '',
+        const lines = [head, when, '']
+        if (narrative) lines.push(narrative, '', facts) // روایت + اعداد خام برای صحت‌سنجی
+        else lines.push(facts) // روایت نبود، فقط اعداد قاعده‌محور
+        lines.push(
+          '',
           `#${c.symbol.replace(/\s+/g, '_')}`,
           `${SITE}/stock/${encodeURIComponent(c.symbol)}`,
           '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
-        ].join('\n')
+        )
+        const caption = capCaption(lines.join('\n'))
 
         const buf = await screenshot(browser, `${SITE}/stock/${encodeURIComponent(c.symbol)}`)
         await sendPhoto(buf, caption)

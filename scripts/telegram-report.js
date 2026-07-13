@@ -73,13 +73,34 @@ async function fetchLatest(cat) {
   }
 }
 
+// تلگرام کپشن عکس را حداکثر ۱۰۲۴ کاراکتر می‌پذیرد (نه ۴۰۹۶ مثل پیام متنی معمولی)
+// Telegram photo captions are capped at 1024 chars (unlike the 4096 limit for text messages)
+const CAPTION_LIMIT = 1024
+const capCaption = (s) => (s.length > CAPTION_LIMIT ? s.slice(0, CAPTION_LIMIT - 1) + '…' : s)
+
+// روایت روان Gemini روی همان اعداد قاعده‌محور — از endpoint موجود سایت
+// اگر شکست بخورد، کپشن قاعده‌محور خام بدون تغییر ارسال می‌شود
+async function narrate(title, facts) {
+  try {
+    const res = await fetch(`${SITE}/api/signal-narrative`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: title, reason: facts }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    const data = await res.json()
+    if (data.ok && data.text) return data.text
+  } catch (e) { console.error(`[report] narrate failed: ${e.message}`) }
+  return null
+}
+
 // ساخت کپشن هوشمند از آخرین سنجه‌ها
 // build a smart caption from the latest metrics
-function buildCaption(cat, snap) {
+async function buildCaption(cat, snap) {
   const c = CATS[cat]
   const head = `${c.emoji} ${c.title} — بورس سنج`
   const when = `🕘 ${faTime()} — ${faDate()}`
-  const lines = [head, when, '']
+  const facts = []
 
   const d = snap && snap.last
   if (d) {
@@ -87,22 +108,27 @@ function buildCaption(cat, snap) {
     // raw market_watch fields → monitor-page units (see app/monitor/[cat]/page.tsx)
     if (d.money_in != null) {
       const flow = Number(d.money_in) / 1e10 // میلیارد تومان
-      lines.push(`${flow >= 0 ? '💚' : '❤️'} ورود پول حقیقی: ${num(flow, 1)} میلیارد تومان`)
+      facts.push(`${flow >= 0 ? '💚' : '❤️'} ورود پول حقیقی: ${num(flow, 1)} میلیارد تومان`)
     }
     if (d.buyq != null || d.sellq != null)
-      lines.push(`🟢 صف خرید: ${num(d.buyq)}   🔴 صف فروش: ${num(d.sellq)}`)
+      facts.push(`🟢 صف خرید: ${num(d.buyq)}   🔴 صف فروش: ${num(d.sellq)}`)
     if (d.sym_pos != null || d.sym_neg != null)
-      lines.push(`📈 نماد مثبت: ${num(d.sym_pos)}   📉 منفی: ${num(d.sym_neg)}`)
+      facts.push(`📈 نماد مثبت: ${num(d.sym_pos)}   📉 منفی: ${num(d.sym_neg)}`)
     if (d.tval_total != null)
-      lines.push(`💰 ارزش کل معاملات: ${num(Number(d.tval_total) / 1e10)} میلیارد تومان`)
+      facts.push(`💰 ارزش کل معاملات: ${num(Number(d.tval_total) / 1e10)} میلیارد تومان`)
     if (d.ind_buy_pc != null || d.ind_sell_pc != null)
-      lines.push(`👤 سرانه خرید/فروش حقیقی: ${num(Number(d.ind_buy_pc) / 1e7, 1)} / ${num(Number(d.ind_sell_pc) / 1e7, 1)} م.ت`)
+      facts.push(`👤 سرانه خرید/فروش حقیقی: ${num(Number(d.ind_buy_pc) / 1e7, 1)} / ${num(Number(d.ind_sell_pc) / 1e7, 1)} م.ت`)
   } else {
-    lines.push('— داده لحظه‌ای در دسترس نیست —')
+    facts.push('— داده لحظه‌ای در دسترس نیست —')
   }
 
-  lines.push('', `${SITE}${c.path}`)
-  return lines.join('\n')
+  const lines = [head, when, '']
+  if (d && facts.length) {
+    const narrated = await narrate(c.title, facts.join('\n'))
+    if (narrated) lines.push(narrated, '')
+  }
+  lines.push(...facts, '', `${SITE}${c.path}`)
+  return capCaption(lines.join('\n'))
 }
 
 // عکس صفحه با puppeteer | screenshot a page via puppeteer
@@ -162,7 +188,7 @@ async function main() {
       }
 
       const buf = await screenshot(browser, `${SITE}${c.path}`)
-      await sendPhoto(buf, buildCaption(cat, snap))
+      await sendPhoto(buf, await buildCaption(cat, snap))
       console.log(`[report] ✅ sent ${cat}`)
       sent++
       if (cats.length > 1) await sleep(1500) // فاصله بین ارسال‌ها | throttle
