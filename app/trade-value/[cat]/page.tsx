@@ -11,6 +11,7 @@ import { supabase } from '../../../lib/supabase'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe } from '../../../lib/format'
+import TimeRangeSelector, { RANGE_DAYS, type RangeKey } from '../../components/TimeRangeSelector'
 
 const TerminalChart = dynamic(() => import('../../dashboard/TerminalChart'), { ssr: false })
 
@@ -39,8 +40,10 @@ function stdDev(arr: number[]): number {
 }
 
 const CAT_MAP: Record<string, {
-  category: string
-  aggregateSlug: string | null   // null = aggregate from individual fund rows
+  category?: string
+  aggregateSlug?: string | null   // null = aggregate from individual fund rows
+  source?: 'market-value'         // 'market-value' = از market_trade_value_daily (کل بازار سرمایه/بورس/فرابورس)
+  column?: 'total' | 'bourse' | 'fara_bourse'
   label: string
   color: string
   iconBg: string
@@ -135,6 +138,48 @@ const CAT_MAP: Record<string, {
       </svg>
     ),
   },
+  'capital-market': {
+    source: 'market-value',
+    column: 'total',
+    label: 'ارزش کل معاملات بازار سرمایه',
+    color: 'oklch(0.75 0.16 155)',
+    iconBg: 'oklch(0.75 0.16 155 / 0.18)',
+    borderColor: 'oklch(0.75 0.16 155 / 0.3)',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0.16 155)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21h18" />
+        <path d="M5 21V10M10 21V6M15 21V13M20 21V3" />
+      </svg>
+    ),
+  },
+  tse: {
+    source: 'market-value',
+    column: 'bourse',
+    label: 'ارزش معاملات بورس',
+    color: 'oklch(0.7 0.18 20)',
+    iconBg: 'oklch(0.7 0.18 20 / 0.18)',
+    borderColor: 'oklch(0.7 0.18 20 / 0.3)',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="oklch(0.7 0.18 20)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M7 15l3-4 3 2 4-6" />
+      </svg>
+    ),
+  },
+  ifb: {
+    source: 'market-value',
+    column: 'fara_bourse',
+    label: 'ارزش معاملات فرابورس',
+    color: 'oklch(0.72 0.14 260)',
+    iconBg: 'oklch(0.72 0.14 260 / 0.18)',
+    borderColor: 'oklch(0.72 0.14 260 / 0.3)',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="oklch(0.72 0.14 260)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9 9h6v6H9z" />
+      </svg>
+    ),
+  },
 }
 
 export default function TradeValueDetailPage() {
@@ -147,6 +192,8 @@ export default function TradeValueDetailPage() {
   // raw rows: { trade_date_shamsi, trade_value }
   const [rawRows, setRawRows] = useState<{ trade_date_shamsi: string; trade_value: number }[]>([])
   const [loading, setLoading] = useState(true)
+  const [range, setRange] = useState<RangeKey>('1m')
+  const [customRange, setCustomRange] = useState<[string, string] | null>(null)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -161,9 +208,22 @@ export default function TradeValueDetailPage() {
   useEffect(() => {
     setLoading(true)
     setRawRows([])
+    setRange('1m')
+    setCustomRange(null)
     const load = async () => {
       try {
-        if (cat.aggregateSlug) {
+        if (cat.source === 'market-value') {
+          // کل بازار سرمایه / بورس / فرابورس — یک ردیف در روز، تجمیع‌شده توسط candles-daily.js
+          const { data: rows } = await supabase
+            .from('market_trade_value_daily')
+            .select(`trade_date_shamsi, ${cat.column}`)
+            .order('trade_date_shamsi', { ascending: true })
+
+          setRawRows((rows ?? []).map((r: any) => ({
+            trade_date_shamsi: r.trade_date_shamsi,
+            trade_value: r[cat.column as string],
+          })))
+        } else if (cat.aggregateSlug) {
           // Gold: use pre-aggregated asset (stored in billion Tomans by sync-funds.js)
           const { data: assetRow } = await supabase
             .from('assets')
@@ -285,6 +345,30 @@ export default function TradeValueDetailPage() {
     }
   }, [rawRows, slug])
 
+  // بازه نمایش (پیش‌فرض ۱ ماه اخیر) — MA/آنومالی روی کل سری حساب شده، فقط نمایش برش می‌خورد
+  const visibleState = useMemo(() => {
+    if (!chartState || !chartState.chartData.length) return chartState
+    const lastIso = chartState.chartData[chartState.chartData.length - 1].time
+    let fromIso: string, toIso: string
+    if (range === 'custom' && customRange) {
+      ;[fromIso, toIso] = customRange
+    } else {
+      const days = RANGE_DAYS[range as Exclude<RangeKey, 'custom'>] ?? 30
+      const anchor = new Date(`${lastIso}T00:00:00`)
+      anchor.setDate(anchor.getDate() - days)
+      fromIso = anchor.toISOString().slice(0, 10)
+      toIso = lastIso
+    }
+    const inRange = (t: string) => t >= fromIso && t <= toIso
+    return {
+      ...chartState,
+      chartData: chartState.chartData.filter(p => inRange(p.time)),
+      ma5Data: chartState.ma5Data.filter(p => inRange(p.time)),
+      ma10Data: chartState.ma10Data.filter(p => inRange(p.time)),
+      anomalyData: chartState.anomalyData.filter(p => inRange(p.time)),
+    }
+  }, [chartState, range, customRange])
+
   const t = isDark
     ? { bg: '#060B14', text: '#E8F4FF', card: 'rgba(10,18,30,0.88)', border: `0.5px solid ${cat.borderColor}`, muted: '#ddd5bd', cardInner: 'rgba(255,255,255,0.025)' }
     : { bg: '#F4F7FB', text: '#0F1E2E', card: 'rgba(255,255,255,0.9)', border: `0.5px solid ${cat.borderColor}`, muted: '#6B7F90', cardInner: 'rgba(0,0,0,0.02)' }
@@ -363,6 +447,17 @@ export default function TradeValueDetailPage() {
           </div>
         )}
 
+        {/* بازه زمانی نمودار */}
+        {!loading && chartState && chartState.chartData.length > 0 && (
+          <TimeRangeSelector
+            value={range}
+            customRange={customRange}
+            onChange={(key, cr) => { setRange(key); setCustomRange(cr ?? null) }}
+            isDark={isDark}
+            accentColor={cat.color}
+          />
+        )}
+
         {/* Chart card */}
         <div style={{
           background: t.card,
@@ -373,12 +468,12 @@ export default function TradeValueDetailPage() {
         }}>
           {loading ? (
             <div style={{ height: isMobile ? 260 : 400, background: t.cardInner, borderRadius: 12, animation: 'bs-pulse 1.8s ease-in-out infinite' }} />
-          ) : chartState && chartState.chartData.length > 0 ? (
+          ) : visibleState && visibleState.chartData.length > 0 ? (
             <TerminalChart
-              data={chartState.chartData}
-              ma5={chartState.ma5Data}
-              ma10={chartState.ma10Data}
-              anomalies={chartState.anomalyData}
+              data={visibleState.chartData}
+              ma5={visibleState.ma5Data}
+              ma10={visibleState.ma10Data}
+              anomalies={visibleState.anomalyData}
               height={isMobile ? 260 : 400}
               isDark={isDark}
             />

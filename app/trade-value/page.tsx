@@ -81,6 +81,51 @@ const CATS = [
       </svg>
     ),
   },
+  {
+    slug: 'capital-market',
+    title: 'ارزش معاملات کل بازار سرمایه',
+    desc: 'مجموع ارزش معاملات سهام بورس + فرابورس + صندوق‌های اهرمی/بخشی/سهامی (بدون طلا/نقره/زعفران)',
+    color: 'oklch(0.75 0.16 155)',
+    borderColor: 'oklch(0.75 0.16 155 / 0.3)',
+    bgColor: 'oklch(0.75 0.16 155 / 0.07)',
+    tags: ['بورس', 'فرابورس', 'صندوق‌های بورسی', 'میانگین متحرک'],
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0.16 155)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21h18" />
+        <path d="M5 21V10M10 21V6M15 21V13M20 21V3" />
+      </svg>
+    ),
+  },
+  {
+    slug: 'tse',
+    title: 'ارزش معاملات بورس',
+    desc: 'ارزش کل معاملات روزانه نمادهای پذیرفته‌شده در بورس اوراق بهادار تهران — طبقه‌بندی بر پایه ISIN',
+    color: 'oklch(0.7 0.18 20)',
+    borderColor: 'oklch(0.7 0.18 20 / 0.3)',
+    bgColor: 'oklch(0.7 0.18 20 / 0.07)',
+    tags: ['بورس تهران', 'ارزش روزانه', 'میانگین متحرک'],
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.7 0.18 20)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M7 15l3-4 3 2 4-6" />
+      </svg>
+    ),
+  },
+  {
+    slug: 'ifb',
+    title: 'ارزش معاملات فرابورس',
+    desc: 'ارزش کل معاملات روزانه نمادهای پذیرفته‌شده در فرابورس ایران — طبقه‌بندی بر پایه ISIN',
+    color: 'oklch(0.72 0.14 260)',
+    borderColor: 'oklch(0.72 0.14 260 / 0.3)',
+    bgColor: 'oklch(0.72 0.14 260 / 0.07)',
+    tags: ['فرابورس', 'ارزش روزانه', 'میانگین متحرک'],
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.72 0.14 260)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9 9h6v6H9z" />
+      </svg>
+    ),
+  },
 ]
 
 export default function TradeValuePage() {

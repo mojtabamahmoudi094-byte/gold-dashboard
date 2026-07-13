@@ -21,7 +21,7 @@ const fs = require('fs')
 const {
   tehranToday, tehranDay,
   clean, num, fetchJson,
-  normalizeIndexName, isCandleSymbol,
+  normalizeIndexName, isCandleSymbol, marketFromIsin,
 } = require('./candles-lib')
 
 function loadEnv(file) {
@@ -107,14 +107,19 @@ async function main() {
 
   const allL18 = new Set(arr.map(it => clean(it.l18)))
   const rows = []
+  const symbolMarketRows = []
+  const marketTotals = { bourse: 0, 'fara-bourse': 0, other: 0 }
   for (const it of arr) {
     if (!isCandleSymbol(it, allL18)) continue
     const close = num(it.pc)
     const tvol = num(it.tvol)
     if (close === null || close === 0) continue
     if (tvol === null || tvol === 0) continue // امروز معامله نشده — کندل جعلی نساز
+    const symbol = clean(it.l18)
+    const value = num(it.tval)
+    const market = marketFromIsin(it.isin)
     rows.push({
-      symbol: clean(it.l18),
+      symbol,
       trade_date: today.gregorian,
       trade_date_shamsi: today.shamsi,
       open: num(it.pf),
@@ -125,9 +130,11 @@ async function main() {
       yesterday: num(it.py),
       change_pct: num(it.pcp),
       volume: tvol,
-      value: num(it.tval),
+      value,
       trades: num(it.tno),
     })
+    symbolMarketRows.push({ symbol, isin: it.isin ?? null, market })
+    marketTotals[market] += value ?? 0
   }
 
   // ── شاخص‌ها — type=2 بالاتر برای گارد تعطیلی گرفته شده، فقط type=3 می‌ماند
@@ -172,12 +179,26 @@ async function main() {
 
   if (PROBE) {
     console.log(`\nنمادهای امروز: ${rows.length} — شاخص‌ها: ${idxRows.length} (${today.shamsi})`)
+    console.log('تفکیک بورس/فرابورس/سایر:', marketTotals)
     return
   }
 
   const okSymbols = rows.length > 0 ? await upsertBatches('stock_candles', rows, 'symbol,trade_date') : 0
   const okIdx = idxRows.length > 0 ? await upsertBatches('index_candles', idxRows, 'index_name,trade_date') : 0
-  console.log(`[candles-daily] ✅ ${okSymbols} کندل نماد + ${okIdx} شاخص برای ${today.shamsi} ثبت شد`)
+  const okSymMarket = symbolMarketRows.length > 0
+    ? await upsertBatches('symbol_market', symbolMarketRows.map(r => ({ ...r, updated_at: new Date().toISOString() })), 'symbol')
+    : 0
+  const okMarketValue = rows.length > 0
+    ? await upsertBatches('market_trade_value_daily', [{
+        trade_date: today.gregorian,
+        trade_date_shamsi: today.shamsi,
+        bourse: marketTotals.bourse,
+        fara_bourse: marketTotals['fara-bourse'],
+        other: marketTotals.other,
+        total: marketTotals.bourse + marketTotals['fara-bourse'] + marketTotals.other,
+      }], 'trade_date')
+    : 0
+  console.log(`[candles-daily] ✅ ${okSymbols} کندل نماد + ${okIdx} شاخص + ${okSymMarket} طبقه‌بندی بورس/فرابورس + ${okMarketValue} تجمیع روزانه برای ${today.shamsi} ثبت شد`)
 
   if (okSymbols === 0) {
     console.error('[candles-daily] هشدار: هیچ کندلی ثبت نشد — خروجی AllSymbols را بررسی کنید')

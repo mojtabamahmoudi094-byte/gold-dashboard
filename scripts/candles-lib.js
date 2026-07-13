@@ -153,8 +153,21 @@ function isCandleSymbol(it, allL18) {
   return true
 }
 
+/**
+ * تفکیک بورس/فرابورس از isin — کاراکتر پنجم (اندیس ۳) استاندارد ISIN ایران:
+ * «1» = پذیرفته‌شده در بورس اوراق بهادار تهران، «3» = فرابورس ایران.
+ * بقیه کدها (۵=ETF، ۷=حق‌تقدم، …) در دستهٔ 'other' می‌مانند.
+ * راستی‌آزمایی با نمونهٔ واقعی AllSymbols.php: فملی=IRO1MSMI0001 (bourse), رانیز=IRO3NEYZ0001 (fara-bourse).
+ */
+function marketFromIsin(isin) {
+  const c = String(isin ?? '').charAt(3)
+  if (c === '1') return 'bourse'
+  if (c === '3') return 'fara-bourse'
+  return 'other'
+}
+
 module.exports = {
   shamsiToGregorian, gregorianToShamsi, tehranToday, tehranDay,
   clean, num, fetchJson, mapLimit, TSETMC_HEADERS,
-  INDEX_CODES, normalizeIndexName, isCandleSymbol,
+  INDEX_CODES, normalizeIndexName, isCandleSymbol, marketFromIsin,
 }
