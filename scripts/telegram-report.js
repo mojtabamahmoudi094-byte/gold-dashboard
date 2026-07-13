@@ -22,8 +22,10 @@ const fs = require('fs')
 // ── تنظیمات | config ────────────────────────────────────────────────
 const SITE = (process.env.SITE_URL || 'https://bourssanj.ir').replace(/\/$/, '')
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID
+// مقصد پست‌های عمومی، کانال است — نه چت شخصی/ادمین که TELEGRAM_CHAT_ID برای هشدار خطا استفاده می‌شود
+const CHAT_ID = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID
 const FRESH_ONLY = process.env.REPORT_FRESH_ONLY === '1'
+const { renderCardHtml, screenshotCard } = require('./telegram-card')
 
 // نگاشت دسته → عنوان، ایموجی، مسیر مانیتور
 // category → title, emoji, monitor path
@@ -94,53 +96,57 @@ async function narrate(title, facts) {
   return null
 }
 
+// اعداد خام market_watch → کارت/کپشن (یک‌بار محاسبه، هم برای عکس هم برای متن)
+// raw market_watch fields → card highlight + rows / caption facts (computed once, used by both the image and the text)
+function computeFacts(d) {
+  const rows = []
+  let highlight = null
+  if (!d) return { highlight, rows }
+  // فیلدهای خام market_watch → واحدهای صفحه مانیتور (see app/monitor/[cat]/page.tsx)
+  if (d.money_in != null) {
+    const flow = Number(d.money_in) / 1e10 // میلیارد تومان
+    highlight = { label: 'ورود پول حقیقی (میلیارد تومان)', value: `${flow >= 0 ? '+' : ''}${num(flow, 1)}`, tone: flow >= 0 ? 'up' : 'down' }
+  }
+  if (d.buyq != null || d.sellq != null)
+    rows.push({ label: 'صف خرید / فروش', value: `${num(d.buyq)} / ${num(d.sellq)}` })
+  if (d.sym_pos != null || d.sym_neg != null)
+    rows.push({ label: 'نماد مثبت / منفی', value: `${num(d.sym_pos)} / ${num(d.sym_neg)}` })
+  if (d.tval_total != null)
+    rows.push({ label: 'ارزش کل معاملات', value: `${num(Number(d.tval_total) / 1e10)} میلیارد تومان` })
+  if (d.ind_buy_pc != null || d.ind_sell_pc != null)
+    rows.push({ label: 'سرانه خرید/فروش حقیقی', value: `${num(Number(d.ind_buy_pc) / 1e7, 1)} / ${num(Number(d.ind_sell_pc) / 1e7, 1)} م.ت` })
+  return { highlight, rows }
+}
+
 // ساخت کپشن هوشمند از آخرین سنجه‌ها
 // build a smart caption from the latest metrics
-async function buildCaption(cat, snap) {
+async function buildCaption(cat, facts) {
   const c = CATS[cat]
   const head = `${c.emoji} ${c.title} — بورس سنج`
   const when = `🕘 ${faTime()} — ${faDate()}`
-  const facts = []
-
-  const d = snap && snap.last
-  if (d) {
-    // فیلدهای خام market_watch → واحدهای صفحه مانیتور
-    // raw market_watch fields → monitor-page units (see app/monitor/[cat]/page.tsx)
-    if (d.money_in != null) {
-      const flow = Number(d.money_in) / 1e10 // میلیارد تومان
-      facts.push(`${flow >= 0 ? '💚' : '❤️'} ورود پول حقیقی: ${num(flow, 1)} میلیارد تومان`)
-    }
-    if (d.buyq != null || d.sellq != null)
-      facts.push(`🟢 صف خرید: ${num(d.buyq)}   🔴 صف فروش: ${num(d.sellq)}`)
-    if (d.sym_pos != null || d.sym_neg != null)
-      facts.push(`📈 نماد مثبت: ${num(d.sym_pos)}   📉 منفی: ${num(d.sym_neg)}`)
-    if (d.tval_total != null)
-      facts.push(`💰 ارزش کل معاملات: ${num(Number(d.tval_total) / 1e10)} میلیارد تومان`)
-    if (d.ind_buy_pc != null || d.ind_sell_pc != null)
-      facts.push(`👤 سرانه خرید/فروش حقیقی: ${num(Number(d.ind_buy_pc) / 1e7, 1)} / ${num(Number(d.ind_sell_pc) / 1e7, 1)} م.ت`)
-  } else {
-    facts.push('— داده لحظه‌ای در دسترس نیست —')
-  }
+  const allRows = facts.highlight ? [{ label: 'ورود پول حقیقی', value: `${facts.highlight.value} میلیارد تومان` }, ...facts.rows] : facts.rows
+  const factLines = allRows.length ? allRows.map(r => `• ${r.label}: ${r.value}`) : ['— داده لحظه‌ای در دسترس نیست —']
 
   const lines = [head, when, '']
-  if (d && facts.length) {
-    const narrated = await narrate(c.title, facts.join('\n'))
+  if (allRows.length) {
+    const narrated = await narrate(c.title, factLines.join('\n'))
     if (narrated) lines.push(narrated, '')
   }
-  lines.push(...facts, '', `${SITE}${c.path}`)
+  lines.push(...factLines, '', `${SITE}${c.path}`)
   return capCaption(lines.join('\n'))
 }
 
-// عکس صفحه با puppeteer | screenshot a page via puppeteer
-async function screenshot(browser, url) {
-  const page = await browser.newPage()
-  await page.setViewport({ width: 900, height: 1400, deviceScaleFactor: 2 })
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 60_000 })
-  // مهلت برای رندر نمودارها | let charts render
-  await sleep(5000)
-  const buf = await page.screenshot({ fullPage: true, type: 'jpeg', quality: 85 })
-  await page.close()
-  return buf
+// کارت گرافیکی از رو همون اعداد (نه اسکرین‌شات از سایت)
+function buildCardHtml(cat, facts) {
+  const c = CATS[cat]
+  return renderCardHtml({
+    emoji: c.emoji,
+    title: c.title,
+    subtitle: null,
+    bigStat: facts.highlight,
+    rows: facts.rows,
+    footer: `${faTime()} — ${faDate()}`,
+  })
 }
 
 // ارسال عکس به تلگرام | send a photo to Telegram
@@ -202,8 +208,9 @@ async function main() {
         continue
       }
 
-      const buf = await screenshot(browser, `${SITE}${c.path}`)
-      await sendPhoto(buf, await buildCaption(cat, snap))
+      const facts = computeFacts(snap && snap.last)
+      const buf = await screenshotCard(browser, buildCardHtml(cat, facts))
+      await sendPhoto(buf, await buildCaption(cat, facts))
       console.log(`[report] ✅ sent ${cat}`)
       sent++
       if (cats.length > 1) await sleep(1500) // فاصله بین ارسال‌ها | throttle

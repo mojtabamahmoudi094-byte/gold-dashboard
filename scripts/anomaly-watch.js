@@ -38,7 +38,8 @@ loadEnv('.env.sync')
 
 const SITE = (process.env.SITE_URL || 'https://bourssanj.ir').replace(/\/$/, '')
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID
+// مقصد پست‌های عمومی، کانال است — نه چت شخصی/ادمین که TELEGRAM_CHAT_ID برای هشدار خطا استفاده می‌شود
+const CHAT_ID = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID
 const DRY = process.argv.includes('--dry')
 const FORCE = process.argv.includes('--force')
 
@@ -128,15 +129,23 @@ async function narrate(c, facts) {
   return null
 }
 
-// ── عکس چارت با puppeteer ──
-async function screenshot(browser, url) {
-  const page = await browser.newPage()
-  await page.setViewport({ width: 900, height: 1400, deviceScaleFactor: 2 })
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 60_000 })
-  await sleep(5000)
-  const buf = await page.screenshot({ fullPage: true, type: 'jpeg', quality: 85 })
-  await page.close()
-  return buf
+const { renderCardHtml, screenshotCard } = require('./telegram-card')
+
+// ── کارت گرافیکی از رو همون اعداد (نه اسکرین‌شات از سایت) ──
+function buildCardHtml(c) {
+  const { s, turnover } = c
+  const up = s.pcp >= 0
+  return renderCardHtml({
+    emoji: '🚨',
+    title: `${c.symbol}${c.name ? ` — ${c.name}` : ''}`,
+    subtitle: c.reasonTag === 'band' ? 'نزدیک سقف/کف دامنهٔ نوسان' : 'حجم معاملات غیرعادی',
+    bigStat: { value: `${up ? '+' : ''}${faNum(s.pcp, 1)}٪`, label: `قیمت پایانی ${faNum(s.pc)} ریال`, tone: up ? 'up' : 'down' },
+    rows: [
+      s.tval != null ? { label: 'ارزش معاملات', value: `${toman(s.tval)} میلیارد تومان` } : null,
+      turnover != null ? { label: 'نسبت معاملات به ارزش بازار', value: `${faNum(turnover * 100, 1)}٪` } : null,
+    ].filter(Boolean),
+    footer: `${faTime()} — رصد لحظه‌ای بورس سنج`,
+  })
 }
 
 // api.telegram.org از داخل ایران فیلتر است — اول مستقیم، بعد از راه رلهٔ سایت (خارج از ایران)
@@ -222,7 +231,7 @@ async function main() {
         )
         const caption = capCaption(lines.join('\n'))
 
-        const buf = await screenshot(browser, `${SITE}/stock/${encodeURIComponent(c.symbol)}`)
+        const buf = await screenshotCard(browser, buildCardHtml(c))
         await sendPhoto(buf, caption)
         seen.add(`${c.symbol}|${c.reasonTag}`)
         sent++
