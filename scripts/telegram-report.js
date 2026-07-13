@@ -21,6 +21,7 @@ const fs = require('fs')
 
 // ── تنظیمات | config ────────────────────────────────────────────────
 const SITE = (process.env.SITE_URL || 'https://bourssanj.ir').replace(/\/$/, '')
+const CHANNEL_TAG = '@bourssanjj'
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN
 // مقصد پست‌های عمومی، کانال است — نه چت شخصی/ادمین که TELEGRAM_CHAT_ID برای هشدار خطا استفاده می‌شود
 const CHAT_ID = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID
@@ -132,7 +133,7 @@ async function buildCaption(cat, facts) {
     const narrated = await narrate(c.title, factLines.join('\n'))
     if (narrated) lines.push(narrated, '')
   }
-  lines.push(...factLines, '', `${SITE}${c.path}`)
+  lines.push(...factLines, '', CHANNEL_TAG, SITE)
   return capCaption(lines.join('\n'))
 }
 

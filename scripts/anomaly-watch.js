@@ -37,6 +37,7 @@ loadEnv('../.env.local')
 loadEnv('.env.sync')
 
 const SITE = (process.env.SITE_URL || 'https://bourssanj.ir').replace(/\/$/, '')
+const CHANNEL_TAG = '@bourssanjj'
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN
 // مقصد پست‌های عمومی، کانال است — نه چت شخصی/ادمین که TELEGRAM_CHAT_ID برای هشدار خطا استفاده می‌شود
 const CHAT_ID = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID
@@ -225,8 +226,8 @@ async function main() {
         else lines.push(facts) // روایت نبود، فقط اعداد قاعده‌محور
         lines.push(
           '',
-          `#${c.symbol.replace(/\s+/g, '_')}`,
-          `${SITE}/stock/${encodeURIComponent(c.symbol)}`,
+          CHANNEL_TAG,
+          SITE,
           '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
         )
         const caption = capCaption(lines.join('\n'))
