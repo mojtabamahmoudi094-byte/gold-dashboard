@@ -26,7 +26,8 @@ const { buildSymbol, sbClient, OUT_DIR } = require('./codal-company-reports.js')
 
 const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
-const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHAT_ID
+// مقصد پست‌های عمومی، کانال است — نه چت شخصی/ادمین که TELEGRAM_CHAT_ID برای هشدار خطا استفاده می‌شود
+const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID
 const SITE = process.env.SITE_URL || 'https://bourssanj.ir'
 const DRY = process.argv.includes('--dry')
 const hoursIdx = process.argv.indexOf('--hours')
