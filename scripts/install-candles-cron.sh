@@ -40,6 +40,8 @@ MAILTO=""
 45 14 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh screener-daily $NODE_BIN $SCRIPT_DIR/screener-daily.js >> /var/log/screener-daily.log 2>&1
 # قیمت‌های تعدیل‌شده — ۱۹:۰۰ تهران (tsetmc، بدون بودجه BrsApi؛ کل تاریخچه هر شب تازه می‌شود)
 30 15 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh candles-adjusted $NODE_BIN $SCRIPT_DIR/candles-adjusted.js >> /var/log/candles-adjusted.log 2>&1
+# توزیع چیپ — ۱۹:۱۵ تهران (نیم ساعت بعد از قیمت‌های تعدیل‌شده)
+45 15 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh chip-distribution $NODE_BIN $SCRIPT_DIR/chip-distribution-daily.js >> /var/log/chip-distribution.log 2>&1
 EOF
 
 chmod 644 "$CRON_FILE"

@@ -12,6 +12,7 @@ import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
 
 const KlineChart = dynamic(() => import('../KlineChart'), { ssr: false })
 const TechnicalSummary = dynamic(() => import('../TechnicalSummary'), { ssr: false })
+const ChipDistribution = dynamic(() => import('../ChipDistribution'), { ssr: false })
 
 type Row = {
   trade_date: string
@@ -300,6 +301,9 @@ export default function TechnicalSymbolPage() {
             </div>
             <div style={enterAnim(2)}>
               <TechnicalSummary symbol={symbol} candles={candles} isDark={isDark} />
+            </div>
+            <div style={enterAnim(3)}>
+              <ChipDistribution symbol={symbol} isDark={isDark} />
             </div>
           </>
         )}
