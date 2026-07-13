@@ -134,19 +134,34 @@ async function screenshot(browser, url) {
   await page.setViewport({ width: 900, height: 1400, deviceScaleFactor: 2 })
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 60_000 })
   await sleep(5000)
-  const buf = await page.screenshot({ fullPage: true, type: 'png' })
+  const buf = await page.screenshot({ fullPage: true, type: 'jpeg', quality: 85 })
   await page.close()
   return buf
 }
 
+// api.telegram.org از داخل ایران فیلتر است — اول مستقیم، بعد از راه رلهٔ سایت (خارج از ایران)
 async function sendPhoto(buf, caption) {
-  const form = new FormData()
-  form.append('chat_id', CHAT_ID)
-  form.append('caption', caption)
-  form.append('photo', new Blob([buf], { type: 'image/png' }), 'anomaly.png')
-  const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: form })
+  try {
+    const form = new FormData()
+    form.append('chat_id', CHAT_ID)
+    form.append('caption', caption)
+    form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'anomaly.jpg')
+    const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(15_000) })
+    const data = await res.json()
+    if (data.ok) return
+    throw new Error(data.description || 'sendPhoto failed')
+  } catch (e) {
+    log(`⚠️ ارسال مستقیم عکس ناموفق (${e.message}) — تلاش از راه رله`)
+  }
+
+  const res = await fetch(`${SITE}/api/telegram-relay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: TOKEN, chat_id: CHAT_ID, photo: buf.toString('base64'), caption }),
+    signal: AbortSignal.timeout(90_000), // کلد-استارت Render
+  })
   const data = await res.json()
-  if (!data.ok) throw new Error(data.description || 'sendPhoto failed')
+  if (!data.ok) throw new Error(data.error || `relay HTTP ${res.status}`)
 }
 
 const loadState = () => {
