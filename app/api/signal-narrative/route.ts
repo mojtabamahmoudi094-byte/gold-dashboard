@@ -3,13 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 const SYSTEM = `تو دستیار «بورس سنج» هستی. یک سیگنال معاملاتی قانون‌محور (نه تولیدشده توسط تو) به همراه دلایل عددی‌اش
-به تو داده می‌شود. کارت این است که همان دلایل را — بدون اضافه کردن هیچ عدد یا ادعای تازه — به یک پاراگراف فارسی
-روان و طبیعی (۳ تا ۵ جمله) تبدیل کنی که خواندنش برای کاربر عادی ساده‌تر از فهرست‌وار خواندن دلایل باشد.
+به تو داده می‌شود. خروجی تو باید یک JSON با دقیقاً دو فیلد باشد: "headline" و "text".
 قوانین:
-- هیچ عدد جدیدی که در دلایل داده‌شده نیامده اختراع نکن.
+- هیچ عدد یا ادعای جدیدی که در دلایل داده‌شده نیامده اختراع نکن — نوع سیگنال و درصد اطمینان از قبل مشخص‌اند، فقط همان‌ها را روایت کن.
 - توصیه خرید/فروش مستقیم نده («بخرید»/«بفروشید» ممنوع) — فقط دلایل را روایت کن.
-- آخر پاراگراف را همیشه با «این تحلیل صرفاً اطلاع‌رسانی است و توصیه مالی نیست.» تمام کن.
-- فقط متن پاراگراف را برگردان، بدون مقدمه یا عنوان.`
+- "headline": حداکثر ۸ کلمه، خلاصه‌ی یک‌خطی نتیجه‌گیری بر پایه‌ی همان نوع سیگنال داده‌شده (بدون عدد جدید).
+- "text": پاراگراف فارسی روان و طبیعی (۳ تا ۵ جمله) که دلایل را روایت می‌کند و همیشه با «این تحلیل صرفاً اطلاع‌رسانی است و توصیه مالی نیست.» تمام می‌شود.
+- فقط همان JSON را برگردان، بدون Markdown fence یا توضیح اضافه.`
 
 export async function POST(req: NextRequest) {
   const KEY = process.env.GEMINI_API_KEY
@@ -48,7 +48,20 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: userPrompt }] }],
         systemInstruction: { parts: [{ text: SYSTEM }] },
-        generationConfig: { temperature: 0.4, maxOutputTokens: 400, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 400,
+          thinkingConfig: { thinkingBudget: 0 },
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              headline: { type: 'STRING' },
+              text: { type: 'STRING' },
+            },
+            required: ['headline', 'text'],
+          },
+        },
       }),
       signal: AbortSignal.timeout(30_000),
     })
@@ -56,11 +69,26 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       return NextResponse.json({ ok: false, error: data?.error?.message || `HTTP ${res.status}` }, { status: 502 })
     }
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) {
+    const raw: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!raw) {
       return NextResponse.json({ ok: false, error: 'پاسخ خالی از Gemini' }, { status: 502 })
     }
-    return NextResponse.json({ ok: true, text: text.trim() })
+    let parsed: { headline?: string; text?: string }
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return NextResponse.json({ ok: false, error: 'خروجی غیرقابل‌پردازش از Gemini' }, { status: 502 })
+    }
+    if (!parsed.text) {
+      return NextResponse.json({ ok: false, error: 'پاسخ ناقص از Gemini' }, { status: 502 })
+    }
+    return NextResponse.json({
+      ok: true,
+      text: parsed.text.trim(),
+      headline: parsed.headline?.trim() || null,
+      signal: type,
+      score: confidence ?? null,
+    })
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'fetch failed' }, { status: 502 })
   }

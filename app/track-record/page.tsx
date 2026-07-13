@@ -23,7 +23,7 @@ type Payload = {
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
 
-type Narrative = { loading: boolean; text?: string; error?: string }
+type Narrative = { loading: boolean; text?: string; headline?: string | null; error?: string }
 
 export default function TrackRecordPage() {
   const [isDark, setIsDark] = useState(true)
@@ -77,7 +77,7 @@ export default function TrackRecordPage() {
       })
       const json = await res.json()
       if (!res.ok || !json.ok) throw new Error(json.error || 'خطا')
-      setNarratives(prev => ({ ...prev, [i]: { loading: false, text: json.text } }))
+      setNarratives(prev => ({ ...prev, [i]: { loading: false, text: json.text, headline: json.headline } }))
     } catch (e) {
       setNarratives(prev => ({ ...prev, [i]: { loading: false, error: e instanceof Error ? e.message : 'خطا' } }))
     }
@@ -217,7 +217,16 @@ export default function TrackRecordPage() {
                               color: narratives[i]?.error ? t.red : cream, lineHeight: 2,
                               background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,30,46,0.02)',
                             }}>
-                              {narratives[i]?.error ? `خطا: ${narratives[i]?.error}` : narratives[i]?.text}
+                              {narratives[i]?.error ? `خطا: ${narratives[i]?.error}` : (
+                                <>
+                                  {narratives[i]?.headline && (
+                                    <div style={{ fontWeight: 800, color: t.textBright, marginBottom: 6 }}>
+                                      {narratives[i]?.headline}
+                                    </div>
+                                  )}
+                                  {narratives[i]?.text}
+                                </>
+                              )}
                             </td>
                           </tr>
                         )}

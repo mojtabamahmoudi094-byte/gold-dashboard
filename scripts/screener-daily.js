@@ -204,6 +204,21 @@ function computeRow(symbol, rows) {
     if (cp) { candlePattern = cp.key; candlePatternBias = cp.bias }
   } catch { /* اختیاری — خطای آن نباید اسکرینر را بیندازد */ }
 
+  // ── سه سیگنال پایه استراتژی‌های آماده (preset strategies)
+  const win20 = rows.slice(-21, -1)
+  const platformHigh = win20.length === 20 ? Math.max(...win20.map(r => Number(r.high))) : null
+  const platformLow = win20.length === 20 ? Math.min(...win20.map(r => Number(r.low))) : null
+  const platformBreakout = platformHigh !== null && platformLow !== null
+    && (platformHigh - platformLow) / platformLow <= 0.12
+    && lastClose > platformHigh
+    && volRatio !== null && volRatio >= 1.5
+
+  const yearLinePullback = n > 205 && s200[n - 1] !== null && s200[n - 6] !== null
+    && s200[n - 1] > s200[n - 6]
+    && Math.abs(lastClose - s200[n - 1]) <= s200[n - 1] * 0.02
+
+  const turtleBreakout20d = platformHigh !== null && lastClose > platformHigh
+
   return {
     symbol,
     trade_date: last.trade_date,
@@ -231,6 +246,9 @@ function computeRow(symbol, rows) {
     ob_bear_near: obBearNear,
     candle_pattern: candlePattern,
     candle_pattern_bias: candlePatternBias,
+    platform_breakout: platformBreakout,
+    year_line_pullback: yearLinePullback,
+    turtle_breakout_20d: turtleBreakout20d,
     updated: new Date().toISOString(),
   }
 }

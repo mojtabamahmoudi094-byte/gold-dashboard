@@ -142,19 +142,59 @@ const CODAL_Q = 'https://search.codal.ir/api/search/v2/q'
   + '&Consolidatable=true&IsNotAudited=false&Length=-1&LetterType=-1&Mains=true'
   + '&NotAudited=true&NotConsolidatable=true&Publisher=false&TracingNo=-1&search=true'
 
+// BrsAPI برای چند شرکت به‌جای نماد معاملاتی، نام کوتاه شرکت را در l18 گذاشته است.
+// کدال فقط نماد واقعی را می‌شناسد.
+const CODAL_ALIAS = {
+  'نیروترانسفو': 'بنیرو',   // نیرو ترانس
+  'گنگین': 'ونگین',         // گروه اقتصادی مالی نگین ایرانیان
+}
+
+// املای کدال با تسه‌تی‌ام‌سی یکی نیست: «آ» را «ا» می‌نویسد (غپآذر → غپاذر) و
+// فاصلهٔ نماد گاهی نیم‌فاصله است (فن افزار → فن‌افزار).
+function codalVariants(symbol) {
+  const s = CODAL_ALIAS[symbol] ?? symbol
+  return [...new Set([
+    s,
+    s.replace(/آ/g, 'ا'),
+    s.replace(/ /g, '‌'),          // نیم‌فاصله
+    s.replace(/ /g, '‌').replace(/آ/g, 'ا'),
+    s.replace(/[ ‌]/g, ''),
+  ])]
+}
+
+async function codalPage(sym, p) {
+  const url = `${CODAL_Q}&Symbol=${encodeURIComponent(sym)}&PageNumber=${p}`
+  const res = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: { 'User-Agent': 'Mozilla/5.0' } })
+  if (res.status === 429) throw new Error('کدال ۴۲۹ (rate limit)')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return (await res.json())?.Letters ?? []
+}
+
+// کدال از جدیدترین مرتب می‌کند؛ همین که به گزارش‌های قدیمی‌تر از بازهٔ ما رسیدیم بس است.
+const OLDEST = WINDOWS[0][0].replace(/-/g, '/')   // «1404/01/01»
+const CODAL_MAX_PAGES = 40
+
 async function fetchFromCodal(symbol) {
+  let sym = null
+  for (const v of codalVariants(symbol)) {
+    const first = await codalPage(v, 1)
+    await sleep(1200)
+    if (first.some(l => l.Symbol === v)) { sym = v; break }
+  }
+  if (!sym) return []
+  if (sym !== symbol) console.log(`  نماد کدالِ «${symbol}» → «${sym}»`)
+
   const out = []
-  for (let p = 1; p <= 12; p++) {
-    const url = `${CODAL_Q}&Symbol=${encodeURIComponent(symbol)}&PageNumber=${p}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: { 'User-Agent': 'Mozilla/5.0' } })
-    if (res.status === 429) throw new Error('کدال ۴۲۹ (rate limit)')
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const letters = (await res.json())?.Letters ?? []
+  for (let p = 1; p <= CODAL_MAX_PAGES; p++) {
+    const letters = await codalPage(sym, p)
     if (!letters.length) break
+    let old = false
     for (const l of letters) {
-      if (l.Symbol !== symbol) continue
+      if (l.Symbol !== sym) continue
+      const pub = faDate(l.PublishDateTime ?? l.SentDateTime)
+      if (pub && pub < OLDEST) { old = true; continue }
       out.push({
-        l18: l.Symbol,
+        l18: symbol,                       // نماد خودمان، نه املای کدال
         title: l.Title,
         date_publish: l.PublishDateTime ?? l.SentDateTime ?? null,
         link_excel: l.ExcelUrl || null,
@@ -162,7 +202,8 @@ async function fetchFromCodal(symbol) {
         link: l.Url || null,
       })
     }
-    await sleep(1500)
+    if (old) break                          // به قبل از بازه رسیدیم
+    await sleep(1200)
   }
   return out
 }
@@ -181,23 +222,37 @@ async function brsApiHealthy() {
   } catch { return false }
 }
 
+// آیا این فهرست اصلاً گزارشی دارد که ما پارس می‌کنیم؟
+// (فاهواز از BrsAPI دو اطلاعیه می‌گیرد که هیچ‌کدام ماهانه/فصلی نیست، در حالی که کدال
+//  ۱۶۰ نامه دارد — پس «فهرست خالی» معیار درستی برای fallback نیست.)
+const hasUsable = (list) => {
+  const { monthly, quarterly } = pickReports(list)
+  return monthly.length > 0 || quarterly.length > 0
+}
+
 // خروجی: { list, throttled }
+// BrsAPI گزارش مفیدی نداد → همیشه کدال را امتحان کن (تنها منبع نمادهای بی‌پوشش).
+// throttle فقط وقتی اعلام می‌شود که کدال هم چیزی ندهد و نماد شاهدِ BrsAPI هم ساکت باشد؛
+// وگرنه یک throttleِ گذرای BrsAPI جلوی fallback را برای همیشه می‌گرفت.
 async function fetchAnnouncements(symbol) {
   const list = await fetchFromBrsApi(symbol)
-  if (list.length) return { list, throttled: false }
+  if (hasUsable(list)) return { list, throttled: false }
 
-  // صفر اطلاعیه: throttle است یا BrsAPI این نماد را ندارد؟
+  console.log(`  BrsAPI برای «${symbol}» گزارشی نداد (${list.length} اطلاعیه) — از خود کدال می‌گیریم`)
   await sleep(2000)
-  if (!(await brsApiHealthy())) return { list: [], throttled: true }
-
-  console.log(`  BrsAPI «${symbol}» را ندارد — از خود کدال می‌گیریم`)
   try {
     const alt = await fetchFromCodal(symbol)
-    return { list: alt, throttled: false }
+    if (hasUsable(alt)) return { list: alt, throttled: false }
+    if (alt.length) return { list: alt, throttled: false }   // کدال جواب داد، ولی این نماد گزارش ماهانه/فصلی ندارد
   } catch (e) {
     console.log(`    کدال: ${e.message}`)
-    return { list: [], throttled: /۴۲۹/.test(e.message) }
+    if (/۴۲۹/.test(e.message)) return { list: [], throttled: true }
   }
+
+  // هیچ‌کدام چیزی نداد: اگر شاهد سالم است، نماد واقعاً گزارشی ندارد
+  if (list.length) return { list, throttled: false }
+  await sleep(2000)
+  return { list: [], throttled: !(await brsApiHealthy()) }
 }
 
 // ═══ دانلود اکسل-HTML کدال و پارس با XLSX (با retry برای throttle) ═══
