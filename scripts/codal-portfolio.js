@@ -185,7 +185,13 @@ async function buildSymbol(symbol, { verbose = true } = {}) {
     try {
       const buf = await downloadPortfolioExcel(rep)
       if (!buf) throw new Error('اکسل دانلود نشد')
-      const wb = XLSX.read(buf, { type: 'buffer' })
+      // فایل‌های سالم چند ده کیلوبایت‌اند (probe) — سقف امن در برابر پیوست خراب/غول‌آسا
+      // که parse آن حافظه پروسه را با OOM از بین می‌برد (رخ‌داده در عمل برای برخی صندوق‌ها)
+      if (buf.length > 8 * 1024 * 1024) throw new Error(`فایل غیرعادی بزرگ (${Math.round(buf.length / 1e6)}MB) — رد شد`)
+      // sheetRows: 500 — سقف ردیف پارس؛ صورت پورتفوی سالم چند ده ردیف است، اما بعضی
+      // فایل‌ها (رخ‌داده در عمل برای صندوق «مثقال») بازه‌ی استفاده‌شده‌ی غول‌آسا اعلام
+      // می‌کنند که بدون این سقف حافظه‌ی پروسه را تا OOM بالا می‌برد
+      const wb = XLSX.read(buf, { type: 'buffer', cellStyles: false, cellHTML: false, sheetRows: 500 })
       const holdings = parseStockSheet(wb)
       log(`  ✅ ${holdings.length} سهم پارس شد`)
       months.push({ date: rep.dateNorm, title: rep.title, holdings })
@@ -346,5 +352,12 @@ async function runFind() {
   unknown.forEach(v => console.log(`  ${v.l18} — ${v.l30}`))
 }
 
-;(SYMBOL === '--all' ? runAll() : SYMBOL === '--dump' ? runDump() : SYMBOL === '--find' ? runFind() : runOne())
-  .catch(e => { console.error(e); process.exit(1) })
+// buildSymbol هم برای صندوق‌های سهامی (این فایل) و هم صندوق‌های طلا/نقره
+// (scripts/sync-fund-weights.js) استفاده می‌شود — شیت «سهام» کدال برای هر دو
+// همان قالب ستونی را دارد، فقط ردیف‌ها به‌جای نماد سهام، سکه/شمش/گواهی‌اند
+if (require.main === module) {
+  (SYMBOL === '--all' ? runAll() : SYMBOL === '--dump' ? runDump() : SYMBOL === '--find' ? runFind() : runOne())
+    .catch(e => { console.error(e); process.exit(1) })
+} else {
+  module.exports = { buildSymbol }
+}

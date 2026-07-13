@@ -725,6 +725,15 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   const [marketBubbles, setMarketBubbles] = useState<{ bullion: number | null; coin: number | null }>({ bullion: null, coin: null })
   const [marketDollars, setMarketDollars] = useState<{ bullion: number | null; coin: number | null }>({ bullion: null, coin: null })
   const [fundsLoading, setFundsLoading] = useState(true)
+  // وزن سکه/شمش: پیش‌فرض هاردکد FUND_WEIGHTS، در صورت وجود public/fund-weights/gold.json
+  // (ماهانه از کدال، scripts/sync-fund-weights.js) override می‌شود
+  const [weights, setWeights] = useState<typeof FUND_WEIGHTS>(FUND_WEIGHTS)
+
+  useEffect(() => {
+    fetch('/fund-weights/gold.json').then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.weights) setWeights(w => ({ ...w, ...j.weights })) })
+      .catch(() => {})
+  }, [])
 
   const loadData = () => {
     Promise.all([
@@ -826,7 +835,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   }
 
   const getBubbleZatiValue = (name: string): number | null => {
-    const w = FUND_WEIGHTS[name]
+    const w = weights[name]
     if (!w || marketBubbles.bullion == null || marketBubbles.coin == null) return null
     return (w.coin / 100) * marketBubbles.coin + (w.bar / 100) * marketBubbles.bullion
   }
@@ -835,7 +844,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     if (fundsLoading) return { display: '...', full: '' }
     const bubble = getBubbleZatiValue(name)
     if (bubble == null) return { display: '—', full: '' }
-    const w = FUND_WEIGHTS[name]!
+    const w = weights[name]!
     const sign = bubble >= 0 ? '+' : ''
     const display = sign + bubble.toFixed(1) + '٪'
     const full = `سکه ${w.coin.toFixed(1)}٪ × حباب سکه ${marketBubbles.coin!.toFixed(2)}٪ + شمش ${w.bar.toFixed(1)}٪ × حباب شمش ${marketBubbles.bullion!.toFixed(2)}٪`
@@ -861,7 +870,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
 
   const getDollarRate = (name: string): { display: string; full: string } => {
     if (fundsLoading) return { display: '...', full: '' }
-    const w = FUND_WEIGHTS[name]
+    const w = weights[name]
     if (!w || marketDollars.bullion == null || marketDollars.coin == null) return { display: '—', full: '' }
     const rate = (w.bar / 100) * marketDollars.bullion + (w.coin / 100) * marketDollars.coin
     const display = Math.round(rate).toLocaleString('fa-IR')
@@ -876,7 +885,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
     if (colKey === 'bubbleZati') return getBubbleZati(name)
     if (colKey === 'bubbleVaqei') return getBubbleVaqei(name)
     if (colKey === 'dollarRate') return getDollarRate(name)
-    const w = FUND_WEIGHTS[name]
+    const w = weights[name]
     if (colKey === 'coinWeight')    return w ? { display: w.coin.toFixed(1) + '٪', full: '' } : { display: '—', full: '' }
     if (colKey === 'goldBarWeight') return w ? { display: w.bar.toFixed(1)  + '٪', full: '' } : { display: '—', full: '' }
     if (colKey === 'liquidity')     return w ? { display: w.liq.toFixed(1)  + '٪', full: '' } : { display: '—', full: '' }

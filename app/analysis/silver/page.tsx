@@ -36,6 +36,15 @@ export default function SilverAnalysisPage() {
   const [lastDate, setLastDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastFetch, setLastFetch] = useState<Date | null>(null)
+  // وزن گواهی نقره: پیش‌فرض هاردکد SILVER_FUND_WEIGHTS، در صورت وجود
+  // public/fund-weights/silver.json (ماهانه از کدال) override می‌شود
+  const [weights, setWeights] = useState<typeof SILVER_FUND_WEIGHTS>(SILVER_FUND_WEIGHTS)
+
+  useEffect(() => {
+    fetch('/fund-weights/silver.json').then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.weights) setWeights(w => ({ ...w, ...j.weights })) })
+      .catch(() => {})
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,7 +129,7 @@ export default function SilverAnalysisPage() {
 
   // حباب ذاتی صندوق = وزن گواهی نقره × حباب شمش نقره
   const bubbleZati = (f: SilverFund): number | null => {
-    const w = SILVER_FUND_WEIGHTS[f.name]
+    const w = weights[f.name]
     if (!w || silverBubble == null) return null
     return (w.silver / 100) * silverBubble
   }
@@ -298,7 +307,7 @@ export default function SilverAnalysisPage() {
                   const bzc = bz == null ? muted : bz > 0 ? red : green
                   const bv = bubbleVaqei(f)
                   const bvc = bv == null ? muted : bv > 0 ? red : green
-                  const w = SILVER_FUND_WEIGHTS[f.name]
+                  const w = weights[f.name]
                   return (
                     <tr key={f.asset_id} className="srow" style={{ borderBottom: `0.5px solid ${border}` }}>
                       <td style={{ padding: '10px 16px', color: text, fontWeight: 600, whiteSpace: 'nowrap' }}>{f.name}</td>
