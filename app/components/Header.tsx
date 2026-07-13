@@ -24,7 +24,6 @@ const NAV: NavItem[] = [
   { label: 'سهام',          href: '/stocks' },
   { label: 'صندوق‌ها',      href: '/funds', menu: [
     { label: 'دیدبان صندوق‌ها', href: '/funds' },
-    { label: 'رادار پول هوشمند', href: '/funds/radar' },
   ] },
   { label: 'نمودار',        href: '/monitor', menu: [
     { label: 'نمودار لحظه‌ای رصد بازارها', href: '/monitor' },
@@ -33,6 +32,7 @@ const NAV: NavItem[] = [
     { label: 'تحلیل بازارها', href: '/analysis' },
     { label: 'تحلیل تکنیکال', href: '/technical' },
     { label: 'دیده‌بان تکنیکال', href: '/technical/screener' },
+    { label: 'رادار پول هوشمند', href: '/funds/radar' },
     { label: 'ماشین‌حساب ارزش‌گذاری', href: '/valuation' },
   ] },
   { label: 'ارزش معاملات',  href: '/trade-value' },

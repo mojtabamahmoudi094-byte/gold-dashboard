@@ -19,6 +19,13 @@ export const fmtCompact = (v: any) => {
   return Math.round(n / div).toLocaleString('fa-IR', { maximumFractionDigits: 0 })
 }
 
+/** ریال → همت (هزار میلیارد تومان)، برای ارزش معاملات صندوق‌های کالایی */
+export const fmtHomat = (v: any, decimals = 2) => {
+  const n = safe(v) / 1e13
+  if (n === 0) return '۰'
+  return n.toLocaleString('fa-IR', { maximumFractionDigits: decimals })
+}
+
 /** درصد با علامت + برای مقادیر مثبت */
 export const fmtPct = (n: number | null, decimals = 2) => {
   if (n == null) return '—'

@@ -14,7 +14,7 @@ type IdxRow = { index_name: string; trade_date: string; trade_date_shamsi: strin
 type SymRow = { l18: string; pcp: number | null }
 type Pulse = { up: number; down: number; oversold: number; overbought: number }
 
-const POPULAR = ['فولاد', 'فملی', 'شستا', 'خودرو', 'ذوب', 'وبملت', 'شپنا', 'اهرم']
+const POPULAR = ['کگل', 'فملی', 'شستا', 'خودرو', 'ذوب', 'وبملت', 'شپنا', 'اهرم']
 const BRSAPI_KEY = process.env.NEXT_PUBLIC_BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
@@ -487,12 +487,12 @@ export default function TechnicalIndexPage() {
           {POPULAR.map(s => (
             <Link key={s} href={`/technical/${toSlug(s)}`} style={{
               fontSize: 12.5, padding: '7px 15px', borderRadius: 99, minHeight: 32,
-              textDecoration: 'none', color: '#3b82f6', fontFamily: 'inherit',
-              background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+              textDecoration: 'none', color: '#22d3ee', fontFamily: 'inherit',
+              background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.25)',
               transition: 'background 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.15)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.08)' }}>
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(34,211,238,0.16)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(34,211,238,0.08)' }}>
               {s}
             </Link>
           ))}

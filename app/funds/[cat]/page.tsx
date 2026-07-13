@@ -5,7 +5,9 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { darkTheme, lightTheme } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
-import { safe, fmtCompact as fmtVal } from '../../../lib/format'
+import { safe, fmtCompact as fmtVal, fmtHomat } from '../../../lib/format'
+
+const COMMODITY_CATS = ['gold', 'silver', 'saffron']
 
 const CAT_MAP: Record<string, { label: string; category: string; color: string }> = {
   gold:    { label: 'طلا',    category: 'طلا',    color: 'oklch(0.82 0.15 70)' },
@@ -34,6 +36,8 @@ export default function FundsCatPage() {
   const router = useRouter()
   const t: any = isDark ? darkTheme : lightTheme
   const cream = isDark ? '#ddd5bd' : '#6B5A3A'
+  const isCommodity = COMMODITY_CATS.includes(slug)
+  const tvStr = (rial: number) => isCommodity ? `${fmtHomat(rial)} همت` : `${fmtVal(rial / 1e10)} م.ت`
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -280,7 +284,7 @@ export default function FundsCatPage() {
 
         {/* کارت‌های خلاصه */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
-          <SummaryCard t={t} label="ارزش کل معاملات" value={`${fmtVal(totalTradeValue / 1e10)} م.ت`} tooltip="مجموع ارزش معاملات همه‌ی صندوق‌ها — میلیارد تومان" />
+          <SummaryCard t={t} label="ارزش کل معاملات" value={tvStr(totalTradeValue)} tooltip={`مجموع ارزش معاملات همه‌ی صندوق‌ها — ${isCommodity ? 'همت' : 'میلیارد تومان'}`} />
           <SummaryCard t={t} label="میانگین تغییر" value={`${avgChange >= 0 ? '+' : ''}${avgChange.toFixed(2)}٪`}
             color={avgChange >= 0 ? '#00E5A0' : '#FF4D6A'} tooltip="میانگین درصد تغییر قیمت پایانی همه‌ی صندوق‌ها" />
           <SummaryCard t={t} label="مثبت / منفی" value={`${positiveCount.toLocaleString('fa-IR')} / ${negativeCount.toLocaleString('fa-IR')}`}
@@ -433,7 +437,7 @@ export default function FundsCatPage() {
                       {' · '}بیشترین خروج: <span style={{ color: '#FF4D6A', fontWeight: 700 }}>{topOutflow.symbol} ({topOutflowVal} میلیارد)</span>
                     </p>
                     <p style={{ margin: 0 }}>
-                      📊 بیشترین ارزش معاملات: <span style={{ fontWeight: 700, color: t.accent }}>{topVolume.symbol} ({fmtVal(topVolume.tradeValue / 1e10)} م.ت)</span>
+                      📊 بیشترین ارزش معاملات: <span style={{ fontWeight: 700, color: t.accent }}>{topVolume.symbol} ({tvStr(topVolume.tradeValue)})</span>
                     </p>
                     <p style={{ margin: 0 }}>
                       🧭 جمع‌بندی: {avgChange > 0
@@ -554,7 +558,7 @@ export default function FundsCatPage() {
                       </div>
                       <div>
                         <div style={{ fontSize: 10, color: cream, marginBottom: 2 }}>ارزش معاملات</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{fmtVal(f.tradeValue / 1e10)} <span style={{ fontSize: 10, color: cream }}>م.ت</span></div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{tvStr(f.tradeValue)}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: 10, color: cream, marginBottom: 2 }}>خریدار / فروشنده</div>
@@ -648,7 +652,7 @@ export default function FundsCatPage() {
                             {isPositive ? '+' : ''}{f.changePct.toFixed(2)}٪
                           </span>
                         </td>
-                        <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.tradeValue / 1e10)} <span style={{ color: cream, fontSize: 10 }}>م.ت</span></td>
+                        <td style={{ padding: '10px 8px', color: t.text }}>{tvStr(f.tradeValue)}</td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{fmtVal(f.marketValue)} <span style={{ color: cream, fontSize: 10 }}>م.ر</span></td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{f.volume.toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '10px 8px', color: '#00E5A0' }}>{f.buyCountI.toLocaleString('fa-IR')}</td>
@@ -698,7 +702,7 @@ export default function FundsCatPage() {
                     <Link
                       href={`/fund/${f.slug}`}
                       key={i}
-                      title={`${f.symbol}\nتغییر: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}٪\nارزش معاملات: ${fmtVal(f.tradeValue / 1e10)} م.ت`}
+                      title={`${f.symbol}\nتغییر: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}٪\nارزش معاملات: ${tvStr(f.tradeValue)}`}
                       style={{
                         textDecoration: 'none',
                         flexBasis: `${Math.max(pct, 2.5)}%`,
@@ -742,7 +746,7 @@ export default function FundsCatPage() {
                       </div>
                       {isLarge && (
                         <div style={{ fontSize: 9, color: textColor, opacity: 0.6, marginTop: 2 }}>
-                          {fmtVal(f.tradeValue / 1e10)} م.ت
+                          {tvStr(f.tradeValue)}
                         </div>
                       )}
                     </Link>

@@ -930,13 +930,40 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
                 </td>
                 {DATA_COLS.map(col => {
                   const v = getCellValue(col.key, name)
+                  const hasValue = v.display !== '—' && v.display !== '...'
+                  if (col.key === 'bubbleAsmi' || col.key === 'bubbleVaqei') {
+                    const raw = col.key === 'bubbleAsmi' ? getBubbleAsmiValue(name) : getBubbleVaqeiValue(name)
+                    const c = raw == null ? muted : col.key === 'bubbleAsmi'
+                      ? (raw > 2 ? '#FF4D6A' : raw < 0 ? '#00E5A0' : '#F59E0B')
+                      : (raw > 0 ? '#FF4D6A' : '#00E5A0')
+                    return (
+                      <td key={col.key} title={v.full || undefined} style={{ padding: '9px 16px', whiteSpace: 'nowrap', cursor: v.full ? 'help' : 'default' }}>
+                        {hasValue ? (
+                          <span style={{
+                            display: 'inline-block', fontSize: 11, fontWeight: 700, color: c,
+                            background: `${c}18`, border: `0.5px solid ${c}30`, boxShadow: `0 0 10px ${c}30`,
+                            borderRadius: 6, padding: '2px 10px', fontFamily: 'system-ui',
+                          }}>{v.display}</span>
+                        ) : <span style={{ color: muted }}>{v.display}</span>}
+                      </td>
+                    )
+                  }
+                  if (col.key === 'bubbleZati') {
+                    const raw = getBubbleZatiValue(name)
+                    const c = raw == null ? muted : raw > 0 ? '#FF4D6A' : '#00E5A0'
+                    return (
+                      <td key={col.key} title={v.full || undefined} style={{ padding: '9px 16px', whiteSpace: 'nowrap', cursor: v.full ? 'help' : 'default' }}>
+                        <span style={{ color: hasValue ? c : muted, fontWeight: 600, fontFamily: 'system-ui', fontSize: 11 }}>{v.display}</span>
+                      </td>
+                    )
+                  }
                   return (
                     <td
                       key={col.key}
                       title={v.full || undefined}
                       style={{
                         padding: '9px 16px',
-                        color: col.key === 'marketToman' && v.display !== '—' && v.display !== '...' ? text : muted,
+                        color: col.key === 'marketToman' && hasValue ? text : muted,
                         fontFamily: 'system-ui',
                         whiteSpace: 'nowrap',
                         cursor: v.full ? 'help' : 'default',
