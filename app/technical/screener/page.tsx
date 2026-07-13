@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
+import { CANDLE_PATTERN_LABELS } from '../../../lib/candlePatternLabels'
 import { GREEN, RED } from '../colors'
 import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
 
@@ -34,6 +35,8 @@ type Row = {
   fvg_bear_near?: boolean
   ob_bull_near?: boolean
   ob_bear_near?: boolean
+  candle_pattern?: string | null
+  candle_pattern_bias?: string | null
 }
 
 // فیلترها با هم AND می‌شوند — چند چیپ فعال یعنی نمادهایی که همه شرط‌ها را دارند
@@ -54,11 +57,15 @@ const FILTERS: { key: string; label: string; tone?: 'pos' | 'neg' }[] = [
   { key: 'fvg_bear_near', label: 'FVG نزولی نزدیک قیمت', tone: 'neg' },
   { key: 'ob_bull_near', label: 'اردر بلاک حمایتی', tone: 'pos' },
   { key: 'ob_bear_near', label: 'اردر بلاک مقاومتی', tone: 'neg' },
+  { key: 'candle_bull', label: 'الگوی کندلی صعودی', tone: 'pos' },
+  { key: 'candle_bear', label: 'الگوی کندلی نزولی', tone: 'neg' },
 ]
 
 function passes(r: Row, key: string): boolean {
   if (key === 'structure_up') return r.structure_break === 'bos_up' || r.structure_break === 'choch_up'
   if (key === 'structure_down') return r.structure_break === 'bos_down' || r.structure_break === 'choch_down'
+  if (key === 'candle_bull') return r.candle_pattern_bias === 'bull'
+  if (key === 'candle_bear') return r.candle_pattern_bias === 'bear'
   return r[key as keyof Row] === true
 }
 
@@ -177,6 +184,10 @@ export default function ScreenerPage() {
     if (r.fvg_bear_near) out.push(badge('FVG نزولی', 'neg'))
     if (r.ob_bull_near) out.push(badge('OB حمایتی', 'pos'))
     if (r.ob_bear_near) out.push(badge('OB مقاومتی', 'neg'))
+    if (r.candle_pattern) {
+      const label = CANDLE_PATTERN_LABELS[r.candle_pattern] ?? r.candle_pattern
+      out.push(badge(label, r.candle_pattern_bias === 'bull' ? 'pos' : r.candle_pattern_bias === 'bear' ? 'neg' : 'mid'))
+    }
     return out
   }
 

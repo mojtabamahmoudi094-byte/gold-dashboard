@@ -33,6 +33,7 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_RO
 const PROBE = process.argv.includes('--probe')
 
 const { swingHighsLows, fvg, bosChoch, orderBlocks } = require('./smc-lib')
+const { detectCandlePattern } = require('./candle-patterns')
 
 let sb = null
 function initClient() {
@@ -196,6 +197,13 @@ function computeRow(symbol, rows) {
     }
   } catch { /* SMC اختیاری است — خطای آن نباید اسکرینر را بیندازد */ }
 
+  // ── الگوی کندلی امروز (candle-patterns.js) — نیاز به ~۱۲ کندل برای context روند
+  let candlePattern = null, candlePatternBias = null
+  try {
+    const cp = detectCandlePattern(rows.slice(-12))
+    if (cp) { candlePattern = cp.key; candlePatternBias = cp.bias }
+  } catch { /* اختیاری — خطای آن نباید اسکرینر را بیندازد */ }
+
   return {
     symbol,
     trade_date: last.trade_date,
@@ -221,6 +229,8 @@ function computeRow(symbol, rows) {
     fvg_bear_near: fvgBearNear,
     ob_bull_near: obBullNear,
     ob_bear_near: obBearNear,
+    candle_pattern: candlePattern,
+    candle_pattern_bias: candlePatternBias,
     updated: new Date().toISOString(),
   }
 }

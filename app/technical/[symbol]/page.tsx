@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { rsi, macd, type Candle } from '../../../lib/indicators'
+import { CANDLE_PATTERN_LABELS } from '../../../lib/candlePatternLabels'
 import { GREEN, RED } from '../colors'
 import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
 
@@ -41,6 +42,7 @@ export default function TechnicalSymbolPage() {
   const [rows, setRows] = useState<Row[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [symbols, setSymbols] = useState<SymRow[]>([])
+  const [candlePattern, setCandlePattern] = useState<{ pattern: string; bias: string | null } | null>(null)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -73,6 +75,19 @@ export default function TechnicalSymbolPage() {
               ...r, adj_open: null, adj_high: null, adj_low: null, adj_close: null,
             })))
           })
+      })
+  }, [symbol])
+
+  useEffect(() => {
+    if (!symbol) return
+    setCandlePattern(null)
+    supabase
+      .from('stock_screener')
+      .select('candle_pattern, candle_pattern_bias')
+      .eq('symbol', symbol)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!error && data?.candle_pattern) setCandlePattern({ pattern: data.candle_pattern, bias: data.candle_pattern_bias })
       })
   }, [symbol])
 
@@ -246,6 +261,15 @@ export default function TechnicalSymbolPage() {
                   background: panel, border: `1px solid ${line}`, color: muted,
                 }}>
                   MACD <b style={{ color: summary!.macdHist! >= 0 ? GREEN : RED }}>{summary!.macdHist! >= 0 ? 'مثبت' : 'منفی'}</b>
+                </span>
+              )}
+              {candlePattern && (
+                <span style={{
+                  fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 8,
+                  color: candlePattern.bias === 'bull' ? GREEN : candlePattern.bias === 'bear' ? RED : '#3b82f6',
+                  background: candlePattern.bias === 'bull' ? 'rgba(38,166,154,0.12)' : candlePattern.bias === 'bear' ? 'rgba(239,83,80,0.12)' : 'rgba(59,130,246,0.12)',
+                }}>
+                  {CANDLE_PATTERN_LABELS[candlePattern.pattern] ?? candlePattern.pattern}
                 </span>
               )}
               {summary && <span style={{ fontSize: 11, color: muted }}>{summary.last.shamsi}</span>}
