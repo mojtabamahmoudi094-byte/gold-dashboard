@@ -421,6 +421,20 @@ export default function PortfolioPage() {
 
   const firstSnapshotDate = snapshots[0]?.snap_date ?? null
 
+  // اسنپ‌شات شبانه (scripts/snapshot-portfolio.js) فقط یک‌بار در روز ثبت می‌شود؛
+  // تا وقتی کرون آن اجرا نشده، امروز را با ارزش زنده‌ی همین لحظه (قیمت‌های priceMap) پر می‌کنیم
+  // تا نمودار به‌محض بسته‌شدن بازار و لود دوباره‌ی صفحه به‌روز به نظر برسد
+  const chartSnapshots = useMemo<Snapshot[]>(() => {
+    const today = todayShamsi()
+    if (snapshots.some(s => s.snap_date === today)) return snapshots
+    if (!totals.priced || totals.value <= 0) return snapshots
+    const live: Snapshot = {
+      snap_date: today, total_value: totals.value, invested_capital: totals.cost,
+      created_at: new Date().toISOString(),
+    }
+    return [...snapshots, live]
+  }, [snapshots, totals])
+
   // ─── ثبت تراکنش ───
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1051,14 +1065,15 @@ ${txs.map(tx => row([
       {active.length > 0 && (
         <div style={{ ...card, marginTop: 16 }}>
           <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 4px' }}>📉 روند واقعی ارزش پورتفو</h2>
-          {snapshots.length > 1 ? (
+          {chartSnapshots.length > 1 ? (
             <>
               <p style={{ fontSize: 11, color: t.muted, margin: '0 0 12px' }}>
                 ارزش روز پورتفو بر اساس ثبت‌های روزانه — برخلاف چارت «رشد سرمایه» زیر، این خط قیمت واقعی بازار را نشان می‌دهد
+                {chartSnapshots.length > snapshots.length && ' — نقطه‌ی امروز بر اساس قیمت لحظه‌ای است تا ثبت شبانه انجام شود'}
               </p>
               <div style={{ width: '100%', height: 260, direction: 'ltr' }}>
                 <ResponsiveContainer>
-                  <AreaChart data={snapshots} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+                  <AreaChart data={chartSnapshots} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
                     <defs>
                       <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={t.green} stopOpacity={0.35} />
