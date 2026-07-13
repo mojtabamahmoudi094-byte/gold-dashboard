@@ -233,6 +233,15 @@ export default function ScreenerPage() {
             </span>
             {isOpen ? 'بازار باز' : 'بازار بسته'}
           </span>
+
+          <Link href="/technical/backtest" style={{
+            marginInlineStart: 'auto',
+            fontSize: 12, color: '#3b82f6', textDecoration: 'none', whiteSpace: 'nowrap',
+            padding: '7px 12px', borderRadius: 9,
+            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+          }}>
+            بازده تاریخی سیگنال‌ها ←
+          </Link>
         </div>
 
         <p style={{ fontSize: 13, color: muted, margin: '0 0 20px', lineHeight: 1.8, ...enterAnim(1) }}>

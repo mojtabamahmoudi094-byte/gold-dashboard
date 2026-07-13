@@ -42,6 +42,8 @@ MAILTO=""
 30 15 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh candles-adjusted $NODE_BIN $SCRIPT_DIR/candles-adjusted.js >> /var/log/candles-adjusted.log 2>&1
 # توزیع چیپ — ۱۹:۱۵ تهران (نیم ساعت بعد از قیمت‌های تعدیل‌شده)
 45 15 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh chip-distribution $NODE_BIN $SCRIPT_DIR/chip-distribution-daily.js >> /var/log/chip-distribution.log 2>&1
+# بک‌تست سیگنال‌ها — هفتگی پنجشنبه ۱۰:۰۰ تهران (بازار تعطیل، سرور بی‌کارتر)
+30 6 * * 4 root $SCRIPT_DIR/run-with-alert.sh backtest-signals $NODE_BIN $SCRIPT_DIR/backtest-signals.js >> /var/log/backtest-signals.log 2>&1
 EOF
 
 chmod 644 "$CRON_FILE"
