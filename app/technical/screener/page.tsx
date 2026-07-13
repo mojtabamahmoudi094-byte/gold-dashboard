@@ -37,6 +37,9 @@ type Row = {
   ob_bear_near?: boolean
   candle_pattern?: string | null
   candle_pattern_bias?: string | null
+  platform_breakout?: boolean
+  year_line_pullback?: boolean
+  turtle_breakout_20d?: boolean
 }
 
 // فیلترها با هم AND می‌شوند — چند چیپ فعال یعنی نمادهایی که همه شرط‌ها را دارند
@@ -59,6 +62,21 @@ const FILTERS: { key: string; label: string; tone?: 'pos' | 'neg' }[] = [
   { key: 'ob_bear_near', label: 'اردر بلاک مقاومتی', tone: 'neg' },
   { key: 'candle_bull', label: 'الگوی کندلی صعودی', tone: 'pos' },
   { key: 'candle_bear', label: 'الگوی کندلی نزولی', tone: 'neg' },
+  { key: 'platform_breakout', label: 'شکست پلتفرم', tone: 'pos' },
+  { key: 'year_line_pullback', label: 'بازگشت به خط سالانه', tone: 'pos' },
+  { key: 'turtle_breakout_20d', label: 'شکست لاک‌پشتی ۲۰روزه', tone: 'pos' },
+]
+
+// استراتژی‌های آماده — هر کدوم چند فیلتر بالا رو با هم فعال می‌کنه (AND)
+const PRESETS: { label: string; keys: string[] }[] = [
+  { label: 'کراس طلایی حجم‌دار', keys: ['golden_cross', 'vol_spike'] },
+  { label: 'اشباع فروش در روند صعودی', keys: ['trend_up', 'rsi_oversold'] },
+  { label: 'سقف جدید ۵۲هفته حجم‌دار', keys: ['new_high_52w', 'vol_spike'] },
+  { label: 'الگوی صعودی + مکدی مثبت', keys: ['candle_bull', 'macd_cross_up'] },
+  { label: 'برگشت از کف با الگوی صعودی', keys: ['new_low_52w', 'candle_bull'] },
+  { label: 'شکست پلتفرم', keys: ['platform_breakout'] },
+  { label: 'بازگشت به خط سالانه', keys: ['year_line_pullback'] },
+  { label: 'شکست لاک‌پشتی ۲۰روزه', keys: ['turtle_breakout_20d'] },
 ]
 
 function passes(r: Row, key: string): boolean {
@@ -66,6 +84,7 @@ function passes(r: Row, key: string): boolean {
   if (key === 'structure_down') return r.structure_break === 'bos_down' || r.structure_break === 'choch_down'
   if (key === 'candle_bull') return r.candle_pattern_bias === 'bull'
   if (key === 'candle_bear') return r.candle_pattern_bias === 'bear'
+  if (key === 'trend_up') return r.trend === 'up'
   return r[key as keyof Row] === true
 }
 
@@ -188,6 +207,9 @@ export default function ScreenerPage() {
       const label = CANDLE_PATTERN_LABELS[r.candle_pattern] ?? r.candle_pattern
       out.push(badge(label, r.candle_pattern_bias === 'bull' ? 'pos' : r.candle_pattern_bias === 'bear' ? 'neg' : 'mid'))
     }
+    if (r.platform_breakout) out.push(badge('شکست پلتفرم', 'pos'))
+    if (r.year_line_pullback) out.push(badge('خط سالانه', 'pos'))
+    if (r.turtle_breakout_20d) out.push(badge('شکست ۲۰روزه', 'pos'))
     return out
   }
 
@@ -249,6 +271,19 @@ export default function ScreenerPage() {
           {rows && rows[0] ? ` · آخرین به‌روزرسانی: ${rows[0].trade_date_shamsi}` : ''}
           {rows && ` · ${fa(rows.length)} نماد`}
         </p>
+
+        {/* استراتژی‌های آماده — هر دکمه یک‌جا چند فیلتر رو ست می‌کنه */}
+        <p style={{ fontSize: 11.5, color: muted, margin: '0 0 6px', ...enterAnim(2) }}>استراتژی‌های آماده</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, ...enterAnim(2) }}>
+          {PRESETS.map(p => {
+            const isActive = active.length === p.keys.length && p.keys.every(k => active.includes(k))
+            return (
+              <button key={p.label} onClick={() => { setActive(p.keys); setQ('') }} style={chip(isActive)}>
+                {p.label}
+              </button>
+            )
+          })}
+        </div>
 
         {/* فیلترها — قابل ترکیب (AND) */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8, ...enterAnim(2) }}>
