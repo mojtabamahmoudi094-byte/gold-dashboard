@@ -62,21 +62,36 @@ const FILTERS: { key: string; label: string; tone?: 'pos' | 'neg' }[] = [
   { key: 'ob_bear_near', label: 'اردر بلاک مقاومتی', tone: 'neg' },
   { key: 'candle_bull', label: 'الگوی کندلی صعودی', tone: 'pos' },
   { key: 'candle_bear', label: 'الگوی کندلی نزولی', tone: 'neg' },
+  { key: 'pattern_hammer', label: 'الگو: چکش', tone: 'pos' },
+  { key: 'pattern_bullish_engulfing', label: 'الگو: پوشای صعودی', tone: 'pos' },
+  { key: 'pattern_morning_star', label: 'الگو: ستاره صبحگاهی', tone: 'pos' },
+  { key: 'pattern_three_white_soldiers', label: 'الگو: سه سرباز سفید', tone: 'pos' },
+  { key: 'pattern_shooting_star', label: 'الگو: ستاره دنباله‌دار', tone: 'neg' },
+  { key: 'pattern_bearish_engulfing', label: 'الگو: پوشای نزولی', tone: 'neg' },
+  { key: 'pattern_evening_star', label: 'الگو: ستاره عصرگاهی', tone: 'neg' },
   { key: 'platform_breakout', label: 'شکست پلتفرم', tone: 'pos' },
   { key: 'year_line_pullback', label: 'بازگشت به خط سالانه', tone: 'pos' },
   { key: 'turtle_breakout_20d', label: 'شکست لاک‌پشتی ۲۰روزه', tone: 'pos' },
 ]
 
 // استراتژی‌های آماده — هر کدوم چند فیلتر بالا رو با هم فعال می‌کنه (AND)
-const PRESETS: { label: string; keys: string[] }[] = [
-  { label: 'کراس طلایی حجم‌دار', keys: ['golden_cross', 'vol_spike'] },
-  { label: 'اشباع فروش در روند صعودی', keys: ['trend_up', 'rsi_oversold'] },
-  { label: 'سقف جدید ۵۲هفته حجم‌دار', keys: ['new_high_52w', 'vol_spike'] },
-  { label: 'الگوی صعودی + مکدی مثبت', keys: ['candle_bull', 'macd_cross_up'] },
-  { label: 'برگشت از کف با الگوی صعودی', keys: ['new_low_52w', 'candle_bull'] },
-  { label: 'شکست پلتفرم', keys: ['platform_breakout'] },
-  { label: 'بازگشت به خط سالانه', keys: ['year_line_pullback'] },
-  { label: 'شکست لاک‌پشتی ۲۰روزه', keys: ['turtle_breakout_20d'] },
+const PRESETS: { label: string; keys: string[]; desc: string }[] = [
+  { label: 'کراس طلایی حجم‌دار', keys: ['golden_cross', 'vol_spike'],
+    desc: 'میانگین متحرک کوتاه‌مدت از میان‌مدت به سمت بالا رد می‌شود (کراس طلایی) و هم‌زمان حجم معاملات به‌شکل مشکوکی افزایش پیدا می‌کند — نشانه‌ی ورود پول تازه هم‌زمان با تغییر روند.' },
+  { label: 'اشباع فروش در روند صعودی', keys: ['trend_up', 'rsi_oversold'],
+    desc: 'نماد در یک روند صعودی کلی قرار دارد اما RSI به منطقه‌ی اشباع فروش (زیر ۳۰) رسیده — یعنی یک اصلاح موقت در دل روندی مثبت، که می‌تواند فرصت ورود باشد.' },
+  { label: 'سقف جدید ۵۲هفته حجم‌دار', keys: ['new_high_52w', 'vol_spike'],
+    desc: 'قیمت به بالاترین سطح یک سال اخیر رسیده و حجم معاملات هم بالاست — نشانه‌ی قدرت روند صعودی و تمایل بازار به ادامه‌ی مسیر.' },
+  { label: 'الگوی صعودی + مکدی مثبت', keys: ['candle_bull', 'macd_cross_up'],
+    desc: 'یک الگوی کندلی صعودی (مثل چکش یا پوشای صعودی) هم‌زمان با تقاطع مثبت مکدی شکل گرفته — دو سیگنال مستقل که هم‌جهت شده‌اند.' },
+  { label: 'برگشت از کف با الگوی صعودی', keys: ['new_low_52w', 'candle_bull'],
+    desc: 'نماد به کف ۵۲ هفته‌ی اخیر رسیده و یک الگوی کندلی صعودی هم شکل گرفته — احتمال برگشت قیمت از کف.' },
+  { label: 'شکست پلتفرم', keys: ['platform_breakout'],
+    desc: 'قیمت پس از مدتی نوسان در یک محدوده‌ی فشرده (پلتفرم)، سقف آن محدوده را با قدرت شکسته — معمولاً نشانه‌ی شروع یک حرکت جدید.' },
+  { label: 'بازگشت به خط سالانه', keys: ['year_line_pullback'],
+    desc: 'قیمت پس از فاصله گرفتن از میانگین متحرک سالانه، دوباره به آن نزدیک شده — نقطه‌ای که در تحلیل تکنیکال معمولاً محل واکنش قیمت است.' },
+  { label: 'شکست لاک‌پشتی ۲۰روزه', keys: ['turtle_breakout_20d'],
+    desc: 'قیمت سقف ۲۰ روز اخیر را شکسته — همان قانون ورود معروف به «معامله‌گران لاک‌پشتی» (Turtle Traders) که روی شکست کانال قیمتی کوتاه‌مدت معامله می‌کنند.' },
 ]
 
 function passes(r: Row, key: string): boolean {
@@ -84,9 +99,14 @@ function passes(r: Row, key: string): boolean {
   if (key === 'structure_down') return r.structure_break === 'bos_down' || r.structure_break === 'choch_down'
   if (key === 'candle_bull') return r.candle_pattern_bias === 'bull'
   if (key === 'candle_bear') return r.candle_pattern_bias === 'bear'
+  if (key.startsWith('pattern_')) return r.candle_pattern === key.slice('pattern_'.length)
   if (key === 'trend_up') return r.trend === 'up'
   return r[key as keyof Row] === true
 }
+
+// signal_backtest_stats از scripts/backtest-signals.js کلید الگوهای کندلی را candle_<pattern> ذخیره می‌کند
+const backtestKeyFor = (filterKey: string) =>
+  filterKey.startsWith('pattern_') ? `candle_${filterKey.slice('pattern_'.length)}` : filterKey
 
 type SortKey = 'change_pct' | 'rsi' | 'vol_ratio'
 
@@ -101,7 +121,22 @@ export default function ScreenerPage() {
   const [sortKey, setSortKey] = useState<SortKey>('change_pct')
   const [sortDesc, setSortDesc] = useState(true)
   const [q, setQ] = useState('')
+  const [explainPreset, setExplainPreset] = useState<{ label: string; desc: string } | null>(null)
+  const [typedDesc, setTypedDesc] = useState('')
+  const [winRates, setWinRates] = useState<Record<string, number>>({})
   const isOpen = marketOpen()
+
+  useEffect(() => {
+    if (!explainPreset) { setTypedDesc(''); return }
+    setTypedDesc('')
+    let i = 0
+    const id = setInterval(() => {
+      i += 1
+      setTypedDesc(explainPreset.desc.slice(0, i))
+      if (i >= explainPreset.desc.length) clearInterval(id)
+    }, 18)
+    return () => clearInterval(id)
+  }, [explainPreset])
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -127,6 +162,23 @@ export default function ScreenerPage() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    supabase.from('signal_backtest_stats').select('signal_key, win_rate, sample_count')
+      .eq('horizon_days', 10).gte('sample_count', 20)
+      .then(({ data, error }) => {
+        if (error || !data) return
+        const map: Record<string, number> = {}
+        for (const row of data as { signal_key: string; win_rate: number }[]) map[row.signal_key] = row.win_rate
+        setWinRates(map)
+      })
+  }, [])
+
+  const winRateLabel = (keys: string[]): string | null => {
+    if (keys.length !== 1) return null
+    const wr = winRates[backtestKeyFor(keys[0])]
+    return wr != null ? `${fa(wr, 0)}٪` : null
+  }
 
   const visible = useMemo(() => {
     if (!rows) return []
@@ -277,9 +329,11 @@ export default function ScreenerPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, ...enterAnim(2) }}>
           {PRESETS.map(p => {
             const isActive = active.length === p.keys.length && p.keys.every(k => active.includes(k))
+            const wr = winRateLabel(p.keys)
             return (
-              <button key={p.label} onClick={() => { setActive(p.keys); setQ('') }} style={chip(isActive)}>
+              <button key={p.label} onClick={() => { setActive(p.keys); setQ(''); setExplainPreset({ label: p.label, desc: p.desc }) }} style={chip(isActive)}>
                 {p.label}
+                {wr && <span style={{ opacity: 0.65, fontSize: 10, marginInlineStart: 5 }}>({wr} برد)</span>}
               </button>
             )
           })}
@@ -290,12 +344,16 @@ export default function ScreenerPage() {
           <button onClick={() => setActive([])} style={chip(active.length === 0)}>
             همه
           </button>
-          {FILTERS.map(f => (
-            <button key={f.key} onClick={() => toggleFilter(f.key)} aria-pressed={active.includes(f.key)}
-              style={chip(active.includes(f.key), f.tone)}>
-              {f.label}
-            </button>
-          ))}
+          {FILTERS.map(f => {
+            const wr = winRateLabel([f.key])
+            return (
+              <button key={f.key} onClick={() => toggleFilter(f.key)} aria-pressed={active.includes(f.key)}
+                style={chip(active.includes(f.key), f.tone)}>
+                {f.label}
+                {wr && <span style={{ opacity: 0.65, fontSize: 10, marginInlineStart: 5 }}>({wr} برد)</span>}
+              </button>
+            )
+          })}
         </div>
         {active.length > 1 && (
           <p style={{ fontSize: 11, color: muted, margin: '0 0 12px' }}>
@@ -389,6 +447,39 @@ export default function ScreenerPage() {
           مسئولیت تصمیم‌های معاملاتی با خود شماست.
         </p>
       </div>
+
+      {explainPreset && (
+        <div
+          onClick={() => setExplainPreset(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(4,8,14,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              ...glass, maxWidth: 440, width: '100%', borderRadius: 16, padding: 22,
+              direction: 'rtl',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: text }}>{explainPreset.label}</span>
+              <button
+                onClick={() => setExplainPreset(null)}
+                style={{ background: 'none', border: 'none', color: muted, fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 4 }}
+                aria-label="بستن"
+              >×</button>
+            </div>
+            <p style={{ fontSize: 13, color: muted, lineHeight: 2, minHeight: 78, margin: 0 }}>
+              {typedDesc}
+              {typedDesc.length < explainPreset.desc.length && (
+                <span style={{ opacity: 0.6, animation: 'taPing 1s ease-in-out infinite' }}>▍</span>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
