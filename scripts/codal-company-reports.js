@@ -119,7 +119,7 @@ const WINDOWS = [
   ['1405-01-01', '1405-02-31'], ['1405-03-01', '1405-04-14'],
 ]
 
-async function fetchAnnouncements(symbol) {
+async function fetchFromBrsApi(symbol) {
   const list = []
   for (const [ds, de] of WINDOWS) {
     const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
@@ -131,6 +131,73 @@ async function fetchAnnouncements(symbol) {
     await sleep(4000)
   }
   return list
+}
+
+// ═══ منبع دوم: API عمومی کدال ═══
+// BrsAPI چند نماد را اصلاً پوشش نمی‌دهد (رفاه، فاهواز، نیروترانسفو، …): HTTP 200 با صفر اطلاعیه،
+// در حالی که همان لحظه برای نماد سالم داده می‌دهد. برای آن‌ها مستقیم از کدال می‌گیریم.
+// خروجی هم‌شکل BrsAPI ساخته می‌شود تا بقیهٔ خط لوله دست نخورد.
+const CODAL_Q = 'https://search.codal.ir/api/search/v2/q'
+  + '?Audited=true&AuditorRef=-1&Category=-1&Childs=false&CompanyState=-1&CompanyType=-1'
+  + '&Consolidatable=true&IsNotAudited=false&Length=-1&LetterType=-1&Mains=true'
+  + '&NotAudited=true&NotConsolidatable=true&Publisher=false&TracingNo=-1&search=true'
+
+async function fetchFromCodal(symbol) {
+  const out = []
+  for (let p = 1; p <= 12; p++) {
+    const url = `${CODAL_Q}&Symbol=${encodeURIComponent(symbol)}&PageNumber=${p}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: { 'User-Agent': 'Mozilla/5.0' } })
+    if (res.status === 429) throw new Error('کدال ۴۲۹ (rate limit)')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const letters = (await res.json())?.Letters ?? []
+    if (!letters.length) break
+    for (const l of letters) {
+      if (l.Symbol !== symbol) continue
+      out.push({
+        l18: l.Symbol,
+        title: l.Title,
+        date_publish: l.PublishDateTime ?? l.SentDateTime ?? null,
+        link_excel: l.ExcelUrl || null,
+        link_attachment: l.AttachmentUrl || null,
+        link: l.Url || null,
+      })
+    }
+    await sleep(1500)
+  }
+  return out
+}
+
+// نماد شاهد: اگر این هم صفر برگرداند، واقعاً throttle است؛ اگر داده بدهد،
+// صفر بودنِ نماد هدف یعنی BrsAPI آن را ندارد — نه throttle. (بدون این، به ازای هر
+// نماد بی‌پوشش چهار بار ۱۵ دقیقه الکی صبر می‌شد.)
+const CANARY = 'شپدیس'
+async function brsApiHealthy() {
+  try {
+    const [ds, de] = WINDOWS[WINDOWS.length - 1]
+    const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
+      + `&l18=${encodeURIComponent(CANARY)}&date_start=${ds}&date_end=${de}`
+    const data = await fetchJson(url)
+    return (Array.isArray(data) ? data : (data?.announcement ?? [])).length > 0
+  } catch { return false }
+}
+
+// خروجی: { list, throttled }
+async function fetchAnnouncements(symbol) {
+  const list = await fetchFromBrsApi(symbol)
+  if (list.length) return { list, throttled: false }
+
+  // صفر اطلاعیه: throttle است یا BrsAPI این نماد را ندارد؟
+  await sleep(2000)
+  if (!(await brsApiHealthy())) return { list: [], throttled: true }
+
+  console.log(`  BrsAPI «${symbol}» را ندارد — از خود کدال می‌گیریم`)
+  try {
+    const alt = await fetchFromCodal(symbol)
+    return { list: alt, throttled: false }
+  } catch (e) {
+    console.log(`    کدال: ${e.message}`)
+    return { list: [], throttled: /۴۲۹/.test(e.message) }
+  }
 }
 
 // ═══ دانلود اکسل-HTML کدال و پارس با XLSX (با retry برای throttle) ═══
@@ -532,10 +599,10 @@ async function buildSymbol(symbol, opts = {}) {
   }
 
   console.log(`\n═══ ${symbol} ═══`)
-  const list = await fetchAnnouncements(symbol)
+  const { list, throttled } = await fetchAnnouncements(symbol)
   console.log(`  ${list.length} اطلاعیه`)
-  // صفر اطلاعیه = تقریباً همیشه throttle کدال (هر شرکت بورسی اطلاعیه دارد)
-  if (list.length === 0) return 'throttle'
+  // صفر اطلاعیه: فقط وقتی throttle است که نماد شاهد هم چیزی برنگرداند
+  if (list.length === 0) return throttled ? 'throttle' : 'empty'
   const { monthly, quarterly } = pickReports(list)
   console.log(`  فعالیت ماهانه: ${monthly.length} دوره | صورت مالی: ${quarterly.length} دوره`)
 
