@@ -30,6 +30,7 @@ const fs   = require('fs')
 const { buildSymbol, sbClient, OUT_DIR } = require('./codal-company-reports.js')
 const { buildMonthlyReportData, renderMonthlyReportCardHtml, screenshotMonthlyReportCard } = require('./monthly-report-card.js')
 const { buildQuarterlyReportData, renderQuarterlyReportCardHtml, screenshotQuarterlyReportCard } = require('./quarterly-report-card.js')
+const { TELEGRAM_CHANNEL } = require('./brand-assets.js')
 
 const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
@@ -335,6 +336,7 @@ async function sendMonthlyPhoto(symbol, payload, monthEntry) {
     narrated || summary.body,
     `${SITE}/stock/${encodeURIComponent(symbol)}`,
     '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
+    TELEGRAM_CHANNEL,
   ].join('\n\n'))
   const browser = await getBrowser()
   const html = renderMonthlyReportCardHtml(data, symbol)
@@ -356,6 +358,7 @@ async function sendQuarterlyPhoto(symbol, payload, quarterEntry) {
     narrated || summary.body,
     `${SITE}/stock/${encodeURIComponent(symbol)}`,
     '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
+    TELEGRAM_CHANNEL,
   ].join('\n\n'))
   const browser = await getBrowser()
   const html = renderQuarterlyReportCardHtml(data, symbol)
