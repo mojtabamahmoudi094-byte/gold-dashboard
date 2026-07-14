@@ -105,10 +105,13 @@ async function main() {
 
   // دامنه «رصد لحظه‌ای»: سهام + صندوق‌های مبتنی بر سهام (سهامی/اهرمی/بخشی)
   const watchItems = []
+  // فقط برای نمودار توزیع محدوده قیمتی کارت «سهام»: حق تقدم هم اضافه می‌شود (در watchItems اصلی نیست)
+  const rightsItems = []
   const byIndustry = new Map()
   for (const it of arr) {
     if (!isStock(it)) {
       if (EQUITY_FUND_NAMES.has(clean(it.l18))) watchItems.push(it)
+      else if (/حق تقدم|حق‌تقدم/.test(clean(it.l30))) rightsItems.push(it)
       continue
     }
     watchItems.push(it)
@@ -174,7 +177,8 @@ async function main() {
   // ── رصد لحظه‌ای بازار: هر دسته یک اسنپ‌شات ۵ دقیقه‌ای در market_watch ──
   const cats = []
   if (stocksOpen) {
-    cats.push(['stocks', watchItems])
+    // نمودار توزیع محدوده قیمتی کارت سهام: سهام + ص.سهامی (watchItems) + حق تقدم
+    cats.push(['stocks', watchItems, watchItems.concat(rightsItems)])
     cats.push(['bourse-funds', arr.filter(it => EQUITY_FUND_NAMES.has(clean(it.l18)))])
   }
 
@@ -196,9 +200,9 @@ async function main() {
     }
   }
 
-  for (const [cat, items] of cats) {
+  for (const [cat, items, distItems] of cats) {
     if (items.length === 0) { console.log(`[stocks-industries] ${cat}: نمادی پیدا نشد — رد شد`); continue }
-    const watch = computeMarketWatch(items)
+    const watch = computeMarketWatch(items, distItems)
     const { error: mwErr } = await sb.from('market_watch').insert({ cat, d: watch })
     if (mwErr) console.error(`[stocks-industries] market_watch(${cat}): ${mwErr.message}`)
     else console.log(`✅ market_watch(${cat}) ثبت شد (${watch.t} — ${watch.count} نماد، هیجان ${watch.excitement})`)
@@ -208,8 +212,22 @@ async function main() {
 // کد حقیقی با سرانه خرید/فروش بالای این آستانه «پول درشت» تلقی می‌شود (۵۰۰ میلیون ریال = ۵۰ میلیون تومان)
 const BIG_MONEY_PC_RIAL = 500_000_000
 
+// باکت‌بندی درصد آخرین معامله (plp) برای نمودار «محدوده قیمتی آخرین معاملات» — ۱۲ باکت
+const PLP_BUCKETS = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5] // مرزهای باکت؛ n مرز → n+1 باکت
+function plpDist(items) {
+  const dist = new Array(PLP_BUCKETS.length + 1).fill(0)
+  for (const it of items) {
+    const plp = num(it.plp) ?? 0
+    let i = 0
+    while (i < PLP_BUCKETS.length && plp >= PLP_BUCKETS[i]) i++
+    dist[i]++
+  }
+  return dist
+}
+
 // سنجه‌های تجمیعی کل بازار سهام برای نمودارهای «رصد لحظه‌ای» — همه ارزش‌ها به ریال
-function computeMarketWatch(items) {
+// distItems: مجموعه نمادهای مخصوص نمودار توزیع محدوده قیمتی (اگر نده، همان items استفاده می‌شود)
+function computeMarketWatch(items, distItems) {
   let mov_pos = 0, mov_neg = 0   // تحرک: درصد «آخرین» مثبت/منفی
   let sym_pos = 0, sym_neg = 0   // نمادها: درصد «پایانی» مثبت/منفی
   let buyq = 0, sellq = 0        // صف خرید/فروش: بهترین سفارش روی سقف/کف دامنه
@@ -269,6 +287,7 @@ function computeMarketWatch(items) {
     ord_demand: r(ord_demand), ord_supply: r(ord_supply),
     ordx_demand: r(ordx_demand), ordx_supply: r(ordx_supply),
     money_in: r(money_in),
+    plp_dist: plpDist(distItems ?? items),
     big_buy: r(bigBuyVal), big_sell: r(bigSellVal),
   }
 }

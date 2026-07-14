@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import {
-  ResponsiveContainer, ComposedChart, Line, Bar, Area,
+  ResponsiveContainer, ComposedChart, BarChart, Line, Bar, Area, Cell, LabelList,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ReferenceLine,
 } from 'recharts'
 import { useIsMobile } from '../../../lib/useIsMobile'
@@ -33,6 +33,7 @@ type Row = {
   ordx_demand: number; ordx_supply: number
   money_in: number
   big_buy: number; big_sell: number
+  plp_dist: number[]
 }
 type Datum = Row & {
   tvalB: number; tval5m: number
@@ -48,6 +49,20 @@ const CATS: Record<string, { title: string; hours: string }> = {
   silver:         { title: 'صندوق‌های نقره',   hours: '۱۲:۰۰ تا ۱۷:۳۰' },
   saffron:        { title: 'صندوق‌های زعفران', hours: '۱۲:۰۰ تا ۱۷:۳۰' },
 }
+
+// عنوان کارت «محدوده قیمتی آخرین معاملات» — برای سهام شامل حق تقدم و ص.سهامی هم می‌شود
+const DIST_TITLES: Record<string, string> = {
+  stocks: 'محدوده قیمتی آخرین معاملات سهام، حق تقدم و ص.سهامی',
+  'bourse-funds': 'محدوده قیمتی آخرین معاملات صندوق‌های بورسی',
+  gold: 'محدوده قیمتی آخرین معاملات صندوق‌های طلا',
+  silver: 'محدوده قیمتی آخرین معاملات صندوق‌های نقره',
+  saffron: 'محدوده قیمتی آخرین معاملات صندوق‌های زعفران',
+}
+// برچسب ۱۲ باکت — باید با PLP_BUCKETS در scripts/stocks-industries.js هم‌ترازی داشته باشد
+const PLP_BUCKET_LABELS = [
+  'پایین‌تر از منفی ۵', 'منفی ۴ تا ۵', 'منفی ۳ تا ۴', 'منفی ۲ تا ۳', 'منفی ۱ تا ۲', 'صفر تا منفی ۱',
+  'صفر تا مثبت ۱', 'مثبت ۱ تا ۲', 'مثبت ۲ تا ۳', 'مثبت ۳ تا ۴', 'مثبت ۴ تا ۵', 'بالاتر از مثبت ۵',
+]
 
 const fa = (n: number, d = 0) => n.toLocaleString('fa-IR', { maximumFractionDigits: d })
 const C = {
@@ -305,6 +320,36 @@ export default function MarketMonitorPage() {
     )
   }
 
+  const distTitle = DIST_TITLES[cat] ?? `محدوده قیمتی آخرین معاملات ${cfg?.title ?? ''}`
+
+  const renderDistChart = (big: boolean) => {
+    if (!last) return null
+    const dist = last.plp_dist ?? []
+    const rows = PLP_BUCKET_LABELS.map((name, i) => ({ name, value: dist[i] ?? 0, neg: i < 6 }))
+    const tickBig = big ? { ...axisTick, fontSize: 11 } : { ...axisTick, fontSize: 9 }
+    return (
+      <ResponsiveContainer>
+        <BarChart data={rows} margin={{ top: 6, left: 4, right: 6, bottom: 0 }}>
+          <CartesianGrid stroke={C.border} strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="name" tick={tickBig} interval={0} angle={-35} textAnchor="end" height={big ? 76 : 58} />
+          <YAxis tick={tickBig} tickFormatter={(v: number) => fa(v)} width={big ? 50 : 40} orientation="right" />
+          <ReTooltip
+            contentStyle={tooltipStyle}
+            cursor={{ fill: 'rgba(255,255,255,0.06)' }}
+            formatter={(v: any) => [fa(Number(v)), 'تعداد نماد']}
+          />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={animate} animationDuration={900}>
+            {rows.map((r, i) => <Cell key={i} fill={r.neg ? C.red : C.green} />)}
+            {big && (
+              <LabelList dataKey="value" position="top" formatter={(v: any) => fa(Number(v))}
+                style={{ fontFamily: FONT, fontSize: 12, fontWeight: 800, fill: '#eef1f8' }} />
+            )}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    )
+  }
+
   if (!cfg) {
     return (
       <main style={{ minHeight: '100vh', background: C.bg, color: '#eef1f8', fontFamily: FONT, direction: 'rtl', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 18 }}>
@@ -360,6 +405,25 @@ export default function MarketMonitorPage() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: 16 }}>
+            {last?.plp_dist && (
+              <button className="chart-card" onClick={() => setExpanded('plp_dist')}
+                aria-label={`بزرگ‌نمایی ${distTitle}`}
+                style={{
+                  all: 'unset', boxSizing: 'border-box', cursor: 'zoom-in',
+                  background: `linear-gradient(165deg, ${C.blue}0c, rgba(255,255,255,0.02))`,
+                  border: `1px solid ${C.border}`, borderTop: `2px solid ${C.blue}55`,
+                  borderRadius: 18, padding: '18px 10px 8px',
+                  display: 'flex', flexDirection: 'column', minWidth: 0,
+                  transition: 'border-color 0.2s, transform 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = `${C.blue}66` }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border }}>
+                <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                  <div style={{ fontSize: 15.5, fontWeight: 800, color: '#eef1f8' }}>{distTitle}</div>
+                </div>
+                <div style={{ width: '100%', height: 240 }}>{renderDistChart(false)}</div>
+              </button>
+            )}
             {DEFS.map((def, i) => (
               <button key={def.id} className="chart-card" onClick={() => setExpanded(def.id)}
                 aria-label={`بزرگ‌نمایی ${def.title}`}
@@ -388,6 +452,33 @@ export default function MarketMonitorPage() {
       </div>
 
       {/* ── مودال بزرگ‌نمایی ── */}
+      {expanded === 'plp_dist' && last?.plp_dist && (
+        <div onClick={close} role="dialog" aria-modal="true" style={{
+          position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(4,6,10,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+          padding: isMobile ? 10 : 32,
+        }}>
+          <div className="chart-modal" onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 1200, height: isMobile ? '82vh' : '78vh',
+            background: `linear-gradient(165deg, ${C.blue}0e, ${C.panel})`,
+            border: `1px solid ${C.border}`, borderTop: `2px solid ${C.blue}77`,
+            borderRadius: 20, padding: isMobile ? '14px 8px 10px' : '20px 16px 14px',
+            display: 'flex', flexDirection: 'column', boxShadow: '0 30px 90px rgba(0,0,0,0.7)',
+            fontFamily: FONT, direction: 'rtl',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, padding: '0 8px' }}>
+              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{distTitle}</span>
+              <button onClick={close} aria-label="بستن" style={{
+                all: 'unset', cursor: 'pointer', width: 34, height: 34, borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: C.text, border: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.04)',
+                fontSize: 16, fontWeight: 700,
+              }}>✕</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>{renderDistChart(true)}</div>
+          </div>
+        </div>
+      )}
       {expandedDef && last && (
         <div onClick={close} role="dialog" aria-modal="true" style={{
           position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
