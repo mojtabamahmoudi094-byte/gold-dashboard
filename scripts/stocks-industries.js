@@ -123,6 +123,8 @@ async function main() {
       tvol: num(it.tvol),
       mv: num(it.mv),                        // ارزش بازار (ریال)
       pe: num(it.pe),
+      bi: num(it.Buy_I_Volume), si: num(it.Sell_I_Volume),   // حجم خرید/فروش حقیقی — برای badge خرید/فروش
+      bn: num(it.Buy_N_Volume), sn: num(it.Sell_N_Volume),   // حجم خرید/فروش حقوقی
     })
   }
 

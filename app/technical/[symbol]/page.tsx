@@ -28,7 +28,10 @@ type Row = {
   adj_low: number | null
   adj_close: number | null
 }
-type SymRow = { l18: string; pcp: number | null; pl?: number | null; plp?: number | null; pc?: number | null }
+type SymRow = {
+  l18: string; pcp: number | null; pl?: number | null; plp?: number | null; pc?: number | null
+  bi?: number | null; si?: number | null   // حجم خرید/فروش حقیقی — برای badge خرید/فروش
+}
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
 const toSlug = (s: string) => encodeURIComponent(s.replace(/\s+/g, '-'))
@@ -167,6 +170,33 @@ export default function TechnicalSymbolPage() {
   const line  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.08)'
   const glass = glassStyle(isDark)
 
+  // نشان خرید/نگه‌دار/فروش — rule ساده: RSI + هیستوگرام مکدی + خالص پول حقیقی امروز
+  // هر سیگنال ±۱ می‌دهد؛ حداقل ۲ سیگنال معتبر لازم است، جمع ≥۲ خرید و ≤−۲ فروش
+  const tradeBadge = useMemo(() => {
+    if (!summary) return null
+    let score = 0, signals = 0
+    if (summary.rsi !== null) {
+      signals++
+      if (summary.rsi < 30) score++
+      else if (summary.rsi > 70) score--
+    }
+    if (summary.macdHist !== null) {
+      signals++
+      if (summary.macdHist > 0) score++
+      else if (summary.macdHist < 0) score--
+    }
+    if (liveRow?.bi != null && liveRow?.si != null) {
+      signals++
+      const net = liveRow.bi - liveRow.si
+      if (net > 0) score++
+      else if (net < 0) score--
+    }
+    if (signals < 2) return null
+    if (score >= 2) return { label: 'خرید', color: GREEN }
+    if (score <= -2) return { label: 'فروش', color: RED }
+    return { label: 'نگه‌دار', color: '#F5B93E' }
+  }, [summary, liveRow])
+
   // قیمت نمایشی: در ساعت بازار آخرین معامله زنده، وگرنه پایانی آخرین کندل
   const showLive = isOpen && liveRow?.pl != null
   const shownPrice = showLive ? (liveRow!.pl as number) : summary?.last.close ?? null
@@ -212,6 +242,18 @@ export default function TechnicalSymbolPage() {
           }}>
             {symbol}
           </h1>
+
+          {/* نشان خرید/نگه‌دار/فروش — RSI + مکدی + خالص پول حقیقی */}
+          {tradeBadge && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 99,
+              color: tradeBadge.color, background: `${tradeBadge.color}1c`,
+              border: `1px solid ${tradeBadge.color}44`, flexShrink: 0,
+            }}>
+              {tradeBadge.label}
+            </span>
+          )}
 
           {/* چیپ ضربان بازار */}
           <span style={{
