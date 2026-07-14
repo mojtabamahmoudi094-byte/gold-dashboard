@@ -257,6 +257,7 @@ export default function StockPage() {
               {reports && reports.quarters.length > 0 && (
                 <QuarterlyFinSection quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
               )}
+              <ShareholdersSection symbol={symbol} t={{ panel, text, muted, line, isDark }} />
               <CodalAnnouncements symbol={symbol} isDark={isDark} isMobile={isMobile} />
               <AiChatSection symbol={symbol} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
             </>
@@ -318,6 +319,72 @@ function AnalysisSection({ months, quarters, t, isMobile }: { months: RMonth[]; 
       </div>
       <div style={{ fontSize: 9.5, color: t.muted, marginTop: 14, lineHeight: 1.7 }}>
         این تحلیل خودکار و صرفاً بر پایه گزارش‌های کدال محاسبه شده است و توصیه خرید یا فروش نیست.
+      </div>
+    </SectionCard>
+  )
+}
+
+type Holder = { id: number; name: string; percent: number; percentChange: number; status: 'in' | 'out' | 'hold' }
+type ShareholdersPayload = { date: string; holders: Holder[] }
+
+// سهامداران عمده — از /api/stock-shareholders (پرشده روزی یک‌بار بعد از بسته‌شدن بازار)
+function ShareholdersSection({ symbol, t }: { symbol: string; t: Theme }) {
+  const [data, setData] = useState<ShareholdersPayload | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setData(null)
+    setFailed(false)
+    fetch(`/api/stock-shareholders/${encodeURIComponent(symbol.replace(/\s+/g, '-'))}`)
+      .then(r => { if (!r.ok) throw new Error(); return r.json() })
+      .then(setData)
+      .catch(() => setFailed(true))
+  }, [symbol])
+
+  if (failed || (data && data.holders.length === 0)) return null
+  if (!data) return null
+
+  const top = data.holders.slice(0, 10)
+  const entries = data.holders.filter(h => h.status === 'in')
+  const exits = data.holders.filter(h => h.status === 'out')
+
+  return (
+    <SectionCard title="سهامداران عمده" badge={data.date} accent="#a78bfa" t={t}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {top.map((h, i) => (
+          <div key={h.id} style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10,
+            background: i % 2 === 0 ? (t.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,30,46,0.02)') : 'transparent',
+          }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: t.muted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
+            <span style={{
+              fontSize: 12, color: t.text, flex: 1, minWidth: 0,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{h.name}</span>
+            {h.status === 'in' && (
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: '#22c55e', background: '#22c55e1c', borderRadius: 6, padding: '2px 6px', flexShrink: 0 }}>سهامدار تازه</span>
+            )}
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: t.text, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>
+              {h.percent.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪
+            </span>
+            {Math.abs(h.percentChange) >= 0.01 && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, flexShrink: 0, fontFamily: 'system-ui, sans-serif',
+                color: h.percentChange > 0 ? GREEN : RED,
+              }}>
+                {h.percentChange > 0 ? '▲' : '▼'} {Math.abs(h.percentChange).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪
+              </span>
+            )}
+          </div>
+        ))}
+        {exits.length > 0 && (
+          <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>
+            امروز {exits.length.toLocaleString('fa-IR')} سهامدار عمده به‌طور کامل خارج شد: {exits.map(h => h.name).join('، ')}
+          </div>
+        )}
+        <div style={{ fontSize: 10, color: t.muted, marginTop: 4 }}>
+          مقایسه مالکیت سهامداران عمده در ابتدا و انتهای معاملات {data.date} — منبع: تابلوی معاملات تسهیم (تسه‌مک)
+        </div>
       </div>
     </SectionCard>
   )
