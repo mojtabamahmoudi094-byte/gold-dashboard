@@ -71,6 +71,8 @@ type M = {
   pd1: number | null; po1: number | null
   spreadPct: number | null   // (عرضه−تقاضا)÷تقاضا ٪
   ratioW: number | null; ratioM: number | null
+  buyQueue: boolean          // صف خرید (قفل در سقف قیمت)
+  sellQueue: boolean         // صف فروش (قفل در کف قیمت)
 }
 
 function buildMetrics(arr: any[], vol: Map<string, { w: number | null; m: number | null }>): M[] {
@@ -105,6 +107,12 @@ function buildMetrics(arr: any[], vol: Map<string, { w: number | null; m: number
     const pd1 = num(it.pd1), po1 = num(it.po1)
     const spreadPct = pd1 && po1 && pd1 > 0 && po1 > 0 ? ((po1 - pd1) / pd1) * 100 : null
 
+    // صف خرید/فروش (همان منطق scripts/stocks-industries.js)
+    const tmax = num(it.tmax), tmin = num(it.tmin)
+    const qd1 = num(it.qd1) ?? 0, qo1 = num(it.qo1) ?? 0
+    const buyQueue = !!(tmax && pd1 != null && pd1 >= tmax && qd1 > 0)
+    const sellQueue = !!(tmin && po1 != null && po1 <= tmin && qo1 > 0)
+
     const v = vol.get(sym)
     out.push({
       sym, name,
@@ -118,6 +126,7 @@ function buildMetrics(arr: any[], vol: Map<string, { w: number | null; m: number
       dVal, oVal, pd1, po1, spreadPct,
       ratioW: v?.w ? tvol / v.w : null,
       ratioM: v?.m ? tvol / v.m : null,
+      buyQueue, sellQueue,
     })
   }
   return out
@@ -147,8 +156,9 @@ function buildCards(ms: M[], hasVol: boolean): Card[] {
   const c2cToI = ms.filter((r) =>
     (r.sellNPct ?? 0) >= 50 && (100 - (r.buyNPct ?? 0)) >= 50
     && (r.bp ?? 0) >= 1 && r.pl >= r.pc && r.plp > 0 && hotVol(r, 1.25))
-  const heavyBuy = ms.filter((r) => r.dVal >= 3e10 && r.dVal >= 2 * r.oVal)
-  const heavySell = ms.filter((r) => r.oVal >= 3e10 && r.oVal >= 2 * r.dVal)
+  // صف خرید/فروش حذف می‌شود: نماد قفل‌شده «سنگین خرید/فروش» زنده نیست، حالت متفاوتی است
+  const heavyBuy = ms.filter((r) => r.dVal >= 3e10 && r.dVal >= 2 * r.oVal && !r.buyQueue)
+  const heavySell = ms.filter((r) => r.oVal >= 3e10 && r.oVal >= 2 * r.dVal && !r.sellQueue)
   const suspW = hasVol ? ms.filter((r) => (r.ratioW ?? 0) >= 3) : []
   const suspM = hasVol ? ms.filter((r) => (r.ratioM ?? 0) >= 2) : []
   const legalBuy = top(ms.filter((r) => r.tval >= 1e9 && (r.buyNPct ?? 0) > 0), (r) => r.buyNPct ?? 0, 20)
@@ -186,14 +196,14 @@ function buildCards(ms: M[], hasVol: boolean): Card[] {
     },
     {
       id: 'heavy-buy', title: 'اردرهای حمایتی و سنگین خرید', tone: 'green',
-      desc: 'ارزش سفارش‌های خرید (۵ سطح تقاضا) ≥۳ میلیارد تومان و حداقل ۲ برابر عرضه',
+      desc: 'ارزش سفارش‌های خرید (۵ سطح تقاضا) ≥۳ میلیارد تومان و حداقل ۲ برابر عرضه — نمادهای در صف خرید حذف می‌شوند',
       cols: [cSym, cPl, cBp, cDemand,
         { label: 'ارزش تقاضا', key: 'dVal', fmt: (r) => fToman(r.dVal), num: (r) => r.dVal },
         cVol], rows: top(heavyBuy, (r) => r.dVal),
     },
     {
       id: 'heavy-sell', title: 'اردرهای ترس و سنگین فروش', tone: 'red',
-      desc: 'ارزش سفارش‌های فروش (۵ سطح عرضه) ≥۳ میلیارد تومان و حداقل ۲ برابر تقاضا',
+      desc: 'ارزش سفارش‌های فروش (۵ سطح عرضه) ≥۳ میلیارد تومان و حداقل ۲ برابر تقاضا — نمادهای در صف فروش حذف می‌شوند',
       cols: [cSym, cPl, cBp, cSupply,
         { label: 'ارزش عرضه', key: 'oVal', fmt: (r) => fToman(r.oVal), num: (r) => r.oVal },
         cVol], rows: top(heavySell, (r) => r.oVal),
