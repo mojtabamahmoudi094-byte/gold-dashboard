@@ -459,14 +459,67 @@ function universe() {
 }
 
 // حالت خام: هر اطلاعیهٔ هر نمادی، بدون فیلتر دسته و بدون پارس مالی — فقط forward سریع
-// برای هرمس (ایجنت بیرونی که همین کانال تلگرام رو می‌خونه). کرون هر ۲ دقیقه.
+// مستقیم به سشن هرمس (ایجنت بیرونی، سرور خارج IP). کرون هر ۲ دقیقه.
+// بدون لینک کدال — سرور هرمس خارجه و کدال IP خارجی رو بلاک می‌کنه، لینک به کارش نمیاد.
 function formatRawAnnouncement(a) {
   return [
     `📢 #${a.symbol.replace(/\s+/g, '_')}`,
     a.title,
     a.publish,
-    a.url,
   ].filter(Boolean).join('\n')
+}
+
+// ═══ ارسال به سشن هرمس (Hermes WebUI) — لاگین رمز → کوکی + CSRF → /api/chat/start ═══
+const HERMES_URL        = process.env.HERMES_URL
+const HERMES_PASSWORD   = process.env.HERMES_PASSWORD
+const HERMES_SESSION_ID = process.env.HERMES_SESSION_ID
+const HERMES_MODEL          = process.env.HERMES_MODEL || 'buy'
+const HERMES_MODEL_PROVIDER = process.env.HERMES_MODEL_PROVIDER || 'custom:buy'
+const HERMES_WORKSPACE      = process.env.HERMES_WORKSPACE || '/root/workspace'
+const HERMES_PROFILE        = process.env.HERMES_PROFILE || 'default'
+
+let _hermesAuth = null // { cookie, csrf } — یک‌بار در طول اجرا گرفته می‌شود
+async function hermesLogin() {
+  if (_hermesAuth) return _hermesAuth
+  const loginRes = await fetch(`${HERMES_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: HERMES_PASSWORD }),
+    signal: AbortSignal.timeout(20_000),
+  })
+  const cookie = (loginRes.headers.get('set-cookie') || '').split(';')[0]
+  const loginData = await loginRes.json()
+  if (!loginData.ok || !cookie) throw new Error(`لاگین هرمس ناموفق: ${loginData.error || loginRes.status}`)
+
+  const pageRes = await fetch(`${HERMES_URL}/session/${HERMES_SESSION_ID}`, {
+    headers: { Cookie: cookie },
+    signal: AbortSignal.timeout(20_000),
+  })
+  const html = await pageRes.text()
+  const m = html.match(/csrfToken:"([a-f0-9]+)"/)
+  if (!m) throw new Error('توکن CSRF هرمس پیدا نشد')
+
+  _hermesAuth = { cookie, csrf: m[1] }
+  return _hermesAuth
+}
+
+async function sendHermes(text) {
+  if (!HERMES_URL || !HERMES_PASSWORD || !HERMES_SESSION_ID) { log('⚠️ HERMES_URL/HERMES_PASSWORD/HERMES_SESSION_ID تنظیم نشده — پیام هرمس ارسال نشد'); return }
+  const { cookie, csrf } = await hermesLogin()
+  const res = await fetch(`${HERMES_URL}/api/chat/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie, 'X-Hermes-CSRF-Token': csrf },
+    body: JSON.stringify({
+      session_id: HERMES_SESSION_ID,
+      message: text,
+      model: HERMES_MODEL,
+      model_provider: HERMES_MODEL_PROVIDER,
+      workspace: HERMES_WORKSPACE,
+      profile: HERMES_PROFILE,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!res.ok) throw new Error(`ارسال به هرمس ناموفق: HTTP ${res.status}`)
 }
 
 async function runRaw() {
@@ -483,10 +536,10 @@ async function runRaw() {
 
   if (DRY) { for (const a of fresh) log(`  • ${a.symbol} — ${a.title}`); log('dry run — چیزی ارسال نشد'); return }
 
-  // قدیمی‌ترین اول، تا ترتیب انتشار در کانال حفظ شود
+  // قدیمی‌ترین اول، تا ترتیب انتشار برای هرمس حفظ شود
   for (const a of [...fresh].reverse()) {
-    try { await sendTelegram(formatRawAnnouncement(a)) }
-    catch (e) { log(`⚠️ ${a.symbol}: ارسال خام شکست خورد — ${e.message}`) }
+    try { await sendHermes(formatRawAnnouncement(a)) }
+    catch (e) { log(`⚠️ ${a.symbol}: ارسال به هرمس شکست خورد — ${e.message}`) }
     seenRaw.add(a.key)
     await sleep(600)
   }
