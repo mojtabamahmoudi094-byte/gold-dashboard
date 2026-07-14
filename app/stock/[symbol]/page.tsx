@@ -186,6 +186,14 @@ export default function StockPage() {
                       }}>
                         نمودار تکنیکال
                       </Link>
+                      <Link href={`/fundamentals/${encodeURIComponent(symbol.replace(/\s+/g, '-'))}`} style={{
+                        display: 'inline-block',
+                        fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
+                        padding: '4px 11px', borderRadius: 8,
+                        background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.28)',
+                      }}>
+                        نسبت‌های مالی
+                      </Link>
                     </div>
                   </div>
                   {/* پیل قیمت پایانی */}

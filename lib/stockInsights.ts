@@ -35,6 +35,10 @@ export type RQuarter = {
   sga: number | null; op: number | null; fin_cost: number | null
   net: number | null; net_ly: number | null
   eps: number | null; capital: number | null
+  // ترازنامه — پایان دوره جاری / پایان سال مالی قبل (نه دورهٔ مشابه)
+  assets?: number | null; assets_prev?: number | null
+  liabilities?: number | null; liabilities_prev?: number | null
+  equity?: number | null; equity_prev?: number | null
 }
 export type Reports = { symbol: string; updated: string; months: RMonth[]; quarters: RQuarter[] }
 

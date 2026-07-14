@@ -40,7 +40,7 @@ const OUT_DIR = path.join(__dirname, 'reports-out')
 // نسخهٔ پارسر — با هر تغییر منطق پارس یکی بالا برود.
 // خروجی قدیمی‌تر از این نسخه دوباره ساخته می‌شود، حتی بدون --force؛ وگرنه بعد از
 // اصلاح پارسر، نمادهایی که فایل کهنه دارند برای همیشه skip می‌شوند.
-const PARSER_VERSION = 5
+const PARSER_VERSION = 6
 
 // خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
 // SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
@@ -553,6 +553,53 @@ function parsePL(wb) {
   return null
 }
 
+// ═══ پارس ترازنامه — همان اکسل صورت‌های مالی میاندوره‌ای/سالانه، شیت جداگانه ═══
+// ستون‌ها: ۱=پایان دوره جاری، ۲=پایان سال مالی قبل (نه دورهٔ مشابه — ترازنامه مقطعی است)
+// ⚠️ لیبل‌ها بر اساس فرم استاندارد کدال حدس زده شده‌اند؛ چون دسترسی به اکسل واقعی از این
+// محیط مسدود است (fetch failed روی excel.codal.ir)، قبل از فعال‌سازی در cron باید با
+// `node codal-reports-probe.js <نماد>` روی سرور ایرانی نام شیت/لیبل واقعی تأیید شود.
+const BS_MAP = [
+  ['assets',      /^جمعداراییها$|^جمعکلداراییها$/],
+  ['liabilities', /^جمعبدهیها$|^جمعکلبدهیها$/],
+  ['equity',      /^جمعحقوقصاحبانسهام$/],
+]
+
+function parseBS(wb) {
+  for (const sn of wb.SheetNames) {
+    const rows = sheetRows(wb, sn)
+    const labels = rows.map(r => label(r[0]))
+    if (!labels.some(l => /^جمعحقوقصاحبانسهام$/.test(l))) continue
+    const out = {}
+    rows.forEach((r, i) => {
+      const v = faNum(r[1])
+      if (v === null) return
+      for (const [key, re] of BS_MAP) {
+        if (out[key] === undefined && re.test(labels[i])) {
+          out[key] = v
+          out[key + '_prev'] = faNum(r[2])   // پایان سال مالی قبل
+        }
+      }
+    })
+    if (out.equity !== undefined) {
+      for (const [key] of BS_MAP) {
+        if (out[key] === undefined) { out[key] = null; out[key + '_prev'] = null }
+      }
+      return out
+    }
+  }
+  return null
+}
+
+// صورت سود و زیان + ترازنامه — هر دو از یک اکسل صورت‌های مالی
+function parseFinancials(wb) {
+  const pl = parsePL(wb)
+  if (!pl) return null
+  const bs = parseBS(wb) || Object.fromEntries(
+    BS_MAP.flatMap(([key]) => [[key, null], [key + '_prev', null]]),
+  )
+  return { ...pl, ...bs }
+}
+
 // ═══ انتخاب اطلاعیه‌ها ═══
 function pickReports(list) {
   const isSub = (t) => /\(شرکت /.test(t)                  // گزارش زیرمجموعه
@@ -687,7 +734,7 @@ async function buildSymbol(symbol, opts = {}) {
 
   const quarters = []
   for (const g of quarterly) {
-    const r = await firstParsable(g.candidates, parsePL)
+    const r = await firstParsable(g.candidates, parseFinancials)
     if (r.reason) { console.log(`    ⚠️ فصلی ${g.key}: ${r.reason} ناموفق (${g.candidates.length} نسخه)`); continue }
     const t = norm(r.a.title)
     const dur = t.match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
