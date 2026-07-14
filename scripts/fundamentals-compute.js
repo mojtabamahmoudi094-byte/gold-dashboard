@@ -9,10 +9,8 @@
  * روی سرور ایرانی، بعد از هر اجرای موفق codal-watch.js:
  *   node fundamentals-compute.js
  *
- * ⚠️ فیلدهای ترازنامه (assets/liabilities/equity) در parseBS (codal-company-reports.js)
- * روی لیبل‌های حدسی کدال نوشته شده‌اند و هنوز روی داده واقعی تأیید نشده‌اند — تا وقتی
- * `node codal-reports-probe.js <نماد>` روی سرور این لیبل‌ها را تأیید نکند، ROE/ROA/P.B
- * ممکن است null بمانند (P/E و رشد EPS به آن‌ها وابسته نیستند و از قبل درست کار می‌کنند).
+ * فیلدهای ترازنامه (assets/liabilities/equity) در parseBS (codal-company-reports.js) روی
+ * داده واقعی شپدیس تأیید شدند — چک تراز (دارایی = بدهی + حقوق مالکانه) هم برقرار بود.
  */
 
 'use strict'
