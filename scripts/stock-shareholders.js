@@ -57,8 +57,10 @@ function toJalali(gy, gm, gd) {
   const jd = 1 + (days < 186 ? days % 31 : (days - 186) % 30)
   return [jy, jm, jd]
 }
-function todayShamsiDash() {
+// دیروز، نه امروز — before_trade امروز تا فردا نهایی نمی‌شود (تست دستی نشان داد: قبل از تسویه شبانه خالی برمی‌گردد)
+function yesterdayShamsiDash() {
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
+  now.setDate(now.getDate() - 1)
   const [y, m, d] = toJalali(now.getFullYear(), now.getMonth() + 1, now.getDate())
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
@@ -95,7 +97,7 @@ async function main() {
   if (ONLY) symbols = symbols.filter(s => s === ONLY)
   console.log(`[stock-shareholders] ${symbols.length} نماد`)
 
-  const date = todayShamsiDash()
+  const date = yesterdayShamsiDash()
   let ok = 0, empty = 0, failed = 0
 
   for (const l18 of symbols) {
@@ -109,14 +111,16 @@ async function main() {
         empty++
         continue
       }
-      const beforeById = new Map(before.map((h) => [h.id, h]))
-      const afterById = new Map(after.map((h) => [h.id, h]))
-      const ids = new Set([...beforeById.keys(), ...afterById.keys()])
-      const holders = [...ids].map((id) => {
-        const b = beforeById.get(id), a = afterById.get(id)
+      // نکته: id بین before_trade و after_trade برای همان سهامدار یکی نیست (ثابت نمی‌ماند بین درخواست‌ها) —
+      // match باید با نام تمیزشده باشد، نه id
+      const normName = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+      const beforeByName = new Map(before.map((h) => [normName(h.name), h]))
+      const afterByName = new Map(after.map((h) => [normName(h.name), h]))
+      const names = new Set([...beforeByName.keys(), ...afterByName.keys()])
+      const holders = [...names].map((name) => {
+        const b = beforeByName.get(name), a = afterByName.get(name)
         return {
-          id,
-          name: (a || b).name,
+          name,
           percent: a ? a.percent : 0,
           percentChange: (a ? a.percent : 0) - (b ? b.percent : 0),
           status: !b ? 'in' : !a ? 'out' : 'hold',   // in=سهامدار تازه, out=خروج کامل امروز, hold=قبلا هم بوده

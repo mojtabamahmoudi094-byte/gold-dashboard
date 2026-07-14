@@ -324,7 +324,7 @@ function AnalysisSection({ months, quarters, t, isMobile }: { months: RMonth[]; 
   )
 }
 
-type Holder = { id: number; name: string; percent: number; percentChange: number; status: 'in' | 'out' | 'hold' }
+type Holder = { name: string; percent: number; percentChange: number; status: 'in' | 'out' | 'hold' }
 type ShareholdersPayload = { date: string; holders: Holder[] }
 
 // سهامداران عمده — از /api/stock-shareholders (پرشده روزی یک‌بار بعد از بسته‌شدن بازار)
@@ -352,7 +352,7 @@ function ShareholdersSection({ symbol, t }: { symbol: string; t: Theme }) {
     <SectionCard title="سهامداران عمده" badge={data.date} accent="#a78bfa" t={t}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {top.map((h, i) => (
-          <div key={h.id} style={{
+          <div key={h.name} style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10,
             background: i % 2 === 0 ? (t.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,30,46,0.02)') : 'transparent',
           }}>
