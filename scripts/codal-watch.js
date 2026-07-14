@@ -14,7 +14,12 @@
  *   node codal-watch.js --hours 72      → بازهٔ بلندتر (جبران قطعی)
  *   node codal-watch.js --dry           → فقط گزارش کن، چیزی نساز
  *
- * وضعیت در codal-watch-state.json نگه داشته می‌شود تا یک اطلاعیه دوبار پردازش نشود.
+ * حالت خام (کرون جدا هر ۲ دقیقه) — هر اطلاعیهٔ هر نمادی را بدون فیلتر دسته و
+ * بدون پارس مالی فوری به تلگرام فوروارد می‌کند (برای مصرف سریع ایجنت بیرونی):
+ *   node codal-watch.js --raw           → اطلاعیه‌های ۳ ساعت اخیر، فقط forward
+ *
+ * وضعیت در codal-watch-state.json نگه داشته می‌شود تا یک اطلاعیه دوبار پردازش نشود
+ * (seen برای حالت عادی، seenRaw جدا برای حالت خام).
  */
 
 'use strict'
@@ -24,6 +29,7 @@ const fs   = require('fs')
 
 const { buildSymbol, sbClient, OUT_DIR } = require('./codal-company-reports.js')
 const { buildMonthlyReportData, renderMonthlyReportCardHtml, screenshotMonthlyReportCard } = require('./monthly-report-card.js')
+const { buildQuarterlyReportData, renderQuarterlyReportCardHtml, screenshotQuarterlyReportCard } = require('./quarterly-report-card.js')
 
 const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
@@ -31,12 +37,14 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID
 const SITE = process.env.SITE_URL || 'https://bourssanj.ir'
 const DRY = process.argv.includes('--dry')
+const RAW = process.argv.includes('--raw')
 const hoursIdx = process.argv.indexOf('--hours')
-const HOURS = hoursIdx !== -1 ? Number(process.argv[hoursIdx + 1]) : 36
+const HOURS = hoursIdx !== -1 ? Number(process.argv[hoursIdx + 1]) : (RAW ? 3 : 36)
 
 const STATE_FILE = path.join(__dirname, 'codal-watch-state.json')
 const LOG_FILE   = path.join(__dirname, 'codal-watch.log')
 const SEEN_CAP   = 5000
+const SEEN_RAW_CAP = 8000
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
@@ -71,17 +79,34 @@ const monthName = (p) => { const pp = periodParts(p); return pp ? J_MONTHS[pp.mo
 // میلیون ریال → میلیارد تومان (÷۱۰٬۰۰۰)
 const toman = (v) => v == null ? '—' : faNumFmt(v / 1e4, Math.abs(v / 1e4) < 100 ? 1 : 0)
 
-// P/E ttm از فید BrsAPI (stocks-industries.json — هر ۵ دقیقه در ساعات بازار تازه می‌شود)
-let _peMap = null
-function peOf(symbol) {
-  if (_peMap === null) {
-    _peMap = new Map()
-    try {
-      const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'stocks-industries.json'), 'utf8'))
-      for (const ind of data.industries) for (const s of ind.symbols) if (s.pe != null && s.pe > 0) _peMap.set(s.l18, s.pe)
-    } catch {}
-  }
-  return _peMap.get(symbol) ?? null
+// فید BrsAPI (stocks-industries.json — هر ۵ دقیقه در ساعات بازار تازه می‌شود): P/E، آخرین قیمت، ارزش بازار، میانگین P/E صنعت
+let _stockMap = null   // symbol → {pe, pl, mv, industryId}
+let _groupPeAvg = null // industryId → میانگین pe صنعت (فقط نمادهای pe مثبت)
+function loadStockInfo() {
+  if (_stockMap) return
+  _stockMap = new Map()
+  _groupPeAvg = new Map()
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'stocks-industries.json'), 'utf8'))
+    for (const ind of data.industries) {
+      const pes = []
+      for (const s of ind.symbols) {
+        _stockMap.set(s.l18, { pe: s.pe ?? null, pl: s.pl ?? null, mv: s.mv ?? null, industryId: ind.id })
+        if (s.pe != null && s.pe > 0) pes.push(s.pe)
+      }
+      _groupPeAvg.set(ind.id, pes.length ? pes.reduce((a, b) => a + b, 0) / pes.length : null)
+    }
+  } catch {}
+}
+function peOf(symbol) { loadStockInfo(); return _stockMap.get(symbol)?.pe ?? null }
+// {pe, groupPe, mv (ریال), shares} یا null اگر نماد تو فید نبود
+function stockInfo(symbol) {
+  loadStockInfo()
+  const s = _stockMap.get(symbol)
+  if (!s) return null
+  const groupPe = _groupPeAvg.get(s.industryId) ?? null
+  const shares = s.mv != null && s.pl ? Math.round(s.mv / s.pl) : null
+  return { pe: s.pe, groupPe, mv: s.mv, shares }
 }
 
 // ورودی ماه قبلِ تقویمی (نه صرفاً عنصر قبلی آرایه)
@@ -318,6 +343,27 @@ async function sendMonthlyPhoto(symbol, payload, monthEntry) {
   return true
 }
 
+// صورت مالی میاندوره‌ای/سالانه → کارت عکسی (روند سود+آمار)، نه متن خام
+async function sendQuarterlyPhoto(symbol, payload, quarterEntry) {
+  const info = stockInfo(symbol)
+  const data = buildQuarterlyReportData(payload, info)
+  if (!data) return false
+  const summary = summarizeQuarter(symbol, quarterEntry)
+  const narrated = await narrate(symbol, summary.body)
+  const caption = capCaption([
+    `#${symbol.replace(/\s+/g, '_')}`,
+    summary.tag,
+    narrated || summary.body,
+    `${SITE}/stock/${encodeURIComponent(symbol)}`,
+    '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
+  ].join('\n\n'))
+  const browser = await getBrowser()
+  const html = renderQuarterlyReportCardHtml(data, symbol)
+  const buf = await screenshotQuarterlyReportCard(browser, html)
+  await sendPhoto(buf, caption)
+  return true
+}
+
 const toLatin = (s) => String(s || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
 // «۱۴۰۵/۰۴/۱۹ ۱۱:۴۰:۳۰» → «1405/04/19 11:40:30» — عرض ثابت، پس مقایسهٔ رشته‌ای = مقایسهٔ زمانی
 const pdt = (s) => toLatin(s).replace(/\s+/g, ' ').trim()
@@ -359,6 +405,7 @@ async function fromCodal(since) {
         symbol: l.Symbol,
         title: l.Title,
         publish,
+        url: l.Url ? `https://codal.ir${l.Url}` : null,
         key: String(l.TracingNo ?? `${l.Symbol}|${l.Title}|${publish}`),
       })
     }
@@ -411,7 +458,47 @@ function universe() {
   return set
 }
 
+// حالت خام: هر اطلاعیهٔ هر نمادی، بدون فیلتر دسته و بدون پارس مالی — فقط forward سریع
+// برای هرمس (ایجنت بیرونی که همین کانال تلگرام رو می‌خونه). کرون هر ۲ دقیقه.
+function formatRawAnnouncement(a) {
+  return [
+    `📢 #${a.symbol.replace(/\s+/g, '_')}`,
+    a.title,
+    a.publish,
+    a.url,
+  ].filter(Boolean).join('\n')
+}
+
+async function runRaw() {
+  log(`▶ دیده‌بان خام کدال — بازهٔ ${HOURS} ساعت`)
+  const uni = universe()
+  const st = loadState()
+  const seenRaw = new Set(st.seenRaw || [])
+
+  const all = await fetchRecent()
+  const fresh = all.filter(a => a.symbol && uni.has(a.symbol) && !seenRaw.has(a.key))
+
+  if (fresh.length === 0) { log('هیچ اطلاعیهٔ تازه‌ای نیست.'); return }
+  log(`${fresh.length} اطلاعیهٔ تازه (خام) در ${new Set(fresh.map(a => a.symbol)).size} نماد`)
+
+  if (DRY) { for (const a of fresh) log(`  • ${a.symbol} — ${a.title}`); log('dry run — چیزی ارسال نشد'); return }
+
+  // قدیمی‌ترین اول، تا ترتیب انتشار در کانال حفظ شود
+  for (const a of [...fresh].reverse()) {
+    try { await sendTelegram(formatRawAnnouncement(a)) }
+    catch (e) { log(`⚠️ ${a.symbol}: ارسال خام شکست خورد — ${e.message}`) }
+    seenRaw.add(a.key)
+    await sleep(600)
+  }
+
+  st.seenRaw = [...seenRaw].slice(-SEEN_RAW_CAP)
+  saveState(st)
+  log(`✔ خام تمام شد. ${fresh.length} اطلاعیه فوروارد شد.`)
+}
+
 async function main() {
+  if (RAW) return runRaw()
+
   log(`▶ دیده‌بان کدال — بازهٔ ${HOURS} ساعت${DRY ? ' (dry run)' : ''}`)
   if (!sbClient()) log('⚠️ SUPABASE_URL/SUPABASE_KEY تنظیم نشده — خروجی فقط روی فایل می‌رود، سایت به‌روز نمی‌شود')
 
