@@ -23,6 +23,7 @@ const path = require('path')
 const fs   = require('fs')
 
 const { buildSymbol, sbClient, OUT_DIR } = require('./codal-company-reports.js')
+const { buildMonthlyReportData, renderMonthlyReportCardHtml, screenshotMonthlyReportCard } = require('./monthly-report-card.js')
 
 const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
@@ -188,8 +189,8 @@ function summarizeQuarter(symbol, q) {
 }
 
 // symbol, و عناوین اطلاعیه‌هایی که برای همین اجرا «تازه» تشخیص داده شدند (تعیین می‌کند ماهانه/فصلی کدام‌یک واقعاً جدیدند)
-function buildKeyPoints(symbol, payload, freshTitles) {
-  const hasMonthly   = freshTitles.some(isMonthlyTitle)
+function buildKeyPoints(symbol, payload, freshTitles, opts = {}) {
+  const hasMonthly   = freshTitles.some(isMonthlyTitle) && !opts.skipMonthly
   const hasQuarterly = freshTitles.some(isQuarterlyTitle)
   const parts = []
   if (hasMonthly && payload.months.length) parts.push(summarizeMonth(symbol, payload.months, payload.months[payload.months.length - 1]))
@@ -251,6 +252,70 @@ async function sendTelegram(text) {
     const data = await res.json()
     if (!data.ok) log(`⚠️ رله تلگرام هم ناموفق: ${data.error || res.status}`)
   } catch (e) { log(`⚠️ رله تلگرام هم خطا داد: ${e.message}`) }
+}
+
+// تلگرام کپشن عکس را حداکثر ۱۰۲۴ کاراکتر می‌پذیرد (نه ۴۰۹۶ مثل پیام متنی معمولی)
+const CAPTION_LIMIT = 1024
+const capCaption = (s) => (s.length > CAPTION_LIMIT ? s.slice(0, CAPTION_LIMIT - 1) + '…' : s)
+
+// api.telegram.org از داخل ایران فیلتر است — اول مستقیم، بعد از راه رلهٔ سایت (همون الگوی telegram-report.js)
+async function sendPhoto(buf, caption) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — عکس ارسال نشد'); return }
+  try {
+    const form = new FormData()
+    form.append('chat_id', TELEGRAM_CHAT_ID)
+    form.append('caption', caption)
+    form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'report.jpg')
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(15_000) })
+    const data = await res.json()
+    if (data.ok) return
+    log(`⚠️ ارسال مستقیم عکس ناموفق: ${data.description || 'نامشخص'} — تلاش از راه رله`)
+  } catch (e) { log(`⚠️ ارسال مستقیم عکس خطا داد (${e.message}) — تلاش از راه رله`) }
+
+  try {
+    const res = await fetch(`${SITE}/api/telegram-relay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: TELEGRAM_CHAT_ID, photo: buf.toString('base64'), caption }),
+      signal: AbortSignal.timeout(90_000), // کلد-استارت Render
+    })
+    const data = await res.json()
+    if (!data.ok) log(`⚠️ رلهٔ عکس هم ناموفق: ${data.error || res.status}`)
+  } catch (e) { log(`⚠️ رلهٔ عکس هم خطا داد: ${e.message}`) }
+}
+
+// مرورگر مشترک puppeteer — فقط وقتی واقعاً یه گزارش تولیدی برای کارت‌سازی داریم راه‌اندازی می‌شه (نه هر اجرا)
+let _browser = null
+async function getBrowser() {
+  if (_browser) return _browser
+  const puppeteer = require('puppeteer')
+  _browser = await puppeteer.launch({
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  })
+  return _browser
+}
+async function closeBrowser() { if (_browser) { await _browser.close(); _browser = null } }
+
+// گزارش فعالیت ماهانهٔ تولیدی → کارت عکسی (نمودار+جدول)، نه متن خام
+async function sendMonthlyPhoto(symbol, payload, monthEntry) {
+  const data = buildMonthlyReportData(payload)
+  if (!data) return false
+  const summary = summarizeMonth(symbol, payload.months, monthEntry)
+  const narrated = await narrate(symbol, summary.body)
+  const caption = capCaption([
+    `#${symbol.replace(/\s+/g, '_')}`,
+    summary.tag,
+    narrated || summary.body,
+    `${SITE}/stock/${encodeURIComponent(symbol)}`,
+    '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.',
+  ].join('\n\n'))
+  const browser = await getBrowser()
+  const html = renderMonthlyReportCardHtml(data, symbol)
+  const buf = await screenshotMonthlyReportCard(browser, html)
+  await sendPhoto(buf, caption)
+  return true
 }
 
 const toLatin = (s) => String(s || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
@@ -381,7 +446,19 @@ async function main() {
           const outFile = path.join(OUT_DIR, `${s.replace(/\s+/g, '-')}.json`)
           const payload = JSON.parse(fs.readFileSync(outFile, 'utf8'))
           const freshTitles = fresh.filter(a => a.symbol === s).map(a => norm(a.title))
-          const kp = buildKeyPoints(s, payload, freshTitles)
+
+          // ماهانهٔ تولیدی (فرم «نام محصول») → کارت عکسی؛ بقیهٔ فرم‌ها (بانک/خدماتی/پرتفوی) و فصلی → متن قبلی
+          const hasMonthly = freshTitles.some(isMonthlyTitle)
+          const latestMonth = hasMonthly && payload.months.length ? payload.months[payload.months.length - 1] : null
+          const monthlyIsProduction = !!latestMonth && latestMonth.kind === 'production'
+          let monthlyPhotoSent = false
+          if (monthlyIsProduction) {
+            try { monthlyPhotoSent = await sendMonthlyPhoto(s, payload, latestMonth) }
+            catch (e) { log(`⚠️ ${s}: کارت عکسی ماهانه شکست خورد، ادامه با متن — ${e.message}`) }
+          }
+
+          // اگه عکس واقعاً نرفت (خطا/عدم داده)، متن قدیمی جایگزینش می‌شه — گزارش نباید کامل از دست بره
+          const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent })
           if (kp) {
             const narrated = await narrate(s, kp.facts)
             await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text)
@@ -399,7 +476,12 @@ async function main() {
   st.lastRun = new Date().toISOString()
   saveState(st)
 
+  await closeBrowser()
   log(`✔ تمام شد. ✅${built.size} به‌روز | ⛔${fail} ناموفق`)
 }
 
-main().catch(e => { log(`FATAL ${(e && e.stack) || e}`); process.exit(1) })
+module.exports = { sendMonthlyPhoto, closeBrowser }
+
+if (require.main === module) {
+  main().catch(e => { log(`FATAL ${(e && e.stack) || e}`); process.exit(1) })
+}

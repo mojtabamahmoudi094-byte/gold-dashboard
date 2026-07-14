@@ -13,6 +13,8 @@
 
 'use strict'
 
+const { SITE_URL, TELEGRAM_CHANNEL, LOGO_DATA_URI } = require('./brand-assets')
+
 const CREAM = '#ddd5bd'
 const MUTED = '#a99f88'
 const GOLD = '#caa66a'
@@ -45,7 +47,7 @@ function renderCardHtml({ emoji = '📊', title, subtitle, bigStat, rows = [], f
 <meta charset="utf-8">
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; width: 1080px; height: 720px; background: ${BG}; }
+  html, body { margin: 0; padding: 0; width: 1080px; height: 760px; background: ${BG}; }
   body {
     font-family: 'Vazirmatn', 'Noto Color Emoji', Tahoma, sans-serif;
     display: flex; align-items: center; justify-content: center;
@@ -56,7 +58,7 @@ function renderCardHtml({ emoji = '📊', title, subtitle, bigStat, rows = [], f
   .bigValue { font-family: 'Vazirmatn Black', 'Vazirmatn', Tahoma, sans-serif; }
   .value { font-family: 'Vazirmatn Medium', 'Vazirmatn', Tahoma, sans-serif; }
   .card {
-    width: 1000px; height: 640px;
+    width: 1000px; height: 680px;
     background: linear-gradient(160deg, ${PANEL} 0%, ${BG} 100%);
     border: 1px solid ${BORDER};
     border-radius: 28px;
@@ -74,7 +76,9 @@ function renderCardHtml({ emoji = '📊', title, subtitle, bigStat, rows = [], f
     content: ''; position: absolute; top: 0; right: 0; left: 0; height: 5px;
     background: linear-gradient(90deg, ${GOLD}, transparent 70%);
   }
-  .brand { color: ${GOLD}; font-size: 26px; font-weight: 700; }
+  .brand { color: ${GOLD}; font-size: 26px; font-weight: 700; display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+  .brand img { width: 44px; height: 44px; border-radius: 50%; }
+  .brandFooter { z-index: 1; margin-top: 10px; color: ${MUTED}; font-size: 15px; text-align: center; }
   .head { display: flex; align-items: center; justify-content: space-between; z-index: 1; }
   .head .emoji { font-size: 40px; }
   .title { color: ${CREAM}; font-size: 34px; font-weight: 700; margin-top: 6px; }
@@ -98,13 +102,14 @@ function renderCardHtml({ emoji = '📊', title, subtitle, bigStat, rows = [], f
         ${subtitle ? `<div class="subtitle">${esc(subtitle)}</div>` : ''}
       </div>
       <div>
-        <div class="brand">بورس سنج</div>
+        <div class="brand"><span>بورس سنج</span><img src="${LOGO_DATA_URI}" alt=""></div>
         <div class="emoji" style="text-align:left">${esc(emoji)}</div>
       </div>
     </div>
     ${bigHtml}
     <div class="rows">${rowsHtml}</div>
     ${footer ? `<div class="footer">${esc(footer)}</div>` : ''}
+    <div class="brandFooter">${esc(SITE_URL)} — ${esc(TELEGRAM_CHANNEL)}</div>
   </div>
 </body>
 </html>`
@@ -112,7 +117,7 @@ function renderCardHtml({ emoji = '📊', title, subtitle, bigStat, rows = [], f
 
 async function screenshotCard(browser, html) {
   const page = await browser.newPage()
-  await page.setViewport({ width: 1080, height: 720, deviceScaleFactor: 2 })
+  await page.setViewport({ width: 1080, height: 760, deviceScaleFactor: 2 })
   await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30_000 })
   const buf = await page.screenshot({ type: 'jpeg', quality: 90 })
   await page.close()

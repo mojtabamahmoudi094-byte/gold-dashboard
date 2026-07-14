@@ -40,7 +40,7 @@ const OUT_DIR = path.join(__dirname, 'reports-out')
 // نسخهٔ پارسر — با هر تغییر منطق پارس یکی بالا برود.
 // خروجی قدیمی‌تر از این نسخه دوباره ساخته می‌شود، حتی بدون --force؛ وگرنه بعد از
 // اصلاح پارسر، نمادهایی که فایل کهنه دارند برای همیشه skip می‌شوند.
-const PARSER_VERSION = 4
+const PARSER_VERSION = 5
 
 // خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
 // SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
@@ -347,6 +347,10 @@ function parseMonthly(wb) {
     const at = (r, i) => (i === -1 ? null : faNum(r[i]))
     const products = []
     let totals = null
+    // سرفصل‌های بخش: «فروش داخلی:» → 'domestic'، «فروش صادراتی:» → 'export'.
+    // پیش‌فرض 'domestic' برای فرم‌هایی که همان اول محصول را بدون سرفصل صریح می‌آورند.
+    // بقیهٔ سرفصل‌ها (درآمد ارائه خدمات، برگشت از فروش، تخفیفات) محصول واقعی نیستند — section=null یعنی ردیف‌های زیرشان push نمی‌شوند.
+    let section = 'domestic'
     for (let i = hi + 1; i < rows.length; i++) {
       const r = rows[i]
       const name = norm(r[0])
@@ -355,12 +359,19 @@ function parseMonthly(wb) {
         totals = { month: at(r, c.month), cum: at(r, c.cum), lastYearCum: at(r, c.lastCum) }
         break
       }
-      if (name.endsWith(':') || name.startsWith('جمع')) continue
+      if (name.endsWith(':')) {
+        if (/^فروش داخلی:?$/.test(name)) section = 'domestic'
+        else if (/^فروش صادراتی:?$/.test(name)) section = 'export'
+        else section = null
+        continue
+      }
+      if (name.startsWith('جمع')) continue
+      if (!section) continue
       const amount_m = at(r, c.month)
       const qty_m    = at(r, c.qty_m)
       if (amount_m === null && qty_m === null) continue
       products.push({
-        name, unit: norm(r[1]) || null,
+        name, unit: norm(r[1]) || null, channel: section,
         prod_m: at(r, c.prod_m), qty_m, rate_m: at(r, c.rate_m), amount_m,
         amount_cum: at(r, c.cum),
       })
@@ -668,6 +679,8 @@ async function buildSymbol(symbol, opts = {}) {
   for (const g of monthly) {
     const r = await firstParsable(g.candidates, parseAnyMonthly)
     if (r.reason) { console.log(`    ⚠️ ماهانه ${g.key}: ${r.reason} ناموفق (${g.candidates.length} نسخه)`); continue }
+    // شفافیت برای دیباگ بعدی: کدوم نسخه واقعاً استفاده شد (اصلاحیه یا اصلی، وقتی چند نسخه بود)
+    if (g.candidates.length > 1) console.log(`    ℹ️ ماهانه ${g.key}: از ${g.candidates.length} نسخه، «${norm(r.a.title)}» (منتشر ${faDate(r.a.date_publish)}) انتخاب شد`)
     months.push({ period: faDate(r.a.title), publish: faDate(r.a.date_publish), kind: 'production', ...r.p })
   }
   months.sort((a, b) => a.period.localeCompare(b.period))
@@ -728,7 +741,18 @@ async function main() {
         if (!seen.has(s.l18)) { seen.add(s.l18); symbols.push(s.l18) }
       }
     }
-    console.log(`همه صنایع — ${symbols.length} نماد یکتا`)
+    const live = symbols.length
+    // stocks-industries.json فقط نمادهای فید زندهٔ BrsAPI را دارد؛ نمادی که یک بار از فید
+    // بیفتد (تعلیق، بدون معامله) دیگر هرگز بازسازی نمی‌شود و برای همیشه با پارسر کهنه می‌ماند.
+    // پس هر نمادی که قبلاً خروجی ساخته‌ایم هم در دامنه بماند.
+    try {
+      for (const f of fs.readdirSync(OUT_DIR)) {
+        if (!f.endsWith('.json')) continue
+        const s = f.replace(/\.json$/, '').replace(/-/g, ' ')
+        if (!seen.has(s)) { seen.add(s); symbols.push(s) }
+      }
+    } catch { /* هنوز خروجی‌ای نیست */ }
+    console.log(`همه صنایع — ${symbols.length} نماد یکتا (${live} از فید زنده، ${symbols.length - live} از خروجی‌های قبلی)`)
   } else if (indIdx !== -1) {
     const id = Number(process.argv[indIdx + 1])
     const file = path.join(__dirname, 'stocks-industries.json')
@@ -766,7 +790,7 @@ async function main() {
 }
 
 // codal-watch.js این ماژول را require می‌کند و فقط buildSymbol را صدا می‌زند
-module.exports = { buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR }
+module.exports = { buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR, parseMonthly }
 
 if (require.main === module) {
   main().catch(e => { console.error(e); process.exit(1) })
