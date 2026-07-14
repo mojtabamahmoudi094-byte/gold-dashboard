@@ -353,7 +353,7 @@ export default function MarketMonitorPage() {
         <BarChart data={rows} margin={{ top: 6, left: 4, right: 6, bottom: 0 }}>
           <CartesianGrid stroke={C.border} strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="name" tick={distTick(big) as any} interval={0} tickLine={false} height={big ? 46 : 36} />
-          <YAxis tick={tickBig} tickFormatter={(v: number) => fa(v)} width={big ? 50 : 40} orientation="right" />
+          <YAxis tick={tickBig} tickFormatter={(v: number) => fa(v)} width={big ? 50 : 40} orientation="right" allowDecimals={false} />
           <ReTooltip
             contentStyle={tooltipStyle}
             cursor={{ fill: 'rgba(255,255,255,0.06)' }}
