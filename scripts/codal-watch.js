@@ -216,7 +216,7 @@ function summarizeQuarter(symbol, q) {
 // symbol, و عناوین اطلاعیه‌هایی که برای همین اجرا «تازه» تشخیص داده شدند (تعیین می‌کند ماهانه/فصلی کدام‌یک واقعاً جدیدند)
 function buildKeyPoints(symbol, payload, freshTitles, opts = {}) {
   const hasMonthly   = freshTitles.some(isMonthlyTitle) && !opts.skipMonthly
-  const hasQuarterly = freshTitles.some(isQuarterlyTitle)
+  const hasQuarterly = freshTitles.some(isQuarterlyTitle) && !opts.skipQuarterly
   const parts = []
   if (hasMonthly && payload.months.length) parts.push(summarizeMonth(symbol, payload.months, payload.months[payload.months.length - 1]))
   if (hasQuarterly && payload.quarters.length) parts.push(summarizeQuarter(symbol, payload.quarters[payload.quarters.length - 1]))
@@ -534,7 +534,7 @@ async function main() {
           const payload = JSON.parse(fs.readFileSync(outFile, 'utf8'))
           const freshTitles = fresh.filter(a => a.symbol === s).map(a => norm(a.title))
 
-          // ماهانهٔ تولیدی (فرم «نام محصول») → کارت عکسی؛ بقیهٔ فرم‌ها (بانک/خدماتی/پرتفوی) و فصلی → متن قبلی
+          // ماهانهٔ تولیدی (فرم «نام محصول») و صورت مالی فصلی/سالانه → کارت عکسی؛ بقیهٔ فرم‌های ماهانه (بانک/خدماتی/پرتفوی) → متن قبلی
           const hasMonthly = freshTitles.some(isMonthlyTitle)
           const latestMonth = hasMonthly && payload.months.length ? payload.months[payload.months.length - 1] : null
           const monthlyIsProduction = !!latestMonth && latestMonth.kind === 'production'
@@ -544,8 +544,16 @@ async function main() {
             catch (e) { log(`⚠️ ${s}: کارت عکسی ماهانه شکست خورد، ادامه با متن — ${e.message}`) }
           }
 
+          const hasQuarterly = freshTitles.some(isQuarterlyTitle)
+          const latestQuarter = hasQuarterly && payload.quarters.length ? payload.quarters[payload.quarters.length - 1] : null
+          let quarterlyPhotoSent = false
+          if (latestQuarter) {
+            try { quarterlyPhotoSent = await sendQuarterlyPhoto(s, payload, latestQuarter) }
+            catch (e) { log(`⚠️ ${s}: کارت عکسی فصلی شکست خورد، ادامه با متن — ${e.message}`) }
+          }
+
           // اگه عکس واقعاً نرفت (خطا/عدم داده)، متن قدیمی جایگزینش می‌شه — گزارش نباید کامل از دست بره
-          const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent })
+          const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent, skipQuarterly: quarterlyPhotoSent })
           if (kp) {
             const narrated = await narrate(s, kp.facts)
             await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text)
@@ -567,7 +575,7 @@ async function main() {
   log(`✔ تمام شد. ✅${built.size} به‌روز | ⛔${fail} ناموفق`)
 }
 
-module.exports = { sendMonthlyPhoto, closeBrowser }
+module.exports = { sendMonthlyPhoto, sendQuarterlyPhoto, closeBrowser }
 
 if (require.main === module) {
   main().catch(e => { log(`FATAL ${(e && e.stack) || e}`); process.exit(1) })
