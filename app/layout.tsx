@@ -1,9 +1,12 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import ChatWidget from './components/ChatWidget'
 import { SITE_URL } from '../lib/site'
+
+const GA_MEASUREMENT_ID = 'G-645YCKXK75'
 
 const title = 'بورس سنج | ترمینال هوشمند بازار'
 const description = 'پلتفرم تحلیل و رصد صندوق‌های کالایی بورس ایران'
@@ -55,6 +58,18 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl">
       <body style={{ margin: 0, padding: 0 }}>
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="ga4-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA_MEASUREMENT_ID}');
+          `}
+        </Script>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
