@@ -38,7 +38,7 @@ const NAV: NavItem[] = [
   { label: 'ارزش معاملات',  href: '/trade-value' },
   { label: 'مقایسه',        href: '/compare' },
   { label: 'سیگنال‌ها',     href: '/signals' },
-  { label: 'VIP',           href: '/vip/filters', menu: [
+  { label: 'فیلترها',       href: '/vip/filters', menu: [
     { label: 'فیلترهای VIP', href: '/vip/filters' },
   ] },
   { label: 'پورتفوی من',    href: '/portfolio' },
