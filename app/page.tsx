@@ -12,6 +12,13 @@ const TICKER_CACHE_KEY = 'bs-home-ticker-cache'
 type StockRow = { l18: string; l30: string; pl: number; plp: number; tval: number; industry: string }
 type IndustryRow = { id: number; name: string; tval: number; up: number; down: number; count: number }
 type MarketStats = { tval: number; up: number; down: number; count: number; updated: string | null }
+type RadarNetBuy = { n: string; sym?: string; net: number }
+
+// واحد رادار پول: میلیارد تومان (م.ت) — از ۱۰۰۰ به بعد همت
+const fmtBt = (v: number) =>
+  v >= 1000
+    ? `${(v / 1000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} همت`
+    : `${v.toLocaleString('fa-IR')} م.ت`
 
 // همت = هزار میلیارد تومان (۱e13 ریال)
 const fmtRial = (rial: number) =>
@@ -252,6 +259,7 @@ export default function HomePage() {
   const [gainers, setGainers] = useState<StockRow[]>([])
   const [liquid, setLiquid] = useState<StockRow[]>([])
   const [industries, setIndustries] = useState<IndustryRow[]>([])
+  const [radarTop, setRadarTop] = useState<RadarNetBuy[]>([])
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -323,8 +331,23 @@ export default function HomePage() {
         })
       } catch {}
     }
+    const loadRadar = async () => {
+      try {
+        const res = await fetch('/portfolio/_radar.json', { cache: 'no-store' })
+        if (!res.ok) return
+        const json = await res.json()
+        const stocks: any[] = json?.stocks || []
+        const netBuy = stocks
+          .map((s: any) => ({ n: String(s.n || ''), sym: s.sym as string | undefined, net: safe(s.b) - safe(s.s) }))
+          .filter(s => s.net > 1)
+          .sort((a, b) => b.net - a.net)
+          .slice(0, 5)
+        setRadarTop(netBuy)
+      } catch {}
+    }
     loadFunds()
     loadStocks()
+    loadRadar()
   }, [])
 
   const t = isDark ? darkTheme : lightTheme
@@ -722,6 +745,34 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ═══════ رادار پول هوشمند (پیش‌نمایش) ═══════ */}
+      {radarTop.length > 0 && (
+        <section style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '0 20px 48px' : '0 6vw 60px', direction: 'rtl' }}>
+          <div style={{ background: cardBg, border: cardBorder, borderRadius: 18, padding: '18px 18px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(244,114,182,0.15)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {ICON.radar('#f472b6')}
+                </span>
+                <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: 0, color: t.text }}>رادار پول هوشمند — بیشترین خرید خالص صندوق‌ها این ماه</h3>
+              </div>
+              <Link href="/funds/radar" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: t.brand, textDecoration: 'none' }}>
+                مشاهده رادار کامل
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.brand} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18 L9 12 L15 6" /></svg>
+              </Link>
+            </div>
+            {radarTop.map((s, i) => (
+              <div key={s.n} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
+                <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.sym || s.n}</span>
+                {s.sym && <span style={{ fontSize: 11.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.n}</span>}
+                <span style={{ marginInlineStart: 'auto', flexShrink: 0, fontWeight: 700, fontSize: 13, color: t.green, fontFamily: 'system-ui, sans-serif' }}>+{fmtBt(s.net)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ═══════ FEATURES ═══════ */}
       <section style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '0 20px 48px' : '0 6vw 60px', direction: 'rtl' }}>

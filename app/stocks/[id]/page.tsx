@@ -66,6 +66,17 @@ export default function IndustryPage() {
     return data.industries.find(x => String(x.id) === rawId || x.name === rawId) ?? null
   }, [data, rawId])
 
+  // میانگین و رتبه P/E صنعت — فقط از نمادهایی که P/E مثبت دارند (زیان‌ده‌ها منحرف‌کننده میانگین‌اند)
+  const peStats = useMemo(() => {
+    if (!ind) return { avg: null as number | null, ranks: new Map<string, number>(), count: 0 }
+    const withPe = ind.symbols.filter(s => s.pe !== null && s.pe > 0)
+    const avg = withPe.length ? withPe.reduce((s, x) => s + (x.pe as number), 0) / withPe.length : null
+    const ranked = [...withPe].sort((a, b) => (a.pe as number) - (b.pe as number))
+    const ranks = new Map<string, number>()
+    ranked.forEach((s, i) => ranks.set(s.l18, i + 1))
+    return { avg, ranks, count: withPe.length }
+  }, [ind])
+
   type SortKey = 'l18' | 'pc' | 'pcp' | 'pl' | 'plp' | 'tval' | 'mv' | 'pe'
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -137,6 +148,7 @@ export default function IndustryPage() {
                   ['ارزش بازار', husd(ind.mv_usd) ? `${hemat(ind.mv)} (${husd(ind.mv_usd)})` : hemat(ind.mv)],
                   ['مثبت', ind.up.toLocaleString('fa-IR')],
                   ['منفی', ind.down.toLocaleString('fa-IR')],
+                  ...(peStats.avg !== null ? [['میانگین P/E صنعت', peStats.avg.toLocaleString('fa-IR', { maximumFractionDigits: 1 })]] : []),
                 ].map(([k, v]) => (
                   <span key={k} style={{
                     padding: '5px 12px', borderRadius: 9,
@@ -170,6 +182,11 @@ export default function IndustryPage() {
                           {h}{sortKey === key ? (sortDir === 'desc' ? ' ▾' : ' ▴') : ''}
                         </th>
                       ))}
+                      {!isMobile && (
+                        <th style={{ textAlign: 'right', padding: '12px 14px', fontWeight: 500, borderBottom: `1px solid ${line}` }}>
+                          رتبه P/E صنعت
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -213,6 +230,11 @@ export default function IndustryPage() {
                             </td>
                             <td style={{ padding: '10px 14px', borderBottom: `1px solid ${line}`, color: muted }}>
                               {s.pe === null ? '—' : s.pe.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}
+                            </td>
+                            <td style={{ padding: '10px 14px', borderBottom: `1px solid ${line}`, color: muted }}>
+                              {peStats.ranks.has(s.l18)
+                                ? `${(peStats.ranks.get(s.l18) as number).toLocaleString('fa-IR')} از ${peStats.count.toLocaleString('fa-IR')}`
+                                : '—'}
                             </td>
                           </>
                         )}
