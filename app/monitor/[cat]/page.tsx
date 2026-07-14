@@ -63,6 +63,27 @@ const PLP_BUCKET_LABELS = [
   'پایین‌تر از منفی ۵', 'منفی ۴ تا ۵', 'منفی ۳ تا ۴', 'منفی ۲ تا ۳', 'منفی ۱ تا ۲', 'صفر تا منفی ۱',
   'صفر تا مثبت ۱', 'مثبت ۱ تا ۲', 'مثبت ۲ تا ۳', 'مثبت ۳ تا ۴', 'مثبت ۴ تا ۵', 'بالاتر از مثبت ۵',
 ]
+// همان برچسب‌ها دو‌خطی — چرخش (angle) روی صفحهٔ RTL جهت‌اش برعکس می‌شود و متن روی چارت می‌افتد
+const PLP_TICK_LINES: [string, string][] = [
+  ['پایین‌تر از', 'منفی ۵'], ['منفی ۴', 'تا ۵'], ['منفی ۳', 'تا ۴'], ['منفی ۲', 'تا ۳'],
+  ['منفی ۱', 'تا ۲'], ['صفر تا', 'منفی ۱'], ['صفر تا', 'مثبت ۱'], ['مثبت ۱', 'تا ۲'],
+  ['مثبت ۲', 'تا ۳'], ['مثبت ۳', 'تا ۴'], ['مثبت ۴', 'تا ۵'], ['بالاتر از', 'مثبت ۵'],
+]
+// tick سفارشی افقیِ دو‌خطی به‌جای چرخش متن
+const distTick = (big: boolean) =>
+  function DistTick(props: any) {
+    const { x, y, payload } = props
+    const [l1, l2] = PLP_TICK_LINES[payload.index] ?? ['', '']
+    const fs = big ? 11 : 9
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text textAnchor="middle" fontFamily={FONT} fontSize={fs} fill={C.text}>
+          <tspan x={0} dy={fs + 4}>{l1}</tspan>
+          <tspan x={0} dy={fs + 2}>{l2}</tspan>
+        </text>
+      </g>
+    )
+  }
 
 const fa = (n: number, d = 0) => n.toLocaleString('fa-IR', { maximumFractionDigits: d })
 const C = {
@@ -331,7 +352,7 @@ export default function MarketMonitorPage() {
       <ResponsiveContainer>
         <BarChart data={rows} margin={{ top: 6, left: 4, right: 6, bottom: 0 }}>
           <CartesianGrid stroke={C.border} strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="name" tick={tickBig} interval={0} angle={-35} textAnchor="end" height={big ? 76 : 58} />
+          <XAxis dataKey="name" tick={distTick(big) as any} interval={0} tickLine={false} height={big ? 46 : 36} />
           <YAxis tick={tickBig} tickFormatter={(v: number) => fa(v)} width={big ? 50 : 40} orientation="right" />
           <ReTooltip
             contentStyle={tooltipStyle}
