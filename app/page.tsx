@@ -7,6 +7,8 @@ import { safe, fmtCompact as fmtVal } from '../lib/format'
 import { darkTheme, lightTheme } from '../lib/theme'
 
 type TickerItem = { name: string; slug: string; price: number; changePct: number }
+
+const TICKER_CACHE_KEY = 'bs-home-ticker-cache'
 type StockRow = { l18: string; l30: string; pl: number; plp: number; tval: number; industry: string }
 type IndustryRow = { id: number; name: string; tval: number; up: number; down: number; count: number }
 type MarketStats = { tval: number; up: number; down: number; count: number; updated: string | null }
@@ -239,7 +241,13 @@ export default function HomePage() {
   const isMobile = useIsMobile()
   const [isDark, setIsDark] = useState(true)
   const [stats, setStats] = useState<{ totalTV: number; fundCount: number } | null>(null)
-  const [ticker, setTicker] = useState<TickerItem[]>([])
+  const [ticker, setTicker] = useState<TickerItem[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const cached = window.sessionStorage.getItem(TICKER_CACHE_KEY)
+      return cached ? JSON.parse(cached) : []
+    } catch { return [] }
+  })
   const [market, setMarket] = useState<MarketStats | null>(null)
   const [gainers, setGainers] = useState<StockRow[]>([])
   const [liquid, setLiquid] = useState<StockRow[]>([])
@@ -271,13 +279,13 @@ export default function HomePage() {
             changePct: safe(rec?.price_change_pct),
           }
         }).filter((f: any) => f.tradeValue > 0)
-        setTicker(
-          [...combined]
-            .filter((f: any) => f.price > 0 && f.name)
-            .sort((a: any, b: any) => b.tradeValue - a.tradeValue)
-            .slice(0, 12)
-            .map((f: any) => ({ name: f.name, slug: f.slug, price: f.price, changePct: f.changePct }))
-        )
+        const nextTicker = [...combined]
+          .filter((f: any) => f.price > 0 && f.name)
+          .sort((a: any, b: any) => b.tradeValue - a.tradeValue)
+          .slice(0, 12)
+          .map((f: any) => ({ name: f.name, slug: f.slug, price: f.price, changePct: f.changePct }))
+        setTicker(nextTicker)
+        try { window.sessionStorage.setItem(TICKER_CACHE_KEY, JSON.stringify(nextTicker)) } catch {}
         const totalTV = combined.reduce((s: number, f: any) => s + f.tradeValue, 0)
         setStats({ totalTV, fundCount: combined.length })
       } catch {}

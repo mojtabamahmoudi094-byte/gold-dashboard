@@ -324,27 +324,6 @@ export default function ChatWidget() {
 
   return (
     <div style={{ fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
-      <style>{`
-        @keyframes cwMsgIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
-        @keyframes cwPanelIn { from { opacity: 0; transform: translateY(14px) scale(0.97) } to { opacity: 1; transform: none } }
-        @keyframes cwDot { 0%,80%,100% { transform: translateY(0); opacity: .45 } 40% { transform: translateY(-4px); opacity: 1 } }
-        @keyframes cwPulse { 0%,100% { box-shadow: 0 6px 24px rgba(59,130,246,0.45) } 50% { box-shadow: 0 6px 34px rgba(139,92,246,0.6) } }
-        @keyframes cwBadge { 0%,100% { transform: scale(1) } 50% { transform: scale(1.25) } }
-        @media (prefers-reduced-motion: reduce) {
-          .cw-anim, .cw-anim * { animation: none !important; transition: none !important }
-        }
-        .cw-fab { transition: transform .2s ease, box-shadow .2s ease }
-        .cw-fab:hover { transform: translateY(-3px) scale(1.05) }
-        .cw-fab:active { transform: scale(0.96) }
-        .cw-chip { transition: transform .18s ease, box-shadow .18s ease, background .18s ease }
-        .cw-chip:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 14px ${ACCENT}30; background: ${ACCENT}1e }
-        .cw-send { transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease }
-        .cw-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px ${ACCENT}50 }
-        .cw-input:focus { outline: none; border-color: ${ACCENT}70 !important; box-shadow: 0 0 0 3px ${ACCENT}22 }
-        .cw-hbtn { transition: background .15s ease; background: transparent }
-        .cw-hbtn:hover { background: rgba(255,255,255,0.15) }
-      `}</style>
-
       {/* ————— پنل چت ————— */}
       {open && (
         <div

@@ -16,8 +16,6 @@ const PRODUCT_LINKS = [
 ]
 
 const COMPANY_LINKS = [
-  { label: 'درباره ما',    href: '#' },
-  { label: 'تماس',        href: '#' },
   { label: 'قوانین',      href: '#' },
   { label: 'حریم خصوصی', href: '#' },
 ]
