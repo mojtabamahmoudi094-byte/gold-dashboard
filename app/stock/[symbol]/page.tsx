@@ -12,11 +12,11 @@ type Sym = {
   pl: number | null; plp: number | null
   pc: number | null; pcp: number | null
   tval: number | null; tvol: number | null
-  mv: number | null; pe: number | null
+  mv: number | null; mv_usd?: number | null; pe: number | null
 }
 type Industry = {
   id: number | null; name: string; count: number
-  tval: number; mv: number; up: number; down: number
+  tval: number; mv: number; mv_usd?: number; up: number; down: number
   symbols: Sym[]
 }
 type Payload = { updated: string; industries: Industry[] }
@@ -25,6 +25,12 @@ const hemat = (rial: number) =>
   rial >= 1e13
     ? `${(rial / 1e13).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} همت`
     : `${Math.round(rial / 1e10).toLocaleString('fa-IR')} میلیارد ت`
+
+// ارزش بازار دلاری — روزی یک‌بار ساعت ۱۳ تهران توسط sync-usd-market-value.js محاسبه می‌شود
+const husd = (v: number | null | undefined) =>
+  v == null ? null : v >= 1e9
+    ? `$${(v / 1e9).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`
+    : `$${(v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`
 
 // مقادیر گزارش‌های کدال به میلیون ریال هستند
 const mrial = (v: number | null | undefined) => (v == null ? '—' : hemat(v * 1e6))
@@ -132,7 +138,7 @@ export default function StockPage() {
             ['حجم معاملات', s.tvol === null ? '—' : s.tvol >= 1e6
               ? `${(s.tvol / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م`
               : s.tvol.toLocaleString('fa-IR'), text],
-            ['ارزش بازار', s.mv === null ? '—' : hemat(s.mv), text],
+            ['ارزش بازار', s.mv === null ? '—' : husd(s.mv_usd) ? `${hemat(s.mv)} (${husd(s.mv_usd)})` : hemat(s.mv), text],
             ['P/E', s.pe === null ? '—' : s.pe.toLocaleString('fa-IR', { maximumFractionDigits: 1 }), text],
           ]
           const up = (s.pcp ?? 0) > 0, down = (s.pcp ?? 0) < 0

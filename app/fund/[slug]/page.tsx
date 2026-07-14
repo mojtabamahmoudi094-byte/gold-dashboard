@@ -11,6 +11,12 @@ import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
 
 
+// ارزش بازار دلاری — روزی یک‌بار ساعت ۱۳ تهران توسط sync-usd-market-value.js محاسبه می‌شود
+const usdFmt = (v: number) =>
+  v >= 1e9
+    ? `$${(v / 1e9).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`
+    : `$${(v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`
+
 export default function FundDetailPage() {
   const params = useParams()
   // slug فارسی (صندوق‌های بورسی) در URL انکد می‌شود — بدون decode در DB پیدا نمی‌شود
@@ -209,8 +215,8 @@ export default function FundDetailPage() {
             value={`${Math.round(safe(record.trade_value) / 1e9).toLocaleString('fa-IR')} م.ت`}
             tooltip={`ارزش دقیق: ${safe(record.trade_value).toLocaleString('fa-IR')} ریال`} />
           <MetricCard t={t} label="ارزش بازار"
-            value={`${Math.round(safe(record.market_value) / 1e12).toLocaleString('fa-IR')} ه.م.ت`}
-            tooltip={`ارزش دقیق: ${safe(record.market_value).toLocaleString('fa-IR')} ریال`} />
+            value={`${Math.round(safe(record.market_value) / 1e12).toLocaleString('fa-IR')} ه.م.ت${record.market_value_usd != null ? ` (${usdFmt(record.market_value_usd)})` : ''}`}
+            tooltip={`ارزش دقیق: ${safe(record.market_value).toLocaleString('fa-IR')} ریال${record.market_value_usd != null ? ` — ${usdFmt(record.market_value_usd)}` : ''}`} />
         </div>
 
         {/* ردیف دوم کارت‌ها */}

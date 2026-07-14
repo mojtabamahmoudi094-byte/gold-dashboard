@@ -11,11 +11,11 @@ type Sym = {
   pl: number | null; plp: number | null
   pc: number | null; pcp: number | null
   tval: number | null; tvol: number | null
-  mv: number | null; pe: number | null
+  mv: number | null; mv_usd?: number | null; pe: number | null
 }
 type Industry = {
   id: number | null; name: string; count: number
-  tval: number; mv: number; up: number; down: number
+  tval: number; mv: number; mv_usd?: number; up: number; down: number
   symbols: Sym[]
 }
 type Payload = { updated: string; industries: Industry[] }
@@ -24,6 +24,12 @@ const hemat = (rial: number) =>
   rial >= 1e13
     ? `${(rial / 1e13).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} همت`
     : `${Math.round(rial / 1e10).toLocaleString('fa-IR')} میلیارد ت`
+
+// ارزش بازار دلاری — روزی یک‌بار ساعت ۱۳ تهران توسط sync-usd-market-value.js محاسبه می‌شود
+const husd = (v: number | null | undefined) =>
+  v == null ? null : v >= 1e9
+    ? `$${(v / 1e9).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`
+    : `$${(v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`
 
 const pct = (v: number | null) =>
   v === null ? '—' : `${v > 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪`
@@ -128,7 +134,7 @@ export default function IndustryPage() {
                 {[
                   ['نماد', ind.count.toLocaleString('fa-IR')],
                   ['ارزش معاملات', hemat(ind.tval)],
-                  ['ارزش بازار', hemat(ind.mv)],
+                  ['ارزش بازار', husd(ind.mv_usd) ? `${hemat(ind.mv)} (${husd(ind.mv_usd)})` : hemat(ind.mv)],
                   ['مثبت', ind.up.toLocaleString('fa-IR')],
                   ['منفی', ind.down.toLocaleString('fa-IR')],
                 ].map(([k, v]) => (
@@ -201,6 +207,9 @@ export default function IndustryPage() {
                           <>
                             <td style={{ padding: '10px 14px', borderBottom: `1px solid ${line}` }}>
                               {s.mv === null ? '—' : hemat(s.mv)}
+                              {husd(s.mv_usd) && (
+                                <div style={{ fontSize: 10, color: muted }}>{husd(s.mv_usd)}</div>
+                              )}
                             </td>
                             <td style={{ padding: '10px 14px', borderBottom: `1px solid ${line}`, color: muted }}>
                               {s.pe === null ? '—' : s.pe.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}
