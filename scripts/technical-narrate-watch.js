@@ -77,11 +77,16 @@ async function fetchTopMovers() {
   const data = await res.json()
   const industries = Array.isArray(data.industries) ? data.industries : []
 
-  const all = []
+  const raw = []
   for (const ind of industries) for (const s of ind.symbols || []) {
     if (!s.l18 || s.pcp == null) continue
-    all.push({ symbol: s.l18, name: s.l30, pcp: s.pcp, price: s.pl })
+    raw.push(s)
   }
+  // حق تقدم (مثل «دپارسح») رفتار قیمتی سهم پایه را ندارد — نوسان طبیعی/موقتی است، نه الگوی فنی
+  // معنادار؛ همان تشخیص isCandleSymbol در candles-lib.js / stocks-industries.js
+  const allL18 = new Set(raw.map(s => s.l18))
+  const isRightsShare = (s) => /حق تقدم|حق‌تقدم/.test(s.l30 || '') || (s.l18.endsWith('ح') && allL18.has(s.l18.slice(0, -1)))
+  const all = raw.filter(s => !isRightsShare(s)).map(s => ({ symbol: s.l18, name: s.l30, pcp: s.pcp, price: s.pl }))
   all.sort((a, b) => b.pcp - a.pcp)
   const gainers = all.slice(0, PER_SIDE)
   const losers = all.slice(-PER_SIDE).reverse()
