@@ -40,6 +40,7 @@ const NAV: NavItem[] = [
   { label: 'سیگنال‌ها',     href: '/signals' },
   { label: 'فیلترها',       href: '/vip/filters', menu: [
     { label: 'فیلترهای VIP', href: '/vip/filters' },
+    { label: 'فیلترهای کاربردی', href: '/vip/useful-filters' },
   ] },
   { label: 'پورتفوی من',    href: '/portfolio' },
 ]
