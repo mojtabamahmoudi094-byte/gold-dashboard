@@ -56,7 +56,7 @@ const LIMIT = (() => {
   return a ? parseInt(a.split('=')[1], 10) : Infinity
 })()
 
-const YEARS = 3
+const YEARS = 6
 const CACHE_FILE = path.resolve(__dirname, '.candles-inscode-cache.json')
 
 if (!PROBE && (!SUPABASE_URL || !SUPABASE_KEY)) {

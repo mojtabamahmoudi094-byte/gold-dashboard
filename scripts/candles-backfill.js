@@ -2,7 +2,7 @@
 /**
  * candles-backfill.js
  *
- * بورس سنج — بک‌فیل یک‌باره کندل‌های ۳ سال اخیر همه نمادها + تاریخچه شاخص‌ها
+ * بورس سنج — بک‌فیل یک‌باره کندل‌های ۶ سال اخیر همه نمادها + تاریخچه شاخص‌ها
  * روی سرور ایرانی اجرا شود (BrsApi و tsetmc فقط به IP ایران جواب می‌دهند)
  *
  *   node candles-backfill.js --probe          → فرمت خام History.php برای یک نماد
@@ -52,7 +52,7 @@ const LIMIT        = (() => {
   return a ? parseInt(a.split('=')[1], 10) : Infinity
 })()
 
-const YEARS = 3
+const YEARS = 6
 const PROGRESS_FILE = path.resolve(__dirname, '.candles-backfill-progress.json')
 
 if (!PROBE && !PROBE_INDEX && (!SUPABASE_URL || !SUPABASE_KEY)) {
