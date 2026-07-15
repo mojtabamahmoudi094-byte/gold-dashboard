@@ -99,18 +99,34 @@ async function fetchCandles(sb, symbol) {
 }
 
 // ── ۲) روایت Gemini از روی عکس چارت ──
+// کلید Gemini پروژه رایگان و بدون billing است (مشترک با bourse-analyst)؛ محدودیت آزاد
+// gemini-2.5-flash کم است (quota exceeded با «Please retry in Ns» برمی‌گردد) — یک تلاش مجدد کافی است
+async function callNarrate(symbol, imageBuf, stats) {
+  const res = await fetch(`${SITE}/api/chart-narrative`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol, imageBase64: imageBuf.toString('base64'), mimeType: 'image/jpeg', stats }),
+    signal: AbortSignal.timeout(60_000),
+  })
+  return res.json()
+}
+
 async function narrateChart(symbol, imageBuf, stats) {
-  try {
-    const res = await fetch(`${SITE}/api/chart-narrative`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, imageBase64: imageBuf.toString('base64'), mimeType: 'image/jpeg', stats }),
-      signal: AbortSignal.timeout(60_000),
-    })
-    const data = await res.json()
-    if (data.ok && data.text) return data
-    log(`⚠️ ${symbol}: روایت Gemini ناموفق — ${data.error || 'پاسخ ناقص'}`)
-  } catch (e) { log(`⚠️ ${symbol}: روایت Gemini شکست خورد — ${e.message}`) }
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const data = await callNarrate(symbol, imageBuf, stats)
+      if (data.ok && data.text) return data
+      const retryMatch = /retry in ([\d.]+)s/i.exec(data.error || '')
+      if (retryMatch && attempt === 1) {
+        const wait = Math.ceil(Number(retryMatch[1])) + 2
+        log(`⏳ ${symbol}: quota Gemini پر است — ${wait}ثانیه صبر و یک تلاش دیگر`)
+        await sleep(wait * 1000)
+        continue
+      }
+      log(`⚠️ ${symbol}: روایت Gemini ناموفق — ${data.error || 'پاسخ ناقص'}`)
+    } catch (e) { log(`⚠️ ${symbol}: روایت Gemini شکست خورد — ${e.message}`) }
+    return null
+  }
   return null
 }
 
@@ -213,7 +229,7 @@ async function main() {
       } catch (e) {
         log(`❌ ${m.symbol}: ${e.message}`)
       }
-      await sleep(2000)
+      await sleep(10_000) // فاصله بین نمادها برای کم‌کردن فشار روی quota رایگان Gemini
     }
   } finally {
     await browser.close()
