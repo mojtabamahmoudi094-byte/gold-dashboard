@@ -152,17 +152,27 @@ async function main() {
     }
     await sleep(150) // ملایم روی API — فراخوانی تک‌به‌تک است
   }
-  console.log(`${rows.length} معامله سنگین/میلیاردی (≥۱ میلیارد تومان) پیدا شد`)
+  // دو گروه غیرمتوالی ممکن است هم‌زمان و هم‌قیمت و هم‌جهت باشند (کلید یکسان) — ادغام قبل از upsert
+  // وگرنه Postgres با «ON CONFLICT DO UPDATE command cannot affect row a second time» خطا می‌دهد
+  const dedup = new Map()
+  for (const r of rows) {
+    const k = `${r.symbol}|${r.trade_date}|${r.trade_time}|${r.price}|${r.direction}`
+    const ex = dedup.get(k)
+    if (ex) { ex.volume += r.volume; ex.value += r.value; ex.tick_count += r.tick_count; ex.updated = r.updated }
+    else dedup.set(k, r)
+  }
+  const dedupedRows = [...dedup.values()]
+  console.log(`${dedupedRows.length} معامله سنگین/میلیاردی یکتا (≥۱ میلیارد تومان) پیدا شد`)
 
-  if (rows.length === 0) return
+  if (dedupedRows.length === 0) return
   const { createClient } = require('@supabase/supabase-js')
   let wsTransport
   try { wsTransport = require('ws') } catch { /* Node 22+ نیازی ندارد */ }
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY,
     wsTransport ? { realtime: { transport: wsTransport } } : {})
 
-  for (let i = 0; i < rows.length; i += 500) {
-    const chunk = rows.slice(i, i + 500)
+  for (let i = 0; i < dedupedRows.length; i += 500) {
+    const chunk = dedupedRows.slice(i, i + 500)
     const { error } = await sb.from('hot_trades').upsert(chunk, { onConflict: 'symbol,trade_date,trade_time,price,direction' })
     if (error) throw new Error(`Supabase upsert: ${error.message}`)
   }
