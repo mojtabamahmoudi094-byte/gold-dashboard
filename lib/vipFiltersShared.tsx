@@ -69,6 +69,7 @@ export type M = {
   sellCountI: number         // تعداد کد فروشنده حقیقی
   qd1: number | null; qo1: number | null   // حجم بهترین سفارش خرید/فروش (حجم صف وقتی buyQueue/sellQueue باشد)
   moneyInI: number           // خالص ورود پول حقیقی امروز (ریال، + یعنی ورود)
+  perCapBuyerN: number | null // سرانه خرید حقوقی (ریال)
 }
 
 export function buildMetrics(
@@ -96,6 +97,8 @@ export function buildMetrics(
     const perCapB = bCI > 0 ? (bI * pc) / bCI : null
     const perCapS = sCI > 0 ? (sI * pc) / sCI : null
     const bp = perCapB != null && perCapS != null && perCapS > 0 ? perCapB / perCapS : null
+    const bCN = num(it.Buy_CountN) ?? 0
+    const perCapBuyerN = bCN > 0 ? (bN * pc) / bCN : null
 
     let dVal = 0, oVal = 0
     for (let i = 1; i <= 5; i++) {
@@ -134,6 +137,7 @@ export function buildMetrics(
       buyCountI: bCI, sellCountI: sCI,
       qd1, qo1,
       moneyInI: (bI - sI) * pc,
+      perCapBuyerN,
     })
   }
   return out

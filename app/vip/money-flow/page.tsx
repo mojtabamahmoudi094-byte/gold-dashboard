@@ -169,6 +169,9 @@ export default function MoneyFlowPage() {
   const [symMoneyIn5, setSymMoneyIn5] = useState<Map<string, number> | null>(null)
   const [symMoneyIn22, setSymMoneyIn22] = useState<Map<string, number> | null>(null)
   const [symMoneyIn66, setSymMoneyIn66] = useState<Map<string, number> | null>(null)
+  const [symLegalIn5, setSymLegalIn5] = useState<Map<string, number> | null>(null)
+  const [symLegalIn22, setSymLegalIn22] = useState<Map<string, number> | null>(null)
+  const [symLegalIn66, setSymLegalIn66] = useState<Map<string, number> | null>(null)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -245,45 +248,60 @@ export default function MoneyFlowPage() {
   }, [])
 
   // بیشترین ورود پول حقیقی (سطح نماد) — تاریخچه stock_moneyflow_daily، پنجره‌های ۵/۲۲/۶۶ روز کاری
+  // تاریخچه ورود/خروج روزانه هر نماد (حقیقی: stock_moneyflow_daily، حقوقی: stock_legalflow_daily) →
+  // مجموع پنجره‌های ۵/۲۲/۶۶ روز کاری هر نماد
+  const fetchFlowHistory = async (table: string) => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 100)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
+    const raw: { symbol: string; trade_date: string; money_in: number | null }[] = []
+    for (let off = 0; off < 100_000; off += 1000) {
+      const { data, error } = await supabase
+        .from(table)
+        .select('symbol, trade_date, money_in')
+        .gte('trade_date', cutoffStr)
+        .order('trade_date', { ascending: false })
+        .order('symbol', { ascending: true })
+        .range(off, off + 999)
+      if (error || !data?.length) break
+      raw.push(...data)
+      if (data.length < 1000) break
+    }
+    const bySym = new Map<string, number[]>()
+    for (const r of raw) {
+      if (r.money_in == null) continue
+      if (!bySym.has(r.symbol)) bySym.set(r.symbol, [])
+      bySym.get(r.symbol)!.push(r.money_in) // ترتیب نزولی تاریخ حفظ می‌شود
+    }
+    const sumN = (vals: number[], n: number) => vals.slice(0, n).reduce((s, v) => s + v, 0)
+    const m5 = new Map<string, number>(), m22 = new Map<string, number>(), m66 = new Map<string, number>()
+    for (const [sym, vals] of bySym) {
+      if (vals.length === 0) continue
+      m5.set(sym, sumN(vals, 5)); m22.set(sym, sumN(vals, 22)); m66.set(sym, sumN(vals, 66))
+    }
+    return { m5, m22, m66 }
+  }
+
   const loadSymbolHistory = async () => {
     try {
-      const cutoff = new Date()
-      cutoff.setDate(cutoff.getDate() - 100)
-      const cutoffStr = cutoff.toISOString().slice(0, 10)
-      const raw: { symbol: string; trade_date: string; money_in: number | null }[] = []
-      for (let off = 0; off < 100_000; off += 1000) {
-        const { data, error } = await supabase
-          .from('stock_moneyflow_daily')
-          .select('symbol, trade_date, money_in')
-          .gte('trade_date', cutoffStr)
-          .order('trade_date', { ascending: false })
-          .order('symbol', { ascending: true })
-          .range(off, off + 999)
-        if (error || !data?.length) break
-        raw.push(...data)
-        if (data.length < 1000) break
-      }
-      const bySym = new Map<string, number[]>()
-      for (const r of raw) {
-        if (r.money_in == null) continue
-        if (!bySym.has(r.symbol)) bySym.set(r.symbol, [])
-        bySym.get(r.symbol)!.push(r.money_in) // ترتیب نزولی تاریخ حفظ می‌شود
-      }
-      const sumN = (vals: number[], n: number) => vals.slice(0, n).reduce((s, v) => s + v, 0)
-      const m5 = new Map<string, number>(), m22 = new Map<string, number>(), m66 = new Map<string, number>()
-      for (const [sym, vals] of bySym) {
-        if (vals.length === 0) continue
-        m5.set(sym, sumN(vals, 5)); m22.set(sym, sumN(vals, 22)); m66.set(sym, sumN(vals, 66))
-      }
+      const { m5, m22, m66 } = await fetchFlowHistory('stock_moneyflow_daily')
       setSymMoneyIn5(m5); setSymMoneyIn22(m22); setSymMoneyIn66(m66)
+    } catch { /* جدول هنوز داده ندارد */ }
+  }
+
+  const loadLegalHistory = async () => {
+    try {
+      const { m5, m22, m66 } = await fetchFlowHistory('stock_legalflow_daily')
+      setSymLegalIn5(m5); setSymLegalIn22(m22); setSymLegalIn66(m66)
     } catch { /* جدول هنوز داده ندارد */ }
   }
 
   useEffect(() => {
     loadSymbolHistory()
-    const iv = setInterval(loadSymbolHistory, 300_000) // هر ۵ دقیقه — هم‌کادنس با کرون سرور
+    loadLegalHistory()
+    const iv = setInterval(() => { loadSymbolHistory(); loadLegalHistory() }, 300_000) // هر ۵ دقیقه — هم‌کادنس با کرون سرور
     return () => clearInterval(iv)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // moneyIn در DailyFlowRow ریالی است (مستقیم از AllSymbols) — fToman خودش بر ۱۰ تقسیم می‌کند
   const cMoneyIn: GCol<DailyFlowRow> = { label: 'ورود پول به میلیارد تومان', fmt: (r) => fToman(r.moneyIn), num: (r) => r.moneyIn }
@@ -367,6 +385,46 @@ export default function MoneyFlowPage() {
   const symOutCard5 = mkSymOutCard('sym-out-5', 'خروج پول حقیقی هفتگی', 'مجموع خالص خروج پول حقیقی نماد در ۵ روز کاری اخیر', symMoneyIn5)
   const symOutCard22 = mkSymOutCard('sym-out-22', 'خروج پول حقیقی ماهانه', 'مجموع خالص خروج پول حقیقی نماد در ۲۲ روز کاری اخیر', symMoneyIn22)
   const symOutCard66 = mkSymOutCard('sym-out-66', 'خروج پول حقیقی سه‌ماهه', 'مجموع خالص خروج پول حقیقی نماد در ۶۶ روز کاری اخیر (~۳ ماه)', symMoneyIn66)
+
+  // ── بیشترین ورود/خروج حقوقی (سطح نماد) — همان الگو، بر مبنای netNVal (خرید منهای فروش حقوقی) ──
+  const cPerCapBuyerN: Col = { label: 'سرانه خرید حقوقی', key: 'perCapBuyerN', fmt: (r) => fToman(r.perCapBuyerN), num: (r) => r.perCapBuyerN ?? 0 }
+  const cLegalInLive: Col = { label: 'ورود پول حقوقی', key: 'netNVal', fmt: (r) => fToman(r.netNVal), num: (r) => r.netNVal }
+  const cLegalOutLive: Col = { label: 'خروج پول حقوقی', key: 'netNVal', fmt: (r) => fToman(-r.netNVal), num: (r) => -r.netNVal }
+  const cLegalWindow = (map: Map<string, number>, out: boolean): Col => ({
+    label: out ? 'خروج پول حقوقی' : 'ورود پول حقوقی', key: 'sym',
+    fmt: (r) => fTomanT(out ? -(map.get(r.sym) ?? 0) : (map.get(r.sym) ?? 0)),
+    num: (r) => (out ? -(map.get(r.sym) ?? 0) : (map.get(r.sym) ?? 0)),
+  })
+
+  const legalInDailyCard: Card | null = metrics ? {
+    id: 'legal-in-daily', title: 'ورود پول حقوقی روزانه', tone: 'green',
+    desc: 'خالص ورود پول حقوقی امروز هر نماد (خرید حقوقی منهای فروش حقوقی) — مرتب‌شده بر اساس بیشترین ورود',
+    cols: [cSym, cPl, cPerCapBuyerN, cTvalSym, cLegalInLive],
+    rows: [...metrics].sort((a, b) => b.netNVal - a.netNVal).slice(0, 30),
+  } : null
+
+  const legalOutDailyCard: Card | null = metrics ? {
+    id: 'legal-out-daily', title: 'خروج پول حقوقی روزانه', tone: 'red',
+    desc: 'خالص خروج پول حقوقی امروز هر نماد (فروش حقوقی منهای خرید حقوقی) — مرتب‌شده بر اساس بیشترین خروج',
+    cols: [cSym, cPl, cPerCapBuyerN, cTvalSym, cLegalOutLive],
+    rows: [...metrics].sort((a, b) => a.netNVal - b.netNVal).slice(0, 30),
+  } : null
+
+  const mkLegalCard = (id: string, title: string, desc: string, map: Map<string, number> | null, out: boolean): Card | null => {
+    if (!metrics || !map) return null
+    const col = cLegalWindow(map, out)
+    const rows = metrics.filter((r) => map.has(r.sym))
+      .sort((a, b) => (out ? (map.get(a.sym) ?? 0) - (map.get(b.sym) ?? 0) : (map.get(b.sym) ?? 0) - (map.get(a.sym) ?? 0)))
+      .slice(0, 30)
+    return { id, title, tone: out ? 'red' : 'green', desc, cols: [cSym, cPl, cPerCapBuyerN, cTvalSym, col], rows }
+  }
+
+  const legalInCard5 = mkLegalCard('legal-in-5', 'ورود پول حقوقی هفتگی', 'مجموع خالص ورود پول حقوقی نماد در ۵ روز کاری اخیر', symLegalIn5, false)
+  const legalInCard22 = mkLegalCard('legal-in-22', 'ورود پول حقوقی ماهانه', 'مجموع خالص ورود پول حقوقی نماد در ۲۲ روز کاری اخیر', symLegalIn22, false)
+  const legalInCard66 = mkLegalCard('legal-in-66', 'ورود پول حقوقی سه‌ماهه', 'مجموع خالص ورود پول حقوقی نماد در ۶۶ روز کاری اخیر (~۳ ماه)', symLegalIn66, false)
+  const legalOutCard5 = mkLegalCard('legal-out-5', 'خروج پول حقوقی هفتگی', 'مجموع خالص خروج پول حقوقی نماد در ۵ روز کاری اخیر', symLegalIn5, true)
+  const legalOutCard22 = mkLegalCard('legal-out-22', 'خروج پول حقوقی ماهانه', 'مجموع خالص خروج پول حقوقی نماد در ۲۲ روز کاری اخیر', symLegalIn22, true)
+  const legalOutCard66 = mkLegalCard('legal-out-66', 'خروج پول حقوقی سه‌ماهه', 'مجموع خالص خروج پول حقوقی نماد در ۶۶ روز کاری اخیر (~۳ ماه)', symLegalIn66, true)
 
   const bg = isDark ? '#060B14' : '#F4F7FB'
   const text = isDark ? '#E8F4FF' : '#0F1E2E'
@@ -464,6 +522,56 @@ export default function MoneyFlowPage() {
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
           {symOutCard66 ? <FilterTable card={symOutCard66} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+        </div>
+
+        <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, margin: '32px 0 6px', color: 'oklch(0.74 0.16 150)' }}>
+          بیشترین ورود حقوقی
+        </h2>
+        <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+          خالص ورود پول حقوقی هر نماد (خرید حقوقی منهای فروش حقوقی) در بازه‌های مختلف — روزانه مستقیم از بازار زنده،
+          هفتگی/ماهانه/سه‌ماهه از تاریخچه روزانه.
+        </p>
+        <div style={{
+          display: 'grid', gap: 16,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+        }}>
+          {legalInDailyCard ? <FilterTable card={legalInDailyCard} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+          )}
+          {legalInCard5 ? <FilterTable card={legalInCard5} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {legalInCard22 ? <FilterTable card={legalInCard22} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {legalInCard66 ? <FilterTable card={legalInCard66} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+        </div>
+
+        <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, margin: '32px 0 6px', color: '#EF4444' }}>
+          بیشترین خروج حقوقی
+        </h2>
+        <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+          خالص خروج پول حقوقی هر نماد (فروش حقوقی منهای خرید حقوقی) در بازه‌های مختلف — روزانه مستقیم از بازار زنده،
+          هفتگی/ماهانه/سه‌ماهه از تاریخچه روزانه.
+        </p>
+        <div style={{
+          display: 'grid', gap: 16,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+        }}>
+          {legalOutDailyCard ? <FilterTable card={legalOutDailyCard} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+          )}
+          {legalOutCard5 ? <FilterTable card={legalOutCard5} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {legalOutCard22 ? <FilterTable card={legalOutCard22} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {legalOutCard66 ? <FilterTable card={legalOutCard66} isDark={isDark} /> : (
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
         </div>
