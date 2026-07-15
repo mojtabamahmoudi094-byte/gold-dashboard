@@ -43,6 +43,7 @@ const NAV: NavItem[] = [
     { label: 'فیلترهای کاربردی', href: '/vip/useful-filters' },
     { label: 'فیلترهای صف خرید و فروش', href: '/vip/queue-filters' },
     { label: 'فیلترهای ورود/خروج پول', href: '/vip/money-flow' },
+    { label: 'پول داغ', href: '/vip/hot-money' },
   ] },
   { label: 'پورتفوی من',    href: '/portfolio' },
 ]

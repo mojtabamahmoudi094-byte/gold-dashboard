@@ -79,6 +79,11 @@ MAILTO=""
 
 # شناوری هر نماد (ff/z) — یک‌بار روزانه، ۱۳:۱۵ تهران = ۰۹:۴۵ UTC (بعد بسته شدن بازار سهام، خودش تک‌به‌تک همه نمادها را می‌خواند)
 45 9 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh stock-float $NODE_BIN $SCRIPT_DIR/stock-float.js >> /var/log/stock-float.log 2>&1
+
+# پول داغ (معاملات سنگین/میلیاردی ~۱۵۰ نماد پرارزش) — هر ۵ دقیقه، ۹:۰۰–۱۲:۳۰ تهران
+30-55/5 5 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh hot-money $NODE_BIN $SCRIPT_DIR/hot-money.js >> /var/log/hot-money.log 2>&1
+*/5 6-8 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh hot-money $NODE_BIN $SCRIPT_DIR/hot-money.js >> /var/log/hot-money.log 2>&1
+0 9 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh hot-money $NODE_BIN $SCRIPT_DIR/hot-money.js >> /var/log/hot-money.log 2>&1
 EOF
 
 chmod +x "$SCRIPT_DIR/run-with-alert.sh"
