@@ -90,6 +90,7 @@ function candleChartSvg({ width, height, candles }) {
 
   let bars = '', vols = '', axisLabels = ''
   const labelEvery = Math.max(1, Math.round(n / 8))
+  let lastLabelIdx = -Infinity
   candles.forEach((c, i) => {
     const cx = padL + i * slotW + slotW / 2
     const up = c.close >= c.open
@@ -104,12 +105,15 @@ function candleChartSvg({ width, height, candles }) {
     const vH = ((c.volume ?? 0) / maxV) * volH
     vols += `<rect x="${(cx - bodyW / 2).toFixed(1)}" y="${(volTop + volH - vH).toFixed(1)}" width="${bodyW.toFixed(1)}" height="${vH.toFixed(1)}" fill="${color}" opacity="0.55"/>`
 
-    if (i % labelEvery === 0 || i === n - 1) {
+    // برچسب آخر فقط وقتی چاپ می‌شود که به برچسب قبلی نچسبد (رد شدن جای برخورد متن)
+    const wantsLabel = i % labelEvery === 0 || i === n - 1
+    if (wantsLabel && i - lastLabelIdx >= labelEvery * 0.75) {
       axisLabels += `<text x="${cx.toFixed(1)}" y="${height - 8}" font-size="12" fill="${MUTED}" text-anchor="middle">${esc(c.trade_date_shamsi ?? c.trade_date ?? '')}</text>`
+      lastLabelIdx = i
     }
   })
 
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${grid}${bars}${vols}${axisLabels}</svg>`
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="Vazirmatn, Tahoma, Arial, sans-serif">${grid}${bars}${vols}${axisLabels}</svg>`
 }
 
 function statRow(label, value, tone) {
