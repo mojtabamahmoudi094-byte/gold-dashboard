@@ -15,9 +15,15 @@
  *   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, SITE_URL (پیش‌فرض https://bourssanj.ir)
  *   ANOMALY_PCP_THRESHOLD (پیش‌فرض ۴.۷ — درصد فاصله تا دامنه نوسان معمول)
  *   ANOMALY_TURNOVER_THRESHOLD (پیش‌فرض ۰.۰۵ — نسبت ارزش معاملات به ارزش بازار)
+ *   ANOMALY_RELVOL_THRESHOLD (پیش‌فرض ۴ — نسبت ارزش معاملات امروز به میانگین ۲۰ روز خودِ نماد)
  *   ANOMALY_MAX_PER_RUN (پیش‌فرض ۴)
  *
  * وضعیت در anomaly-watch-state.json نگه داشته می‌شود تا هر نماد فقط یک‌بار در روز برای هر دلیل هشدار بگیرد.
+ *
+ * سومین قاعده (P4): حجم غیرعادی نسبت به تاریخچهٔ خودِ نماد (نه فقط نسبت به ارزش بازار مثل turnover) —
+ * از stock_candles.value (پرشده توسط candles-daily.js) میانگین ۲۰ روز اخیر هر نماد را می‌گیرد؛
+ * اگر ارزش معاملات امروز چند برابر آن باشد، پرچم «حجم غیرعادی» می‌زند. صرفاً توصیف الگوی معاملاتی
+ * است، ادعای تخلف/دستکاری نمی‌کند.
  */
 
 'use strict'
@@ -56,7 +62,12 @@ function isMarketOpen() {
 
 const PCP_THRESHOLD = Number(process.env.ANOMALY_PCP_THRESHOLD || 4.7)
 const TURNOVER_THRESHOLD = Number(process.env.ANOMALY_TURNOVER_THRESHOLD || 0.05)
+const RELVOL_THRESHOLD = Number(process.env.ANOMALY_RELVOL_THRESHOLD || 4)
 const MAX_PER_RUN = Number(process.env.ANOMALY_MAX_PER_RUN || 4)
+// نمادهای کم‌معامله (میانگین ارزش زیر این سقف) رد می‌شوند — نسبت حجم رو این‌ها بی‌معنی/پرنویز است
+const RELVOL_MIN_AVG_VALUE = 1_000_000_000 // ۱ میلیارد ریال ≈ ۱۰۰ میلیون تومان
+// فقط پرمعامله‌ترین‌های امروز را با تاریخچهٔ خودشان مقایسه می‌کنیم — کوئری Supabase برای کل بازار گران است
+const VOLSPIKE_POOL = Number(process.env.ANOMALY_VOLSPIKE_POOL || 25)
 
 const STATE_FILE = path.join(__dirname, 'anomaly-watch-state.json')
 const LOG_FILE = path.join(__dirname, 'anomaly-watch.log')
@@ -78,6 +89,47 @@ const toman = (rial) => (rial == null ? '—' : faNum(rial / 1e10, 1)) // ریا
 const tehranDay = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' })
 const faTime = () => new Intl.DateTimeFormat('fa-IR', { timeZone: 'Asia/Tehran', hour: '2-digit', minute: '2-digit' }).format(new Date())
 
+// ── ۱ب) حجم غیرعادی نسبت به تاریخچهٔ خودِ نماد — فقط برای پرمعامله‌ترین‌های امروز چک می‌شود
+// (کوئری stock_candles برای کل بازار گران است؛ یه اسپایک واقعی طبیعتاً ارزش معاملات مطلق بالایی هم دارد)
+async function findVolumeSpikes(allSymbols) {
+  const pool = [...allSymbols].sort((a, b) => (b.s.tval ?? 0) - (a.s.tval ?? 0)).slice(0, VOLSPIKE_POOL)
+  if (!pool.length) return []
+
+  const { sbClient } = require('./codal-company-reports.js')
+  const sb = sbClient()
+  if (!sb) return []
+
+  const since = new Date(Date.now() - 40 * 86400_000).toISOString().slice(0, 10) // بافر تقویمی برای ~۲۰ روز معاملاتی
+  const { data, error } = await sb
+    .from('stock_candles')
+    .select('symbol, trade_date, value')
+    .in('symbol', pool.map((c) => c.symbol))
+    .gte('trade_date', since)
+    .order('trade_date', { ascending: false })
+  if (error) { log(`⚠️ حجم غیرعادی: کوئری stock_candles شکست خورد — ${error.message}`); return [] }
+
+  const bySymbol = new Map()
+  for (const row of data || []) {
+    if (row.value == null) continue
+    const arr = bySymbol.get(row.symbol) || []
+    if (arr.length < 20) arr.push(row.value) // نزولی مرتب شده، پس ۲۰ تای اول = ۲۰ روز اخیر
+    bySymbol.set(row.symbol, arr)
+  }
+
+  const out = []
+  for (const c of pool) {
+    const hist = bySymbol.get(c.symbol)
+    if (!hist || hist.length < 10) continue // تاریخچه کافی نیست، نسبت بی‌معنی می‌شود
+    const avg = hist.reduce((a, b) => a + b, 0) / hist.length
+    if (avg < RELVOL_MIN_AVG_VALUE) continue
+    const relVol = (c.s.tval ?? 0) / avg
+    if (relVol >= RELVOL_THRESHOLD) {
+      out.push({ ...c, reasonTag: 'volSpike', score: relVol * 10, relVol, avgValue: avg })
+    }
+  }
+  return out
+}
+
 // ── ۱) اسنپ‌شات لحظه‌ای را می‌گیرد و نامزدهای غیرعادی را استخراج می‌کند ──
 async function fetchCandidates() {
   const res = await fetch(`${SITE}/api/stocks-industries`, { headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(30_000) })
@@ -86,10 +138,12 @@ async function fetchCandidates() {
   const industries = Array.isArray(data.industries) ? data.industries : []
 
   const out = []
+  const allSymbols = []
   for (const ind of industries) {
     for (const s of ind.symbols || []) {
       if (!s.l18 || s.pcp == null) continue
       const turnover = s.tval != null && s.mv ? s.tval / s.mv : null
+      allSymbols.push({ symbol: s.l18, name: s.l30, s, turnover })
 
       if (Math.abs(s.pcp) >= PCP_THRESHOLD) {
         out.push({ symbol: s.l18, name: s.l30, reasonTag: 'band', s, score: Math.abs(s.pcp), turnover })
@@ -98,6 +152,10 @@ async function fetchCandidates() {
       }
     }
   }
+
+  const volSpikes = await findVolumeSpikes(allSymbols)
+  out.push(...volSpikes)
+
   out.sort((a, b) => b.score - a.score)
   return out
 }
@@ -110,7 +168,9 @@ function buildFacts(c) {
   lines.push(`قیمت پایانی: ${faNum(s.pc)} ریال — تغییر: ${s.pcp >= 0 ? '+' : ''}${faNum(s.pcp, 1)}٪`)
   if (s.tval != null) lines.push(`ارزش معاملات: ${toman(s.tval)} میلیارد تومان`)
   if (turnover != null) lines.push(`نسبت ارزش معاملات به ارزش بازار: ${faNum(turnover * 100, 1)}٪`)
+  if (c.reasonTag === 'volSpike') lines.push(`ارزش معاملات نسبت به میانگین ۲۰ روز اخیر خودِ نماد: ${faNum(c.relVol, 1)} برابر`)
   if (c.reasonTag === 'band') lines.push('علت هشدار: نزدیک/برخورد به سقف یا کف دامنهٔ نوسان روزانه')
+  else if (c.reasonTag === 'volSpike') lines.push('علت هشدار: حجم معاملات چند برابر میانگین ۲۰ روز اخیر همین نماد است')
   else lines.push('علت هشدار: حجم معاملات نسبت به ارزش بازار غیرعادی است')
   return lines.join('\n')
 }
@@ -139,11 +199,14 @@ function buildCardHtml(c) {
   return renderCardHtml({
     emoji: '🚨',
     title: `${c.symbol}${c.name ? ` — ${c.name}` : ''}`,
-    subtitle: c.reasonTag === 'band' ? 'نزدیک سقف/کف دامنهٔ نوسان' : 'حجم معاملات غیرعادی',
+    subtitle: c.reasonTag === 'band' ? 'نزدیک سقف/کف دامنهٔ نوسان'
+      : c.reasonTag === 'volSpike' ? 'حجم معاملات چند برابر میانگین خودِ نماد'
+      : 'حجم معاملات غیرعادی',
     bigStat: { value: `${up ? '+' : ''}${faNum(s.pcp, 1)}٪`, label: `قیمت پایانی ${faNum(s.pc)} ریال`, tone: up ? 'up' : 'down' },
     rows: [
       s.tval != null ? { label: 'ارزش معاملات', value: `${toman(s.tval)} میلیارد تومان` } : null,
-      turnover != null ? { label: 'نسبت معاملات به ارزش بازار', value: `${faNum(turnover * 100, 1)}٪` } : null,
+      c.reasonTag === 'volSpike' ? { label: 'نسبت به میانگین ۲۰ روز خودِ نماد', value: `${faNum(c.relVol, 1)}×` }
+        : turnover != null ? { label: 'نسبت معاملات به ارزش بازار', value: `${faNum(turnover * 100, 1)}٪` } : null,
     ].filter(Boolean),
     footer: `${faTime()} — رصد لحظه‌ای بورس سنج`,
   })
