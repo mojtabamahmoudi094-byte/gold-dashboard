@@ -100,8 +100,10 @@ async function fetchCandles(sb, symbol) {
 }
 
 // ── ۲) روایت Gemini از روی عکس چارت ──
-// کلید Gemini پروژه رایگان و بدون billing است (مشترک با bourse-analyst)؛ محدودیت آزاد
-// gemini-2.5-flash کم است (quota exceeded با «Please retry in Ns» برمی‌گردد) — یک تلاش مجدد کافی است
+// کلید Gemini پروژه رایگان و بدون billing است، بین چند فیچر مشترک (signal-narrative، anomaly-watch،
+// چت bourse-analyst) — quota لحظه‌ای گاهی حتی روی اولین درخواست روز پر است (رقابت بیرونی، نه حجم
+// خودمان)، پس چند تلاش با تأخیر پیشنهادی خود Gemini لازم است، نه فقط یک بار
+const NARRATE_MAX_ATTEMPTS = 4
 async function callNarrate(symbol, imageBuf, stats) {
   const res = await fetch(`${SITE}/api/chart-narrative`, {
     method: 'POST',
@@ -113,14 +115,14 @@ async function callNarrate(symbol, imageBuf, stats) {
 }
 
 async function narrateChart(symbol, imageBuf, stats) {
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= NARRATE_MAX_ATTEMPTS; attempt++) {
     try {
       const data = await callNarrate(symbol, imageBuf, stats)
       if (data.ok && data.text) return data
       const retryMatch = /retry in ([\d.]+)s/i.exec(data.error || '')
-      if (retryMatch && attempt === 1) {
-        const wait = Math.ceil(Number(retryMatch[1])) + 2
-        log(`⏳ ${symbol}: quota Gemini پر است — ${wait}ثانیه صبر و یک تلاش دیگر`)
+      if (retryMatch && attempt < NARRATE_MAX_ATTEMPTS) {
+        const wait = Math.ceil(Number(retryMatch[1])) + 3
+        log(`⏳ ${symbol}: quota Gemini پر است (تلاش ${attempt}/${NARRATE_MAX_ATTEMPTS}) — ${wait}ثانیه صبر`)
         await sleep(wait * 1000)
         continue
       }
