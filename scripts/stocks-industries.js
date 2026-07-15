@@ -43,6 +43,11 @@ function tehranClock() {
   const tehran = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
   return { day: tehran.getDay(), mins: tehran.getHours() * 60 + tehran.getMinutes() } // 0=یکشنبه … 6=شنبه
 }
+// تاریخ امروز به وقت تهران، برای کلید ردیف روزانه سرانه (YYYY-MM-DD)
+function tehranDateStr() {
+  const tehran = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
+  return `${tehran.getFullYear()}-${String(tehran.getMonth() + 1).padStart(2, '0')}-${String(tehran.getDate()).padStart(2, '0')}`
+}
 const STOCKS_OPEN  = 9 * 60
 const STOCKS_CLOSE = 12 * 60 + 30
 const FUNDS_OPEN   = 12 * 60 + 30
@@ -172,6 +177,22 @@ async function main() {
     const { error } = await sb.from('stock_industries').upsert({ id: 1, data: out, updated: out.updated })
     if (error) throw new Error(`Supabase upsert: ${error.message}`)
     console.log('✅ Supabase (stock_industries) بروز شد')
+
+    // ── سرانه خرید حقیقی امروز هر نماد — برای فیلترهای «افزایش سرانه خریدار» (/vip/filters) ──
+    const today = tehranDateStr()
+    const perCapRows = []
+    for (const it of watchItems) {
+      const sym = clean(it.l18)
+      const pc = num(it.pc), bI = num(it.Buy_I_Volume), bCI = num(it.Buy_CountI)
+      if (!sym || !pc || !bI || !bCI || bCI <= 0) continue
+      const perCapBuyToman = (bI * pc) / bCI / 10 // ریال → تومان
+      perCapRows.push({ symbol: sym, trade_date: today, per_capita_buy: Math.round(perCapBuyToman), updated: out.updated })
+    }
+    if (perCapRows.length > 0) {
+      const { error: pcErr } = await sb.from('stock_per_capita_daily').upsert(perCapRows, { onConflict: 'symbol,trade_date' })
+      if (pcErr) console.error(`[stocks-industries] stock_per_capita_daily: ${pcErr.message}`)
+      else console.log(`✅ stock_per_capita_daily بروز شد (${perCapRows.length} نماد)`)
+    }
   }
 
   // ── رصد لحظه‌ای بازار: هر دسته یک اسنپ‌شات ۵ دقیقه‌ای در market_watch ──
