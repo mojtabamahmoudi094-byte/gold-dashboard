@@ -40,7 +40,7 @@ const OUT_DIR = path.join(__dirname, 'reports-out')
 // نسخهٔ پارسر — با هر تغییر منطق پارس یکی بالا برود.
 // خروجی قدیمی‌تر از این نسخه دوباره ساخته می‌شود، حتی بدون --force؛ وگرنه بعد از
 // اصلاح پارسر، نمادهایی که فایل کهنه دارند برای همیشه skip می‌شوند.
-const PARSER_VERSION = 7
+const PARSER_VERSION = 8
 
 // خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
 // SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
@@ -347,9 +347,11 @@ function parseMonthly(wb) {
     const at = (r, i) => (i === -1 ? null : faNum(r[i]))
     const products = []
     let totals = null
-    // سرفصل‌های بخش: «فروش داخلی:» → 'domestic'، «فروش صادراتی:» → 'export'.
+    // سرفصل‌های بخش: «فروش داخلی:» → 'domestic'، «فروش صادراتی:» → 'export'،
+    // «درآمد ارائه خدمات:» → 'service' (شرکت‌های خدماتی/لیزینگ محصولشان همین‌جاست).
+    // فقط «برگشت از فروش» و «تخفیفات» محصول نیستند → section=null یعنی drop.
+    // سرفصل ناشناخته به‌جای drop، 'other' می‌شود تا داده بی‌صدا از دست نرود.
     // پیش‌فرض 'domestic' برای فرم‌هایی که همان اول محصول را بدون سرفصل صریح می‌آورند.
-    // بقیهٔ سرفصل‌ها (درآمد ارائه خدمات، برگشت از فروش، تخفیفات) محصول واقعی نیستند — section=null یعنی ردیف‌های زیرشان push نمی‌شوند.
     let section = 'domestic'
     for (let i = hi + 1; i < rows.length; i++) {
       const r = rows[i]
@@ -362,7 +364,9 @@ function parseMonthly(wb) {
       if (name.endsWith(':')) {
         if (/^فروش داخلی:?$/.test(name)) section = 'domestic'
         else if (/^فروش صادراتی:?$/.test(name)) section = 'export'
-        else section = null
+        else if (/^درآمد ارائه خدمات:?$/.test(name)) section = 'service'
+        else if (/^(برگشت از فروش|تخفیفات):?$/.test(name)) section = null
+        else section = 'other'
         continue
       }
       if (name.startsWith('جمع')) continue
@@ -704,8 +708,18 @@ function sbClient() {
 async function upsertReport(row) {
   const sb = sbClient()
   if (!sb) return
-  const { error } = await sb.from('stock_reports').upsert(row, { onConflict: 'symbol' })
-  if (error) throw new Error(`Supabase upsert «${row.symbol}»: ${error.message}`)
+  // شبکهٔ ایران→Supabase گاهی «fetch failed» گذرا می‌دهد. چون skip بعدی نسخهٔ فایل را می‌بیند
+  // نه جدول را، یک upsert ازدست‌رفته یعنی جدول برای همیشه کهنه می‌ماند — پس چند بار تلاش کن.
+  let lastErr
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const { error } = await sb.from('stock_reports').upsert(row, { onConflict: 'symbol' })
+      if (!error) return
+      lastErr = error.message
+    } catch (e) { lastErr = (e && e.message) || String(e) }
+    await sleep(3000 * attempt)
+  }
+  throw new Error(`Supabase upsert «${row.symbol}»: ${lastErr}`)
 }
 
 // ═══ پردازش یک نماد ═══
