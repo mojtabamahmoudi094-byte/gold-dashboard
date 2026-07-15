@@ -21,12 +21,15 @@ type Fundamentals = {
   netMargin: number | null; opMargin: number | null
   assetTurnover: number | null; equityMultiplier: number | null
   debtToEquity: number | null; bookValuePerShare: number | null
+  marketCap: number | null; enterpriseValue: number | null; evToEbit: number | null
   updated: string
 }
 
 const fa = (v: number, d = 1) => v.toLocaleString('fa-IR', { maximumFractionDigits: d, minimumFractionDigits: 0 })
 const pct = (v: number | null) => (v == null ? '—' : `${fa(v * 100)}٪`)
 const ratio = (v: number | null) => (v == null ? '—' : fa(v, 2))
+// میلیون ریال → میلیارد تومان (همان الگوی scripts/quarterly-report-card.js)
+const toman = (v: number | null) => (v == null ? '—' : `${fa(v / 1e4, Math.abs(v / 1e4) < 10 ? 1 : 0)} م.ت`)
 
 export default function FundamentalsPage() {
   const params = useParams<{ symbol: string }>()
@@ -104,6 +107,9 @@ export default function FundamentalsPage() {
               <Card title="اهرم مالی" value={ratio(data.equityMultiplier)} formula="جمع دارایی‌ها ÷ حقوق صاحبان سهام" accent={t.red} />
               <Card title="نسبت بدهی به حقوق صاحبان سهام" value={ratio(data.debtToEquity)} formula="جمع بدهی‌ها ÷ حقوق صاحبان سهام" accent={t.red} />
               <Card title="ارزش دفتری هر سهم" value={data.bookValuePerShare == null ? '—' : `${fa(data.bookValuePerShare, 0)} ریال`} formula="حقوق صاحبان سهام ÷ تعداد سهم" accent={t.text} />
+              <Card title="ارزش بازار" value={toman(data.marketCap)} formula="قیمت × تعداد سهم" accent={t.accent} />
+              <Card title="ارزش شرکت (EV)" value={toman(data.enterpriseValue)} formula="ارزش بازار + بدهی بهره‌دار − نقد" accent={t.brand2} />
+              <Card title="EV/EBIT" value={ratio(data.evToEbit)} formula="ارزش شرکت ÷ سود عملیاتی (نه EBITDA — بدون استهلاک)" accent={t.muted} />
             </div>
 
             <div style={{ fontSize: 10, color: cream, marginTop: 10, textAlign: 'center', opacity: 0.75 }}>

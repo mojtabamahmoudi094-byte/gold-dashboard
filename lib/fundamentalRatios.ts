@@ -16,6 +16,9 @@ export type FundamentalRatios = {
   equityMultiplier: number | null // جمع دارایی‌ها / حقوق صاحبان سهام
   debtToEquity: number | null
   bookValuePerShare: number | null
+  marketCap: number | null       // میلیون ریال
+  enterpriseValue: number | null // EV = ارزش بازار + بدهی بهره‌دار (تسهیلات مالی جاری+بلندمدت) − موجودی نقد
+  evToEbit: number | null        // EV/EBIT — نه EV/EBITDA: استهلاک جدا از صورت سود/زیان کدال قابل پارس مطمئن نیست
 }
 
 const div = (a: number | null | undefined, b: number | null | undefined): number | null => {
@@ -41,6 +44,13 @@ export function computeFundamentals(quarters: RQuarter[], price: number | null):
   const pe = price != null && q.eps ? price / q.eps : null
   const pb = price != null && bookValuePerShare ? price / bookValuePerShare : null
 
+  // ارزش بازار میلیون ریال = قیمت(ریال) × تعداد سهم / ۱۰۰۰۰۰۰ = قیمت × سرمایه / ۱۰۰۰
+  const marketCap = price != null && q.capital != null ? (price * q.capital) / 1000 : null
+  const netDebt = q.debt_lt != null && q.debt_st != null && q.cash != null
+    ? q.debt_lt + q.debt_st - q.cash
+    : null
+  const enterpriseValue = marketCap != null && netDebt != null ? marketCap + netDebt : null
+
   return {
     period: q.period,
     pe,
@@ -53,5 +63,8 @@ export function computeFundamentals(quarters: RQuarter[], price: number | null):
     equityMultiplier: div(q.assets, q.equity),
     debtToEquity: div(q.liabilities, q.equity),
     bookValuePerShare,
+    marketCap,
+    enterpriseValue,
+    evToEbit: div(enterpriseValue, q.op),
   }
 }

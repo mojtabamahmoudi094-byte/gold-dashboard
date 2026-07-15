@@ -39,6 +39,9 @@ export type RQuarter = {
   assets?: number | null; assets_prev?: number | null
   liabilities?: number | null; liabilities_prev?: number | null
   equity?: number | null; equity_prev?: number | null
+  cash?: number | null; cash_prev?: number | null
+  debt_lt?: number | null; debt_lt_prev?: number | null
+  debt_st?: number | null; debt_st_prev?: number | null
 }
 export type Reports = { symbol: string; updated: string; months: RMonth[]; quarters: RQuarter[] }
 

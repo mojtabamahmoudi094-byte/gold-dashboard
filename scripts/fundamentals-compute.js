@@ -40,6 +40,13 @@ function computeFundamentals(quarters, price) {
   const pe = price != null && q.eps ? price / q.eps : null
   const pb = price != null && bookValuePerShare ? price / bookValuePerShare : null
 
+  // ارزش بازار میلیون ریال = قیمت × سرمایه / ۱۰۰۰؛ EV با بدهی بهره‌دار (تسهیلات) نه جمع بدهی‌ها
+  const marketCap = price != null && q.capital != null ? (price * q.capital) / 1000 : null
+  const netDebt = q.debt_lt != null && q.debt_st != null && q.cash != null
+    ? q.debt_lt + q.debt_st - q.cash
+    : null
+  const enterpriseValue = marketCap != null && netDebt != null ? marketCap + netDebt : null
+
   return {
     period: q.period,
     pe, pb,
@@ -51,6 +58,10 @@ function computeFundamentals(quarters, price) {
     equityMultiplier: div(q.assets, q.equity),
     debtToEquity: div(q.liabilities, q.equity),
     bookValuePerShare,
+    marketCap,
+    enterpriseValue,
+    // EV/EBIT، نه EV/EBITDA — استهلاک از صورت‌های کدال قابل پارس مطمئن نیست
+    evToEbit: div(enterpriseValue, q.op),
   }
 }
 
