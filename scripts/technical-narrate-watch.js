@@ -88,15 +88,33 @@ async function fetchTopMovers() {
   return [...gainers, ...losers]
 }
 
+// قیمت تعدیل‌شده (adj_*) را ترجیح می‌دهیم — خام با افزایش سرمایه/تقسیم سود یک پرش کاذب نشان می‌دهد
+// (همان الگوی candlesAdj در app/technical/[symbol]/page.tsx)
+function useAdjusted(rows) {
+  return (rows || [])
+    .filter(r => r.close != null && r.close > 0)
+    .map(r => {
+      const c = (r.adj_close != null && r.adj_close > 0) ? r.adj_close : r.close
+      return {
+        trade_date: r.trade_date, trade_date_shamsi: r.trade_date_shamsi,
+        open: r.adj_open ?? r.open ?? c,
+        high: r.adj_high ?? r.high ?? c,
+        low: r.adj_low ?? r.low ?? c,
+        close: c,
+        volume: r.volume ?? 0,
+      }
+    })
+}
+
 async function fetchCandles(sb, symbol) {
   const { data, error } = await sb
     .from('stock_candles')
-    .select('trade_date, trade_date_shamsi, open, high, low, close, volume')
+    .select('trade_date, trade_date_shamsi, open, high, low, close, volume, adj_open, adj_high, adj_low, adj_close')
     .eq('symbol', symbol)
     .order('trade_date', { ascending: true })
     .limit(400)
   if (error) throw new Error(`stock_candles «${symbol}»: ${error.message}`)
-  return data
+  return useAdjusted(data)
 }
 
 // ── ۲) روایت Gemini از روی عکس چارت ──

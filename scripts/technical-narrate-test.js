@@ -39,13 +39,25 @@ async function main() {
 
   const { data, error } = await sb
     .from('stock_candles')
-    .select('trade_date, trade_date_shamsi, open, high, low, close, volume')
+    .select('trade_date, trade_date_shamsi, open, high, low, close, volume, adj_open, adj_high, adj_low, adj_close')
     .eq('symbol', SYMBOL)
     .order('trade_date', { ascending: true })
     .limit(400)
   if (error) throw new Error(`stock_candles select: ${error.message}`)
 
-  const chartData = buildTechnicalChartData(data)
+  // قیمت تعدیل‌شده را ترجیح می‌دهیم — خام با افزایش سرمایه/تقسیم سود پرش کاذب نشان می‌دهد
+  const adjusted = data
+    .filter(r => r.close != null && r.close > 0)
+    .map(r => {
+      const c = (r.adj_close != null && r.adj_close > 0) ? r.adj_close : r.close
+      return {
+        trade_date: r.trade_date, trade_date_shamsi: r.trade_date_shamsi,
+        open: r.adj_open ?? r.open ?? c, high: r.adj_high ?? r.high ?? c, low: r.adj_low ?? r.low ?? c,
+        close: c, volume: r.volume ?? 0,
+      }
+    })
+
+  const chartData = buildTechnicalChartData(adjusted)
   if (!chartData) throw new Error('کندل کافی برای این نماد نیست')
   console.log('آمار چارت:', chartData.stats)
 
