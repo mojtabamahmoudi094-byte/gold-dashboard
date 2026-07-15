@@ -143,7 +143,9 @@ async function main() {
       const mv   = ind.symbols.reduce((s, x) => s + (x.mv ?? 0), 0)
       const up   = ind.symbols.filter(x => (x.pcp ?? 0) > 0).length
       const down = ind.symbols.filter(x => (x.pcp ?? 0) < 0).length
-      return { ...ind, count: ind.symbols.length, tval, mv, up, down }
+      // خالص ورود پول حقیقی صنعت (ریال، + یعنی ورود) — برای فیلتر «ورود/خروج پول» (/vip/money-flow)
+      const moneyIn = ind.symbols.reduce((s, x) => s + ((x.bi ?? 0) - (x.si ?? 0)) * (x.pc ?? 0), 0)
+      return { ...ind, count: ind.symbols.length, tval, mv, up, down, moneyIn }
     })
     .sort((a, b) => b.tval - a.tval)
 
@@ -192,6 +194,20 @@ async function main() {
       const { error: pcErr } = await sb.from('stock_per_capita_daily').upsert(perCapRows, { onConflict: 'symbol,trade_date' })
       if (pcErr) console.error(`[stocks-industries] stock_per_capita_daily: ${pcErr.message}`)
       else console.log(`✅ stock_per_capita_daily بروز شد (${perCapRows.length} نماد)`)
+    }
+
+    // ── خالص ورود پول حقیقی هر صنعت امروز — برای فیلترهای «ورود/خروج پول» (/vip/money-flow) ──
+    const flowRows = industries.map(ind => ({
+      industry_key: String(ind.id ?? ind.name),
+      industry_name: ind.name,
+      trade_date: today,
+      money_in: Math.round(ind.moneyIn / 10), // ریال → تومان
+      updated: out.updated,
+    }))
+    if (flowRows.length > 0) {
+      const { error: flowErr } = await sb.from('industry_moneyflow_daily').upsert(flowRows, { onConflict: 'industry_key,trade_date' })
+      if (flowErr) console.error(`[stocks-industries] industry_moneyflow_daily: ${flowErr.message}`)
+      else console.log(`✅ industry_moneyflow_daily بروز شد (${flowRows.length} صنعت)`)
     }
   }
 
