@@ -67,6 +67,8 @@ export type M = {
   floatShares: number | null // تعداد سهام شناور (z × ff٪)
   buyCountI: number          // تعداد کد خریدار حقیقی
   sellCountI: number         // تعداد کد فروشنده حقیقی
+  qd1: number | null; qo1: number | null   // حجم بهترین سفارش خرید/فروش (حجم صف وقتی buyQueue/sellQueue باشد)
+  moneyInI: number           // خالص ورود پول حقیقی امروز (ریال، + یعنی ورود)
 }
 
 export function buildMetrics(
@@ -130,6 +132,8 @@ export function buildMetrics(
       buyQueue, sellQueue,
       mv: num(it.mv) ?? 0, floatShares,
       buyCountI: bCI, sellCountI: sCI,
+      qd1, qo1,
+      moneyInI: (bI - sI) * pc,
     })
   }
   return out
