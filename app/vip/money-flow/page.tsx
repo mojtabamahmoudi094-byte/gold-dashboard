@@ -339,6 +339,35 @@ export default function MoneyFlowPage() {
   const symCard22 = mkSymCard('sym-flow-22', 'ورود پول حقیقی ماهانه', 'مجموع خالص ورود پول حقیقی نماد در ۲۲ روز کاری اخیر', symMoneyIn22)
   const symCard66 = mkSymCard('sym-flow-66', 'ورود پول حقیقی سه‌ماهه', 'مجموع خالص ورود پول حقیقی نماد در ۶۶ روز کاری اخیر (~۳ ماه)', symMoneyIn66)
 
+  // ── بیشترین خروج پول حقیقی (سطح نماد) — همان داده، جهت مرتب‌سازی و برچسب برعکس ────
+  const cMoneyOutLive: Col = { label: 'خروج پول', key: 'moneyInI', fmt: (r) => fToman(-r.moneyInI), num: (r) => -r.moneyInI }
+  const cMoneyOutWindow = (map: Map<string, number>): Col => ({
+    label: 'خروج پول', key: 'sym',
+    fmt: (r) => fTomanT(-(map.get(r.sym) ?? 0)),
+    num: (r) => -(map.get(r.sym) ?? 0),
+  })
+
+  const symOutDailyCard: Card | null = metrics ? {
+    id: 'sym-out-daily', title: 'خروج پول حقیقی روزانه', tone: 'red',
+    desc: 'خالص خروج پول حقیقی امروز هر نماد (فروش حقیقی منهای خرید حقیقی) — مرتب‌شده بر اساس بیشترین خروج',
+    cols: [cSym, cPl, cPerCapBuyer, cTvalSym, cMoneyOutLive],
+    rows: [...metrics].sort((a, b) => a.moneyInI - b.moneyInI).slice(0, 30),
+  } : null
+
+  const mkSymOutCard = (id: string, title: string, desc: string, map: Map<string, number> | null): Card | null => {
+    if (!metrics || !map) return null
+    const col = cMoneyOutWindow(map)
+    return {
+      id, title, tone: 'red', desc,
+      cols: [cSym, cPl, cPerCapBuyer, cTvalSym, col],
+      rows: metrics.filter((r) => map.has(r.sym)).sort((a, b) => (map.get(a.sym) ?? 0) - (map.get(b.sym) ?? 0)).slice(0, 30),
+    }
+  }
+
+  const symOutCard5 = mkSymOutCard('sym-out-5', 'خروج پول حقیقی هفتگی', 'مجموع خالص خروج پول حقیقی نماد در ۵ روز کاری اخیر', symMoneyIn5)
+  const symOutCard22 = mkSymOutCard('sym-out-22', 'خروج پول حقیقی ماهانه', 'مجموع خالص خروج پول حقیقی نماد در ۲۲ روز کاری اخیر', symMoneyIn22)
+  const symOutCard66 = mkSymOutCard('sym-out-66', 'خروج پول حقیقی سه‌ماهه', 'مجموع خالص خروج پول حقیقی نماد در ۶۶ روز کاری اخیر (~۳ ماه)', symMoneyIn66)
+
   const bg = isDark ? '#060B14' : '#F4F7FB'
   const text = isDark ? '#E8F4FF' : '#0F1E2E'
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
@@ -409,6 +438,32 @@ export default function MoneyFlowPage() {
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
           {symCard66 ? <FilterTable card={symCard66} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+        </div>
+
+        <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, margin: '32px 0 6px', color: '#EF4444' }}>
+          بیشترین خروج پول حقیقی
+        </h2>
+        <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+          خالص خروج پول حقیقی هر نماد (فروش حقیقی منهای خرید حقیقی) در بازه‌های مختلف — روزانه مستقیم از بازار زنده،
+          هفتگی/ماهانه/سه‌ماهه از تاریخچه روزانه. تا تکمیل تاریخچه، بازه‌های بلندتر بر مبنای روزهای موجود محاسبه می‌شوند.
+        </p>
+
+        <div style={{
+          display: 'grid', gap: 16,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+        }}>
+          {symOutDailyCard ? <FilterTable card={symOutDailyCard} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+          )}
+          {symOutCard5 ? <FilterTable card={symOutCard5} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {symOutCard22 ? <FilterTable card={symOutCard22} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {symOutCard66 ? <FilterTable card={symOutCard66} isDark={isDark} /> : (
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
         </div>
