@@ -209,6 +209,21 @@ async function main() {
       if (flowErr) console.error(`[stocks-industries] industry_moneyflow_daily: ${flowErr.message}`)
       else console.log(`✅ industry_moneyflow_daily بروز شد (${flowRows.length} صنعت)`)
     }
+
+    // ── خالص ورود پول حقیقی هر نماد امروز — برای «بیشترین ورود پول حقیقی» (/vip/money-flow) ──
+    const symFlowRows = []
+    for (const it of watchItems) {
+      const sym = clean(it.l18)
+      const pc = num(it.pc), bI = num(it.Buy_I_Volume), sI = num(it.Sell_I_Volume)
+      if (!sym || !pc) continue
+      const moneyInToman = ((bI ?? 0) - (sI ?? 0)) * pc / 10 // ریال → تومان
+      symFlowRows.push({ symbol: sym, trade_date: today, money_in: Math.round(moneyInToman), updated: out.updated })
+    }
+    if (symFlowRows.length > 0) {
+      const { error: symFlowErr } = await sb.from('stock_moneyflow_daily').upsert(symFlowRows, { onConflict: 'symbol,trade_date' })
+      if (symFlowErr) console.error(`[stocks-industries] stock_moneyflow_daily: ${symFlowErr.message}`)
+      else console.log(`✅ stock_moneyflow_daily بروز شد (${symFlowRows.length} نماد)`)
+    }
   }
 
   // ── رصد لحظه‌ای بازار: هر دسته یک اسنپ‌شات ۵ دقیقه‌ای در market_watch ──

@@ -7,12 +7,18 @@
  * جدول‌های ۲–۴ (۳روزه/هفتگی/ماهانه): از تاریخچه industry_moneyflow_daily (کرون سرور هر ۵ دقیقه ردیف امروز هر صنعت را upsert می‌کند)
  * هفتگی=۵ روز کاری، ماهانه=۲۲ روز کاری (همان قرارداد پروژه در stock_vol_avgs)
  * چون تاریخچه گذشته موجود نبود، جمع‌آوری از نصب شروع شده — پنجره‌های بلندتر تا تکمیل، از روزهای موجود جمع می‌زنند
+ *
+ * بخش «بیشترین ورود پول حقیقی» (سطح نماد): جدول روزانه از همان AllSymbols زنده (M.moneyInI)،
+ * جدول‌های هفتگی/ماهانه/سه‌ماهه از تاریخچه stock_moneyflow_daily (۵/۲۲/۶۶ روز کاری)
  */
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
-import { BRSAPI_KEY, num, faN, fToman, fX, clean, NOT_STOCK_CS } from '../../../lib/vipFiltersShared'
+import {
+  BRSAPI_KEY, num, faN, fToman, fX, clean, NOT_STOCK_CS,
+  type M, buildMetrics, type Col, type Card, cSym, cPl, FilterTable,
+} from '../../../lib/vipFiltersShared'
 
 // عدد از قبل به تومان ذخیره‌شده (بدون تبدیل ریال) — برای مقادیر تاریخچه industry_moneyflow_daily
 const fTomanT = (t: number | null) => {
@@ -67,10 +73,10 @@ function buildDailyFlow(arr: any[]): DailyFlowRow[] {
 type FlowRow = { key: string; name: string; moneyIn: number }
 
 // ── ستون‌ها و کارت‌ها ────────────────────────────────────────────────────────
-type Col<T> = { label: string; fmt: (r: T) => string; num: (r: T) => number }
-type TCard<T> = { id: string; title: string; desc: string; cols: Col<T>[]; rows: T[] }
+type GCol<T> = { label: string; fmt: (r: T) => string; num: (r: T) => number }
+type GCard<T> = { id: string; title: string; desc: string; cols: GCol<T>[]; rows: T[] }
 
-function Table<T extends { key: string; name: string }>({ card, isDark }: { card: TCard<T>; isDark: boolean }) {
+function Table<T extends { key: string; name: string }>({ card, isDark }: { card: GCard<T>; isDark: boolean }) {
   const [sortI, setSortI] = useState<number | null>(null)
   const [asc, setAsc] = useState(false)
 
@@ -154,11 +160,15 @@ export default function MoneyFlowPage() {
   const [isDark, setIsDark] = useState(true)
   const isMobile = useIsMobile()
   const [dailyRows, setDailyRows] = useState<DailyFlowRow[] | null>(null)
+  const [metrics, setMetrics] = useState<M[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [updated, setUpdated] = useState<string | null>(null)
   const [histRows3, setHistRows3] = useState<FlowRow[] | null>(null)
   const [histRows5, setHistRows5] = useState<FlowRow[] | null>(null)
   const [histRows22, setHistRows22] = useState<FlowRow[] | null>(null)
+  const [symMoneyIn5, setSymMoneyIn5] = useState<Map<string, number> | null>(null)
+  const [symMoneyIn22, setSymMoneyIn22] = useState<Map<string, number> | null>(null)
+  const [symMoneyIn66, setSymMoneyIn66] = useState<Map<string, number> | null>(null)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -179,6 +189,7 @@ export default function MoneyFlowPage() {
       const arr = Array.isArray(data) ? data : (data?.symbols ?? data?.data ?? [])
       if (!Array.isArray(arr) || arr.length === 0) throw new Error('empty')
       setDailyRows(buildDailyFlow(arr))
+      setMetrics(buildMetrics(arr, new Map()))
       setUpdated(new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran' }))
     } catch {
       setFailed(true)
@@ -233,27 +244,100 @@ export default function MoneyFlowPage() {
     return () => clearInterval(iv)
   }, [])
 
-  // moneyIn در DailyFlowRow ریالی است (مستقیم از AllSymbols) — fToman خودش بر ۱۰ تقسیم می‌کند
-  const cMoneyIn: Col<DailyFlowRow> = { label: 'ورود پول به میلیارد تومان', fmt: (r) => fToman(r.moneyIn), num: (r) => r.moneyIn }
-  const cTval: Col<DailyFlowRow> = { label: 'ارزش معاملات', fmt: (r) => fToman(r.tval), num: (r) => r.tval }
-  const cBp: Col<DailyFlowRow> = { label: 'قدرت خریدار', fmt: (r) => fX(r.bp), num: (r) => r.bp ?? 0 }
-  const cName: Col<any> = { label: 'صنعت', fmt: (r) => r.name, num: () => 0 }
-  // moneyIn در FlowRow (تاریخچه) از قبل به تومان ذخیره شده (scripts/stocks-industries.js) — بدون تبدیل ریال
-  const cFlow: Col<FlowRow> = { label: 'ورود پول', fmt: (r) => fTomanT(r.moneyIn), num: (r) => r.moneyIn }
+  // بیشترین ورود پول حقیقی (سطح نماد) — تاریخچه stock_moneyflow_daily، پنجره‌های ۵/۲۲/۶۶ روز کاری
+  const loadSymbolHistory = async () => {
+    try {
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 100)
+      const cutoffStr = cutoff.toISOString().slice(0, 10)
+      const raw: { symbol: string; trade_date: string; money_in: number | null }[] = []
+      for (let off = 0; off < 100_000; off += 1000) {
+        const { data, error } = await supabase
+          .from('stock_moneyflow_daily')
+          .select('symbol, trade_date, money_in')
+          .gte('trade_date', cutoffStr)
+          .order('trade_date', { ascending: false })
+          .order('symbol', { ascending: true })
+          .range(off, off + 999)
+        if (error || !data?.length) break
+        raw.push(...data)
+        if (data.length < 1000) break
+      }
+      const bySym = new Map<string, number[]>()
+      for (const r of raw) {
+        if (r.money_in == null) continue
+        if (!bySym.has(r.symbol)) bySym.set(r.symbol, [])
+        bySym.get(r.symbol)!.push(r.money_in) // ترتیب نزولی تاریخ حفظ می‌شود
+      }
+      const sumN = (vals: number[], n: number) => vals.slice(0, n).reduce((s, v) => s + v, 0)
+      const m5 = new Map<string, number>(), m22 = new Map<string, number>(), m66 = new Map<string, number>()
+      for (const [sym, vals] of bySym) {
+        if (vals.length === 0) continue
+        m5.set(sym, sumN(vals, 5)); m22.set(sym, sumN(vals, 22)); m66.set(sym, sumN(vals, 66))
+      }
+      setSymMoneyIn5(m5); setSymMoneyIn22(m22); setSymMoneyIn66(m66)
+    } catch { /* جدول هنوز داده ندارد */ }
+  }
 
-  const dailyCard: TCard<DailyFlowRow> | null = dailyRows ? {
+  useEffect(() => {
+    loadSymbolHistory()
+    const iv = setInterval(loadSymbolHistory, 300_000) // هر ۵ دقیقه — هم‌کادنس با کرون سرور
+    return () => clearInterval(iv)
+  }, [])
+
+  // moneyIn در DailyFlowRow ریالی است (مستقیم از AllSymbols) — fToman خودش بر ۱۰ تقسیم می‌کند
+  const cMoneyIn: GCol<DailyFlowRow> = { label: 'ورود پول به میلیارد تومان', fmt: (r) => fToman(r.moneyIn), num: (r) => r.moneyIn }
+  const cTval: GCol<DailyFlowRow> = { label: 'ارزش معاملات', fmt: (r) => fToman(r.tval), num: (r) => r.tval }
+  const cBp: GCol<DailyFlowRow> = { label: 'قدرت خریدار', fmt: (r) => fX(r.bp), num: (r) => r.bp ?? 0 }
+  const cName: GCol<any> = { label: 'صنعت', fmt: (r) => r.name, num: () => 0 }
+  // moneyIn در FlowRow (تاریخچه) از قبل به تومان ذخیره شده (scripts/stocks-industries.js) — بدون تبدیل ریال
+  const cFlow: GCol<FlowRow> = { label: 'ورود پول', fmt: (r) => fTomanT(r.moneyIn), num: (r) => r.moneyIn }
+
+  const dailyCard: GCard<DailyFlowRow> | null = dailyRows ? {
     id: 'flow-daily', title: 'ورود پول به صنعت روزانه',
     desc: 'خالص ورود پول حقیقی امروز به هر صنعت (خرید حقیقی منهای فروش حقیقی) — مرتب‌شده بر اساس بیشترین ورود',
     cols: [cName, cMoneyIn, cTval, cBp],
     rows: [...dailyRows].sort((a, b) => b.moneyIn - a.moneyIn).slice(0, 30),
   } : null
 
-  const mk = (id: string, title: string, desc: string, rows: FlowRow[] | null): TCard<FlowRow> | null =>
+  const mk = (id: string, title: string, desc: string, rows: FlowRow[] | null): GCard<FlowRow> | null =>
     rows ? { id, title, desc, cols: [cName, cFlow], rows: [...rows].sort((a, b) => b.moneyIn - a.moneyIn).slice(0, 30) } : null
 
   const card3 = mk('flow-3', 'ورود پول به صنعت (۳روزه)', 'مجموع خالص ورود پول حقیقی صنعت در ۳ روز کاری اخیر', histRows3)
   const card5 = mk('flow-5', 'ورود پول به صنعت (هفتگی)', 'مجموع خالص ورود پول حقیقی صنعت در ۵ روز کاری اخیر', histRows5)
   const card22 = mk('flow-22', 'ورود پول به صنعت (ماهانه)', 'مجموع خالص ورود پول حقیقی صنعت در ۲۲ روز کاری اخیر', histRows22)
+
+  // ── بیشترین ورود پول حقیقی (سطح نماد) ──────────────────────────────────────
+  const cPerCapBuyer: Col = { label: 'سرانه خریدار', key: 'perCapB', fmt: (r) => fToman(r.perCapB), num: (r) => r.perCapB ?? 0 }
+  const cTvalSym: Col = { label: 'ارزش معاملات', key: 'tval', fmt: (r) => fToman(r.tval), num: (r) => r.tval }
+  const cMoneyInLive: Col = { label: 'ورود پول', key: 'moneyInI', fmt: (r) => fToman(r.moneyInI), num: (r) => r.moneyInI }
+
+  const cMoneyInWindow = (map: Map<string, number>): Col => ({
+    label: 'ورود پول', key: 'sym',
+    fmt: (r) => fTomanT(map.get(r.sym) ?? 0),
+    num: (r) => map.get(r.sym) ?? 0,
+  })
+
+  const symDailyCard: Card | null = metrics ? {
+    id: 'sym-flow-daily', title: 'ورود پول حقیقی روزانه', tone: 'green',
+    desc: 'خالص ورود پول حقیقی امروز هر نماد (خرید حقیقی منهای فروش حقیقی) — مرتب‌شده بر اساس بیشترین ورود',
+    cols: [cSym, cPl, cPerCapBuyer, cTvalSym, cMoneyInLive],
+    rows: [...metrics].sort((a, b) => b.moneyInI - a.moneyInI).slice(0, 30),
+  } : null
+
+  const mkSymCard = (id: string, title: string, desc: string, map: Map<string, number> | null): Card | null => {
+    if (!metrics || !map) return null
+    const col = cMoneyInWindow(map)
+    return {
+      id, title, tone: 'green', desc,
+      cols: [cSym, cPl, cPerCapBuyer, cTvalSym, col],
+      rows: metrics.filter((r) => map.has(r.sym)).sort((a, b) => (map.get(b.sym) ?? 0) - (map.get(a.sym) ?? 0)).slice(0, 30),
+    }
+  }
+
+  const symCard5 = mkSymCard('sym-flow-5', 'ورود پول حقیقی هفتگی', 'مجموع خالص ورود پول حقیقی نماد در ۵ روز کاری اخیر', symMoneyIn5)
+  const symCard22 = mkSymCard('sym-flow-22', 'ورود پول حقیقی ماهانه', 'مجموع خالص ورود پول حقیقی نماد در ۲۲ روز کاری اخیر', symMoneyIn22)
+  const symCard66 = mkSymCard('sym-flow-66', 'ورود پول حقیقی سه‌ماهه', 'مجموع خالص ورود پول حقیقی نماد در ۶۶ روز کاری اخیر (~۳ ماه)', symMoneyIn66)
 
   const bg = isDark ? '#060B14' : '#F4F7FB'
   const text = isDark ? '#E8F4FF' : '#0F1E2E'
@@ -299,6 +383,32 @@ export default function MoneyFlowPage() {
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
           {card22 ? <Table card={card22} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+        </div>
+
+        <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, margin: '32px 0 6px', color: 'oklch(0.74 0.16 150)' }}>
+          بیشترین ورود پول حقیقی
+        </h2>
+        <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+          خالص ورود پول حقیقی هر نماد (خرید حقیقی منهای فروش حقیقی) در بازه‌های مختلف — روزانه مستقیم از بازار زنده،
+          هفتگی/ماهانه/سه‌ماهه از تاریخچه روزانه. تا تکمیل تاریخچه، بازه‌های بلندتر بر مبنای روزهای موجود محاسبه می‌شوند.
+        </p>
+
+        <div style={{
+          display: 'grid', gap: 16,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+        }}>
+          {symDailyCard ? <FilterTable card={symDailyCard} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+          )}
+          {symCard5 ? <FilterTable card={symCard5} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {symCard22 ? <FilterTable card={symCard22} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {symCard66 ? <FilterTable card={symCard66} isDark={isDark} /> : (
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
         </div>
