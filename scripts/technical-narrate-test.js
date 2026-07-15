@@ -37,13 +37,16 @@ async function main() {
   const sb = sbClient()
   if (!sb) throw new Error('SUPABASE_URL/SUPABASE_KEY تنظیم نشده')
 
-  const { data, error } = await sb
+  // نزولی + limit تا ۴۰۰ ردیف *اخیر* بیاید — صعودی+limit روی نمادهای با سابقهٔ طولانی قدیمی‌ترین
+  // ۴۰۰ روز را برمی‌گرداند نه اخیرترین‌ها (باگ: چارت پارس‌دارو/دپارس تاریخ ۱۴۰۴/۰۱ نشان می‌داد)
+  const { data: raw, error } = await sb
     .from('stock_candles')
     .select('trade_date, trade_date_shamsi, open, high, low, close, volume, adj_open, adj_high, adj_low, adj_close')
     .eq('symbol', SYMBOL)
-    .order('trade_date', { ascending: true })
+    .order('trade_date', { ascending: false })
     .limit(400)
   if (error) throw new Error(`stock_candles select: ${error.message}`)
+  const data = raw.reverse()
 
   // قیمت تعدیل‌شده را ترجیح می‌دهیم — خام با افزایش سرمایه/تقسیم سود پرش کاذب نشان می‌دهد
   const adjusted = data

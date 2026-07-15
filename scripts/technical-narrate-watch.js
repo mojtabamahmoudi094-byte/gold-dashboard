@@ -112,14 +112,16 @@ function useAdjusted(rows) {
 }
 
 async function fetchCandles(sb, symbol) {
+  // نزولی + limit تا ۴۰۰ ردیف *اخیر* بیاید — صعودی+limit روی نمادهای با سابقهٔ طولانی (بیشتر از ۴۰۰ روز
+  // معاملاتی) قدیمی‌ترین ۴۰۰ روز را برمی‌گرداند، نه اخیرترین‌ها (باگ: چارت پارس‌دارو تاریخ ۱۴۰۴/۰۱ نشان می‌داد)
   const { data, error } = await sb
     .from('stock_candles')
     .select('trade_date, trade_date_shamsi, open, high, low, close, volume, adj_open, adj_high, adj_low, adj_close')
     .eq('symbol', symbol)
-    .order('trade_date', { ascending: true })
+    .order('trade_date', { ascending: false })
     .limit(400)
   if (error) throw new Error(`stock_candles «${symbol}»: ${error.message}`)
-  return useAdjusted(data)
+  return useAdjusted((data || []).reverse())
 }
 
 // ── ۲) روایت Gemini از روی عکس چارت ──
