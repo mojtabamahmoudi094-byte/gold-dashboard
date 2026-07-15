@@ -181,17 +181,15 @@ export default function QueueFiltersPage() {
         )}
 
         {metrics && stats && (
-          <div style={{
-            display: 'grid', gap: 16,
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
-          }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            {/* هر جدول تمام عرض صفحه — با ۱۰ ستون بدون نیاز به اسکرول افقی جا می‌شود */}
             <div>
               {statBar(stats.buyCount, stats.buyTotalVal, 'green')}
-              <FilterTable card={cards[0]} isDark={isDark} />
+              <FilterTable card={cards[0]} isDark={isDark} compact />
             </div>
             <div>
               {statBar(stats.sellCount, stats.sellTotalVal, 'red')}
-              <FilterTable card={cards[1]} isDark={isDark} />
+              <FilterTable card={cards[1]} isDark={isDark} compact />
             </div>
           </div>
         )}

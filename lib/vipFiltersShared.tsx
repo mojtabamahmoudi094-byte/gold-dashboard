@@ -149,7 +149,8 @@ export const cVol: Col = { label: 'حجم', key: 'tvol', fmt: (r) => fVol(r.tvol
 export const cRatioM: Col = { label: 'ضریب حجم', key: 'ratioM', fmt: (r) => fX(r.ratioM), num: (r) => r.ratioM ?? 0 }
 
 // ── جدول با سورت (استفاده مشترک هر صفحه‌ای که رو نوع M کار می‌کند) ────────────
-export function FilterTable({ card, isDark }: { card: Card; isDark: boolean }) {
+// compact: بدون سقف ارتفاع/اسکرول — برای جدول‌های تمام‌عرض با ستون‌های زیاد (مثل صف خرید/فروش)
+export function FilterTable({ card, isDark, compact }: { card: Card; isDark: boolean; compact?: boolean }) {
   const [sortI, setSortI] = useState<number | null>(null)
   const [asc, setAsc] = useState(false)
 
@@ -189,8 +190,8 @@ export function FilterTable({ card, isDark }: { card: Card; isDark: boolean }) {
         <span style={{ width: 18 }} />
       </div>
 
-      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 430, flex: 1 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <div style={{ overflowX: compact ? 'visible' : 'auto', overflowY: compact ? 'visible' : 'auto', maxHeight: compact ? 'none' : 430, flex: 1 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: compact ? 11 : 12, tableLayout: compact ? 'fixed' : 'auto' }}>
           <thead>
             <tr>
               {card.cols.map((c, i) => (
@@ -198,9 +199,10 @@ export function FilterTable({ card, isDark }: { card: Card; isDark: boolean }) {
                   onClick={() => { if (sortI === i) setAsc(!asc); else { setSortI(i); setAsc(false) } }}
                   style={{
                     position: 'sticky', top: 0, background: headBg, zIndex: 1,
-                    padding: '8px 8px', fontWeight: 700, color: text,
-                    whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none',
-                    backdropFilter: 'blur(6px)',
+                    padding: compact ? '7px 4px' : '8px 8px', fontWeight: 700, color: text,
+                    whiteSpace: compact ? 'normal' : 'nowrap', cursor: 'pointer', userSelect: 'none',
+                    backdropFilter: 'blur(6px)', wordBreak: compact ? 'break-word' : 'normal',
+                    fontSize: compact ? 10.5 : undefined, lineHeight: compact ? 1.4 : undefined,
                   }}>
                   {c.label}{' '}
                   <span style={{ fontSize: 8, color: sortI === i ? '#3b82f6' : cream }}>
@@ -218,7 +220,11 @@ export function FilterTable({ card, isDark }: { card: Card; isDark: boolean }) {
             ) : rows.map((r) => (
               <tr key={r.sym} style={{ borderBottom: `1px solid ${line}` }}>
                 {card.cols.map((c, i) => (
-                  <td key={i} style={{ padding: '7px 8px', textAlign: 'center', whiteSpace: 'nowrap', color: i === 0 ? '#3b82f6' : cream }}>
+                  <td key={i} style={{
+                    padding: compact ? '6px 4px' : '7px 8px', textAlign: 'center',
+                    whiteSpace: compact ? 'normal' : 'nowrap', wordBreak: compact ? 'break-word' : 'normal',
+                    color: i === 0 ? '#3b82f6' : cream,
+                  }}>
                     {i === 0 ? (
                       <Link href={`/technical/${encodeURIComponent(r.sym)}`} style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 700 }}>
                         {r.sym}
