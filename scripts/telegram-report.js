@@ -26,7 +26,7 @@ const TOKEN = process.env.TELEGRAM_BOT_TOKEN
 // مقصد پست‌های عمومی، کانال است — نه چت شخصی/ادمین که TELEGRAM_CHAT_ID برای هشدار خطا استفاده می‌شود
 const CHAT_ID = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID
 const FRESH_ONLY = process.env.REPORT_FRESH_ONLY === '1'
-const { renderCardHtml, screenshotCard } = require('./telegram-card')
+const { renderMarketCardHtml, screenshotCard } = require('./telegram-card')
 
 // نگاشت دسته → عنوان، ایموجی، مسیر مانیتور
 // category → title, emoji, monitor path
@@ -58,9 +58,9 @@ const num = (v, dec = 0) =>
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-// آخرین ردیف market_watch را از API عمومی می‌گیرد
-// fetch latest market_watch row from the public API
-async function fetchLatest(cat) {
+// ردیف‌های امروزِ market_watch را از API عمومی می‌گیرد (کل روز، برای چارت‌ها)
+// fetch today's market_watch rows from the public API (full day, for charts)
+async function fetchDay(cat) {
   try {
     const res = await fetch(`${SITE}/api/market-watch?cat=${encodeURIComponent(cat)}`, {
       headers: { 'cache-control': 'no-store' },
@@ -68,11 +68,38 @@ async function fetchLatest(cat) {
     if (!res.ok) return null
     const data = await res.json()
     const rows = Array.isArray(data.rows) ? data.rows : []
-    if (!rows.length) return { date: data.date, last: null }
-    return { date: data.date, last: rows[rows.length - 1] }
+    return { date: data.date, rows, last: rows.length ? rows[rows.length - 1] : null }
   } catch (e) {
     console.error(`[report] fetch data failed (${cat}):`, e.message)
     return null
+  }
+}
+
+// حداکثر این‌قدر نقطه رو رو چارت نشون می‌دیم — ردیف‌های ۵ دقیقه‌ای رو یکنواخت نمونه‌برداری می‌کنیم
+// so the chart stays readable regardless of the row cadence (5-min stocks vs sparser fund rows)
+const MAX_CHART_POINTS = 10
+function sampleRows(rows) {
+  if (rows.length <= MAX_CHART_POINTS) return rows
+  const n = MAX_CHART_POINTS
+  const idx = Array.from({ length: n }, (_, i) => Math.round((i * (rows.length - 1)) / (n - 1)))
+  return [...new Set(idx)].map((i) => rows[i])
+}
+
+// ردیف‌های روز → سری زمانی هر سنجه، برای چارت‌های کارت
+// day rows → per-metric time series, for the card charts
+function computeSeries(rows) {
+  const sampled = sampleRows(rows)
+  const times = sampled.map((r) =>
+    new Intl.DateTimeFormat('fa-IR', { timeZone: 'Asia/Tehran', hour: '2-digit', minute: '2-digit' }).format(new Date(r.ts))
+  )
+  const pick = (fn) => sampled.map((r) => { const v = fn(r); return v == null || Number.isNaN(Number(v)) ? 0 : Number(v) })
+  return {
+    times,
+    flow: pick((r) => r.money_in != null ? Number(r.money_in) / 1e10 : null),
+    tval: pick((r) => r.tval_total != null ? Number(r.tval_total) / 1e10 : null),
+    queue: { buy: pick((r) => r.buyq), sell: pick((r) => r.sellq) },
+    sym: { pos: pick((r) => r.sym_pos), neg: pick((r) => r.sym_neg) },
+    pc: { buy: pick((r) => r.ind_buy_pc != null ? Number(r.ind_buy_pc) / 1e7 : null), sell: pick((r) => r.ind_sell_pc != null ? Number(r.ind_sell_pc) / 1e7 : null) },
   }
 }
 
@@ -137,15 +164,19 @@ async function buildCaption(cat, facts) {
   return capCaption(lines.join('\n'))
 }
 
-// کارت گرافیکی از رو همون اعداد (نه اسکرین‌شات از سایت)
-function buildCardHtml(cat, facts) {
+// کارت گرافیکی چارت‌دار از رو سری زمانی امروز (نه اسکرین‌شات از سایت)
+function buildCardHtml(cat, series) {
   const c = CATS[cat]
-  return renderCardHtml({
+  return renderMarketCardHtml({
     emoji: c.emoji,
     title: c.title,
     subtitle: null,
-    bigStat: facts.highlight,
-    rows: facts.rows,
+    times: series.times,
+    flow: series.flow,
+    tval: series.tval,
+    queue: series.queue,
+    sym: series.sym,
+    pc: series.pc,
     footer: `${faTime()} — ${faDate()}`,
   })
 }
@@ -201,7 +232,7 @@ async function main() {
   try {
     for (const cat of cats) {
       const c = CATS[cat]
-      const snap = await fetchLatest(cat)
+      const snap = await fetchDay(cat)
 
       // نگهبان تازگی داده | freshness guard
       if (FRESH_ONLY && snap && snap.date && snap.date !== today) {
@@ -210,7 +241,8 @@ async function main() {
       }
 
       const facts = computeFacts(snap && snap.last)
-      const buf = await screenshotCard(browser, buildCardHtml(cat, facts))
+      const series = computeSeries((snap && snap.rows) || [])
+      const buf = await screenshotCard(browser, buildCardHtml(cat, series))
       await sendPhoto(buf, await buildCaption(cat, facts))
       console.log(`[report] ✅ sent ${cat}`)
       sent++
