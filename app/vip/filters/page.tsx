@@ -44,6 +44,8 @@ const fToman = (rial: number | null) => {
     : `${faN(t, 0)} ت`
 }
 const fPct = (v: number | null, d = 1) => (v == null ? '—' : `${faN(v, d)}٪`)
+// ارزش ریالی → میلیارد تومان با واحد ثابت (بدون فشرده‌سازی همت/میلیون)
+const fBn = (rial: number | null) => (rial == null ? '—' : `${faN(rial / 10 / 1e9, 2)} میلیارد ت`)
 // سرانه خرید روزانه از قبل به تومان ذخیره شده (بدون تقسیم بر ۱۰)
 const fTomanT = (t: number | null) => {
   if (t == null) return '—'
@@ -78,11 +80,18 @@ type M = {
   pd1: number | null; po1: number | null
   spreadPct: number | null   // (عرضه−تقاضا)÷تقاضا ٪
   ratioW: number | null; ratioM: number | null
+  avgVolW: number | null; avgVolM: number | null   // میانگین حجم خام هفته/ماه
   buyQueue: boolean          // صف خرید (قفل در سقف قیمت)
   sellQueue: boolean         // صف فروش (قفل در کف قیمت)
+  mv: number                 // ارزش بازار شرکت (ریال)
+  floatShares: number | null // تعداد سهام شناور (z × ff٪)
 }
 
-function buildMetrics(arr: any[], vol: Map<string, { w: number | null; m: number | null }>): M[] {
+function buildMetrics(
+  arr: any[],
+  vol: Map<string, { w: number | null; m: number | null }>,
+  float: Map<string, { ff: number | null; z: number | null }>,
+): M[] {
   const allL18 = new Set(arr.map((it) => clean(it.l18)))
   const out: M[] = []
   for (const it of arr) {
@@ -121,6 +130,8 @@ function buildMetrics(arr: any[], vol: Map<string, { w: number | null; m: number
     const sellQueue = !!(tmin && po1 != null && po1 <= tmin && qo1 > 0)
 
     const v = vol.get(sym)
+    const fl = float.get(sym)
+    const floatShares = fl?.ff != null && fl?.z != null ? fl.z * (fl.ff / 100) : null
     out.push({
       sym, name,
       pl, plp: num(it.plp) ?? 0, pc, pcp: num(it.pcp) ?? 0,
@@ -133,7 +144,9 @@ function buildMetrics(arr: any[], vol: Map<string, { w: number | null; m: number
       dVal, oVal, pd1, po1, spreadPct,
       ratioW: v?.w ? tvol / v.w : null,
       ratioM: v?.m ? tvol / v.m : null,
+      avgVolW: v?.w ?? null, avgVolM: v?.m ?? null,
       buyQueue, sellQueue,
+      mv: num(it.mv) ?? 0, floatShares,
     })
   }
   return out
@@ -141,7 +154,7 @@ function buildMetrics(arr: any[], vol: Map<string, { w: number | null; m: number
 
 // ── تعریف جدول‌ها ────────────────────────────────────────────────────────────
 type Col = { label: string; key: keyof M | 'spreadAbs'; fmt: (r: M) => string; num: (r: M) => number }
-type Card = { id: string; title: string; tone: 'green' | 'red'; desc: string; cols: Col[]; rows: M[]; needVol?: boolean }
+type Card = { id: string; title: string; tone: 'green' | 'red'; desc: string; cols: Col[]; rows: M[]; needVol?: boolean; needFloat?: boolean }
 
 const cSym: Col = { label: 'نماد', key: 'sym', fmt: (r) => r.sym, num: () => 0 }
 const cPl: Col = { label: 'قیمت آخر', key: 'pl', fmt: (r) => `${faN(r.pl)} (${faN(r.plp, 2)}٪)`, num: (r) => r.plp }
@@ -151,6 +164,33 @@ const cVal: Col = { label: 'ارزش', key: 'tval', fmt: (r) => fToman(r.tval), 
 const cPerCap: Col = { label: 'سرانه خرید', key: 'perCapB', fmt: (r) => fToman(r.perCapB), num: (r) => r.perCapB ?? 0 }
 const cRatioM: Col = { label: 'ضریب حجم', key: 'ratioM', fmt: (r) => fX(r.ratioM), num: (r) => r.ratioM ?? 0 }
 const cSellN: Col = { label: 'فروش حقوقی', key: 'sellNPct', fmt: (r) => fPct(r.sellNPct, 0), num: (r) => r.sellNPct ?? 0 }
+const cMv: Col = { label: 'مارکت سهم', key: 'mv', fmt: (r) => fToman(r.mv), num: (r) => r.mv }
+const cValBn: Col = { label: 'ارزش معاملات', key: 'tval', fmt: (r) => fBn(r.tval), num: (r) => r.tval }
+const cVolFloatToday: Col = {
+  label: 'حجم امروز/شناوری', key: 'floatShares',
+  fmt: (r) => (r.floatShares ? fPct((r.tvol / r.floatShares) * 100, 2) : '—'),
+  num: (r) => (r.floatShares ? (r.tvol / r.floatShares) * 100 : 0),
+}
+const cVolFloatWeek: Col = {
+  label: 'حجم هفته/شناوری', key: 'floatShares',
+  fmt: (r) => (r.floatShares && r.avgVolW ? fPct((r.avgVolW / r.floatShares) * 100, 2) : '—'),
+  num: (r) => (r.floatShares && r.avgVolW ? (r.avgVolW / r.floatShares) * 100 : 0),
+}
+const cVolFloatMonth: Col = {
+  label: 'حجم ماه/شناوری', key: 'floatShares',
+  fmt: (r) => (r.floatShares && r.avgVolM ? fPct((r.avgVolM / r.floatShares) * 100, 2) : '—'),
+  num: (r) => (r.floatShares && r.avgVolM ? (r.avgVolM / r.floatShares) * 100 : 0),
+}
+const cValMvPct: Col = {
+  label: 'ارزش/مارکت', key: 'mv',
+  fmt: (r) => (r.mv > 0 ? fPct((r.tval / r.mv) * 100, 2) : '—'),
+  num: (r) => (r.mv > 0 ? (r.tval / r.mv) * 100 : 0),
+}
+const cValFloatPct: Col = {
+  label: 'ارزش/شناوری', key: 'floatShares',
+  fmt: (r) => (r.floatShares && r.pc ? fPct((r.tval / (r.floatShares * r.pc)) * 100, 2) : '—'),
+  num: (r) => (r.floatShares && r.pc ? (r.tval / (r.floatShares * r.pc)) * 100 : 0),
+}
 
 function buildCards(ms: M[], hasVol: boolean): Card[] {
   const top = (rows: M[], by: (r: M) => number, n = 30) => [...rows].sort((a, b) => by(b) - by(a)).slice(0, n)
@@ -259,6 +299,34 @@ function buildCards(ms: M[], hasVol: boolean): Card[] {
       id: 'golden', title: 'فیلتر طلایی بورس سنج', tone: 'green',
       desc: 'ترکیب قوی‌ترین نشانه‌ها: قدرت خرید ≥۲ + سرانه خرید حقیقی ≥۳۰ میلیون تومان + فروش حقوقی ≥۳۰٪ (کد به کد) + حجم بالا + آخرین مثبت',
       cols: [cSym, cPl, cBp, cPerCap, cRatioM, cSellN, cVol], rows: top(golden, (r) => r.bp ?? 0),
+    },
+  ]
+}
+
+// ── فیلترهای کاربردی → حجم به شناوری و مارکت — نیازمند stock_float (کرون روزانه stock-float.js) ────
+function buildVolFloatCards(ms: M[]): Card[] {
+  const top = (rows: M[], by: (r: M) => number, n = 30) => [...rows].sort((a, b) => by(b) - by(a)).slice(0, n)
+  const withFloat = ms.filter((r) => r.floatShares != null && r.floatShares > 0)
+
+  const volFloat = top(withFloat, (r) => r.tvol / (r.floatShares as number))
+  const valMv = top(ms.filter((r) => r.mv > 0), (r) => r.tval / r.mv)
+  const valFloat = top(withFloat, (r) => r.tval / ((r.floatShares as number) * r.pc))
+
+  return [
+    {
+      id: 'vol-float', title: 'بیشترین درصد حجم نسبت به شناوری', tone: 'green', needFloat: true,
+      desc: 'حجم معاملات امروز نسبت به تعداد سهام شناور شرکت — نمادهایی که بخش بزرگی از شناورشان امروز جابه‌جا شده',
+      cols: [cSym, cPl, cRatioM, cVolFloatToday, cVolFloatWeek, cVolFloatMonth, cVol], rows: volFloat,
+    },
+    {
+      id: 'val-mv', title: 'بیشترین ارزش معاملات نسبت به مارکت شرکت', tone: 'green',
+      desc: 'ارزش معاملات امروز نسبت به ارزش بازار کل شرکت',
+      cols: [cSym, cPl, cValMvPct, cValBn, cVol, cMv], rows: valMv,
+    },
+    {
+      id: 'val-float', title: 'بیشترین ارزش معاملات نسبت به شناوری', tone: 'green', needFloat: true,
+      desc: 'ارزش معاملات امروز نسبت به ارزش بازار سهام شناور شرکت',
+      cols: [cSym, cPl, cValFloatPct, cValBn, cVol, cMv], rows: valFloat,
     },
   ]
 }
@@ -384,7 +452,7 @@ function FilterTable({ card, isDark }: { card: Card; isDark: boolean }) {
           <tbody>
             {rows.length === 0 ? (
               <tr><td colSpan={card.cols.length} style={{ padding: '38px 14px', textAlign: 'center', color: cream, fontSize: 12.5 }}>
-                {card.needVol ? 'نمادی با این شرط پیدا نشد' : 'در حال حاضر نمادی شرایط این فیلتر را ندارد'}
+                {card.needFloat ? 'داده شناوری هنوز در دسترس نیست' : card.needVol ? 'نمادی با این شرط پیدا نشد' : 'در حال حاضر نمادی شرایط این فیلتر را ندارد'}
               </td></tr>
             ) : rows.map((r) => (
               <tr key={r.sym} style={{ borderBottom: `1px solid ${line}` }}>
@@ -507,6 +575,7 @@ export default function VipFiltersPage() {
   const isMobile = useIsMobile()
   const [metrics, setMetrics] = useState<M[] | null>(null)
   const [hasVol, setHasVol] = useState(false)
+  const [hasFloat, setHasFloat] = useState(false)
   const [failed, setFailed] = useState(false)
   const [updated, setUpdated] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -540,6 +609,21 @@ export default function VipFiltersPage() {
       } catch { /* view هنوز ساخته نشده */ }
       setHasVol(volMap.size > 0)
 
+      // شناوری هر نماد (ff٪, z) از جدول stock_float (کرون روزانه stock-float.js) — اختیاری
+      const floatMap = new Map<string, { ff: number | null; z: number | null }>()
+      try {
+        for (let off = 0; off < 10000; off += 1000) {
+          const { data, error } = await supabase
+            .from('stock_float')
+            .select('symbol, free_float_pct, shares_outstanding')
+            .range(off, off + 999)
+          if (error || !data?.length) break
+          for (const r of data) floatMap.set(clean(r.symbol), { ff: num(r.free_float_pct), z: num(r.shares_outstanding) })
+          if (data.length < 1000) break
+        }
+      } catch { /* جدول هنوز ساخته نشده */ }
+      setHasFloat(floatMap.size > 0)
+
       // BrsApi فقط از IP ایران جواب می‌دهد — فچ سمت کلاینت (الگوی Header)
       const res = await fetch(`https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${BRSAPI_KEY}`, {
         cache: 'no-store', signal: AbortSignal.timeout(60_000),
@@ -549,7 +633,7 @@ export default function VipFiltersPage() {
       const arr = Array.isArray(data) ? data : (data?.symbols ?? data?.data ?? [])
       if (!Array.isArray(arr) || arr.length === 0) throw new Error('empty')
 
-      setMetrics(buildMetrics(arr, volMap))
+      setMetrics(buildMetrics(arr, volMap, floatMap))
       setUpdated(new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran' }))
     } catch {
       setFailed(true)
@@ -611,6 +695,7 @@ export default function VipFiltersPage() {
 
   const cards = useMemo(() => (metrics ? buildCards(metrics, hasVol) : []), [metrics, hasVol])
   const perCapCards = useMemo(() => (perCapRows ? buildPerCapCards(perCapRows) : []), [perCapRows])
+  const volFloatCards = useMemo(() => (metrics ? buildVolFloatCards(metrics) : []), [metrics])
 
   const bg = isDark ? '#060B14' : '#F4F7FB'
   const text = isDark ? '#E8F4FF' : '#0F1E2E'
@@ -705,6 +790,32 @@ export default function VipFiltersPage() {
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
             }}>
               {perCapCards.map((c) => <PerCapTable key={c.id} card={c} isDark={isDark} />)}
+            </div>
+          )}
+
+          <h3 style={{ fontSize: isMobile ? 15 : 17, fontWeight: 700, margin: '28px 0 6px', color: 'oklch(0.74 0.16 150)' }}>
+            حجم به شناوری و مارکت
+          </h3>
+          <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+            حجم و ارزش معاملات امروز هر نماد نسبت به تعداد سهام شناور و ارزش بازار شرکت — نمادهایی که نسبت به اندازه واقعی خودشان معاملات سنگینی داشته‌اند.
+          </p>
+
+          {!hasFloat && metrics && (
+            <div style={{
+              padding: '10px 16px', borderRadius: 10, marginBottom: 16, fontSize: 12,
+              background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b',
+            }}>
+              داده شناوری هر نماد هنوز در دسترس نیست — جدول‌های «نسبت به شناوری» خالی می‌مانند تا کرون روزانه اجرا شود.
+            </div>
+          )}
+          {!metrics ? (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+          ) : (
+            <div style={{
+              display: 'grid', gap: 16,
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+            }}>
+              {volFloatCards.map((c) => <FilterTable key={c.id} card={c} isDark={isDark} />)}
             </div>
           )}
         </div>
