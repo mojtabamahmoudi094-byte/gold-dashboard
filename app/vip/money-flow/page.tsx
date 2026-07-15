@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import {
-  BRSAPI_KEY, num, faN, fToman, fX, clean, NOT_STOCK_CS,
+  BRSAPI_KEY, num, faN, fToman, fX, fPct, clean, NOT_STOCK_CS,
   type M, buildMetrics, type Col, type Card, cSym, cPl, FilterTable,
 } from '../../../lib/vipFiltersShared'
 
@@ -161,6 +161,7 @@ export default function MoneyFlowPage() {
   const isMobile = useIsMobile()
   const [dailyRows, setDailyRows] = useState<DailyFlowRow[] | null>(null)
   const [metrics, setMetrics] = useState<M[] | null>(null)
+  const [hasFloat, setHasFloat] = useState(false)
   const [failed, setFailed] = useState(false)
   const [updated, setUpdated] = useState<string | null>(null)
   const [histRows3, setHistRows3] = useState<FlowRow[] | null>(null)
@@ -184,6 +185,21 @@ export default function MoneyFlowPage() {
   const loadDaily = async () => {
     setFailed(false)
     try {
+      // شناوری هر نماد (ff٪, z) از جدول stock_float (کرون روزانه stock-float.js) — برای نسبت ورود/خروج پول به شناوری
+      const floatMap = new Map<string, { ff: number | null; z: number | null }>()
+      try {
+        for (let off = 0; off < 10000; off += 1000) {
+          const { data, error } = await supabase
+            .from('stock_float')
+            .select('symbol, free_float_pct, shares_outstanding')
+            .range(off, off + 999)
+          if (error || !data?.length) break
+          for (const r of data) floatMap.set(clean(r.symbol), { ff: num(r.free_float_pct), z: num(r.shares_outstanding) })
+          if (data.length < 1000) break
+        }
+      } catch { /* جدول هنوز ساخته نشده */ }
+      setHasFloat(floatMap.size > 0)
+
       const res = await fetch(`https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${BRSAPI_KEY}`, {
         cache: 'no-store', signal: AbortSignal.timeout(60_000),
       })
@@ -192,7 +208,7 @@ export default function MoneyFlowPage() {
       const arr = Array.isArray(data) ? data : (data?.symbols ?? data?.data ?? [])
       if (!Array.isArray(arr) || arr.length === 0) throw new Error('empty')
       setDailyRows(buildDailyFlow(arr))
-      setMetrics(buildMetrics(arr, new Map()))
+      setMetrics(buildMetrics(arr, new Map(), floatMap))
       setUpdated(new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran' }))
     } catch {
       setFailed(true)
@@ -426,6 +442,57 @@ export default function MoneyFlowPage() {
   const legalOutCard22 = mkLegalCard('legal-out-22', 'خروج پول حقوقی ماهانه', 'مجموع خالص خروج پول حقوقی نماد در ۲۲ روز کاری اخیر', symLegalIn22, true)
   const legalOutCard66 = mkLegalCard('legal-out-66', 'خروج پول حقوقی سه‌ماهه', 'مجموع خالص خروج پول حقوقی نماد در ۶۶ روز کاری اخیر (~۳ ماه)', symLegalIn66, true)
 
+  // ── بیشترین ورود/خروج پول حقیقی نسبت به شناوری (سطح نماد) — نیازمند stock_float ──────
+  const floatPctLive = (r: M): number | null => (r.floatShares && r.pc ? (r.moneyInI / (r.floatShares * r.pc)) * 100 : null)
+  const cFloatPctIn: Col = { label: 'ورود پول/شناوری', key: 'floatShares', fmt: (r) => fPct(floatPctLive(r), 3), num: (r) => floatPctLive(r) ?? 0 }
+  const cFloatPctOut: Col = {
+    label: 'خروج پول/شناوری', key: 'floatShares',
+    fmt: (r) => { const v = floatPctLive(r); return v == null ? '—' : fPct(-v, 3) },
+    num: (r) => { const v = floatPctLive(r); return v == null ? 0 : -v },
+  }
+  const floatPctWindow = (r: M, tomanSum: number | undefined): number | null =>
+    (r.floatShares && r.pc && tomanSum != null) ? (tomanSum / (r.floatShares * r.pc / 10)) * 100 : null
+  const cFloatPctWindow = (map: Map<string, number>, out: boolean): Col => ({
+    label: out ? 'خروج پول/شناوری' : 'ورود پول/شناوری', key: 'floatShares',
+    fmt: (r) => { const v = floatPctWindow(r, map.get(r.sym)); return v == null ? '—' : fPct(out ? -v : v, 3) },
+    num: (r) => { const v = floatPctWindow(r, map.get(r.sym)); return v == null ? 0 : (out ? -v : v) },
+  })
+
+  const withFloat = (ms: M[]) => ms.filter((r) => r.floatShares != null && r.floatShares > 0)
+
+  const floatInDailyCard: Card | null = metrics ? {
+    id: 'float-in-daily', title: 'ورود پول حقیقی روزانه نسبت به شناوری', tone: 'green', needFloat: true,
+    desc: 'خالص ورود پول حقیقی امروز به نسبت ارزش بازار سهام شناور شرکت — مرتب‌شده بر اساس بیشترین نسبت',
+    cols: [cSym, cPl, cPerCapBuyer, cTvalSym, cFloatPctIn],
+    rows: [...withFloat(metrics)].sort((a, b) => (floatPctLive(b) ?? 0) - (floatPctLive(a) ?? 0)).slice(0, 30),
+  } : null
+
+  const floatOutDailyCard: Card | null = metrics ? {
+    id: 'float-out-daily', title: 'خروج پول حقیقی روزانه نسبت به شناوری', tone: 'red', needFloat: true,
+    desc: 'خالص خروج پول حقیقی امروز به نسبت ارزش بازار سهام شناور شرکت — مرتب‌شده بر اساس بیشترین نسبت',
+    cols: [cSym, cPl, cPerCapBuyer, cTvalSym, cFloatPctOut],
+    rows: [...withFloat(metrics)].sort((a, b) => -(floatPctLive(b) ?? 0) - -(floatPctLive(a) ?? 0)).slice(0, 30),
+  } : null
+
+  const mkFloatCard = (id: string, title: string, desc: string, map: Map<string, number> | null, out: boolean): Card | null => {
+    if (!metrics || !map) return null
+    const col = cFloatPctWindow(map, out)
+    const rows = withFloat(metrics).filter((r) => map.has(r.sym))
+      .sort((a, b) => {
+        const va = floatPctWindow(a, map.get(a.sym)) ?? 0, vb = floatPctWindow(b, map.get(b.sym)) ?? 0
+        return out ? va - vb : vb - va
+      })
+      .slice(0, 30)
+    return { id, title, tone: out ? 'red' : 'green', desc, cols: [cSym, cPl, cPerCapBuyer, cTvalSym, col], rows, needFloat: true }
+  }
+
+  const floatInCard5 = mkFloatCard('float-in-5', 'ورود پول حقیقی هفتگی نسبت به شناوری', 'مجموع خالص ورود پول حقیقی ۵ روز کاری اخیر به نسبت ارزش بازار سهام شناور', symMoneyIn5, false)
+  const floatInCard22 = mkFloatCard('float-in-22', 'ورود پول حقیقی ماهانه نسبت به شناوری', 'مجموع خالص ورود پول حقیقی ۲۲ روز کاری اخیر به نسبت ارزش بازار سهام شناور', symMoneyIn22, false)
+  const floatInCard66 = mkFloatCard('float-in-66', 'ورود پول حقیقی سه‌ماهه نسبت به شناوری', 'مجموع خالص ورود پول حقیقی ۶۶ روز کاری اخیر به نسبت ارزش بازار سهام شناور', symMoneyIn66, false)
+  const floatOutCard5 = mkFloatCard('float-out-5', 'خروج پول حقیقی هفتگی نسبت به شناوری', 'مجموع خالص خروج پول حقیقی ۵ روز کاری اخیر به نسبت ارزش بازار سهام شناور', symMoneyIn5, true)
+  const floatOutCard22 = mkFloatCard('float-out-22', 'خروج پول حقیقی ماهانه نسبت به شناوری', 'مجموع خالص خروج پول حقیقی ۲۲ روز کاری اخیر به نسبت ارزش بازار سهام شناور', symMoneyIn22, true)
+  const floatOutCard66 = mkFloatCard('float-out-66', 'خروج پول حقیقی سه‌ماهه نسبت به شناوری', 'مجموع خالص خروج پول حقیقی ۶۶ روز کاری اخیر به نسبت ارزش بازار سهام شناور', symMoneyIn66, true)
+
   const bg = isDark ? '#060B14' : '#F4F7FB'
   const text = isDark ? '#E8F4FF' : '#0F1E2E'
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
@@ -572,6 +639,62 @@ export default function MoneyFlowPage() {
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
           {legalOutCard66 ? <FilterTable card={legalOutCard66} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+        </div>
+
+        <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, margin: '32px 0 6px', color: 'oklch(0.74 0.16 150)' }}>
+          ورود پول حقیقی نسبت به شناوری
+        </h2>
+        <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+          خالص ورود پول حقیقی به نسبت ارزش بازار سهام شناور شرکت (نه کل شرکت) — نمادهای کوچک‌شناور با ورود پول کم هم اینجا بالا می‌آیند.
+        </p>
+        {!hasFloat && metrics && (
+          <div style={{
+            padding: '10px 16px', borderRadius: 10, marginBottom: 16, fontSize: 12,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b',
+          }}>
+            داده شناوری هر نماد هنوز در دسترس نیست — این جدول‌ها خالی می‌مانند تا کرون روزانه اجرا شود.
+          </div>
+        )}
+        <div style={{
+          display: 'grid', gap: 16,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+        }}>
+          {floatInDailyCard ? <FilterTable card={floatInDailyCard} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+          )}
+          {floatInCard5 ? <FilterTable card={floatInCard5} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {floatInCard22 ? <FilterTable card={floatInCard22} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {floatInCard66 ? <FilterTable card={floatInCard66} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+        </div>
+
+        <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, margin: '32px 0 6px', color: '#EF4444' }}>
+          خروج پول حقیقی نسبت به شناوری
+        </h2>
+        <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+          خالص خروج پول حقیقی به نسبت ارزش بازار سهام شناور شرکت.
+        </p>
+        <div style={{
+          display: 'grid', gap: 16,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+        }}>
+          {floatOutDailyCard ? <FilterTable card={floatOutDailyCard} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+          )}
+          {floatOutCard5 ? <FilterTable card={floatOutCard5} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {floatOutCard22 ? <FilterTable card={floatOutCard22} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+          {floatOutCard66 ? <FilterTable card={floatOutCard66} isDark={isDark} /> : (
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
         </div>
