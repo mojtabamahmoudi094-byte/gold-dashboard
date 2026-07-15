@@ -149,7 +149,11 @@ function multiLineChart({ width, height, labels, series, labelAllPoints }) {
     if (pts.length > 1) paths += `<polyline points="${pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="${l.color}" stroke-width="2.5"/>`
     paths += pts.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${l.color}"/>`).join('')
     if (labelAllPoints) {
-      paths += pts.map(p => `<text x="${p.x.toFixed(1)}" y="${(p.y + 20).toFixed(1)}" font-size="13" fill="${l.color}" text-anchor="middle">${faNum(p.v)}</text>`).join('')
+      paths += pts.map(p => {
+        const below = p.y + 20 <= height - padB - 4
+        const ly = below ? p.y + 20 : p.y - 10
+        return `<text x="${p.x.toFixed(1)}" y="${ly.toFixed(1)}" font-size="13" fill="${l.color}" text-anchor="middle">${faNum(p.v)}</text>`
+      }).join('')
     } else if (pts.length) {
       const last = pts[pts.length - 1]
       paths += `<text x="${(last.x + 8).toFixed(1)}" y="${(last.y - 6).toFixed(1)}" font-size="12" fill="${l.color}" text-anchor="start">${faNum(last.v)}</text>`
