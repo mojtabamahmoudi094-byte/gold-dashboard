@@ -8,6 +8,7 @@
  *    چون تاریخچه گذشته موجود نبود، جمع‌آوری از نصب شروع شده — میانگین‌های ۱۰/۲۰ روزه تا تکمیل زمان می‌برند.
  * ۲) حجم به شناوری و مارکت — نیازمند stock_float (کرون روزانه scripts/stock-float.js، چون
  *    درصد شناوری فقط با فراخوانی BrsApi Symbol.php به‌ازای هر نماد جداگانه به دست می‌آید).
+ * ۳) تعداد کد خریدار و فروشنده — بیشترین تعداد کد حقیقی خریدار/فروشنده امروز هر نماد.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -15,30 +16,21 @@ import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import {
-  BRSAPI_KEY, num, clean, fPct,
+  BRSAPI_KEY, num, clean, fPct, fX, faN, fToman as fTomanShared,
   type M, buildMetrics, type Col, type Card, cSym, cPl, cRatioM, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
 
 // سرانه خرید روزانه از قبل به تومان ذخیره شده (بدون تقسیم بر ۱۰) — همان فرمت fToman ولی بدون تبدیل ریال
 const fTomanT = (t: number | null) => {
   if (t == null) return '—'
-  const faN = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
   return t >= 1e9 ? `${faN(t / 1e9, 2)} میلیارد ت`
     : t >= 1e6 ? `${faN(t / 1e6, 0)} میلیون ت`
     : `${faN(t, 0)} ت`
 }
-const fToman = (rial: number | null) => {
-  if (rial == null) return '—'
-  return fTomanT(rial / 10)
-}
-const fBn = (rial: number | null) => {
-  if (rial == null) return '—'
-  const faN = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
-  return `${faN(rial / 10 / 1e9, 2)} میلیارد ت`
-}
+const fBn = (rial: number | null) => (rial == null ? '—' : `${faN(rial / 10 / 1e9, 2)} میلیارد ت`)
 
 // ── حجم به شناوری و مارکت ──────────────────────────────────────────────────
-const cMv: Col = { label: 'مارکت سهم', key: 'mv', fmt: (r) => fToman(r.mv), num: (r) => r.mv }
+const cMv: Col = { label: 'مارکت سهم', key: 'mv', fmt: (r) => fTomanShared(r.mv), num: (r) => r.mv }
 const cValBn: Col = { label: 'ارزش معاملات', key: 'tval', fmt: (r) => fBn(r.tval), num: (r) => r.tval }
 const cVolFloatToday: Col = {
   label: 'حجم امروز/شناوری', key: 'floatShares',
@@ -89,6 +81,35 @@ function buildVolFloatCards(ms: M[]): Card[] {
       id: 'val-float', title: 'بیشترین ارزش معاملات نسبت به شناوری', tone: 'green', needFloat: true,
       desc: 'ارزش معاملات امروز نسبت به ارزش بازار سهام شناور شرکت',
       cols: [cSym, cPl, cValFloatPct, cValBn, cVol, cMv], rows: valFloat,
+    },
+  ]
+}
+
+// ── تعداد کد خریدار و فروشنده ──────────────────────────────────────────────
+const cBuyCount: Col = { label: 'تعداد خریدار', key: 'buyCountI', fmt: (r) => faN(r.buyCountI), num: (r) => r.buyCountI }
+const cSellCount: Col = { label: 'تعداد فروشنده', key: 'sellCountI', fmt: (r) => faN(r.sellCountI), num: (r) => r.sellCountI }
+const cBuyPower: Col = { label: 'قدرت خریدار', key: 'bp', fmt: (r) => fX(r.bp), num: (r) => r.bp ?? 0 }
+const cSellPower: Col = {
+  label: 'قدرت فروشنده', key: 'bp',
+  fmt: (r) => fX(r.bp && r.bp > 0 ? 1 / r.bp : null),
+  num: (r) => (r.bp && r.bp > 0 ? 1 / r.bp : 0),
+}
+const cValToday: Col = { label: 'ارزش معاملات امروز', key: 'tval', fmt: (r) => fTomanShared(r.tval), num: (r) => r.tval }
+
+function buildCodeCountCards(ms: M[]): Card[] {
+  const top = (rows: M[], by: (r: M) => number, n = 30) => [...rows].sort((a, b) => by(b) - by(a)).slice(0, n)
+  const withCounts = ms.filter((r) => r.buyCountI > 0 || r.sellCountI > 0)
+
+  return [
+    {
+      id: 'most-buyers', title: 'بیشترین تعداد کد خریدار حقیقی', tone: 'green',
+      desc: 'نمادهایی که امروز بیشترین تعداد کد حقیقی خریدار داشته‌اند — نشانه تقاضای گسترده و توزیع‌شده',
+      cols: [cSym, cBuyCount, cSellCount, cBuyPower, cValToday], rows: top(withCounts, (r) => r.buyCountI),
+    },
+    {
+      id: 'most-sellers', title: 'بیشترین تعداد کد فروشنده حقیقی', tone: 'red',
+      desc: 'نمادهایی که امروز بیشترین تعداد کد حقیقی فروشنده داشته‌اند — نشانه عرضه گسترده و توزیع‌شده',
+      cols: [cSym, cSellCount, cBuyCount, cSellPower, cValToday], rows: top(withCounts, (r) => r.sellCountI),
     },
   ]
 }
@@ -357,6 +378,7 @@ export default function UsefulFiltersPage() {
 
   const perCapCards = useMemo(() => (perCapRows ? buildPerCapCards(perCapRows) : []), [perCapRows])
   const volFloatCards = useMemo(() => (metrics ? buildVolFloatCards(metrics) : []), [metrics])
+  const codeCountCards = useMemo(() => (metrics ? buildCodeCountCards(metrics) : []), [metrics])
 
   const bg = isDark ? '#060B14' : '#F4F7FB'
   const text = isDark ? '#E8F4FF' : '#0F1E2E'
@@ -438,6 +460,24 @@ export default function UsefulFiltersPage() {
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
           }}>
             {volFloatCards.map((c) => <FilterTable key={c.id} card={c} isDark={isDark} />)}
+          </div>
+        )}
+
+        <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, margin: '32px 0 6px', color: 'oklch(0.74 0.16 150)' }}>
+          تعداد کد خریدار و فروشنده
+        </h2>
+        <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+          نمادهایی که امروز بیشترین تعداد کد حقیقی خریدار/فروشنده را داشته‌اند — نشانه تقاضا یا عرضه گسترده و توزیع‌شده بین سهامداران، نه فقط چند کد بزرگ.
+        </p>
+
+        {!metrics ? (
+          <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+        ) : (
+          <div style={{
+            display: 'grid', gap: 16,
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+          }}>
+            {codeCountCards.map((c) => <FilterTable key={c.id} card={c} isDark={isDark} />)}
           </div>
         )}
       </div>

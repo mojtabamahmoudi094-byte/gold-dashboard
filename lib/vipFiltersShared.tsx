@@ -65,6 +65,8 @@ export type M = {
   sellQueue: boolean         // صف فروش (قفل در کف قیمت)
   mv: number                 // ارزش بازار شرکت (ریال)
   floatShares: number | null // تعداد سهام شناور (z × ff٪)
+  buyCountI: number          // تعداد کد خریدار حقیقی
+  sellCountI: number         // تعداد کد فروشنده حقیقی
 }
 
 export function buildMetrics(
@@ -127,6 +129,7 @@ export function buildMetrics(
       avgVolW: v?.w ?? null, avgVolM: v?.m ?? null,
       buyQueue, sellQueue,
       mv: num(it.mv) ?? 0, floatShares,
+      buyCountI: bCI, sellCountI: sCI,
     })
   }
   return out
