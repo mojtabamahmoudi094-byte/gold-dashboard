@@ -69,7 +69,8 @@ function isAfterMarketClose() {
   return [6, 0, 1, 2, 3].includes(day) && mins > 12 * 60 + 35
 }
 
-// ── ۱) سه صعودی‌ترین + سه نزولی‌ترین امروز ──
+// ── ۱) صعودی‌ترین + نزولی‌ترین امروز — تعداد از NARRATE_PER_SIDE (پیش‌فرض ۱+۱=۲، quota رایگان Gemini تنگ است) ──
+const PER_SIDE = Number(process.env.NARRATE_PER_SIDE || 1)
 async function fetchTopMovers() {
   const res = await fetch(`${SITE}/api/stocks-industries`, { headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(30_000) })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -82,8 +83,8 @@ async function fetchTopMovers() {
     all.push({ symbol: s.l18, name: s.l30, pcp: s.pcp, price: s.pl })
   }
   all.sort((a, b) => b.pcp - a.pcp)
-  const gainers = all.slice(0, 3)
-  const losers = all.slice(-3).reverse()
+  const gainers = all.slice(0, PER_SIDE)
+  const losers = all.slice(-PER_SIDE).reverse()
   return [...gainers, ...losers]
 }
 
