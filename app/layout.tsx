@@ -4,6 +4,7 @@ import Script from 'next/script'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import ChatWidget from './components/ChatWidget'
+import ScrollProgress from './components/ScrollProgress'
 import { SITE_URL } from '../lib/site'
 
 const GA_MEASUREMENT_ID = 'G-645YCKXK75'
@@ -74,6 +75,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
         />
+        <ScrollProgress />
         <Header />
         {children}
         <Footer />

@@ -68,6 +68,29 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--text);
+  position: relative;
+}
+
+/* ── Aurora — پس‌زمینه محو متحرک، پشت تمام صفحات ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(600px circle at 12% 8%,  rgba(59,130,246,0.14),  transparent 60%),
+    radial-gradient(560px circle at 88% 18%, rgba(139,92,246,0.12), transparent 60%),
+    radial-gradient(700px circle at 50% 95%, rgba(59,130,246,0.08), transparent 60%);
+  animation: auroraDrift 22s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(-1.5%, 1.5%) scale(1.06); }
+  100% { transform: translate(1.5%, -1%) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
 }
 
 /* ── Scrollbar ── */
@@ -99,7 +122,95 @@ body {
 .card:hover {
   border-color: rgba(59,130,246,0.2);
   box-shadow: 0 6px 32px rgba(0,0,0,0.65), 0 0 0 1px rgba(59,130,246,0.08);
+  transform: translateY(-2px);
 }
+
+/* ── اعداد برجسته (KPI/آمار) — فونت رقومی یکنواخت + گرادینت ── */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.num-hero {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.01em;
+  transition: filter 0.2s;
+}
+.num-hero:hover { filter: brightness(1.25); }
+.num-up   { color: var(--green) !important; }
+.num-down { color: var(--red) !important; }
+
+/* ── دکمه با افکت درخشش عبوری (shine sweep) ── */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.35) 45%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.55s ease;
+}
+.btn-shine:hover::after { transform: translateX(120%); }
+
+/* ── پاپ‌آپ / مودال عمومی ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(5,7,12,0.65);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease both;
+}
+.modal-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(59,130,246,0.06);
+  animation: modalIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── برند هدر/فوتر ── */
+.brand-logo { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.brand-link:hover .brand-logo { transform: scale(1.08) rotate(-4deg); }
+.brand-link:hover .brand-title { filter: brightness(1.3); }
+.brand-title { transition: filter 0.2s; background-size: 200% auto; }
+
+/* ── CTA ورود/ثبت‌نام — درخشش نبضی هنگام هاور ── */
+.cta-pulse:hover { animation: pulseBlue 1.4s ease infinite; }
+
+/* ── آیکون‌های شبکه اجتماعی فوتر ── */
+.social-icon { transition: transform 0.2s ease, background 0.18s ease, box-shadow 0.2s ease; }
+.social-icon:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 6px 18px rgba(59,130,246,0.25); }
+
+/* ── لینک با زیرخط متحرک ── */
+.link-underline {
+  position: relative;
+  text-decoration: none;
+}
+.link-underline::after {
+  content: '';
+  position: absolute;
+  right: 0; left: 0; bottom: -2px;
+  height: 1.5px;
+  background: linear-gradient(90deg, var(--brand), var(--brand2));
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.25s ease;
+}
+.link-underline:hover::after { transform: scaleX(1); }
 
 /* ── Animations ── */
 @keyframes fadeIn {

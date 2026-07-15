@@ -92,7 +92,7 @@ const UserIcon = () => (
 )
 
 const LogoMark = () => (
-  <div style={{
+  <div className="brand-logo" style={{
     width: 40, height: 40, borderRadius: 11, overflow: 'hidden', flexShrink: 0,
     backgroundImage: 'url(/logo.jpeg)',
     backgroundSize: '148% 148%',
@@ -239,15 +239,15 @@ export default function Header() {
           }}>
             {it.name}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#eef1f8' : '#2A2A2A', direction: 'ltr' }}>
+          <span className="num" style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#eef1f8' : '#2A2A2A' }}>
             {faInt(it.value)}
           </span>
           {it.pct !== null ? (
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: clr, minWidth: 52, textAlign: 'left' }}>
+            <span className="num" style={{ fontSize: 11.5, fontWeight: 700, color: clr, minWidth: 52, textAlign: 'left' }}>
               {up ? '▲' : '▼'} {faPct(it.pct)}٪
             </span>
           ) : it.change !== null ? (
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: clr, minWidth: 52, textAlign: 'left' }}>
+            <span className="num" style={{ fontSize: 11.5, fontWeight: 700, color: clr, minWidth: 52, textAlign: 'left' }}>
               {up ? '▲' : '▼'} {faInt(Math.abs(it.change))}
             </span>
           ) : (
@@ -305,10 +305,10 @@ export default function Header() {
       }}>
 
         {/* Brand */}
-        <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Link href="/" className="brand-link" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
           <LogoMark />
           <div>
-            <div style={{
+            <div className="brand-title" style={{
               fontSize: 17,
               fontWeight: 700,
               background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
@@ -513,6 +513,7 @@ export default function Header() {
             ) : (
               <Link
                 href="/auth"
+                className="cta-pulse btn-shine"
                 style={{
                   fontSize: 12.5, padding: '7px 18px', borderRadius: 8,
                   background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
