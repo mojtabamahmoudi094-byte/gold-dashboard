@@ -109,6 +109,7 @@ async function narrateChart(symbol, imageBuf, stats) {
     })
     const data = await res.json()
     if (data.ok && data.text) return data
+    log(`⚠️ ${symbol}: روایت Gemini ناموفق — ${data.error || 'پاسخ ناقص'}`)
   } catch (e) { log(`⚠️ ${symbol}: روایت Gemini شکست خورد — ${e.message}`) }
   return null
 }
