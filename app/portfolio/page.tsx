@@ -168,6 +168,14 @@ export default function PortfolioPage() {
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
 
+  // اتصال به بات تلگرام — کد یک‌بارمصرف
+  const [showTelegram, setShowTelegram] = useState(false)
+  const [tgLinked, setTgLinked] = useState(false)
+  const [tgUsername, setTgUsername] = useState<string | null>(null)
+  const [tgCode, setTgCode] = useState<string | null>(null)
+  const [tgLoading, setTgLoading] = useState(false)
+  const [tgMsg, setTgMsg] = useState<string | null>(null)
+
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
     if (saved === 'light') setIsDark(false)
@@ -188,6 +196,12 @@ export default function PortfolioPage() {
       subscription.unsubscribe()
     }
   }, [])
+
+  // وضعیت اتصال به بات تلگرام
+  useEffect(() => {
+    if (!user) return
+    loadTelegramStatus()
+  }, [user])
 
   // قیمت‌های روز: سهام + صندوق‌ها
   useEffect(() => {
@@ -772,6 +786,42 @@ ${txs.map(tx => row([
     w.document.close()
   }
 
+  // ─── اتصال به بات تلگرام ───
+  const authHeader = async (): Promise<Record<string, string>> => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }
+
+  const loadTelegramStatus = async () => {
+    const res = await fetch('/api/telegram/link-code', { headers: await authHeader() })
+    if (!res.ok) return
+    const data = await res.json()
+    setTgLinked(!!data.linked)
+    setTgUsername(data.username ?? null)
+  }
+
+  const requestTelegramCode = async () => {
+    setTgLoading(true); setTgMsg(null)
+    try {
+      const res = await fetch('/api/telegram/link-code', { method: 'POST', headers: await authHeader() })
+      const data = await res.json()
+      if (!res.ok) { setTgMsg(data.error || 'خطا در دریافت کد'); return }
+      setTgCode(data.code)
+    } finally {
+      setTgLoading(false)
+    }
+  }
+
+  const unlinkTelegram = async () => {
+    setTgLoading(true); setTgMsg(null)
+    try {
+      const res = await fetch('/api/telegram/link-code', { method: 'DELETE', headers: await authHeader() })
+      if (res.ok) { setTgLinked(false); setTgUsername(null); setTgCode(null) }
+    } finally {
+      setTgLoading(false)
+    }
+  }
+
   // ─── استایل‌های مشترک ───
   const card: React.CSSProperties = {
     background: t.panel, border: `1px solid ${t.border}`, borderRadius: 14,
@@ -891,6 +941,18 @@ ${txs.map(tx => row([
           )}
           <button
             type="button"
+            onClick={() => { setShowTelegram(!showTelegram); setTgMsg(null) }}
+            style={{
+              padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+              background: tgLinked ? 'rgba(16,185,129,0.08)' : 'rgba(59,130,246,0.08)',
+              border: `1px solid ${tgLinked ? 'rgba(16,185,129,0.3)' : 'rgba(59,130,246,0.3)'}`,
+              color: tgLinked ? t.green : t.brand, fontFamily: 'inherit',
+            }}
+          >
+            {tgLinked ? '✅ متصل به تلگرام' : '🤖 اتصال به بات تلگرام'}
+          </button>
+          <button
+            type="button"
             onClick={() => setShowForm(!showForm)}
             style={{
               padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
@@ -904,6 +966,53 @@ ${txs.map(tx => row([
           </button>
         </div>
       </div>
+
+      {/* اتصال به بات تلگرام */}
+      {showTelegram && (
+        <div style={{ ...card, marginBottom: 22 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>اتصال به بات تلگرام پورتفو</h3>
+            <button type="button" onClick={() => setShowTelegram(false)} style={{
+              background: 'transparent', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+            }}>✕ بستن</button>
+          </div>
+
+          {tgLinked ? (
+            <div>
+              <p style={{ fontSize: 12.5, color: t.text, margin: '0 0 12px' }}>
+                حساب شما به تلگرام {tgUsername ? <b>@{tgUsername}</b> : 'شما'} متصل است. برای دیدن خلاصه پورتفو در تلگرام دکمه «📊 پورتفوی من» را بزنید.
+              </p>
+              <button type="button" onClick={unlinkTelegram} disabled={tgLoading} style={{
+                padding: '9px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)',
+                color: t.red, fontFamily: 'inherit', opacity: tgLoading ? 0.6 : 1,
+              }}>{tgLoading ? '...' : 'قطع اتصال'}</button>
+            </div>
+          ) : (
+            <div>
+              <p style={{ fontSize: 12.5, color: t.muted, margin: '0 0 12px', lineHeight: 2 }}>
+                یک کد یک‌بارمصرف بگیرید، در تلگرام بات بورس سنج را باز کنید، دکمه «🔗 اتصال حساب» را بزنید و کد را بفرستید.
+              </p>
+              {tgCode && (
+                <div>
+                  <div style={{
+                    display: 'inline-block', padding: '10px 20px', borderRadius: 8, fontSize: 20, fontWeight: 800,
+                    letterSpacing: '0.25em', background: t.inputBg, border: `1px solid ${t.borderStrong}`,
+                    color: t.text, marginBottom: 10,
+                  }}>{tgCode}</div>
+                  <p style={{ fontSize: 11.5, color: t.muted, margin: '0 0 12px' }}>این کد تا ۱۰ دقیقه معتبر است.</p>
+                </div>
+              )}
+              <button type="button" onClick={requestTelegramCode} disabled={tgLoading} style={{
+                padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none',
+                fontFamily: 'inherit', opacity: tgLoading ? 0.6 : 1,
+              }}>{tgLoading ? 'در حال دریافت…' : tgCode ? 'دریافت کد جدید' : 'دریافت کد اتصال'}</button>
+              {tgMsg && <p style={{ fontSize: 12, color: t.red, margin: '10px 0 0' }}>{tgMsg}</p>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* فرم افزودن */}
       {showForm && (

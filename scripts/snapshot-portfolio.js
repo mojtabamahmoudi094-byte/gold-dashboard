@@ -55,62 +55,14 @@ let wsTransport
 try { wsTransport = require('ws') } catch { /* Node 22+ */ }
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, wsTransport ? { realtime: { transport: wsTransport } } : {})
 
-const safe = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
+const { computeHoldings, fetchPriceMap } = require('../lib/portfolioValuation')
 
 const todayShamsi = () =>
   new Intl.DateTimeFormat('fa-IR-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran' })
     .format(new Date())
 
-// قیمت روز همه‌ی نمادها (سهام + صندوق + فیزیکی) — دقیقاً همان سه منبعی که app/portfolio/page.tsx در مرورگر می‌خواند
-async function fetchPriceMap() {
-  const map = new Map()
-  try {
-    const res = await fetch(`${SITE}/api/stocks-industries`)
-    const data = await res.json()
-    for (const ind of data.industries ?? []) {
-      for (const s of ind.symbols ?? []) map.set(s.l18, safe(s.pl))
-    }
-  } catch (e) { console.error('[snapshot-portfolio] stocks-industries fetch failed:', e.message) }
-  try {
-    const res = await fetch(`${SITE}/api/funds`)
-    const data = await res.json()
-    const byId = new Map()
-    for (const r of data.records ?? []) byId.set(r.asset_id, r)
-    for (const a of data.assets ?? []) {
-      const r = byId.get(a.id)
-      if (r) map.set(a.slug, safe(r.price_close))
-    }
-  } catch (e) { console.error('[snapshot-portfolio] funds fetch failed:', e.message) }
-  try {
-    const res = await fetch(`${SITE}/api/physical-prices`)
-    const data = await res.json()
-    for (const [k, v] of Object.entries(data.prices ?? {})) map.set(k, safe(v))
-  } catch (e) { console.error('[snapshot-portfolio] physical-prices fetch failed:', e.message) }
-  return map
-}
-
-// میانگین موزون هلدینگ‌ها — همان منطق useMemo(holdings) در app/portfolio/page.tsx
-function computeHoldings(txs) {
-  const map = new Map()
-  for (const tx of txs) {
-    let h = map.get(tx.symbol)
-    if (!h) { h = { symbol: tx.symbol, qty: 0, totalCost: 0 }; map.set(tx.symbol, h) }
-    const q = safe(tx.quantity)
-    if (tx.side === 'buy') {
-      h.totalCost += q * safe(tx.price) + safe(tx.commission)
-      h.qty += q
-    } else {
-      const avg = h.qty > 0 ? h.totalCost / h.qty : 0
-      const sellQty = Math.min(q, h.qty)
-      h.totalCost -= avg * sellQty
-      h.qty -= sellQty
-    }
-  }
-  return [...map.values()]
-}
-
 async function main() {
-  const priceMap = await fetchPriceMap()
+  const priceMap = await fetchPriceMap(SITE)
   const date = todayShamsi()
 
   const { data: txs, error } = await sb

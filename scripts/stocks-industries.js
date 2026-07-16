@@ -191,10 +191,14 @@ async function main() {
     const perCapRows = []
     for (const it of watchItems) {
       const sym = clean(it.l18)
-      const pc = num(it.pc), bI = num(it.Buy_I_Volume), bCI = num(it.Buy_CountI)
-      if (!sym || !pc || !bI || !bCI || bCI <= 0) continue
-      const perCapBuyToman = (bI * pc) / bCI / 10 // ریال → تومان
-      perCapRows.push({ symbol: sym, trade_date: today, per_capita_buy: Math.round(perCapBuyToman), updated: out.updated })
+      const pc = num(it.pc)
+      const bI = num(it.Buy_I_Volume), bCI = num(it.Buy_CountI)
+      const sI = num(it.Sell_I_Volume), sCI = num(it.Sell_CountI)
+      if (!sym || !pc) continue
+      const perCapBuy = (bI && bCI > 0) ? Math.round((bI * pc) / bCI / 10) : null   // ریال → تومان
+      const perCapSell = (sI && sCI > 0) ? Math.round((sI * pc) / sCI / 10) : null  // برای «قدرت خرید» = سرانه خرید ÷ سرانه فروش
+      if (perCapBuy == null && perCapSell == null) continue
+      perCapRows.push({ symbol: sym, trade_date: today, per_capita_buy: perCapBuy, per_capita_sell: perCapSell, updated: out.updated })
     }
     if (perCapRows.length > 0) {
       const { error: pcErr } = await sb.from('stock_per_capita_daily').upsert(perCapRows, { onConflict: 'symbol,trade_date' })
