@@ -6,8 +6,8 @@ import { sendOtpSms } from '../../../../lib/smsIr'
 export const dynamic = 'force-dynamic'
 
 const PHONE_RE = /^09\d{9}$/
-const CODE_TTL_MS = 2 * 60 * 1000
-const RESEND_COOLDOWN_MS = 60 * 1000
+const CODE_TTL_MS = 5 * 60 * 1000
+const RESEND_COOLDOWN_MS = 5 * 60 * 1000
 const MAX_PER_DAY = 5
 
 function hashCode(code: string) {

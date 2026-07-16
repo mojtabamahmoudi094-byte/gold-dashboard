@@ -35,6 +35,7 @@ export default function AuthPage() {
   const [otpUserId, setOtpUserId] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [otpResending, setOtpResending] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   const cities = PROVINCES.find(p => p.name === province)?.cities ?? []
 
@@ -43,6 +44,12 @@ export default function AuthPage() {
       if (data.user) router.replace('/funds')
     })
   }, [])
+
+  useEffect(() => {
+    if (tab !== 'otp' || resendCooldown <= 0) return
+    const t = setInterval(() => setResendCooldown(s => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [tab, resendCooldown > 0])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -125,6 +132,7 @@ export default function AuthPage() {
       return
     }
     setTab('otp')
+    setResendCooldown(60)
   }
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -159,6 +167,7 @@ export default function AuthPage() {
       setMsg({ type: 'error', text: body?.error || 'خطا در ارسال کد' })
       return
     }
+    setResendCooldown(60)
     setMsg({ type: 'success', text: 'کد جدید ارسال شد' })
   }
 
@@ -228,26 +237,15 @@ export default function AuthPage() {
               border: '0.5px solid rgba(0,229,160,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 28,
-            }}>✉️</div>
+            }}>✅</div>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#00E5A0', marginBottom: 8 }}>ثبت‌نام موفق!</div>
               <div style={{ fontSize: 13, color: '#A0B4C8', lineHeight: 1.8 }}>
-                لینک تأیید به ایمیل <span style={{ color: '#E8F4FF', fontWeight: 600 }}>{regEmail}</span> ارسال شد.
+                شماره موبایل <span style={{ color: '#E8F4FF', fontWeight: 600 }}>{phone}</span> تایید شد. حساب کاربری‌ات آماده است.
               </div>
-              <div style={{ fontSize: 12, color: '#ddd5bd', marginTop: 6, lineHeight: 1.7 }}>
-                ایمیل را باز کنید، روی لینک تأیید کلیک کنید، سپس وارد شوید.
-              </div>
-            </div>
-            <div style={{
-              padding: '12px 16px', borderRadius: 10,
-              background: 'rgba(0,229,160,0.06)',
-              border: '0.5px solid rgba(0,229,160,0.2)',
-              fontSize: 12, color: '#ddd5bd', lineHeight: 1.7, textAlign: 'right', width: '100%',
-            }}>
-              اسپم رو هم چک کنید اگر ایمیل نیومد.
             </div>
             <button
-              onClick={() => { setRegistered(false); setTab('login'); setMsg(null) }}
+              onClick={() => router.push('/funds')}
               style={{
                 width: '100%', padding: '13px', borderRadius: 11,
                 fontSize: 14, fontWeight: 700,
@@ -271,7 +269,7 @@ export default function AuthPage() {
           }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#fff' }}>بورس سنج</div>
-            <div style={{ fontSize: 9, color: '#ddd5bd', marginTop: -1 }}>bourssanj.ir · شاگرد تنبل بازار</div>
+            <div style={{ fontSize: 9, color: '#ddd5bd', marginTop: -1 }}>bourssanj.ir</div>
           </div>
           <Link href="/funds" style={{
             fontSize: 11, color: '#ddd5bd', textDecoration: 'none',
@@ -520,10 +518,14 @@ export default function AuthPage() {
             <Btn loading={loading} color="#00E5A0" label="تایید کد" />
             <div style={{ textAlign: 'center', fontSize: 12, color: '#ddd5bd', marginTop: 4 }}>
               کد نیامد؟{' '}
-              <button type="button" disabled={otpResending} onClick={handleResendOtp} style={{
-                background: 'none', border: 'none', color: '#00C8FF', fontSize: 12,
-                cursor: otpResending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontWeight: 600,
-              }}>{otpResending ? '...' : 'ارسال مجدد کد'}</button>
+              {resendCooldown > 0 ? (
+                <span style={{ color: '#5A7088' }}>ارسال مجدد کد ({resendCooldown} ثانیه)</span>
+              ) : (
+                <button type="button" disabled={otpResending} onClick={handleResendOtp} style={{
+                  background: 'none', border: 'none', color: '#00C8FF', fontSize: 12,
+                  cursor: otpResending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontWeight: 600,
+                }}>{otpResending ? '...' : 'ارسال مجدد کد'}</button>
+              )}
             </div>
           </form>
         )}
