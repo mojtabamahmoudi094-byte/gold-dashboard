@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import {
-  BRSAPI_KEY, num, faN, fToman, fX, fPct, clean, NOT_STOCK_CS,
+  BRSAPI_KEY, num, faN, fToman, fX, fPct, clean, NOT_STOCK_CS, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cPl, FilterTable,
 } from '../../../lib/vipFiltersShared'
 
@@ -163,6 +163,7 @@ export default function MoneyFlowPage() {
   const [metrics, setMetrics] = useState<M[] | null>(null)
   const [hasFloat, setHasFloat] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [marketClosed, setMarketClosed] = useState(false)
   const [updated, setUpdated] = useState<string | null>(null)
   const [histRows3, setHistRows3] = useState<FlowRow[] | null>(null)
   const [histRows5, setHistRows5] = useState<FlowRow[] | null>(null)
@@ -183,6 +184,8 @@ export default function MoneyFlowPage() {
   }, [])
 
   const loadDaily = async () => {
+    if (isTehranMarketClosedDay()) { setMarketClosed(true); return }
+    setMarketClosed(false)
     setFailed(false)
     try {
       // شناوری هر نماد (ff٪, z) از جدول stock_float (کرون روزانه stock-float.js) — برای نسبت ورود/خروج پول به شناوری
@@ -514,7 +517,16 @@ export default function MoneyFlowPage() {
           تا تکمیل تاریخچه ۲۲ روزه، پنجره‌های بلندتر بر مبنای روزهای موجود محاسبه می‌شوند. صرفاً ابزار رصد است و توصیه خرید یا فروش نیست.
         </p>
 
-        {failed && (
+        {marketClosed && (
+          <div style={{
+            padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b',
+          }}>
+            بازار سرمایه پنج‌شنبه و جمعه تعطیل است — بروزرسانی لحظه‌ای غیرفعال شد.
+          </div>
+        )}
+
+        {!marketClosed && failed && (
           <div style={{
             padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444',

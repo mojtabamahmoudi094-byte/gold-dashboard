@@ -13,7 +13,7 @@ import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import {
-  BRSAPI_KEY, num, faN, fToman, clean,
+  BRSAPI_KEY, num, faN, fToman, clean, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cPl, FilterTable,
 } from '../../../lib/vipFiltersShared'
 
@@ -117,6 +117,7 @@ export default function HotMoneyPage() {
   const [hotUpdated, setHotUpdated] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<M[] | null>(null)
   const [failed, setFailed] = useState(false)
+  const [marketClosed, setMarketClosed] = useState(false)
   const [updated, setUpdated] = useState<string | null>(null)
 
   useEffect(() => {
@@ -160,6 +161,8 @@ export default function HotMoneyPage() {
   }, [])
 
   const loadMetrics = async () => {
+    if (isTehranMarketClosedDay()) { setMarketClosed(true); return }
+    setMarketClosed(false)
     setFailed(false)
     try {
       const res = await fetch(`https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${BRSAPI_KEY}`, {
@@ -235,7 +238,16 @@ export default function HotMoneyPage() {
           صرفاً ابزار رصد است و توصیه خرید یا فروش نیست. جهت معاملات تکی از «قانون تیک» تخمین زده شده و ممکن است دقیق نباشد.
         </p>
 
-        {failed && (
+        {marketClosed && (
+          <div style={{
+            padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b',
+          }}>
+            بازار سرمایه پنج‌شنبه و جمعه تعطیل است — بروزرسانی لحظه‌ای غیرفعال شد.
+          </div>
+        )}
+
+        {!marketClosed && failed && (
           <div style={{
             padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444',

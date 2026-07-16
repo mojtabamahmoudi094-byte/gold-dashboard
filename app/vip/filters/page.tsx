@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import {
-  BRSAPI_KEY, num, faN, fVol, fToman, fPct, fX, clean,
+  BRSAPI_KEY, num, faN, fVol, fToman, fPct, fX, clean, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cPl, cRatioM, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
 
@@ -28,6 +28,14 @@ const cBp: Col = { label: 'قدرت خرید', key: 'bp', fmt: (r) => fX(r.bp), 
 const cVal: Col = { label: 'ارزش', key: 'tval', fmt: (r) => fToman(r.tval), num: (r) => r.tval }
 const cPerCap: Col = { label: 'سرانه خرید', key: 'perCapB', fmt: (r) => fToman(r.perCapB), num: (r) => r.perCapB ?? 0 }
 const cSellN: Col = { label: 'فروش حقوقی', key: 'sellNPct', fmt: (r) => fPct(r.sellNPct, 0), num: (r) => r.sellNPct ?? 0 }
+const cSellPower: Col = {
+  label: 'قدرت فروش', key: 'bp',
+  fmt: (r) => fX(r.bp && r.bp > 0 ? 1 / r.bp : null),
+  num: (r) => (r.bp && r.bp > 0 ? 1 / r.bp : 0),
+}
+const cBuyCnt: Col = { label: 'تعداد خریدار', key: 'buyCountI', fmt: (r) => faN(r.buyCountI), num: (r) => r.buyCountI }
+const cSellCnt: Col = { label: 'تعداد فروشنده', key: 'sellCountI', fmt: (r) => faN(r.sellCountI), num: (r) => r.sellCountI }
+const cPcpCol: Col = { label: 'درصد پایانی', key: 'pcp', fmt: (r) => fPct(r.pcp, 2), num: (r) => r.pcp }
 
 function buildCards(ms: M[], hasVol: boolean): Card[] {
   const top = (rows: M[], by: (r: M) => number, n = 30) => [...rows].sort((a, b) => by(b) - by(a)).slice(0, n)
@@ -47,10 +55,14 @@ function buildCards(ms: M[], hasVol: boolean): Card[] {
   const suspM = hasVol ? ms.filter((r) => (r.ratioM ?? 0) >= 2) : []
   const legalBuy = top(ms.filter((r) => r.tval >= 1e9 && (r.buyNPct ?? 0) > 0), (r) => r.buyNPct ?? 0, 20)
   const tick = ms.filter((r) => r.pl > r.pc && r.plp > 0 && r.pcp > 0 && (r.bp ?? 0) > 1)
+  const tickDown = ms.filter((r) => r.pl < r.pc && r.plp < 0 && r.pcp < 0 && r.bp != null && r.bp > 0 && r.bp < 1)
+  const swingReversal = ms.filter((r) => r.pcp < -3 && r.plp > -3)
   const spread = top(ms.filter((r) => r.tval >= 5e8 && r.spreadPct != null && r.spreadPct > 0), (r) => r.spreadPct ?? 0, 20)
   const golden = ms.filter((r) =>
     r.plp > 0 && (r.bp ?? 0) >= 2 && (r.perCapB ?? 0) >= 3e8
     && (r.sellNPct ?? 0) >= 30 && hotVol(r, 1.5))
+  const withPower = ms.filter((r) => r.bp != null && r.bp > 0 && (r.buyCountI > 0 || r.sellCountI > 0))
+  const suspHeavy = hasVol ? ms.filter((r) => (r.ratioM ?? 0) >= 5) : []
 
   const cDemand: Col = { label: 'تقاضا به عرضه', key: 'dVal', fmt: (r) => (r.oVal > 0 ? fX(r.dVal / r.oVal) : '∞'), num: (r) => (r.oVal > 0 ? r.dVal / r.oVal : 1e9) }
   const cSupply: Col = { label: 'عرضه به تقاضا', key: 'oVal', fmt: (r) => (r.dVal > 0 ? fX(r.oVal / r.dVal) : '∞'), num: (r) => (r.dVal > 0 ? r.oVal / r.dVal : 1e9) }
@@ -137,6 +149,31 @@ function buildCards(ms: M[], hasVol: boolean): Card[] {
       desc: 'ترکیب قوی‌ترین نشانه‌ها: قدرت خرید ≥۲ + سرانه خرید حقیقی ≥۳۰ میلیون تومان + فروش حقوقی ≥۳۰٪ (کد به کد) + حجم بالا + آخرین مثبت',
       cols: [cSym, cPl, cBp, cPerCap, cRatioM, cSellN, cVol], rows: top(golden, (r) => r.bp ?? 0),
     },
+    {
+      id: 'most-buy-power', title: 'بیشترین قدرت خریدار حقیقی', tone: 'green',
+      desc: 'نسبت سرانه خرید به سرانه فروش حقیقی — بدون شرط حجمی، صرفاً رتبه‌بندی قدرت خریداران',
+      cols: [cSym, cPl, cBp, cBuyCnt, cSellCnt, cVol], rows: top(withPower, (r) => r.bp ?? 0),
+    },
+    {
+      id: 'most-sell-power', title: 'بیشترین قدرت فروشنده حقیقی', tone: 'red',
+      desc: 'نسبت سرانه فروش به سرانه خرید حقیقی — بدون شرط حجمی، صرفاً رتبه‌بندی قدرت فروشندگان',
+      cols: [cSym, cPl, cSellPower, cSellCnt, cBuyCnt, cVol], rows: top(withPower, (r) => (r.bp && r.bp > 0 ? 1 / r.bp : 0)),
+    },
+    {
+      id: 'susp-heavy', title: `حجم خیلی مشکوک (${faN(suspHeavy.length)})`, tone: 'red', needVol: true,
+      desc: 'حجم امروز حداقل ۵ برابر میانگین حجم ماه — نشانه‌ی جابه‌جایی غیرعادی',
+      cols: [cSym, cRatioM, cVol, cBp, cPl], rows: top(suspHeavy, (r) => r.ratioM ?? 0),
+    },
+    {
+      id: 'tick-down', title: 'فیلتر الگوی تیک نزولی', tone: 'red',
+      desc: 'آخرین قیمت پایین‌تر از پایانی + پایانی منفی + قدرت فروشنده حقیقی >۱ — احتمال ادامه افت فردا',
+      cols: [cSym, cPl, cSellPower, cPerCap, cRatioM, cVol], rows: top(tickDown, (r) => (r.bp && r.bp > 0 ? 1 / r.bp : 0)),
+    },
+    {
+      id: 'swing-reversal', title: 'فیلتر نوسان‌گیری', tone: 'green',
+      desc: 'پایانی حداقل ۳٪ منفی بوده ولی آخرین معامله بهتر از منفی۳٪ است — نشانه برگشت قیمتی روزانه، مناسب نوسان‌گیری کوتاه‌مدت',
+      cols: [cSym, cPl, cPcpCol, cVol, cVal], rows: top(swingReversal, (r) => r.plp - r.pcp),
+    },
   ]
 }
 
@@ -149,6 +186,7 @@ export default function VipFiltersPage() {
   const [failed, setFailed] = useState(false)
   const [updated, setUpdated] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [marketClosed, setMarketClosed] = useState(false)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -159,6 +197,8 @@ export default function VipFiltersPage() {
   }, [])
 
   const load = async () => {
+    if (isTehranMarketClosedDay()) { setMarketClosed(true); return }
+    setMarketClosed(false)
     setLoading(true)
     setFailed(false)
     try {
@@ -232,11 +272,20 @@ export default function VipFiltersPage() {
         </div>
 
         <p style={{ fontSize: 12.5, color: cream, margin: '0 0 20px', lineHeight: 2 }}>
-          ۱۲ فیلتر لحظه‌ای روی کل سهام بازار — پول هوشمند، کد به کد، حجم مشکوک، اردرهای سنگین و فیلتر طلایی.
+          ۱۷ فیلتر لحظه‌ای روی کل سهام بازار — پول هوشمند، کد به کد، حجم مشکوک، اردرهای سنگین، قدرت خریدار/فروشنده، الگوی تیک و فیلتر طلایی.
           داده‌ها در ساعت بازار (۹:۰۰–۱۲:۳۰) هر ۲ دقیقه به‌روز می‌شود. این فیلترها صرفاً ابزار رصد هستند و توصیه خرید یا فروش نیستند.
         </p>
 
-        {failed && (
+        {marketClosed && (
+          <div style={{
+            padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b',
+          }}>
+            بازار سرمایه پنج‌شنبه و جمعه تعطیل است — بروزرسانی لحظه‌ای غیرفعال شد.
+          </div>
+        )}
+
+        {!marketClosed && failed && (
           <div style={{
             padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444',
@@ -245,7 +294,7 @@ export default function VipFiltersPage() {
           </div>
         )}
 
-        {!metrics && !failed && (
+        {!marketClosed && !metrics && !failed && (
           <div style={{ padding: 60, textAlign: 'center', color: cream, fontSize: 14 }}>در حال دریافت اطلاعات بازار…</div>
         )}
 

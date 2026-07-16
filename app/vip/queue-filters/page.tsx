@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import {
-  BRSAPI_KEY, num, faN, fPct, fX, fBn, fToman, clean,
+  BRSAPI_KEY, num, faN, fPct, fX, fBn, fToman, clean, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
 
@@ -44,6 +44,17 @@ const cSellQueueMvPct: Col = {
 
 type QueueStats = { buyCount: number; buyTotalVal: number; sellCount: number; sellTotalVal: number }
 
+const cNearBuyPct: Col = {
+  label: 'فاصله تا سقف', key: 'tmax',
+  fmt: (r) => (r.tmax ? fPct(((r.tmax - r.pl) / r.tmax) * 100, 2) : '—'),
+  num: (r) => (r.tmax ? ((r.tmax - r.pl) / r.tmax) * 100 : 99),
+}
+const cNearSellPct: Col = {
+  label: 'فاصله تا کف', key: 'tmin',
+  fmt: (r) => (r.tmin ? fPct(((r.pl - r.tmin) / r.tmin) * 100, 2) : '—'),
+  num: (r) => (r.tmin ? ((r.pl - r.tmin) / r.tmin) * 100 : 99),
+}
+
 function buildQueueCards(ms: M[]): { cards: Card[]; stats: QueueStats } {
   const top = (rows: M[], by: (r: M) => number, n = 30) => [...rows].sort((a, b) => by(b) - by(a)).slice(0, n)
 
@@ -51,6 +62,10 @@ function buildQueueCards(ms: M[]): { cards: Card[]; stats: QueueStats } {
   const sellRows = ms.filter((r) => r.sellQueue)
   const buyVal = (r: M) => (r.qd1 ?? 0) * r.pl
   const sellVal = (r: M) => (r.qo1 ?? 0) * r.pl
+
+  // آستانه صف: نزدیک صف اما هنوز قفل نشده (فیلتر ۷۲/۱۰۷ PDF)
+  const nearBuy = ms.filter((r) => !r.buyQueue && r.tmax != null && r.pl >= 0.994 * r.tmax)
+  const nearSell = ms.filter((r) => !r.sellQueue && r.tmin != null && r.pl <= 1.006 * r.tmin)
 
   const stats: QueueStats = {
     buyCount: buyRows.length,
@@ -76,6 +91,18 @@ function buildQueueCards(ms: M[]): { cards: Card[]; stats: QueueStats } {
         cVol, cSellPower, cMv, cSellQueueMvPct, cMoneyOut],
       rows: top(sellRows, sellVal),
     },
+    {
+      id: 'near-buy-queue', title: 'در آستانه صف خرید', tone: 'green',
+      desc: 'آخرین قیمت حداقل ۹۹.۴٪ سقف مجاز روز است اما هنوز صف خرید قفل نشده — نامزد صف خرید',
+      cols: [cSym, cLastPct, cClosePct, cNearBuyPct, cVol, cBuyPower, cMv, cMoneyIn],
+      rows: top(nearBuy, (r) => -(cNearBuyPct.num(r))),
+    },
+    {
+      id: 'near-sell-queue', title: 'در آستانه صف فروش', tone: 'red',
+      desc: 'آخرین قیمت حداکثر ۰.۶٪ بالاتر از کف مجاز روز است اما هنوز صف فروش قفل نشده — نامزد صف فروش',
+      cols: [cSym, cLastPct, cClosePct, cNearSellPct, cVol, cSellPower, cMv, cMoneyOut],
+      rows: top(nearSell, (r) => -(cNearSellPct.num(r))),
+    },
   ]
 
   return { cards, stats }
@@ -89,6 +116,7 @@ export default function QueueFiltersPage() {
   const [failed, setFailed] = useState(false)
   const [updated, setUpdated] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [marketClosed, setMarketClosed] = useState(false)
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -99,6 +127,8 @@ export default function QueueFiltersPage() {
   }, [])
 
   const load = async () => {
+    if (isTehranMarketClosedDay()) { setMarketClosed(true); return }
+    setMarketClosed(false)
     setLoading(true)
     setFailed(false)
     try {
@@ -167,7 +197,16 @@ export default function QueueFiltersPage() {
           نمادهای در صف خرید/فروش لحظه‌ای بازار — بزرگ‌ترین صف‌ها بر اساس ارزش ریالی. صرفاً ابزار رصد است و توصیه خرید یا فروش نیست.
         </p>
 
-        {failed && (
+        {marketClosed && (
+          <div style={{
+            padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b',
+          }}>
+            بازار سرمایه پنج‌شنبه و جمعه تعطیل است — بروزرسانی لحظه‌ای غیرفعال شد.
+          </div>
+        )}
+
+        {!marketClosed && failed && (
           <div style={{
             padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444',
@@ -176,7 +215,7 @@ export default function QueueFiltersPage() {
           </div>
         )}
 
-        {!metrics && !failed && (
+        {!marketClosed && !metrics && !failed && (
           <div style={{ padding: 60, textAlign: 'center', color: cream, fontSize: 14 }}>در حال دریافت اطلاعات بازار…</div>
         )}
 
@@ -191,6 +230,8 @@ export default function QueueFiltersPage() {
               {statBar(stats.sellCount, stats.sellTotalVal, 'red')}
               <FilterTable card={cards[1]} isDark={isDark} compact />
             </div>
+            <div><FilterTable card={cards[2]} isDark={isDark} compact /></div>
+            <div><FilterTable card={cards[3]} isDark={isDark} compact /></div>
           </div>
         )}
       </div>

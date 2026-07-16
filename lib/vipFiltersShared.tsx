@@ -8,6 +8,12 @@ import Link from 'next/link'
 
 export const BRSAPI_KEY = process.env.NEXT_PUBLIC_BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 
+// بورس ایران پنج‌شنبه و جمعه تعطیل است — فچ لحظه‌ای BrsApi را در این دو روز نزنیم (سوختن کوتای درخواست بی‌فایده)
+export const isTehranMarketClosedDay = () => {
+  const day = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tehran', weekday: 'short' }).format(new Date())
+  return day === 'Thu' || day === 'Fri'
+}
+
 // ── اعداد ────────────────────────────────────────────────────────────────────
 export const num = (v: unknown): number | null => {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
@@ -63,6 +69,8 @@ export type M = {
   avgVolW: number | null; avgVolM: number | null   // میانگین حجم خام هفته/ماه
   buyQueue: boolean          // صف خرید (قفل در سقف قیمت)
   sellQueue: boolean         // صف فروش (قفل در کف قیمت)
+  tmax: number | null        // سقف مجاز قیمت روز
+  tmin: number | null        // کف مجاز قیمت روز
   mv: number                 // ارزش بازار شرکت (ریال)
   floatShares: number | null // تعداد سهام شناور (z × ff٪)
   buyCountI: number          // تعداد کد خریدار حقیقی
@@ -132,7 +140,7 @@ export function buildMetrics(
       ratioW: v?.w ? tvol / v.w : null,
       ratioM: v?.m ? tvol / v.m : null,
       avgVolW: v?.w ?? null, avgVolM: v?.m ?? null,
-      buyQueue, sellQueue,
+      buyQueue, sellQueue, tmax, tmin,
       mv: num(it.mv) ?? 0, floatShares,
       buyCountI: bCI, sellCountI: sCI,
       qd1, qo1,
