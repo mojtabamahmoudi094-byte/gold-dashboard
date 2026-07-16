@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { PROVINCES } from '../../lib/iranRegions'
 
-type Tab = 'login' | 'register' | 'forgot'
+type Tab = 'login' | 'register' | 'forgot' | 'otp'
 type Msg = { type: 'success' | 'error'; text: string }
 
 export default function AuthPage() {
@@ -30,6 +30,11 @@ export default function AuthPage() {
   const [phone, setPhone] = useState('')
   const [province, setProvince] = useState('')
   const [city, setCity] = useState('')
+
+  // otp fields
+  const [otpUserId, setOtpUserId] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+  const [otpResending, setOtpResending] = useState(false)
 
   const cities = PROVINCES.find(p => p.name === province)?.cities ?? []
 
@@ -80,7 +85,7 @@ export default function AuthPage() {
       ? window.location.origin + '/auth'
       : '/auth'
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: regEmail,
       password: regPassword,
       options: {
@@ -88,8 +93,8 @@ export default function AuthPage() {
         data: { first_name: firstName, last_name: lastName, phone, province, city },
       },
     })
-    setLoading(false)
     if (error) {
+      setLoading(false)
       const errMsg =
         error.message.includes('already registered') || error.message.includes('already been registered')
           ? 'این ایمیل قبلاً ثبت‌نام شده — لطفاً وارد شوید'
@@ -97,9 +102,64 @@ export default function AuthPage() {
           ? 'رمز عبور باید حداقل ۶ کاراکتر باشد'
           : 'خطا در ثبت‌نام. لطفاً دوباره تلاش کنید'
       setMsg({ type: 'error', text: errMsg })
-    } else {
-      setRegistered(true)
+      return
     }
+
+    const userId = data.user?.id
+    if (!userId) {
+      setLoading(false)
+      setMsg({ type: 'error', text: 'خطا در ثبت‌نام. لطفاً دوباره تلاش کنید' })
+      return
+    }
+
+    setOtpUserId(userId)
+    const res = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, phone }),
+    })
+    setLoading(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setMsg({ type: 'error', text: body?.error || 'خطا در ارسال کد تایید' })
+      return
+    }
+    setTab('otp')
+  }
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setMsg(null)
+    const res = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: otpUserId, phone, code: otpCode }),
+    })
+    setLoading(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setMsg({ type: 'error', text: body?.error || 'کد تایید اشتباه است' })
+      return
+    }
+    setRegistered(true)
+  }
+
+  const handleResendOtp = async () => {
+    setOtpResending(true)
+    setMsg(null)
+    const res = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: otpUserId, phone }),
+    })
+    setOtpResending(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setMsg({ type: 'error', text: body?.error || 'خطا در ارسال کد' })
+      return
+    }
+    setMsg({ type: 'success', text: 'کد جدید ارسال شد' })
   }
 
   const inputBase: React.CSSProperties = {
@@ -223,6 +283,7 @@ export default function AuthPage() {
         </div>
 
         {/* tab switcher */}
+        {tab !== 'otp' && (
         <div style={{
           display: 'flex', gap: 0, marginBottom: 28,
           background: 'rgba(0,0,0,0.35)', borderRadius: 12, padding: 4,
@@ -246,6 +307,7 @@ export default function AuthPage() {
             </button>
           ))}
         </div>
+        )}
 
         {/* message */}
         {msg && (
@@ -437,6 +499,31 @@ export default function AuthPage() {
                 background: 'none', border: 'none', color: '#00C8FF', fontSize: 12,
                 cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
               }}>وارد شوید</button>
+            </div>
+          </form>
+        )}
+
+        {/* OTP VERIFY FORM */}
+        {tab === 'otp' && (
+          <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 12, color: '#ddd5bd', lineHeight: 1.7, marginBottom: 4 }}>
+              کد تایید به شماره <span style={{ color: '#E8F4FF', fontWeight: 600 }}>{phone}</span> پیامک شد. کد را وارد کنید.
+            </div>
+            <Field label="کد تایید">
+              <input
+                type="text" required inputMode="numeric" autoComplete="one-time-code"
+                value={otpCode} onChange={e => setOtpCode(e.target.value)}
+                placeholder="12345"
+                style={{ ...inputBase, direction: 'ltr', textAlign: 'center', letterSpacing: '0.3em', fontSize: 18 }}
+              />
+            </Field>
+            <Btn loading={loading} color="#00E5A0" label="تایید کد" />
+            <div style={{ textAlign: 'center', fontSize: 12, color: '#ddd5bd', marginTop: 4 }}>
+              کد نیامد؟{' '}
+              <button type="button" disabled={otpResending} onClick={handleResendOtp} style={{
+                background: 'none', border: 'none', color: '#00C8FF', fontSize: 12,
+                cursor: otpResending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontWeight: 600,
+              }}>{otpResending ? '...' : 'ارسال مجدد کد'}</button>
             </div>
           </form>
         )}
