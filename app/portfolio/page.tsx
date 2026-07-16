@@ -149,6 +149,12 @@ export default function PortfolioPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
+  // آپلود اکسل کارگزاری — پیش‌نمایش + تایید قبل از افزودن به پورتفو
+  const [showImport, setShowImport] = useState(false)
+  const [importRows, setImportRows] = useState<{ symbol: string; name: string; qty: number; price: number; matched: boolean }[]>([])
+  const [importMsg, setImportMsg] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
     if (saved === 'light') setIsDark(false)
@@ -463,6 +469,78 @@ export default function PortfolioPage() {
     }
   }
 
+  // ─── آپلود اکسل کارگزاری — استخراج دارایی‌های سهام از خروجی پورتفوی کارگزاری ───
+  // فایل کارگزاری «موجودی/تعداد/میانگین خرید» فعلیِ هر نماد را می‌دهد، نه تک‌تک تراکنش‌ها؛
+  // برای همین هر ردیف را به‌عنوان یک تراکنش خرید ترکیبی (تعداد کل × میانگین خرید) با تاریخ امروز ثبت می‌کنیم
+  // تا میانگین قیمت و بهای تمام‌شده‌ی فعلی در پورتفو درست بازسازی شود.
+  const parseBrokerExcel = async (file: File) => {
+    setImportMsg(null)
+    setImportRows([])
+    try {
+      const XLSX = await import('xlsx')
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+
+      // سطر هدر — اولین سطری که ستون «نماد» در آن است (ممکن است چند سطر اول فایل خالی/عنوان باشد)
+      const headerIdx = rows.findIndex(r => r.some(c => normFa(String(c)).includes('نماد')))
+      if (headerIdx === -1) { setImportMsg('ستون «نماد» در فایل پیدا نشد. فرمت اکسل کارگزاری را بررسی کنید.'); return }
+      const header = rows[headerIdx].map(c => normFa(String(c)))
+      const colOf = (...keys: string[]) => header.findIndex(h => keys.every(k => h.includes(k)))
+      const cSymbol = colOf('نماد')
+      const cQty = colOf('تعداد')
+      const cAvgBuy = colOf('میانگین', 'خرید')
+      if (cSymbol === -1 || cQty === -1 || cAvgBuy === -1) {
+        setImportMsg('ستون‌های «نماد»، «تعداد» یا «میانگین خرید» در فایل پیدا نشد.')
+        return
+      }
+
+      const stockInstruments = instruments.filter(i => i.type === 'stock')
+      const out: typeof importRows = []
+      for (const r of rows.slice(headerIdx + 1)) {
+        const rawSymbol = String(r[cSymbol] ?? '').trim()
+        const qty = safe(r[cQty])
+        const avgBuy = safe(r[cAvgBuy])
+        if (!rawSymbol || qty <= 0 || avgBuy <= 0) continue
+        const inst = stockInstruments.find(i => normFa(i.symbol) === normFa(rawSymbol))
+        out.push({ symbol: inst?.symbol ?? rawSymbol, name: inst?.name ?? rawSymbol, qty, price: avgBuy, matched: !!inst })
+      }
+      if (out.length === 0) { setImportMsg('هیچ ردیف معتبری (با تعداد و میانگین خرید مثبت) در فایل پیدا نشد.'); return }
+      setImportRows(out)
+    } catch (err: any) {
+      setImportMsg('خطا در خواندن فایل اکسل: ' + (err?.message || String(err)))
+    }
+  }
+
+  const confirmImport = async () => {
+    if (importRows.length === 0) return
+    setImporting(true)
+    const today = todayShamsi()
+    const { error } = await supabase.from('portfolio_transactions').insert(
+      importRows.map(r => ({
+        symbol: r.symbol,
+        name: r.name,
+        asset_type: 'stock',
+        side: 'buy',
+        quantity: r.qty,
+        price: r.price,          // اکسل کارگزاری از قبل بر حسب ریال است — بدون تبدیل تومان→ریال
+        commission: 0,
+        trade_date: today,
+        note: 'ایمپورت از اکسل کارگزاری',
+      }))
+    )
+    setImporting(false)
+    if (error) {
+      setImportMsg('خطا در ثبت: ' + error.message)
+    } else {
+      setImportRows([])
+      setShowImport(false)
+      setImportMsg(null)
+      loadTxs()
+    }
+  }
+
   const removeTx = async (id: number) => {
     if (!window.confirm('این تراکنش حذف شود؟')) return
     await supabase.from('portfolio_transactions').delete().eq('id', id)
@@ -641,6 +719,23 @@ ${txs.map(tx => row([
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <label style={{
+            padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)',
+            color: t.brand, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center',
+          }}>
+            📥 ارسال اکسل کارگزاری
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const f = e.target.files?.[0]
+                if (f) { setShowImport(true); parseBrokerExcel(f) }
+                e.target.value = ''
+              }}
+            />
+          </label>
           {txs.length > 0 && (
             <>
               <button type="button" onClick={exportExcel} title="دانلود فایل اکسل" style={{
@@ -786,6 +881,64 @@ ${txs.map(tx => row([
             </div>
           </div>
         </form>
+      )}
+
+      {/* پیش‌نمایش آپلود اکسل کارگزاری */}
+      {showImport && (
+        <div style={{ ...card, marginBottom: 22 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>پیش‌نمایش اکسل کارگزاری</h3>
+            <button type="button" onClick={() => { setShowImport(false); setImportRows([]); setImportMsg(null) }} style={{
+              background: 'transparent', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+            }}>✕ بستن</button>
+          </div>
+          {importMsg && <p style={{ fontSize: 12.5, color: t.red, margin: '0 0 12px' }}>{importMsg}</p>}
+          {importRows.length === 0 && !importMsg && (
+            <p style={{ fontSize: 12.5, color: t.muted, margin: 0 }}>در حال خواندن فایل…</p>
+          )}
+          {importRows.length > 0 && (
+            <>
+              <div style={{ overflowX: 'auto', marginBottom: 14 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${t.border}` }}>
+                      <th style={{ textAlign: 'right', padding: '6px 8px' }}>نماد</th>
+                      <th style={{ textAlign: 'right', padding: '6px 8px' }}>تعداد</th>
+                      <th style={{ textAlign: 'right', padding: '6px 8px' }}>میانگین خرید (تومان)</th>
+                      <th style={{ textAlign: 'right', padding: '6px 8px' }}>وضعیت</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importRows.map((r, idx) => (
+                      <tr key={idx} style={{ borderBottom: `1px solid ${t.border}` }}>
+                        <td style={{ padding: '6px 8px' }}>
+                          <b>{r.symbol}</b>
+                          {r.name !== r.symbol && <span style={{ color: t.muted, marginRight: 6, fontSize: 11 }}>{r.name}</span>}
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>{fmtNum(r.qty)}</td>
+                        <td style={{ padding: '6px 8px' }}>{fmtToman(r.price)}</td>
+                        <td style={{ padding: '6px 8px', color: r.matched ? t.green : t.red }}>
+                          {r.matched ? 'شناسایی‌شده' : 'نماد ناشناس'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p style={{ fontSize: 11.5, color: t.muted, margin: '0 0 12px', lineHeight: 1.9 }}>
+                هر ردیف به‌عنوان یک تراکنش «خرید» با تاریخ امروز ({todayShamsi()}) و بدون کارمزد به پورتفوی شما اضافه می‌شود.
+                اگر قبلاً تراکنشی برای این نمادها ثبت کرده‌اید، این مقدار روی آن جمع می‌شود، جایگزینش نمی‌کند.
+              </p>
+              <button type="button" onClick={confirmImport} disabled={importing} style={{
+                padding: '10px 28px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none',
+                fontFamily: 'inherit', opacity: importing ? 0.6 : 1,
+              }}>
+                {importing ? 'در حال ثبت…' : `تایید و افزودن ${importRows.length} ردیف`}
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {/* کارت‌های خلاصه */}
