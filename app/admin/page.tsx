@@ -151,7 +151,15 @@ export default function AdminPage() {
   const [log, setLog]           = useState<string[]>([])
   const [autoSync, setAutoSync] = useState(false)
   const syncingRef              = useRef(false)
-  const [stats, setStats]       = useState<{ viewsToday: number; usersCount: number } | null>(null)
+  type Stats = {
+    viewsToday: number
+    usersCount: number
+    viewsByDay: { date: string; count: number }[]
+    signupsByDay: { date: string; count: number }[]
+  }
+  type AdminUser = { id: string; email: string; created_at: string; last_sign_in_at: string | null }
+  const [stats, setStats]       = useState<Stats | null>(null)
+  const [users, setUsers]       = useState<AdminUser[] | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -168,6 +176,9 @@ export default function AdminPage() {
     fetch('/api/admin/stats', { headers: { Authorization: `Bearer ${s.access_token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(setStats)
+    fetch('/api/admin/users', { headers: { Authorization: `Bearer ${s.access_token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setUsers(d?.users ?? null))
   }, [session])
 
   useEffect(() => {
@@ -277,6 +288,62 @@ export default function AdminPage() {
             <div className="text-sm mb-1" style={{ color: t.muted }}>تعداد ثبت‌نامی</div>
             <div className="text-3xl font-bold" style={{ color: t.textBright }}>{stats?.usersCount ?? '...'}</div>
           </div>
+        </div>
+
+        {/* Daily views chart */}
+        {stats && (
+          <div className="rounded-2xl border p-6 mb-4" style={{ background: t.surface, borderColor: t.border }}>
+            <h2 className="font-bold mb-4" style={{ color: t.textBright }}>بازدید ۷ روز اخیر</h2>
+            <div className="flex items-end gap-2" style={{ height: 100 }}>
+              {stats.viewsByDay.map(d => {
+                const max = Math.max(1, ...stats.viewsByDay.map(x => x.count))
+                return (
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="text-xs" style={{ color: t.muted }}>{d.count}</div>
+                    <div
+                      className="w-full rounded-t-md"
+                      style={{
+                        height: Math.max(4, (d.count / max) * 70),
+                        background: `linear-gradient(180deg, ${t.brand}, ${t.brand2})`,
+                      }}
+                    />
+                    <div className="text-[10px]" style={{ color: t.muted }}>{d.date.slice(5)}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Users table */}
+        <div className="rounded-2xl border p-6 mb-4" style={{ background: t.surface, borderColor: t.border }}>
+          <h2 className="font-bold mb-4" style={{ color: t.textBright }}>کاربران ثبت‌نامی ({users?.length ?? '...'})</h2>
+          {users ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-right" style={{ color: t.text }}>
+                <thead>
+                  <tr style={{ color: t.muted }}>
+                    <th className="p-2 font-medium">ایمیل</th>
+                    <th className="p-2 font-medium">آیدی</th>
+                    <th className="p-2 font-medium">تاریخ ثبت‌نام</th>
+                    <th className="p-2 font-medium">آخرین ورود</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id} className="border-t" style={{ borderColor: t.border }}>
+                      <td className="p-2">{u.email}</td>
+                      <td className="p-2 font-mono text-xs" style={{ color: t.muted }}>{u.id}</td>
+                      <td className="p-2">{new Date(u.created_at).toLocaleString('fa-IR')}</td>
+                      <td className="p-2">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('fa-IR') : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-sm" style={{ color: t.muted }}>...</div>
+          )}
         </div>
 
         {/* Sync card */}
