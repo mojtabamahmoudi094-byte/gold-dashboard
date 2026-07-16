@@ -334,8 +334,8 @@ export default function AuthPage() {
               />
             </Field>
             <Field label="رمز عبور">
-              <input
-                type="password" required autoComplete="current-password"
+              <PasswordInput
+                autoComplete="current-password"
                 value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
                 placeholder="••••••••"
                 style={inputBase}
@@ -440,8 +440,8 @@ export default function AuthPage() {
             </Field>
 
             <Field label="رمز عبور (حداقل ۶ کاراکتر)">
-              <input
-                type="password" required minLength={6} autoComplete="new-password"
+              <PasswordInput
+                minLength={6} autoComplete="new-password"
                 value={regPassword} onChange={e => setRegPassword(e.target.value)}
                 placeholder="••••••••"
                 style={inputBase}
@@ -552,6 +552,43 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <label htmlFor={id} style={{ fontSize: 11, color: '#ddd5bd', fontWeight: 500 }}>{label}</label>
       {child}
+    </div>
+  )
+}
+
+function PasswordInput({ id, value, onChange, placeholder, autoComplete, minLength, style }: {
+  id?: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  placeholder?: string
+  autoComplete?: string
+  minLength?: number
+  style: React.CSSProperties
+}) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        id={id}
+        type={visible ? 'text' : 'password'}
+        required minLength={minLength} autoComplete={autoComplete}
+        value={value} onChange={onChange}
+        placeholder={placeholder}
+        style={{ ...style, paddingLeft: 40 }}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible(v => !v)}
+        aria-label={visible ? 'پنهان کردن رمز عبور' : 'نمایش رمز عبور'}
+        style={{
+          position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
+          background: 'none', border: 'none', cursor: 'pointer',
+          padding: 8, color: '#ddd5bd', fontSize: 13, lineHeight: 1,
+          fontFamily: 'inherit',
+        }}
+      >
+        {visible ? '🙈' : '👁️'}
+      </button>
     </div>
   )
 }
