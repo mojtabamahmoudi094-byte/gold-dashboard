@@ -126,6 +126,9 @@ export default function PortfolioPage() {
   const [user, setUser] = useState<any>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [instruments, setInstruments] = useState<Instrument[]>([])
+  // فهرست کامل نمادهای بورس (شامل نمادهای متوقف/بدون معامله امروز) — فقط برای شناسایی نماد
+  // در آپلود اکسل کارگزاری استفاده می‌شود؛ instruments بالا فقط نمادهای «زنده‌ی امروز» را دارد
+  const [symbolMaster, setSymbolMaster] = useState<{ symbol: string; name: string }[]>([])
   const [txs, setTxs] = useState<Tx[]>([])
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [loading, setLoading] = useState(true)
@@ -213,6 +216,14 @@ export default function PortfolioPage() {
       setInstruments(list)
     }
     load()
+
+    // فهرست کامل نمادها (شامل نمادهای متوقف/بدون معامله امروز و حق‌تقدم‌ها) — فقط برای شناسایی، بدون قیمت زنده
+    fetch('/stocks/all-symbols.json')
+      .then(r => r.json())
+      .then((data: { l18: string; l30: string }[]) => {
+        setSymbolMaster((data ?? []).map(d => ({ symbol: d.l18, name: d.l30 || d.l18 })))
+      })
+      .catch(() => { /* نبودش فقط یعنی fallback شناسایی نمادهای متوقف کار نمی‌کند */ })
   }, [])
 
   const setManualPrice = (symbol: string, value: number) => {
@@ -258,7 +269,7 @@ export default function PortfolioPage() {
   // اگر کاربر فایل اکسل را قبل از تکمیل بارگذاری لیست نمادها آپلود کرده باشد،
   // ردیف‌های «ناشناس» را به‌محض رسیدن لیست دوباره تطبیق بده — بدون نیاز به آپلود دوباره
   useEffect(() => {
-    if (instruments.length === 0) return
+    if (instruments.length === 0 && symbolMaster.length === 0) return
     setImportRows(prev => {
       if (prev.length === 0) return prev
       let changed = false
@@ -272,7 +283,7 @@ export default function PortfolioPage() {
       return changed ? next : prev
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instruments])
+  }, [instruments, symbolMaster])
 
   const priceMap = useMemo(() => {
     const m = new Map<string, Instrument>()
@@ -502,7 +513,15 @@ export default function PortfolioPage() {
       if (inst) return inst
     }
     inst = instruments.find(i => normFa(i.name) === norm || (stripped && normFa(i.name) === stripped))
-    return inst
+    if (inst) return inst
+    // نمادهای متوقف/بدون معامله‌ی امروز در instruments (اسنپ‌شات زنده) نیستند ولی معتبرند —
+    // symbolMaster فهرست کامل بورس است، فقط بدون قیمت زنده (مثل ثبت دستی نماد)
+    const master = symbolMaster.find(m => normFa(m.symbol) === norm || (stripped && normFa(m.symbol) === stripped))
+    if (master) {
+      const isFund = /صندوق/.test(master.name)
+      return { symbol: master.symbol, name: master.name, type: isFund ? 'fund' : 'stock', price: 0, changePct: 0 }
+    }
+    return undefined
   }
 
   // ─── آپلود اکسل کارگزاری — استخراج دارایی‌های سهام از خروجی پورتفوی کارگزاری ───
