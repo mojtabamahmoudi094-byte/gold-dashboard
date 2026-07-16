@@ -255,6 +255,25 @@ export default function PortfolioPage() {
     else if (authChecked) setLoading(false)
   }, [user, authChecked])
 
+  // اگر کاربر فایل اکسل را قبل از تکمیل بارگذاری لیست نمادها آپلود کرده باشد،
+  // ردیف‌های «ناشناس» را به‌محض رسیدن لیست دوباره تطبیق بده — بدون نیاز به آپلود دوباره
+  useEffect(() => {
+    if (instruments.length === 0) return
+    setImportRows(prev => {
+      if (prev.length === 0) return prev
+      let changed = false
+      const next = prev.map(r => {
+        if (r.matched) return r
+        const inst = matchInstrument(r.symbol)
+        if (!inst) return r
+        changed = true
+        return { ...r, symbol: inst.symbol, name: inst.name, type: inst.type, matched: true }
+      })
+      return changed ? next : prev
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instruments])
+
   const priceMap = useMemo(() => {
     const m = new Map<string, Instrument>()
     for (const i of instruments) m.set(i.symbol, i)
@@ -756,15 +775,20 @@ ${txs.map(tx => row([
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <label style={{
-            padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)',
-            color: t.brand, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center',
-          }}>
-            📥 ارسال اکسل کارگزاری
+          <label
+            title={instruments.length === 0 ? 'در حال بارگذاری لیست نمادها…' : undefined}
+            style={{
+              padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600,
+              cursor: instruments.length === 0 ? 'not-allowed' : 'pointer',
+              background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)',
+              color: t.brand, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center',
+              opacity: instruments.length === 0 ? 0.5 : 1,
+            }}>
+            {instruments.length === 0 ? '⏳ در حال بارگذاری نمادها…' : '📥 ارسال اکسل کارگزاری'}
             <input
               type="file"
               accept=".xlsx,.xls"
+              disabled={instruments.length === 0}
               style={{ display: 'none' }}
               onChange={e => {
                 const f = e.target.files?.[0]
