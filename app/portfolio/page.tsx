@@ -1234,7 +1234,7 @@ ${txs.map(tx => row([
                         <button type="button" onClick={() => openQuickTx(h, 'buy')} style={{
                           padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                           background: 'rgba(16,185,129,0.08)', border: `1px solid ${t.green}`, color: t.green, fontFamily: 'inherit',
-                        }}>+ خرید</button>
+                        }}>خرید مجدد</button>
                       </div>
                     </td>
                   </tr>
