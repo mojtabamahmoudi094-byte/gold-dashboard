@@ -151,6 +151,7 @@ export default function AdminPage() {
   const [log, setLog]           = useState<string[]>([])
   const [autoSync, setAutoSync] = useState(false)
   const syncingRef              = useRef(false)
+  const [stats, setStats]       = useState<{ viewsToday: number; usersCount: number } | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -160,6 +161,14 @@ export default function AdminPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!session) return
+    const s = session as { access_token: string }
+    fetch('/api/admin/stats', { headers: { Authorization: `Bearer ${s.access_token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(setStats)
+  }, [session])
 
   useEffect(() => {
     syncingRef.current = syncing
@@ -256,6 +265,18 @@ export default function AdminPage() {
           <button type="button" onClick={logout} className="text-sm transition-colors hover:opacity-80" style={{ color: t.muted }}>
             خروج
           </button>
+        </div>
+
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="rounded-2xl border p-6" style={{ background: t.surface, borderColor: t.border }}>
+            <div className="text-sm mb-1" style={{ color: t.muted }}>بازدید امروز</div>
+            <div className="text-3xl font-bold" style={{ color: t.textBright }}>{stats?.viewsToday ?? '...'}</div>
+          </div>
+          <div className="rounded-2xl border p-6" style={{ background: t.surface, borderColor: t.border }}>
+            <div className="text-sm mb-1" style={{ color: t.muted }}>تعداد ثبت‌نامی</div>
+            <div className="text-3xl font-bold" style={{ color: t.textBright }}>{stats?.usersCount ?? '...'}</div>
+          </div>
         </div>
 
         {/* Sync card */}
