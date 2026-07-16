@@ -152,6 +152,16 @@ export default function PortfolioPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
+  // فروش سریع / خرید مجدد از روی ردیف دارایی — بدون نیاز به جستجوی نماد در فرم اصلی
+  const [quickTx, setQuickTx] = useState<{ symbol: string; name: string; type: AssetType; side: 'buy' | 'sell'; maxQty: number } | null>(null)
+  const [qtQty, setQtQty] = useState('')
+  const [qtPrice, setQtPrice] = useState('')
+  const [qtDate, setQtDate] = useState('')
+  const [qtCommission, setQtCommission] = useState('')
+  const [qtAutoFee, setQtAutoFee] = useState(true)
+  const [qtSaving, setQtSaving] = useState(false)
+  const [qtMsg, setQtMsg] = useState<string | null>(null)
+
   // آپلود اکسل کارگزاری — پیش‌نمایش + تایید قبل از افزودن به پورتفو
   const [showImport, setShowImport] = useState(false)
   const [importRows, setImportRows] = useState<{ symbol: string; name: string; type: AssetType; qty: number; price: number; date: string; matched: boolean }[]>([])
@@ -299,6 +309,15 @@ export default function PortfolioPage() {
     if (gross <= 0) { setCommission(''); return }
     setCommission(String(Math.round(gross * (side === 'buy' ? FEE_BUY : FEE_SELL))))
   }, [qty, price, side, autoFee, picked])
+
+  // کارمزد خودکار برای فرم فروش/خرید مجدد سریع روی ردیف دارایی
+  useEffect(() => {
+    if (!quickTx || !qtAutoFee) return
+    if (quickTx.type === 'physical') { setQtCommission('0'); return }
+    const gross = safe(qtQty) * safe(qtPrice)
+    if (gross <= 0) { setQtCommission(''); return }
+    setQtCommission(String(Math.round(gross * (quickTx.side === 'buy' ? FEE_BUY : FEE_SELL))))
+  }, [qtQty, qtPrice, qtAutoFee, quickTx])
 
   const searchResults = useMemo(() => {
     const q = normFa(query)
@@ -617,6 +636,43 @@ export default function PortfolioPage() {
       setImportMsg(null)
       loadTxs()
     }
+  }
+
+  // ─── فروش سریع / خرید مجدد از روی ردیف دارایی ───
+  const openQuickTx = (h: Holding, side: 'buy' | 'sell') => {
+    setQuickTx({ symbol: h.symbol, name: h.name, type: h.type, side, maxQty: h.qty })
+    setQtQty(side === 'sell' ? String(h.qty) : '')
+    const livePx = h.price ?? 0
+    setQtPrice(livePx > 0 ? String(toToman(livePx)) : '')
+    setQtDate(todayShamsi())
+    setQtAutoFee(true)
+    setQtCommission('')
+    setQtMsg(null)
+  }
+
+  const submitQuickTx = async () => {
+    if (!quickTx) return
+    setQtMsg(null)
+    if (safe(qtQty) <= 0 || safe(qtPrice) <= 0) { setQtMsg('تعداد و قیمت باید بزرگ‌تر از صفر باشد'); return }
+    if (quickTx.side === 'sell' && safe(qtQty) > quickTx.maxQty) {
+      setQtMsg(`تعداد فروش نمی‌تواند از موجودی فعلی (${fmtNum(quickTx.maxQty)}) بیشتر باشد`)
+      return
+    }
+    setQtSaving(true)
+    const { error } = await supabase.from('portfolio_transactions').insert({
+      symbol: quickTx.symbol,
+      name: quickTx.name,
+      asset_type: quickTx.type,
+      side: quickTx.side,
+      quantity: safe(qtQty),
+      price: tomanToRial(qtPrice),
+      commission: tomanToRial(qtCommission),
+      trade_date: qtDate || todayShamsi(),
+    })
+    setQtSaving(false)
+    if (error) { setQtMsg('خطا در ثبت: ' + error.message); return }
+    setQuickTx(null)
+    loadTxs()
   }
 
   const removeTx = async (id: number) => {
@@ -1079,19 +1135,21 @@ ${txs.map(tx => row([
         gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
       }}>
         {[
-          { title: 'بهای تمام‌شده', value: fmtToman(totals.cost) + ' تومان', color: t.text },
-          { title: 'ارزش روز پورتفو', value: totals.value > 0 ? fmtToman(totals.value) + ' تومان' : '—', color: t.brand },
+          { title: 'بهای تمام‌شده', value: fmtToman(totals.cost) + ' تومان', pct: null as string | null, color: t.text },
+          { title: 'ارزش روز پورتفو', value: totals.value > 0 ? fmtToman(totals.value) + ' تومان' : '—', pct: null as string | null, color: t.brand },
           {
             title: 'سود/زیان باز',
-            value: totals.value > 0 ? `${fmtToman(totals.unrealized)} (${fmtPct(totals.unrealizedPct, 1)})` : '—',
+            value: totals.value > 0 ? fmtToman(totals.unrealized) + ' تومان' : '—',
+            pct: totals.value > 0 ? fmtPct(totals.unrealizedPct, 1) : null,
             color: pnlColor(totals.unrealized),
           },
-          { title: 'سود/زیان محقق‌شده', value: fmtToman(totals.realized) + ' تومان', color: pnlColor(totals.realized) },
+          { title: 'سود/زیان محقق‌شده', value: fmtToman(totals.realized) + ' تومان', pct: null as string | null, color: pnlColor(totals.realized) },
         ].map(c => (
           <div key={c.title} style={{ ...card, padding: isMobile ? '12px 14px' : '16px 18px' }}>
             <div style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>{c.title}</div>
             <div style={{ fontSize: isMobile ? 13.5 : 16, fontWeight: 700, color: c.color, direction: 'ltr', textAlign: 'right' }}>
               {c.value}
+              {c.pct != null && <span style={{ fontSize: 12, marginRight: 10, opacity: 0.85 }}>({c.pct})</span>}
             </div>
           </div>
         ))}
@@ -1124,6 +1182,7 @@ ${txs.map(tx => row([
                   <th style={th}>قیمت روز</th>
                   <th style={th}>ارزش روز</th>
                   <th style={th}>سود/زیان</th>
+                  <th style={th}>عملیات</th>
                 </tr>
               </thead>
               <tbody>
@@ -1157,14 +1216,26 @@ ${txs.map(tx => row([
                         <>
                           {h.price != null ? fmtToman(h.price) : '—'}
                           {h.changePct != null && (
-                            <span style={{ fontSize: 10.5, marginRight: 5, color: pnlColor(h.changePct) }}>{fmtPct(h.changePct, 1)}</span>
+                            <span style={{ fontSize: 10.5, marginRight: 9, color: pnlColor(h.changePct) }}>({fmtPct(h.changePct, 1)})</span>
                           )}
                         </>
                       )}
                     </td>
                     <td style={td}>{h.value != null ? fmtToman(h.value) : '—'}</td>
                     <td style={{ ...td, color: pnlColor(h.unrealized), fontWeight: 600 }}>
-                      {h.unrealized != null ? <>{fmtToman(h.unrealized)}<span style={{ fontSize: 10.5, marginRight: 5 }}>{fmtPct(h.unrealizedPct, 1)}</span></> : '—'}
+                      {h.unrealized != null ? <>{fmtToman(h.unrealized)}<span style={{ fontSize: 10.5, marginRight: 9, opacity: 0.85 }}>({fmtPct(h.unrealizedPct, 1)})</span></> : '—'}
+                    </td>
+                    <td style={td}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" onClick={() => openQuickTx(h, 'sell')} style={{
+                          padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                          background: 'rgba(239,68,68,0.08)', border: `1px solid ${t.red}`, color: t.red, fontFamily: 'inherit',
+                        }}>فروش</button>
+                        <button type="button" onClick={() => openQuickTx(h, 'buy')} style={{
+                          padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                          background: 'rgba(16,185,129,0.08)', border: `1px solid ${t.green}`, color: t.green, fontFamily: 'inherit',
+                        }}>+ خرید</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1483,6 +1554,66 @@ ${txs.map(tx => row([
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* مودال فروش سریع / خرید مجدد از روی ردیف دارایی */}
+      {quickTx && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onClick={() => setQuickTx(null)}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 4px' }}>
+              {quickTx.side === 'sell' ? '📤 فروش' : '📥 خرید مجدد'} {quickTx.symbol}
+            </h3>
+            <p style={{ fontSize: 11.5, color: t.muted, margin: '0 0 16px', lineHeight: 1.9 }}>
+              {quickTx.side === 'sell'
+                ? `موجودی فعلی: ${fmtNum(quickTx.maxQty)} — مبلغ فروش به‌عنوان سود/زیان محقق‌شده در پورتفو ثبت می‌شود.`
+                : 'میانگین خرید و تعداد این دارایی به‌صورت خودکار بر اساس این خرید به‌روزرسانی می‌شود.'}
+            </p>
+            <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
+              <div>
+                <span style={label}>تعداد {quickTx.side === 'sell' ? `(حداکثر ${fmtNum(quickTx.maxQty)})` : ''}</span>
+                <input style={input} inputMode="numeric" value={qtQty} onChange={e => setQtQty(e.target.value.replace(/[^\d.]/g, ''))} />
+              </div>
+              <div>
+                <span style={label}>قیمت واحد (تومان)</span>
+                <input style={input} inputMode="numeric" value={qtPrice} onChange={e => setQtPrice(e.target.value.replace(/[^\d.]/g, ''))} />
+              </div>
+              <div>
+                <span style={label}>تاریخ (شمسی)</span>
+                <input style={input} value={qtDate} onChange={e => setQtDate(e.target.value)} placeholder="1405/04/15" />
+              </div>
+              <div>
+                <span style={label}>
+                  کارمزد (تومان)
+                  <label style={{ marginRight: 10, fontSize: 10.5, color: cream, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={qtAutoFee} onChange={e => setQtAutoFee(e.target.checked)} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
+                    محاسبه خودکار
+                  </label>
+                </span>
+                <input style={input} inputMode="numeric" value={qtCommission} onChange={e => { setQtAutoFee(false); setQtCommission(e.target.value.replace(/[^\d.]/g, '')) }} />
+              </div>
+            </div>
+            {qtMsg && <p style={{ fontSize: 12, color: t.red, margin: '0 0 12px' }}>{qtMsg}</p>}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={submitQuickTx} disabled={qtSaving} style={{
+                flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                background: quickTx.side === 'sell' ? 'linear-gradient(135deg, #ef4444, #f97316)' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                color: '#fff', border: 'none', fontFamily: 'inherit', opacity: qtSaving ? 0.6 : 1,
+              }}>
+                {qtSaving ? 'در حال ثبت…' : quickTx.side === 'sell' ? 'ثبت فروش' : 'ثبت خرید'}
+              </button>
+              <button type="button" onClick={() => setQuickTx(null)} style={{
+                padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.muted, fontFamily: 'inherit',
+              }}>انصراف</button>
+            </div>
+          </div>
         </div>
       )}
     </>
