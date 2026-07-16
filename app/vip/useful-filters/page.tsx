@@ -268,7 +268,7 @@ export default function UsefulFiltersPage() {
   const [updated, setUpdated] = useState<string | null>(null)
   const [perCapRows, setPerCapRows] = useState<PerCapRow[] | null>(null)
   const [perCapUpdated, setPerCapUpdated] = useState<string | null>(null)
-  const [marketClosed, setMarketClosed] = useState(false)
+  const [marketClosed] = useState(() => isTehranMarketClosedDay())
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme')
@@ -279,8 +279,6 @@ export default function UsefulFiltersPage() {
   }, [])
 
   const load = async () => {
-    if (isTehranMarketClosedDay()) { setMarketClosed(true); return }
-    setMarketClosed(false)
     setFailed(false)
     try {
       // میانگین حجم هفته/ماه از view سوپابیس (اختیاری — بدون آن ستون‌های حجم/شناوری هفته و ماه خالی می‌مانند)
@@ -330,7 +328,7 @@ export default function UsefulFiltersPage() {
 
   useEffect(() => {
     load()
-    const iv = setInterval(load, 120_000) // هر ۲ دقیقه
+    const iv = setInterval(() => { if (!isTehranMarketClosedDay()) load() }, 120_000)
     return () => clearInterval(iv)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -408,11 +406,11 @@ export default function UsefulFiltersPage() {
             padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
             background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b',
           }}>
-            بازار سرمایه پنج‌شنبه و جمعه تعطیل است — بروزرسانی لحظه‌ای غیرفعال شد.
+            بازار سرمایه پنج‌شنبه و جمعه تعطیل است — دیتای آخرین روز معاملاتی نمایش داده می‌شود و تا شنبه بروزرسانی خودکار انجام نمی‌شود.
           </div>
         )}
 
-        {!marketClosed && failed && (
+        {failed && (
           <div style={{
             padding: '16px 18px', borderRadius: 12, marginBottom: 18, fontSize: 13,
             background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444',
