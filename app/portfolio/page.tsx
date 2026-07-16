@@ -86,7 +86,7 @@ const PHYSICAL_KEYWORDS = ['طلا', 'سکه', 'نقره', 'فیزیکی', 'گر
 const normFa = (s: string) =>
   s.replace(/[يی]/g, 'ی')
    .replace(/[كک]/g, 'ک')
-   .replace(/[‌‎‏]/g, ' ')  // نیم‌فاصله → فاصله
+   .replace(/[‌‎‏​﻿ ]/g, ' ')  // نیم‌فاصله و کاراکترهای نامرئی (از اکسل کارگزاری) → فاصله
    .replace(/[أإآ]/g, 'ا')
    .replace(/ؤ/g, 'و')
    .replace(/ة/g, 'ه')
@@ -151,7 +151,7 @@ export default function PortfolioPage() {
 
   // آپلود اکسل کارگزاری — پیش‌نمایش + تایید قبل از افزودن به پورتفو
   const [showImport, setShowImport] = useState(false)
-  const [importRows, setImportRows] = useState<{ symbol: string; name: string; qty: number; price: number; matched: boolean }[]>([])
+  const [importRows, setImportRows] = useState<{ symbol: string; name: string; type: AssetType; qty: number; price: number; matched: boolean }[]>([])
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
 
@@ -469,6 +469,23 @@ export default function PortfolioPage() {
     }
   }
 
+  // شناسایی نماد اکسل کارگزاری در لیست زنده نمادها (سهم/صندوق/فیزیکی).
+  // برخی کارگزاری‌ها یک رقم اضافه (مثلاً «کارا۱») یا کاراکترهای نامرئی/فاصله انتهای نماد اضافه می‌کنند
+  // که با تطبیق مستقیم جور در نمی‌آید؛ برای همین اول تطبیق دقیق و در نبودش با حذف رقم انتهایی و تطبیق روی نام امتحان می‌شود.
+  const matchInstrument = (rawSymbol: string): Instrument | undefined => {
+    const norm = normFa(rawSymbol)
+    if (!norm) return undefined
+    let inst = instruments.find(i => normFa(i.symbol) === norm)
+    if (inst) return inst
+    const stripped = norm.replace(/[0-9۰-۹]+$/, '').trim()
+    if (stripped && stripped !== norm) {
+      inst = instruments.find(i => normFa(i.symbol) === stripped)
+      if (inst) return inst
+    }
+    inst = instruments.find(i => normFa(i.name) === norm || (stripped && normFa(i.name) === stripped))
+    return inst
+  }
+
   // ─── آپلود اکسل کارگزاری — استخراج دارایی‌های سهام از خروجی پورتفوی کارگزاری ───
   // فایل کارگزاری «موجودی/تعداد/میانگین خرید» فعلیِ هر نماد را می‌دهد، نه تک‌تک تراکنش‌ها؛
   // برای همین هر ردیف را به‌عنوان یک تراکنش خرید ترکیبی (تعداد کل × میانگین خرید) با تاریخ امروز ثبت می‌کنیم
@@ -496,21 +513,41 @@ export default function PortfolioPage() {
         return
       }
 
-      const stockInstruments = instruments.filter(i => i.type === 'stock')
       const out: typeof importRows = []
       for (const r of rows.slice(headerIdx + 1)) {
         const rawSymbol = String(r[cSymbol] ?? '').trim()
         const qty = safe(r[cQty])
         const avgBuy = safe(r[cAvgBuy])
         if (!rawSymbol || qty <= 0 || avgBuy <= 0) continue
-        const inst = stockInstruments.find(i => normFa(i.symbol) === normFa(rawSymbol))
-        out.push({ symbol: inst?.symbol ?? rawSymbol, name: inst?.name ?? rawSymbol, qty, price: avgBuy, matched: !!inst })
+        const inst = matchInstrument(rawSymbol)
+        out.push({
+          symbol: inst?.symbol ?? rawSymbol, name: inst?.name ?? rawSymbol, type: inst?.type ?? 'stock',
+          qty, price: avgBuy, matched: !!inst,
+        })
       }
       if (out.length === 0) { setImportMsg('هیچ ردیف معتبری (با تعداد و میانگین خرید مثبت) در فایل پیدا نشد.'); return }
       setImportRows(out)
     } catch (err: any) {
       setImportMsg('خطا در خواندن فایل اکسل: ' + (err?.message || String(err)))
     }
+  }
+
+  // ویرایش/حذف تک‌تک ردیف‌های پیش‌نمایش قبل از ثبت نهایی
+  const updateImportRow = (idx: number, patch: Partial<typeof importRows[number]>) => {
+    setImportRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
+  }
+  const removeImportRow = (idx: number) => {
+    setImportRows(prev => prev.filter((_, i) => i !== idx))
+  }
+  // وقتی کاربر خودش نماد یک ردیف ناشناس را دستی اصلاح می‌کند، دوباره با لیست زنده تطبیق بده
+  const rematchImportRow = (idx: number, newSymbol: string) => {
+    const inst = matchInstrument(newSymbol)
+    updateImportRow(idx, {
+      symbol: inst?.symbol ?? newSymbol.trim(),
+      name: inst?.name ?? newSymbol.trim(),
+      type: inst?.type ?? 'stock',
+      matched: !!inst,
+    })
   }
 
   const confirmImport = async () => {
@@ -521,7 +558,7 @@ export default function PortfolioPage() {
       importRows.map(r => ({
         symbol: r.symbol,
         name: r.name,
-        asset_type: 'stock',
+        asset_type: r.type,
         side: 'buy',
         quantity: r.qty,
         price: r.price,          // اکسل کارگزاری از قبل بر حسب ریال است — بدون تبدیل تومان→ریال
@@ -906,19 +943,57 @@ ${txs.map(tx => row([
                       <th style={{ textAlign: 'right', padding: '6px 8px' }}>تعداد</th>
                       <th style={{ textAlign: 'right', padding: '6px 8px' }}>میانگین خرید (تومان)</th>
                       <th style={{ textAlign: 'right', padding: '6px 8px' }}>وضعیت</th>
+                      <th style={{ padding: '6px 8px' }} />
                     </tr>
                   </thead>
                   <tbody>
                     {importRows.map((r, idx) => (
                       <tr key={idx} style={{ borderBottom: `1px solid ${t.border}` }}>
-                        <td style={{ padding: '6px 8px' }}>
-                          <b>{r.symbol}</b>
-                          {r.name !== r.symbol && <span style={{ color: t.muted, marginRight: 6, fontSize: 11 }}>{r.name}</span>}
+                        <td style={{ padding: '6px 8px', minWidth: 160 }}>
+                          {r.matched ? (
+                            <>
+                              <b>{r.symbol}</b>
+                              {r.name !== r.symbol && <span style={{ color: t.muted, marginRight: 6, fontSize: 11 }}>{r.name}</span>}
+                            </>
+                          ) : (
+                            <input
+                              value={r.symbol}
+                              onChange={e => updateImportRow(idx, { symbol: e.target.value })}
+                              onBlur={e => rematchImportRow(idx, e.target.value)}
+                              placeholder="نماد را اصلاح کنید"
+                              style={{ ...input, padding: '5px 8px', fontSize: 12, border: `1px solid ${t.red}` }}
+                            />
+                          )}
                         </td>
-                        <td style={{ padding: '6px 8px' }}>{fmtNum(r.qty)}</td>
-                        <td style={{ padding: '6px 8px' }}>{fmtToman(r.price)}</td>
-                        <td style={{ padding: '6px 8px', color: r.matched ? t.green : t.red }}>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input
+                            inputMode="numeric"
+                            value={r.qty}
+                            onChange={e => updateImportRow(idx, { qty: safe(e.target.value.replace(/[^\d.]/g, '')) })}
+                            style={{ ...input, padding: '5px 8px', fontSize: 12, width: 100 }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input
+                            inputMode="numeric"
+                            value={toToman(r.price)}
+                            onChange={e => updateImportRow(idx, { price: tomanToRial(e.target.value.replace(/[^\d.]/g, '')) })}
+                            style={{ ...input, padding: '5px 8px', fontSize: 12, width: 100 }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 8px', color: r.matched ? t.green : t.red, whiteSpace: 'nowrap' }}>
                           {r.matched ? 'شناسایی‌شده' : 'نماد ناشناس'}
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => removeImportRow(idx)}
+                            title="حذف این ردیف"
+                            style={{
+                              background: 'transparent', border: 'none', color: t.red, cursor: 'pointer',
+                              fontSize: 14, fontFamily: 'inherit', padding: 4,
+                            }}
+                          >✕</button>
                         </td>
                       </tr>
                     ))}
@@ -928,6 +1003,7 @@ ${txs.map(tx => row([
               <p style={{ fontSize: 11.5, color: t.muted, margin: '0 0 12px', lineHeight: 1.9 }}>
                 هر ردیف به‌عنوان یک تراکنش «خرید» با تاریخ امروز ({todayShamsi()}) و بدون کارمزد به پورتفوی شما اضافه می‌شود.
                 اگر قبلاً تراکنشی برای این نمادها ثبت کرده‌اید، این مقدار روی آن جمع می‌شود، جایگزینش نمی‌کند.
+                ردیف‌های «نماد ناشناس» را می‌توانید قبل از تایید، ویرایش یا حذف کنید.
               </p>
               <button type="button" onClick={confirmImport} disabled={importing} style={{
                 padding: '10px 28px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
