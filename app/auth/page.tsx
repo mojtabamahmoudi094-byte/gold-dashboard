@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { PROVINCES } from '../../lib/iranRegions'
 
-type Tab = 'login' | 'register'
+type Tab = 'login' | 'register' | 'forgot'
 type Msg = { type: 'success' | 'error'; text: string }
 
 export default function AuthPage() {
@@ -15,6 +15,8 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<Msg | null>(null)
   const [registered, setRegistered] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
 
   // login fields
   const [loginEmail, setLoginEmail] = useState('')
@@ -47,6 +49,22 @@ export default function AuthPage() {
       setMsg({ type: 'error', text: 'ایمیل یا رمز عبور اشتباه است' })
     } else {
       router.push('/funds')
+    }
+  }
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setMsg(null)
+    const redirectTo = typeof window !== 'undefined'
+      ? window.location.origin + '/auth/reset'
+      : '/auth/reset'
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, { redirectTo })
+    setLoading(false)
+    if (error) {
+      setMsg({ type: 'error', text: 'خطا در ارسال ایمیل. لطفاً دوباره تلاش کنید' })
+    } else {
+      setForgotSent(true)
     }
   }
 
@@ -262,6 +280,12 @@ export default function AuthPage() {
               />
             </Field>
             <Btn loading={loading} color="#00C8FF" label="ورود به حساب" />
+            <div style={{ textAlign: 'center', fontSize: 12, color: '#ddd5bd' }}>
+              <button type="button" onClick={() => { setTab('forgot'); setMsg(null); setForgotSent(false) }} style={{
+                background: 'none', border: 'none', color: '#ddd5bd', fontSize: 12,
+                cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline',
+              }}>رمز عبور را فراموش کرده‌اید؟</button>
+            </div>
             <div style={{ textAlign: 'center', fontSize: 12, color: '#ddd5bd', marginTop: 4 }}>
               حساب ندارید؟{' '}
               <button type="button" onClick={() => { setTab('register'); setMsg(null) }} style={{
@@ -270,6 +294,56 @@ export default function AuthPage() {
               }}>ثبت‌نام کنید</button>
             </div>
           </form>
+        )}
+
+        {/* FORGOT PASSWORD FORM */}
+        {tab === 'forgot' && (
+          forgotSent ? (
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: '50%',
+                background: 'rgba(0,229,160,0.1)',
+                border: '0.5px solid rgba(0,229,160,0.4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+              }}>✉️</div>
+              <div style={{ fontSize: 13, color: '#A0B4C8', lineHeight: 1.8 }}>
+                لینک بازیابی رمز به <span style={{ color: '#E8F4FF', fontWeight: 600 }}>{forgotEmail}</span> ارسال شد.
+                ایمیل را باز کنید و روی لینک کلیک کنید.
+              </div>
+              <button
+                type="button"
+                onClick={() => { setTab('login'); setForgotSent(false); setMsg(null) }}
+                style={{
+                  width: '100%', padding: '13px', borderRadius: 11,
+                  fontSize: 14, fontWeight: 700,
+                  background: 'linear-gradient(135deg, rgba(0,200,255,0.13), rgba(0,200,255,0.22))',
+                  border: '0.5px solid rgba(0,200,255,0.5)',
+                  color: '#00C8FF', cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >بازگشت به ورود</button>
+            </div>
+          ) : (
+            <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ fontSize: 12, color: '#ddd5bd', lineHeight: 1.7, marginBottom: 4 }}>
+                ایمیل حساب‌تان را وارد کنید تا لینک بازیابی رمز برایتان ارسال شود.
+              </div>
+              <Field label="ایمیل">
+                <input
+                  type="email" required autoComplete="email"
+                  value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                  placeholder="example@email.com"
+                  style={{ ...inputBase, direction: 'ltr', textAlign: 'right' }}
+                />
+              </Field>
+              <Btn loading={loading} color="#00C8FF" label="ارسال لینک بازیابی" />
+              <div style={{ textAlign: 'center', fontSize: 12, color: '#ddd5bd', marginTop: 4 }}>
+                <button type="button" onClick={() => { setTab('login'); setMsg(null) }} style={{
+                  background: 'none', border: 'none', color: '#00C8FF', fontSize: 12,
+                  cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+                }}>بازگشت به ورود</button>
+              </div>
+            </form>
+          )
         )}
 
         {/* REGISTER FORM */}
