@@ -148,11 +148,21 @@ export default function ScreenerPage() {
 
   useEffect(() => {
     const load = async () => {
+      const { data: latest } = await supabase
+        .from('stock_screener')
+        .select('trade_date')
+        .order('trade_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const latestDate = (latest as { trade_date: string } | null)?.trade_date
+      if (!latestDate) return setRows([])
+
       const all: Row[] = []
       for (let from = 0; ; from += 1000) {
         const { data, error } = await supabase
           .from('stock_screener')
           .select('*')
+          .eq('trade_date', latestDate)
           .range(from, from + 999)
         if (error || !data) break
         all.push(...(data as Row[]))

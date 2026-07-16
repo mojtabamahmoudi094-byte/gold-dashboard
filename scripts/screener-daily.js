@@ -315,7 +315,7 @@ async function main() {
   let ok = 0
   for (let i = 0; i < out.length; i += BATCH) {
     const batch = out.slice(i, i + BATCH)
-    const { error } = await sb.from('stock_screener').upsert(batch, { onConflict: 'symbol' })
+    const { error } = await sb.from('stock_screener').upsert(batch, { onConflict: 'symbol,trade_date' })
     if (error) console.error(`[screener] خطا در batch #${i / BATCH + 1}:`, error.message)
     else ok += batch.length
   }

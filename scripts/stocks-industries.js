@@ -182,6 +182,12 @@ async function main() {
 
     // ── سرانه خرید حقیقی امروز هر نماد — برای فیلترهای «افزایش سرانه خریدار» (/vip/filters) ──
     const today = tehranDateStr()
+
+    // ── آرشیو روزانه اسنپ‌شات کل بازار — یک ردیف به‌ازای هر روز، آخرین ران آن روز جایگزین می‌شود ──
+    const { error: histErr } = await sb.from('stock_industries_history')
+      .upsert({ trade_date: today, data: out, updated: out.updated }, { onConflict: 'trade_date' })
+    if (histErr) console.error(`[stocks-industries] stock_industries_history: ${histErr.message}`)
+    else console.log('✅ stock_industries_history بروز شد')
     const perCapRows = []
     for (const it of watchItems) {
       const sym = clean(it.l18)

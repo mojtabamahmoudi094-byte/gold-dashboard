@@ -88,6 +88,8 @@ export default function TechnicalSymbolPage() {
       .from('stock_screener')
       .select('candle_pattern, candle_pattern_bias')
       .eq('symbol', symbol)
+      .order('trade_date', { ascending: false })
+      .limit(1)
       .maybeSingle()
       .then(({ data, error }) => {
         if (!error && data?.candle_pattern) setCandlePattern({ pattern: data.candle_pattern, bias: data.candle_pattern_bias })

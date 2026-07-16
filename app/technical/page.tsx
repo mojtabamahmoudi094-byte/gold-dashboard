@@ -120,16 +120,27 @@ export default function TechnicalIndexPage() {
   useEffect(() => {
     supabase
       .from('stock_screener')
-      .select('trend, rsi_oversold, rsi_overbought, change_pct')
-      .range(0, 999)
-      .then(({ data }) => {
-        if (!data || data.length === 0) return
-        setPulse({
-          up: data.filter(r => (r.change_pct ?? 0) > 0).length,
-          down: data.filter(r => (r.change_pct ?? 0) < 0).length,
-          oversold: data.filter(r => r.rsi_oversold).length,
-          overbought: data.filter(r => r.rsi_overbought).length,
-        })
+      .select('trade_date')
+      .order('trade_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: latest }) => {
+        const latestDate = (latest as { trade_date: string } | null)?.trade_date
+        if (!latestDate) return
+        return supabase
+          .from('stock_screener')
+          .select('trend, rsi_oversold, rsi_overbought, change_pct')
+          .eq('trade_date', latestDate)
+          .range(0, 999)
+          .then(({ data }) => {
+            if (!data || data.length === 0) return
+            setPulse({
+              up: data.filter(r => (r.change_pct ?? 0) > 0).length,
+              down: data.filter(r => (r.change_pct ?? 0) < 0).length,
+              oversold: data.filter(r => r.rsi_oversold).length,
+              overbought: data.filter(r => r.rsi_overbought).length,
+            })
+          })
       })
   }, [])
 

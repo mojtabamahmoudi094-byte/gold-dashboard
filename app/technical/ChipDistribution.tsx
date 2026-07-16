@@ -33,6 +33,8 @@ export default function ChipDistribution({ symbol, isDark }: Props) {
       .from('stock_chip_distribution')
       .select('symbol, trade_date_shamsi, bins, avg_cost, concentration_pct, profit_ratio, current_close')
       .eq('symbol', symbol)
+      .order('trade_date', { ascending: false })
+      .limit(1)
       .maybeSingle()
       .then(({ data, error }) => setRow(error || !data ? null : (data as Row)))
   }, [symbol])
