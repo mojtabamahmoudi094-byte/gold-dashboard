@@ -154,7 +154,7 @@ export default function PortfolioPage() {
 
   // آپلود اکسل کارگزاری — پیش‌نمایش + تایید قبل از افزودن به پورتفو
   const [showImport, setShowImport] = useState(false)
-  const [importRows, setImportRows] = useState<{ symbol: string; name: string; type: AssetType; qty: number; price: number; matched: boolean }[]>([])
+  const [importRows, setImportRows] = useState<{ symbol: string; name: string; type: AssetType; qty: number; price: number; date: string; matched: boolean }[]>([])
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
 
@@ -388,20 +388,24 @@ export default function PortfolioPage() {
   const active = holdings.filter(h => h.qty > 0)
   const closed = holdings.filter(h => h.qty <= 0 && h.realized !== 0)
 
+  // «بهای تمام‌شده» همیشه روی همه‌ی دارایی‌های فعال است؛ «ارزش روز» و «سود/زیان باز» فقط
+  // روی نمادهایی که قیمت روز دارند — قبلاً یک نماد بی‌قیمت (مثلاً صندوق‌ غیرطلا بدون فید زنده،
+  // یا نماد متوقف) کل ارزش/سود‌وزیان پورتفو را «—» می‌کرد، حتی وقتی بقیه نمادها قیمت داشتند.
   const totals = useMemo(() => {
-    let cost = 0, value = 0, realized = 0
-    let priced = true
+    let cost = 0, pricedCost = 0, value = 0, realized = 0, unpricedCount = 0
     for (const h of holdings) realized += h.realized
     for (const h of active) {
       cost += h.totalCost
-      if (h.value == null) priced = false
-      else value += h.value
+      if (h.value == null) { unpricedCount++; continue }
+      pricedCost += h.totalCost
+      value += h.value
     }
-    const unrealized = value - cost
+    const unrealized = value - pricedCost
     return {
       cost, value, realized, unrealized,
-      unrealizedPct: cost > 0 ? (unrealized / cost) * 100 : null,
-      priced,
+      unrealizedPct: pricedCost > 0 ? (unrealized / pricedCost) * 100 : null,
+      priced: unpricedCount === 0 && active.length > 0,
+      unpricedCount,
     }
   }, [holdings, active])
 
@@ -447,7 +451,7 @@ export default function PortfolioPage() {
         if (new Date(s.created_at).getTime() <= cutoff) baseline = s
         else break
       }
-      if (!baseline || baseline.total_value <= 0 || !totals.priced) {
+      if (!baseline || baseline.total_value <= 0 || totals.value <= 0) {
         return { ...p, pct: null as number | null }
       }
       const pct = ((totals.value - baseline.total_value) / baseline.total_value) * 100
@@ -463,7 +467,7 @@ export default function PortfolioPage() {
   const chartSnapshots = useMemo<Snapshot[]>(() => {
     const today = todayShamsi()
     if (snapshots.some(s => s.snap_date === today)) return snapshots
-    if (!totals.priced || totals.value <= 0) return snapshots
+    if (totals.value <= 0) return snapshots
     const live: Snapshot = {
       snap_date: today, total_value: totals.value, invested_capital: totals.cost,
       created_at: new Date().toISOString(),
@@ -560,7 +564,7 @@ export default function PortfolioPage() {
         const inst = matchInstrument(rawSymbol)
         out.push({
           symbol: inst?.symbol ?? rawSymbol, name: inst?.name ?? rawSymbol, type: inst?.type ?? 'stock',
-          qty, price: avgBuy, matched: !!inst,
+          qty, price: avgBuy, date: todayShamsi(), matched: !!inst,
         })
       }
       if (out.length === 0) { setImportMsg('هیچ ردیف معتبری (با تعداد و میانگین خرید مثبت) در فایل پیدا نشد.'); return }
@@ -591,7 +595,6 @@ export default function PortfolioPage() {
   const confirmImport = async () => {
     if (importRows.length === 0) return
     setImporting(true)
-    const today = todayShamsi()
     const { error } = await supabase.from('portfolio_transactions').insert(
       importRows.map(r => ({
         symbol: r.symbol,
@@ -601,7 +604,7 @@ export default function PortfolioPage() {
         quantity: r.qty,
         price: r.price,          // اکسل کارگزاری از قبل بر حسب ریال است — بدون تبدیل تومان→ریال
         commission: 0,
-        trade_date: today,
+        trade_date: r.date || todayShamsi(),
         note: 'ایمپورت از اکسل کارگزاری',
       }))
     )
@@ -647,8 +650,8 @@ export default function PortfolioPage() {
       ]),
       [],
       ['بهای تمام‌شده', toToman(totals.cost)],
-      ['ارزش روز', totals.priced ? toToman(totals.value) : ''],
-      ['سود/زیان باز', totals.priced ? toToman(totals.unrealized) : ''],
+      ['ارزش روز', totals.value > 0 ? toToman(totals.value) : ''],
+      ['سود/زیان باز', totals.value > 0 ? toToman(totals.unrealized) : ''],
       ['سود/زیان محقق‌شده', toToman(totals.realized)],
     ])
     XLSX.utils.book_append_sheet(wb, holdingsSheet, 'دارایی‌ها')
@@ -691,7 +694,7 @@ export default function PortfolioPage() {
 <div class="sub">تاریخ گزارش: ${todayShamsi()} — bourssanj.ir</div>
 <h2>خلاصه</h2>
 <table>${row(['بهای تمام‌شده (تومان)', 'ارزش روز (تومان)', 'سود/زیان باز (تومان)', 'سود/زیان محقق‌شده (تومان)'], 'th')}
-${row([fmtToman(totals.cost), totals.priced ? fmtToman(totals.value) : '—', fmtToman(totals.unrealized), fmtToman(totals.realized)])}</table>
+${row([fmtToman(totals.cost), totals.value > 0 ? fmtToman(totals.value) : '—', fmtToman(totals.unrealized), fmtToman(totals.realized)])}</table>
 <h2>دارایی‌های فعال</h2>
 <table>${row(['نماد', 'نوع', 'تعداد', 'میانگین خرید (تومان)', 'سربه‌سر (تومان)', 'قیمت روز (تومان)', 'ارزش روز (تومان)', 'سود/زیان (تومان)'], 'th')}
 ${active.map(h => row([
@@ -985,6 +988,7 @@ ${txs.map(tx => row([
                       <th style={{ textAlign: 'right', padding: '6px 8px' }}>نماد</th>
                       <th style={{ textAlign: 'right', padding: '6px 8px' }}>تعداد</th>
                       <th style={{ textAlign: 'right', padding: '6px 8px' }}>میانگین خرید (تومان)</th>
+                      <th style={{ textAlign: 'right', padding: '6px 8px' }}>تاریخ خرید</th>
                       <th style={{ textAlign: 'right', padding: '6px 8px' }}>وضعیت</th>
                       <th style={{ padding: '6px 8px' }} />
                     </tr>
@@ -1024,6 +1028,14 @@ ${txs.map(tx => row([
                             style={{ ...input, padding: '5px 8px', fontSize: 12, width: 100 }}
                           />
                         </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input
+                            value={r.date}
+                            onChange={e => updateImportRow(idx, { date: e.target.value })}
+                            placeholder="1405/04/15"
+                            style={{ ...input, padding: '5px 8px', fontSize: 12, width: 100 }}
+                          />
+                        </td>
                         <td style={{ padding: '6px 8px', color: r.matched ? t.green : t.red, whiteSpace: 'nowrap' }}>
                           {r.matched ? 'شناسایی‌شده' : 'نماد ناشناس'}
                         </td>
@@ -1044,7 +1056,8 @@ ${txs.map(tx => row([
                 </table>
               </div>
               <p style={{ fontSize: 11.5, color: t.muted, margin: '0 0 12px', lineHeight: 1.9 }}>
-                هر ردیف به‌عنوان یک تراکنش «خرید» با تاریخ امروز ({todayShamsi()}) و بدون کارمزد به پورتفوی شما اضافه می‌شود.
+                هر ردیف به‌عنوان یک تراکنش «خرید» بدون کارمزد به پورتفوی شما اضافه می‌شود — تاریخ پیش‌فرض امروز است،
+                اگر واقعاً قبل‌تر خریده‌اید تاریخ واقعی خرید را در ستون «تاریخ خرید» اصلاح کنید تا نمودار رشد سرمایه درست باشد.
                 اگر قبلاً تراکنشی برای این نمادها ثبت کرده‌اید، این مقدار روی آن جمع می‌شود، جایگزینش نمی‌کند.
                 ردیف‌های «نماد ناشناس» را می‌توانید قبل از تایید، ویرایش یا حذف کنید.
               </p>
@@ -1067,10 +1080,10 @@ ${txs.map(tx => row([
       }}>
         {[
           { title: 'بهای تمام‌شده', value: fmtToman(totals.cost) + ' تومان', color: t.text },
-          { title: 'ارزش روز پورتفو', value: totals.priced ? fmtToman(totals.value) + ' تومان' : '—', color: t.brand },
+          { title: 'ارزش روز پورتفو', value: totals.value > 0 ? fmtToman(totals.value) + ' تومان' : '—', color: t.brand },
           {
             title: 'سود/زیان باز',
-            value: totals.priced ? `${fmtToman(totals.unrealized)} (${fmtPct(totals.unrealizedPct, 1)})` : '—',
+            value: totals.value > 0 ? `${fmtToman(totals.unrealized)} (${fmtPct(totals.unrealizedPct, 1)})` : '—',
             color: pnlColor(totals.unrealized),
           },
           { title: 'سود/زیان محقق‌شده', value: fmtToman(totals.realized) + ' تومان', color: pnlColor(totals.realized) },
@@ -1083,6 +1096,14 @@ ${txs.map(tx => row([
           </div>
         ))}
       </div>
+      {/* بعضی نمادها (صندوق‌های غیرطلا، نمادهای متوقف) قیمت روز در سایت ندارند —
+          ارزش/سود‌وزیان بالا فقط روی نمادهای قیمت‌دار محاسبه شده، نه کل پورتفو */}
+      {totals.unpricedCount > 0 && (
+        <p style={{ fontSize: 11.5, color: t.muted, margin: '-14px 0 22px', lineHeight: 1.9 }}>
+          ⚠️ {fmtNum(totals.unpricedCount)} نماد از دارایی‌های شما قیمت روز در سایت ندارند (صندوق غیرطلا یا نماد متوقف)؛
+          ارزش روز و سود/زیان باز فقط برای بقیه‌ی نمادها محاسبه شده. برای این نمادها می‌توانید در جدول زیر قیمت را دستی ثبت کنید.
+        </p>
+      )}
 
       <div style={{ display: 'grid', gap: 16, gridTemplateColumns: isMobile || pieData.length === 0 ? '1fr' : '2fr 1fr', alignItems: 'start' }}>
         {/* جدول دارایی‌ها */}
