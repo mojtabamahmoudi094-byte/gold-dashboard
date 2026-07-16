@@ -93,10 +93,13 @@ function buildMonthlyReportData(payload) {
 
   // نرخ فروش هر محصول جدا (واحدها متفاوته — دستگاه/عدد/…، جمع‌زدنشون بی‌معنیه)
   // از rate_m خودِ اکسل می‌خونیم (ستون «نرخ فروش»)، نه محاسبهٔ دستی
-  // شرکت‌های چندمحصولی: فقط پرتأثیرترین‌ها رو نشون بده (بر اساس مبلغ فروش ۱۲ماهه)، نه همهٔ محصولات
+  // شرکت‌های چندمحصولی: فقط پرتأثیرترین‌ها رو نشون بده — سهم زیر ۵٪ از فروش ۱۲ماهه اصلاً نیاد،
+  // و از بقیه فقط تا جایی که سهم تجمعی به ۹۰٪ برسه (بعدش نیازی به خط بیشتر نیست)
   const amountOfKey = (m, k) => { const x = (m.products || []).find(p => key(p) === k); return x ? (x.amount_m || 0) : 0 }
   const MAX_RATE_LINES = 4
-  const rateLines = [...productInfo.entries()]
+  const MIN_SHARE_PCT = 5
+  const CUM_SHARE_STOP = 90
+  const rateCandidates = [...productInfo.entries()]
     .map(([k, info]) => {
       const values = last12.map(m => { const x = (m.products || []).find(p => key(p) === k); return x && x.rate_m != null && x.rate_m > 0 ? x.rate_m : null })
       const sales12 = last12.reduce((s, m) => s + amountOfKey(m, k), 0)
@@ -104,7 +107,17 @@ function buildMonthlyReportData(payload) {
     })
     .filter(l => l.values.some(v => v != null))
     .sort((a, b) => b.sales12 - a.sales12)
-    .slice(0, MAX_RATE_LINES)
+  const rateTotalSales12 = rateCandidates.reduce((s, l) => s + l.sales12, 0)
+  const rateLines = []
+  let cumShare = 0
+  for (const l of rateCandidates) {
+    const sharePct = rateTotalSales12 > 0 ? (l.sales12 / rateTotalSales12) * 100 : 0
+    if (sharePct < MIN_SHARE_PCT) break
+    if (rateLines.length >= MAX_RATE_LINES) break
+    rateLines.push(l)
+    cumShare += sharePct
+    if (cumShare >= CUM_SHARE_STOP) break
+  }
 
   // مخرج سهم‌ها: مجموع ناخالص محصولات (پیش از تخفیف/برگشت) — تا سهم‌ها دقیقاً ۱۰۰٪ جمع بزنند
   const periodProductSum = (m) => (m.products || []).filter(x => x.channel).reduce((s, x) => s + (x.amount_m || 0), 0)
