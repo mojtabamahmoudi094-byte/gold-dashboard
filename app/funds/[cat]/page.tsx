@@ -542,7 +542,7 @@ export default function FundsCatPage() {
                           background: isPositive ? 'rgba(0,229,160,0.1)' : isNegative ? 'rgba(255,77,106,0.1)' : `${t.accent}10`,
                           padding: '2px 10px', borderRadius: 6,
                         }}>
-                          {isPositive ? '+' : ''}{f.changePct.toFixed(2)}٪
+                          {isPositive ? '▲ ' : isNegative ? '▼ ' : ''}{isPositive ? '+' : ''}{f.changePct.toFixed(2)}٪
                         </span>
                         <span style={{
                           fontSize: 12, fontWeight: 700, color: scoreColor,
@@ -651,7 +651,7 @@ export default function FundsCatPage() {
                             color: isPositive ? '#00E5A0' : isNegative ? '#FF4D6A' : t.muted,
                             borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700,
                           }}>
-                            {isPositive ? '+' : ''}{f.changePct.toFixed(2)}٪
+                            {isPositive ? '▲ ' : isNegative ? '▼ ' : ''}{isPositive ? '+' : ''}{f.changePct.toFixed(2)}٪
                           </span>
                         </td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{tvStr(f.tradeValue)}</td>
