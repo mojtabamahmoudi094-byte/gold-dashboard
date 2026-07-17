@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import { toGregorian } from 'jalaali-js'
 import { useIsMobile } from '../lib/useIsMobile'
+import TimeRangeSelector, { RANGE_DAYS, type RangeKey } from '../app/components/TimeRangeSelector'
 
 // «1405/04/24» → شماره روز پیوسته (برای فیلتر بازه‌ی زمانی روی محور تقویم واقعی، نه شمارش ردیف)
 function shamsiDayNum(s: string): number | null {
@@ -23,9 +24,11 @@ function shamsiDayNum(s: string): number | null {
   } catch { return null }
 }
 
-type RangeKey = '1w' | '1m' | '3m' | '1y' | 'custom'
-const RANGE_DAYS: Record<Exclude<RangeKey, 'custom'>, number> = { '1w': 7, '1m': 30, '3m': 90, '1y': 365 }
-const RANGE_LABELS: Record<Exclude<RangeKey, 'custom'>, string> = { '1w': '۱ هفته', '1m': '۱ ماه', '3m': '۳ ماه', '1y': '۱ سال' }
+// «2024-10-29» (ایزو میلادی، خروجی TimeRangeSelector) → شماره روز پیوسته
+function isoDayNum(s: string): number | null {
+  const d = new Date(s)
+  return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 86400000)
+}
 
 const FONT = 'Vazirmatn, Arial, sans-serif'
 const C = { text: '#a9b0c2', cream: '#ddd5bd', border: 'rgba(255,255,255,0.09)', bg: '#0a0d14', panel: '#12161f' }
@@ -63,8 +66,7 @@ export default function ChartModal({
   const isMobile = useIsMobile()
   const close = useCallback(() => onClose(), [onClose])
   const [range, setRange] = useState<RangeKey>('1m')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
+  const [customRange, setCustomRange] = useState<[string, string] | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -76,22 +78,23 @@ export default function ChartModal({
 
   // بازه پیش‌فرض هر بار که مودال برای یک کارت جدید باز می‌شود: ۱ ماه اخیر
   useEffect(() => {
-    if (open) { setRange('1m'); setCustomFrom(''); setCustomTo('') }
+    if (open) { setRange('1m'); setCustomRange(null) }
   }, [open, title])
 
   const filteredData = useMemo(() => {
     if (data.length === 0) return data
     const lastDay = shamsiDayNum(data[data.length - 1].t)
     if (range === 'custom') {
-      const fromDay = shamsiDayNum(customFrom)
-      const toDay = shamsiDayNum(customTo)
+      if (!customRange) return data
+      const fromDay = isoDayNum(customRange[0])
+      const toDay = isoDayNum(customRange[1])
       if (fromDay == null || toDay == null) return data
       return data.filter(p => { const d = shamsiDayNum(p.t); return d != null && d >= fromDay && d <= toDay })
     }
     if (lastDay == null) return data
     const cutoff = lastDay - RANGE_DAYS[range]
     return data.filter(p => { const d = shamsiDayNum(p.t); return d != null && d >= cutoff })
-  }, [data, range, customFrom, customTo])
+  }, [data, range, customRange])
 
   if (!open) return null
 
@@ -124,42 +127,15 @@ export default function ChartModal({
           }}>✕</button>
         </div>
 
-        {/* انتخاب بازه زمانی */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10, padding: '0 8px' }}>
-          {(Object.keys(RANGE_DAYS) as (keyof typeof RANGE_DAYS)[]).map(k => (
-            <button key={k} onClick={() => setRange(k)} style={{
-              all: 'unset', cursor: 'pointer', padding: '5px 12px', borderRadius: 8, fontSize: 11.5,
-              fontFamily: FONT, fontWeight: range === k ? 800 : 500,
-              color: range === k ? '#eef1f8' : C.text,
-              background: range === k ? `${color}26` : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${range === k ? `${color}66` : C.border}`,
-            }}>{RANGE_LABELS[k]}</button>
-          ))}
-          <button onClick={() => setRange('custom')} style={{
-            all: 'unset', cursor: 'pointer', padding: '5px 12px', borderRadius: 8, fontSize: 11.5,
-            fontFamily: FONT, fontWeight: range === 'custom' ? 800 : 500,
-            color: range === 'custom' ? '#eef1f8' : C.text,
-            background: range === 'custom' ? `${color}26` : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${range === 'custom' ? `${color}66` : C.border}`,
-          }}>بازه دلخواه</button>
-
-          {range === 'custom' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
-              <input value={customFrom} onChange={e => setCustomFrom(e.target.value)} placeholder="از ۱۴۰۴/۰۱/۰۱"
-                style={{
-                  width: 108, fontSize: 11.5, fontFamily: FONT, direction: 'ltr', textAlign: 'center',
-                  background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`, borderRadius: 8,
-                  color: '#eef1f8', padding: '5px 6px',
-                }} />
-              <span style={{ color: C.text, fontSize: 11 }}>تا</span>
-              <input value={customTo} onChange={e => setCustomTo(e.target.value)} placeholder={data[data.length - 1]?.t ?? ''}
-                style={{
-                  width: 108, fontSize: 11.5, fontFamily: FONT, direction: 'ltr', textAlign: 'center',
-                  background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`, borderRadius: 8,
-                  color: '#eef1f8', padding: '5px 6px',
-                }} />
-            </div>
-          )}
+        {/* انتخاب بازه زمانی — بازه دلخواه با تقویم شمسی واقعی (TimeRangeSelector) */}
+        <div style={{ padding: '0 8px' }}>
+          <TimeRangeSelector
+            value={range}
+            customRange={customRange}
+            onChange={(key, cr) => { setRange(key); if (cr) setCustomRange(cr) }}
+            isDark
+            accentColor={color}
+          />
         </div>
 
         <div style={{ flex: 1, minHeight: 0 }}>
