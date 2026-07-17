@@ -19,7 +19,7 @@ type Industry = {
   tval: number; mv: number; mv_usd?: number; up: number; down: number
   symbols: Sym[]
 }
-type Payload = { updated: string; industries: Industry[] }
+type Payload = { updated: string; industries: Industry[]; usdRate?: number | null }
 
 const hemat = (rial: number) =>
   rial >= 1e13
@@ -34,6 +34,13 @@ const husd = (v: number | null | undefined) =>
 
 // مقادیر گزارش‌های کدال به میلیون ریال هستند
 const mrial = (v: number | null | undefined) => (v == null ? '—' : hemat(v * 1e6))
+
+// ارزش دلاری قیمت هر سهم — قیمت (ریال) ÷ نرخ دلار آزاد (ریال)، همان نرخ sync-usd-market-value.js
+const priceUsd = (rial: number | null | undefined, rate: number | null | undefined) =>
+  rial == null || rate == null ? null : rial / rate
+
+const fmtUsdPrice = (v: number | null) =>
+  v == null ? '—' : `$${v.toLocaleString('en-US', { maximumFractionDigits: v < 1 ? 4 : 2 })}`
 
 const gPct = (v: number | null) =>
   v === null ? '—' : `${v > 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}٪`
@@ -131,6 +138,7 @@ export default function StockPage() {
           const { s, ind } = found
           const cards: [string, string, string][] = [
             ['قیمت پایانی', s.pc === null ? '—' : s.pc.toLocaleString('fa-IR'), pcColor(s.pcp) as string],
+            ['ارزش دلاری', fmtUsdPrice(priceUsd(s.pc, data?.usdRate)), text],
             ['٪ پایانی', pct(s.pcp), pcColor(s.pcp) as string],
             ['آخرین معامله', s.pl === null ? '—' : s.pl.toLocaleString('fa-IR'), pcColor(s.plp) as string],
             ['٪ آخرین', pct(s.plp), pcColor(s.plp) as string],

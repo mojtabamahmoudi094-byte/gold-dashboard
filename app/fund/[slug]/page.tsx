@@ -17,6 +17,9 @@ const usdFmt = (v: number) =>
     ? `$${(v / 1e9).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`
     : `$${(v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`
 
+const fmtUsdPrice = (v: number | null) =>
+  v == null ? '—' : `$${v.toLocaleString('en-US', { maximumFractionDigits: v < 1 ? 4 : 2 })}`
+
 export default function FundDetailPage() {
   const params = useParams()
   // slug فارسی (صندوق‌های بورسی) در URL انکد می‌شود — بدون decode در DB پیدا نمی‌شود
@@ -144,6 +147,13 @@ export default function FundDetailPage() {
   // قدرت خریدار
   const buyPower = sellAvg > 0 ? (buyAvg / sellAvg).toFixed(2) : '—'
 
+  // نرخ دلار ضمنی — از نسبت ارزش بازار (همیشه ریال) به ارزش بازار دلاری (sync-usd-market-value.js)
+  const impliedUsdRate = record.market_value_usd != null && safe(record.market_value_usd) > 0
+    ? safe(record.market_value) / safe(record.market_value_usd)
+    : null
+  const priceCloseRial = priceIsRial ? safe(record.price_close) : safe(record.price_close) * 10
+  const priceCloseUsd = impliedUsdRate != null ? priceCloseRial / impliedUsdRate : null
+
   return (
     <main style={{
       minHeight: '100vh', background: t.bg, color: t.text,
@@ -204,10 +214,13 @@ export default function FundDetailPage() {
         </div>
 
         {/* کارت‌های اصلی */}
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: 12 }}>
           <MetricCard t={t} label="قیمت پایانی"
             value={`${priceToman(safe(record.price_close)).toLocaleString('fa-IR')} تومان`}
             tooltip={`قیمت دقیق: ${safe(record.price_close).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`} />
+          <MetricCard t={t} label="ارزش دلاری"
+            value={fmtUsdPrice(priceCloseUsd)}
+            tooltip="ارزش دلاری قیمت پایانی — بر مبنای نرخ دلار بازار آزاد" />
           <MetricCard t={t} label="آخرین قیمت"
             value={`${priceToman(safe(record.price_last)).toLocaleString('fa-IR')} تومان`}
             tooltip={`قیمت دقیق: ${safe(record.price_last).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`} />
