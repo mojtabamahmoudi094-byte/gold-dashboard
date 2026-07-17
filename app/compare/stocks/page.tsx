@@ -14,9 +14,10 @@ import { supabase } from '../../../lib/supabase'
 import { darkTheme, lightTheme, shouldUseDark } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { rsi } from '../../../lib/indicators'
+import { findTradingGaps, detectDilutionEvents, applyDilution, type DilutionEvent, type QuarterCapital } from '../../../lib/dilutionAdjust'
 
 type CandleRow = { trade_date: string; trade_date_shamsi: string; close: number; adj_close: number | null }
-type SymSeries = { symbol: string; rows: CandleRow[]; color: string }
+type SymSeries = { symbol: string; rows: CandleRow[]; color: string; dilutionEvents: DilutionEvent[] }
 
 const COLORS = ['#00C8FF', '#F59E0B', '#00E5A0', '#EF476F']
 const RANGES = [
@@ -31,6 +32,10 @@ const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigi
 // قیمت تعدیل‌شده (افزایش سرمایه/سود نقدی) — همان روش app/technical/[symbol]/page.tsx؛ بدون این، بازده نمادی که
 // افزایش سرمایه داده (افت مصنوعی قیمت) در چارت به‌شدت منفی و نادرست نمایش داده می‌شود
 const effClose = (r: CandleRow) => (r.adj_close != null && r.adj_close > 0) ? r.adj_close : r.close
+
+// بعد از تعدیل tsetmc (بالا)، یک لایه دوم برای رویدادهایی که tsetmc تعدیل نمی‌کند (افزایش سرمایه آورده نقدی/حق‌تقدم) —
+// از جهش سرمایه فصلی کدال + شکاف معاملاتی واقعی نماد ساخته می‌شود، نه حدس
+const finalPrice = (r: CandleRow, events: DilutionEvent[]) => applyDilution(r.trade_date_shamsi, effClose(r), events)
 
 export default function CompareStocksPage() {
   const isMobile = useIsMobile()
@@ -81,7 +86,18 @@ export default function CompareStocksPage() {
         data = (fallback.data ?? []).map(r => ({ ...r, adj_close: null })) as any
       }
       const rows = ((data ?? []) as CandleRow[]).slice().reverse()
-      return { symbol, rows, color: COLORS[(Object.keys(series).length + i) % COLORS.length] } as SymSeries
+
+      let dilutionEvents: DilutionEvent[] = []
+      try {
+        const repRes = await fetch(`/api/stock-reports/${encodeURIComponent(symbol.replace(/\s+/g, '-'))}`)
+        if (repRes.ok) {
+          const rep = await repRes.json()
+          const quarters: QuarterCapital[] = (rep?.quarters ?? []).map((q: any) => ({ period: q.period, capital: q.capital }))
+          dilutionEvents = detectDilutionEvents(findTradingGaps(rows), quarters)
+        }
+      } catch { /* گزارش کدال نبود — بدون تعدیل رقیق‌شدگی ادامه بده */ }
+
+      return { symbol, rows, dilutionEvents, color: COLORS[(Object.keys(series).length + i) % COLORS.length] } as SymSeries
     })).then(results => {
       if (cancelled) return
       setSeries(prev => {
@@ -108,18 +124,18 @@ export default function CompareStocksPage() {
   const chartData = useMemo(() => {
     const active = selected.filter(s => series[s]?.rows?.length)
     if (active.length === 0) return []
-    const sliced = active.map(s => ({ symbol: s, rows: series[s].rows.slice(-rangeDays) }))
+    const sliced = active.map(s => ({ symbol: s, rows: series[s].rows.slice(-rangeDays), events: series[s].dilutionEvents }))
     const dateSet = new Set<string>()
     sliced.forEach(s => s.rows.forEach(r => dateSet.add(r.trade_date_shamsi)))
     const dates = [...dateSet].sort()
     const baseline: Record<string, number | null> = {}
-    sliced.forEach(s => { baseline[s.symbol] = s.rows[0] ? effClose(s.rows[0]) : null })
+    sliced.forEach(s => { baseline[s.symbol] = s.rows[0] ? finalPrice(s.rows[0], s.events) : null })
     return dates.map(date => {
       const point: Record<string, number | string | null> = { date }
       for (const s of sliced) {
         const row = s.rows.find(r => r.trade_date_shamsi === date)
         const base = baseline[s.symbol]
-        point[s.symbol] = row && base ? Math.round(((effClose(row) - base) / base) * 1000) / 10 : null
+        point[s.symbol] = row && base ? Math.round(((finalPrice(row, s.events) - base) / base) * 1000) / 10 : null
       }
       return point
     })
@@ -127,18 +143,19 @@ export default function CompareStocksPage() {
 
   const summary = useMemo(() => selected.map(sym => {
     const s = series[sym]
-    if (!s || s.rows.length < 15) return { symbol: sym, close: null, changePct: null, rsiVal: null, color: s?.color ?? COLORS[0] }
+    if (!s || s.rows.length < 15) return { symbol: sym, close: null, changePct: null, rsiVal: null, color: s?.color ?? COLORS[0], dilutionAdjusted: false }
     // بازه نمایش (چند ماه انتخاب‌شده) — تغییر روزانه/RSI را هم روی همان بازه بگیریم، نه کل ۲۸۰ روز
     const rangeRows = s.rows.slice(-rangeDays)
-    const effCloses = rangeRows.map(effClose)
-    const rsiSeries = rsi(effCloses, 14)
+    const finalCloses = rangeRows.map(r => finalPrice(r, s.dilutionEvents))
+    const rsiSeries = rsi(finalCloses, 14)
     const lastRow = rangeRows[rangeRows.length - 1]
-    const prevEff = effCloses[effCloses.length - 2]
-    const lastEff = effCloses[effCloses.length - 1]
+    const prevFinal = finalCloses[finalCloses.length - 2]
+    const lastFinal = finalCloses[finalCloses.length - 1]
     return {
       symbol: sym, close: lastRow?.close ?? null,
-      changePct: prevEff ? ((lastEff - prevEff) / prevEff) * 100 : null,
+      changePct: prevFinal ? ((lastFinal - prevFinal) / prevFinal) * 100 : null,
       rsiVal: rsiSeries[rsiSeries.length - 1], color: s.color,
+      dilutionAdjusted: s.dilutionEvents.some(ev => rangeRows.some(r => r.trade_date_shamsi < ev.atDateShamsi)),
     }
   }), [selected, series, rangeDays])
 
@@ -243,6 +260,12 @@ export default function CompareStocksPage() {
                         <Link href={`/technical/${encodeURIComponent(s.symbol.replace(/\s+/g, '-'))}`} style={{ color: s.color, textDecoration: 'none' }}>
                           {s.symbol}
                         </Link>
+                        {s.dilutionAdjusted && (
+                          <span title="بازده این نماد بابت افزایش سرمایه (رقیق‌شدگی) تعدیل شده — بر اساس سرمایه فصلی کدال"
+                            style={{ marginInlineStart: 6, fontSize: 10, color: muted, cursor: 'help' }}>
+                            *تعدیل‌شده
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '9px 8px' }}>{s.close == null ? '—' : fa(s.close)}</td>
                       <td style={{ padding: '9px 8px', fontWeight: 700, color: s.changePct == null ? muted : s.changePct >= 0 ? t.green : t.red }}>
