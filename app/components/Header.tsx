@@ -46,7 +46,6 @@ const NAV: NavItem[] = [
     { label: 'پول داغ', href: '/vip/hot-money' },
   ] },
   { label: 'پورتفوی من',    href: '/portfolio' },
-  { label: 'هشدارها',       href: '/alerts' },
 ]
 
 const pn = { style: { pointerEvents: 'none' as const } }

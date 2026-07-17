@@ -951,6 +951,14 @@ ${txs.map(tx => row([
           >
             {tgLinked ? '✅ متصل به تلگرام' : '🤖 اتصال به بات تلگرام'}
           </button>
+          <Link href="/alerts" style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
+            color: '#F59E0B', textDecoration: 'none', fontFamily: 'inherit',
+          }}>
+            🔔 هشدارها
+          </Link>
           <button
             type="button"
             onClick={() => setShowForm(!showForm)}
