@@ -902,7 +902,7 @@ async function main() {
 }
 
 // codal-watch.js این ماژول را require می‌کند و فقط buildSymbol را صدا می‌زند
-module.exports = { buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR, parseMonthly, faDate }
+module.exports = { buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR, parseMonthly, parseFinancials, upsertReport, faDate }
 
 if (require.main === module) {
   main().catch(e => { console.error(e); process.exit(1) })
