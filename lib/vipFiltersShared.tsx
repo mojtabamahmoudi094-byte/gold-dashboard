@@ -5,6 +5,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import FlashValue from '../app/components/ui/FlashValue'
 
 export const BRSAPI_KEY = process.env.NEXT_PUBLIC_BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 
@@ -241,10 +242,15 @@ export function FilterTable({ card, isDark, compact }: { card: Card; isDark: boo
                       <Link href={`/technical/${encodeURIComponent(r.sym)}`} style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 700 }}>
                         {r.sym}
                       </Link>
+                    ) : c.key === 'pl' ? (
+                      <FlashValue value={r.pl}>
+                        <span style={{ color: r.plp > 0 ? 'oklch(0.74 0.16 150)' : r.plp < 0 ? '#EF4444' : cream, fontWeight: 500 }}>
+                          {c.fmt(r)}
+                        </span>
+                      </FlashValue>
                     ) : (
                       <span style={{
-                        color: c.key === 'pl' ? (r.plp > 0 ? 'oklch(0.74 0.16 150)' : r.plp < 0 ? '#EF4444' : cream)
-                          : c.key === 'netNVal' ? (r.netNVal >= 0 ? 'oklch(0.74 0.16 150)' : '#EF4444')
+                        color: c.key === 'netNVal' ? (r.netNVal >= 0 ? 'oklch(0.74 0.16 150)' : '#EF4444')
                           : cream,
                         fontWeight: 500,
                       }}>{c.fmt(r)}</span>
