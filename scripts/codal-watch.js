@@ -63,7 +63,7 @@ const norm = (s) => String(s || '')
 const isMonthlyTitle   = (t) => /گزارش فعالیت ماهانه/.test(t)
 const isQuarterlyTitle = (t) =>
   (/میاندوره|میان دوره/.test(t.replace(/‌/g, '')) && /دوره (۳|۶|۹|3|6|9) ماهه/.test(t)) ||
-  /^صورت های مالی\s+سال مالی منتهی به/.test(t.replace(/‌/g, ' '))
+  /^صورت های مالی(\s+تلفیقی)?\s+سال مالی منتهی به/.test(t.replace(/‌/g, ' '))
 const isInteresting = (title) => {
   const t = norm(title)
   return isMonthlyTitle(t) || isQuarterlyTitle(t)

@@ -660,7 +660,7 @@ function pickReports(list) {
   })
   const annual = list.filter(a => {
     const t = norm(a.title).replace(/‌/g, ' ')
-    return /^صورت های مالی\s+سال مالی منتهی به/.test(t) && !isSub(norm(a.title))
+    return /^صورت های مالی(\s+تلفیقی)?\s+سال مالی منتهی به/.test(t) && !isSub(norm(a.title))
   })
 
   const durOf = (a) => {
