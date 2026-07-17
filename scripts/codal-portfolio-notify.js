@@ -14,9 +14,11 @@
  *   node codal-portfolio-notify.js            # اطلاعیه‌های ۳۶ ساعت اخیر
  *   node codal-portfolio-notify.js --dry       # فقط گزارش کن، چیزی نفرست
  *
- * کرون پیشنهادی (مثل codal-watch.js، هر ۳۰ دقیقه):
- *   30-and-0 4-17 * * * root /usr/bin/node /opt/bourssanj/scripts/codal-portfolio-notify.js >> /var/log/codal-portfolio-notify.log 2>&1
- *   (فرمت واقعی cron: دقیقه 0 و 30، ساعت 4 تا 17 UTC — نمونه‌ی دقیق را در /etc/cron.d/codal-portfolio-notify ببینید)
+ * کرون واقعی (/etc/cron.d/codal-portfolio-notify) — تهران ۰۶:۰۰ تا ۲۳:۳۰ هر ۳۰ دقیقه، همه‌ی روزها
+ * (کدال پنجشنبه/جمعه هم اطلاعیه می‌دهد، پس بر خلاف codal-watch.js روزها محدود به بازار نیست):
+ *   30 2-19 * * * root /usr/bin/node /opt/bourssanj/scripts/codal-portfolio-notify.js >> /var/log/codal-portfolio-notify.log 2>&1
+ *   0 3-20 * * * root /usr/bin/node /opt/bourssanj/scripts/codal-portfolio-notify.js >> /var/log/codal-portfolio-notify.log 2>&1
+ *   (دو خط چون آفست تهران نیم‌ساعته است؛ زمان‌ها UTC — تهران = UTC+3:30)
  *
  * متغیرهای لازم (.env.sync یا .env.local):
  *   TELEGRAM_PORTFOLIO_BOT_TOKEN   همان توکن بات پورتفو — رله با همین توکن احراز می‌کند
