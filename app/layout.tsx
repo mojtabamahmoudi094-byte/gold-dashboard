@@ -5,7 +5,9 @@ import Header from './components/Header'
 import Footer from './components/Footer'
 import ChatWidget from './components/ChatWidget'
 import ScrollProgress from './components/ScrollProgress'
+import ScrollToTop from './components/ScrollToTop'
 import PageViewLogger from './components/PageViewLogger'
+import ToastProvider from './components/ui/Toast'
 import { SITE_URL } from '../lib/site'
 
 const GA_MEASUREMENT_ID = 'G-645YCKXK75'
@@ -78,10 +80,13 @@ export default function RootLayout({
         />
         <PageViewLogger />
         <ScrollProgress />
-        <Header />
-        {children}
-        <Footer />
-        <ChatWidget />
+        <ToastProvider>
+          <Header />
+          {children}
+          <Footer />
+          <ChatWidget />
+          <ScrollToTop />
+        </ToastProvider>
       </body>
     </html>
   )
