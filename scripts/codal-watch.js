@@ -27,7 +27,7 @@
 const path = require('path')
 const fs   = require('fs')
 
-const { buildSymbol, sbClient, OUT_DIR } = require('./codal-company-reports.js')
+const { buildSymbol, sbClient, OUT_DIR, faDate } = require('./codal-company-reports.js')
 const { buildMonthlyReportData, renderMonthlyReportCardHtml, screenshotMonthlyReportCard } = require('./monthly-report-card.js')
 const { buildQuarterlyReportData, renderQuarterlyReportCardHtml, screenshotQuarterlyReportCard } = require('./quarterly-report-card.js')
 const { TELEGRAM_CHANNEL } = require('./brand-assets.js')
@@ -67,6 +67,20 @@ const isQuarterlyTitle = (t) =>
 const isInteresting = (title) => {
   const t = norm(title)
   return isMonthlyTitle(t) || isQuarterlyTitle(t)
+}
+
+// آیا این اطلاعیه واقعاً در payload نشسته؟ رکورد همان دوره باید publish ≥ انتشار اطلاعیه داشته باشد.
+// اگر نه (اکسل نسخهٔ جدید هنوز روی کدال نیامده و پارسر به نسخهٔ قدیمی برگشته)، false برمی‌گردد
+// تا اطلاعیه seen نشود و اجرای بعدی دوباره تلاش کند — وگرنه نسخهٔ حسابرسی‌شده/اصلاحیه برای همیشه
+// گم می‌شود و کارت/سایت روی دادهٔ کهنه می‌ماند (اتفاق کفرا، سالانهٔ ۱۴۰۴).
+function isIngested(a, payload) {
+  const t = norm(a.title)
+  const period = faDate(t)
+  const pubDate = faDate(a.publish)
+  if (!period || !pubDate) return true   // قابل سنجش نیست — مثل رفتار قبلی
+  const arr = isMonthlyTitle(t) ? payload.months : isQuarterlyTitle(t) ? payload.quarters : null
+  if (!arr) return true
+  return arr.some(x => x.period === period && x.publish && x.publish >= pubDate)
 }
 
 // ═══ خلاصهٔ نکات مهم برای تلگرام — فقط از همان اعداد پارس‌شده، بدون LLM ═══
@@ -580,6 +594,7 @@ async function main() {
 
   let fail = 0
   const built = new Set()
+  const pendingKeys = new Set()   // اطلاعیه‌هایی که هنوز ingest نشده‌اند — seen نمی‌شوند تا retry شوند
   for (const s of symbols) {
     try {
       const status = await buildSymbol(s, { force: true })
@@ -588,31 +603,39 @@ async function main() {
         try {
           const outFile = path.join(OUT_DIR, `${s.replace(/\s+/g, '-')}.json`)
           const payload = JSON.parse(fs.readFileSync(outFile, 'utf8'))
-          const freshTitles = fresh.filter(a => a.symbol === s).map(a => norm(a.title))
-
-          // ماهانهٔ تولیدی (فرم «نام محصول») و صورت مالی فصلی/سالانه → کارت عکسی؛ بقیهٔ فرم‌های ماهانه (بانک/خدماتی/پرتفوی) → متن قبلی
-          const hasMonthly = freshTitles.some(isMonthlyTitle)
-          const latestMonth = hasMonthly && payload.months.length ? payload.months[payload.months.length - 1] : null
-          const monthlyIsProduction = !!latestMonth && latestMonth.kind === 'production'
-          let monthlyPhotoSent = false
-          if (monthlyIsProduction) {
-            try { monthlyPhotoSent = await sendMonthlyPhoto(s, payload, latestMonth) }
-            catch (e) { log(`⚠️ ${s}: کارت عکسی ماهانه شکست خورد، ادامه با متن — ${e.message}`) }
+          const mine = fresh.filter(a => a.symbol === s)
+          const pending = mine.filter(a => !isIngested(a, payload))
+          for (const a of pending) {
+            pendingKeys.add(a.key)
+            log(`⏳ ${s}: «${norm(a.title)}» هنوز ingest نشده (اکسل نیامده؟) — اجرای بعدی دوباره تلاش می‌شود`)
           }
+          // کارت/متن فقط برای اطلاعیه‌هایی که واقعاً در داده نشسته‌اند — نه کارتِ کهنه از دادهٔ قدیمی
+          const freshTitles = mine.filter(a => !pendingKeys.has(a.key)).map(a => norm(a.title))
+          if (freshTitles.length) {
+            // ماهانهٔ تولیدی (فرم «نام محصول») و صورت مالی فصلی/سالانه → کارت عکسی؛ بقیهٔ فرم‌های ماهانه (بانک/خدماتی/پرتفوی) → متن قبلی
+            const hasMonthly = freshTitles.some(isMonthlyTitle)
+            const latestMonth = hasMonthly && payload.months.length ? payload.months[payload.months.length - 1] : null
+            const monthlyIsProduction = !!latestMonth && latestMonth.kind === 'production'
+            let monthlyPhotoSent = false
+            if (monthlyIsProduction) {
+              try { monthlyPhotoSent = await sendMonthlyPhoto(s, payload, latestMonth) }
+              catch (e) { log(`⚠️ ${s}: کارت عکسی ماهانه شکست خورد، ادامه با متن — ${e.message}`) }
+            }
 
-          const hasQuarterly = freshTitles.some(isQuarterlyTitle)
-          const latestQuarter = hasQuarterly && payload.quarters.length ? payload.quarters[payload.quarters.length - 1] : null
-          let quarterlyPhotoSent = false
-          if (latestQuarter) {
-            try { quarterlyPhotoSent = await sendQuarterlyPhoto(s, payload, latestQuarter) }
-            catch (e) { log(`⚠️ ${s}: کارت عکسی فصلی شکست خورد، ادامه با متن — ${e.message}`) }
-          }
+            const hasQuarterly = freshTitles.some(isQuarterlyTitle)
+            const latestQuarter = hasQuarterly && payload.quarters.length ? payload.quarters[payload.quarters.length - 1] : null
+            let quarterlyPhotoSent = false
+            if (latestQuarter) {
+              try { quarterlyPhotoSent = await sendQuarterlyPhoto(s, payload, latestQuarter) }
+              catch (e) { log(`⚠️ ${s}: کارت عکسی فصلی شکست خورد، ادامه با متن — ${e.message}`) }
+            }
 
-          // اگه عکس واقعاً نرفت (خطا/عدم داده)، متن قدیمی جایگزینش می‌شه — گزارش نباید کامل از دست بره
-          const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent, skipQuarterly: quarterlyPhotoSent })
-          if (kp) {
-            const narrated = await narrate(s, kp.facts)
-            await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text)
+            // اگه عکس واقعاً نرفت (خطا/عدم داده)، متن قدیمی جایگزینش می‌شه — گزارش نباید کامل از دست بره
+            const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent, skipQuarterly: quarterlyPhotoSent })
+            if (kp) {
+              const narrated = await narrate(s, kp.facts)
+              await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text)
+            }
           }
         } catch (e) { log(`⚠️ ${s}: ساخت/ارسال خلاصه تلگرام شکست خورد — ${e.message}`) }
       } else { fail++; log(`⚠️ ${s}: ${status}`) }
@@ -621,8 +644,9 @@ async function main() {
   }
 
   // فقط اطلاعیه‌های نمادهایی که موفق ساخته شدند seen می‌شوند؛
-  // ناموفق‌ها (throttle کدال، اکسل خراب) اجرای بعدی دوباره تلاش می‌شوند
-  for (const a of fresh) if (built.has(a.symbol)) seen.add(a.key)
+  // ناموفق‌ها (throttle کدال، اکسل خراب) و pendingها (نسخهٔ جدیدتر که هنوز ingest نشده)
+  // اجرای بعدی دوباره تلاش می‌شوند
+  for (const a of fresh) if (built.has(a.symbol) && !pendingKeys.has(a.key)) seen.add(a.key)
   st.seen = [...seen].slice(-SEEN_CAP)
   st.lastRun = new Date().toISOString()
   saveState(st)

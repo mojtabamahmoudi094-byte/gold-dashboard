@@ -43,6 +43,10 @@ next-env.d.ts
 # telegram report secrets
 scripts/.env.report
 
+# MCP config — contains Supabase access token
+.mcp.json
+
 # cron script state/logs (generated on the server)
 scripts/*-state.json
 scripts/*.log
+scripts/reports-out/

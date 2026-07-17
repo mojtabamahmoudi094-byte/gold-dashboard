@@ -40,7 +40,7 @@ const OUT_DIR = path.join(__dirname, 'reports-out')
 // نسخهٔ پارسر — با هر تغییر منطق پارس یکی بالا برود.
 // خروجی قدیمی‌تر از این نسخه دوباره ساخته می‌شود، حتی بدون --force؛ وگرنه بعد از
 // اصلاح پارسر، نمادهایی که فایل کهنه دارند برای همیشه skip می‌شوند.
-const PARSER_VERSION = 8
+const PARSER_VERSION = 9
 
 // خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
 // SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
@@ -231,26 +231,31 @@ const hasUsable = (list) => {
 }
 
 // خروجی: { list, throttled }
-// BrsAPI گزارش مفیدی نداد → همیشه کدال را امتحان کن (تنها منبع نمادهای بی‌پوشش).
-// throttle فقط وقتی اعلام می‌شود که کدال هم چیزی ندهد و نماد شاهدِ BrsAPI هم ساکت باشد؛
-// وگرنه یک throttleِ گذرای BrsAPI جلوی fallback را برای همیشه می‌گرفت.
+// کدال منبع مرجع است — BrsAPI گاهی اطلاعیه‌های تازه را جا می‌اندازد (سالانهٔ حسابرسی‌شدهٔ
+// کفرا، منتشر ۱۴۰۵/۰۴/۲۵، در فید BrsAPI نبود در حالی که روی کدال بود؛ نتیجه: سایت و کانال
+// روی نسخهٔ حسابرسی‌نشده ماندند). پس همیشه هر دو گرفته و ادغام می‌شوند؛ ردیف کدال مقدم است
+// (لینک اکسل مستقیم و فهرست کامل‌تر). throttle فقط وقتی اعلام می‌شود که هیچ‌کدام چیزی
+// ندهند و نماد شاهدِ BrsAPI هم ساکت باشد.
 async function fetchAnnouncements(symbol) {
   const list = await fetchFromBrsApi(symbol)
-  if (hasUsable(list)) return { list, throttled: false }
 
-  console.log(`  BrsAPI برای «${symbol}» گزارشی نداد (${list.length} اطلاعیه) — از خود کدال می‌گیریم`)
   await sleep(2000)
-  try {
-    const alt = await fetchFromCodal(symbol)
-    if (hasUsable(alt)) return { list: alt, throttled: false }
-    if (alt.length) return { list: alt, throttled: false }   // کدال جواب داد، ولی این نماد گزارش ماهانه/فصلی ندارد
-  } catch (e) {
-    console.log(`    کدال: ${e.message}`)
-    if (/۴۲۹/.test(e.message)) return { list: [], throttled: true }
+  let codal = []
+  let codalErr = null
+  try { codal = await fetchFromCodal(symbol) }
+  catch (e) { codalErr = e; console.log(`    کدال: ${e.message}`) }
+
+  if (codal.length) {
+    // dedupe نمی‌کنیم: ردیف تکراری کدال/BrsAPI لینک اکسل متفاوت دارد و firstParsable
+    // نسخهٔ بعدی را وقتی امتحان می‌کند که قبلی دانلود/پارس نشود — حذفش یعنی از دست دادن fallback
+    // (اکسل GetAll کدال زیر بار پشت‌سرهم throttle می‌شود و ماهانه‌ها فقط با لینک BrsAPI درآمدند).
+    return { list: [...codal, ...list], throttled: false }
   }
 
-  // هیچ‌کدام چیزی نداد: اگر شاهد سالم است، نماد واقعاً گزارشی ندارد
   if (list.length) return { list, throttled: false }
+  if (codalErr && /۴۲۹/.test(codalErr.message)) return { list: [], throttled: true }
+
+  // هیچ‌کدام چیزی نداد: اگر شاهد سالم است، نماد واقعاً گزارشی ندارد
   await sleep(2000)
   return { list: [], throttled: !(await brsApiHealthy()) }
 }
@@ -529,6 +534,10 @@ function parseMonthlyRevenue(wb) {
 }
 
 function parsePL(wb) {
+  // «صورت سود و زیان جامع» هم ردیف «سود(زیان) خالص» را دارد؛ اگر قبل از صورت سود و زیان
+  // اصلی بیاید (فرم سالانهٔ کفرا)، فقط net پر می‌شد و بقیه null می‌ماند. پس همهٔ شیت‌ها
+  // امتیازدهی می‌شوند و کامل‌ترین (بیشترین فیلد PL_MAP) برنده است.
+  let best = null, bestScore = 0
   for (const sn of wb.SheetNames) {
     const rows = sheetRows(wb, sn)
     const labels = rows.map(r => label(r[0]))
@@ -546,15 +555,16 @@ function parsePL(wb) {
       }
     })
     // بانک‌ها ردیف «درآمدهای عملیاتی» استاندارد ندارند — سود خالص کافی است
-    if (out.net !== undefined) {
-      // کلیدهای غایب باید null باشند نه undefined (وگرنه در JSON حذف و در UI به NaN تبدیل می‌شوند)
-      for (const [key] of PL_MAP) {
-        if (out[key] === undefined) { out[key] = null; out[key + '_ly'] = null }
-      }
-      return out
-    }
+    if (out.net === undefined) continue
+    const score = PL_MAP.filter(([key]) => out[key] !== undefined).length
+    if (score > bestScore) { best = out; bestScore = score }
   }
-  return null
+  if (!best) return null
+  // کلیدهای غایب باید null باشند نه undefined (وگرنه در JSON حذف و در UI به NaN تبدیل می‌شوند)
+  for (const [key] of PL_MAP) {
+    if (best[key] === undefined) { best[key] = null; best[key + '_ly'] = null }
+  }
+  return best
 }
 
 // ═══ پارس ترازنامه — همان اکسل صورت‌های مالی میاندوره‌ای/سالانه، شیت جداگانه ═══
@@ -673,20 +683,25 @@ function pickReports(list) {
 }
 
 // اولین نسخه‌ای که اکسلش می‌آید و پارس می‌شود؛ در غیر این صورت null
+// isComplete (اختیاری): اگر نسخهٔ پارس‌شده ناقص بود (مثلاً اکسل سالانهٔ حسابرسی‌نشدهٔ کفرا
+// که کلاً شیت صورت سود و زیان ندارد و فقط «جامع» دارد)، نسخه‌های بعدی هم امتحان می‌شوند
+// و ناقصِ اول فقط وقتی برمی‌گردد که هیچ نسخهٔ کاملی پیدا نشود.
 // خروجی: { a, p } یا { reason: 'دانلود' | 'پارس' }
-async function firstParsable(candidates, parse) {
+async function firstParsable(candidates, parse, isComplete) {
   let reason = 'دانلود'
+  let partial = null
   for (const a of candidates) {
     try {
       const wb = await fetchWorkbook(a)
       await sleep(1500)
       if (!wb) continue
       const p = parse(wb)
-      if (p) return { a, p }
-      reason = 'پارس'   // اکسل آمد ولی فرم شناخته نشد
+      if (!p) { reason = 'پارس'; continue }   // اکسل آمد ولی فرم شناخته نشد
+      if (!isComplete || isComplete(p)) return { a, p }
+      if (!partial) partial = { a, p }        // ناقص — نگه دار، شاید نسخهٔ دیگر کامل باشد
     } catch { await sleep(1500) }
   }
-  return { reason }
+  return partial || { reason }
 }
 
 // ═══ Supabase ═══ (lazy — اگر کلید نبود، فقط فایل نوشته می‌شود)
@@ -758,7 +773,8 @@ async function buildSymbol(symbol, opts = {}) {
 
   const quarters = []
   for (const g of quarterly) {
-    const r = await firstParsable(g.candidates, parseFinancials)
+    // eps و revenue هر دو null یعنی فقط شیت «سود و زیان جامع» پارس شده — نسخهٔ کامل‌تر را بگرد
+    const r = await firstParsable(g.candidates, parseFinancials, (p) => p.eps != null || p.revenue != null)
     if (r.reason) { console.log(`    ⚠️ فصلی ${g.key}: ${r.reason} ناموفق (${g.candidates.length} نسخه)`); continue }
     const t = norm(r.a.title)
     const dur = t.match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
@@ -772,6 +788,31 @@ async function buildSymbol(symbol, opts = {}) {
     })
   }
   quarters.sort((a, b) => (a.period + a.months).localeCompare(b.period + b.months))
+
+  // ادغام با خروجی قبلی همین نماد: throttle/قطعی گذرای دانلود اکسل نباید دوره‌هایی را که
+  // قبلاً سالم پارس شده‌اند بپراند (اتفاق واقعی: ۵ ماهانهٔ کفرا در یک اجرای بد شبکه گم شد و
+  // همان payload لاغر روی Supabase نشست). قاعدهٔ برد: رکورد جدید فقط وقتی جای قبلی را
+  // می‌گیرد که publish جدیدتر داشته باشد، یا publish برابر و فیلد پرشدهٔ کمتری نداشته باشد.
+  let prevOut = null
+  try { prevOut = JSON.parse(fs.readFileSync(outFile, 'utf8')) } catch {}
+  if (prevOut) {
+    const filled = (x) => Object.values(x).filter(v => v != null).length
+    const keepNew = (n, o) => (n.publish || '') > (o.publish || '')
+      || ((n.publish || '') === (o.publish || '') && filled(n) >= filled(o))
+    const mergeInto = (cur, old, keyFn) => {
+      const map = new Map(cur.map(x => [keyFn(x), x]))
+      for (const o of old || []) {
+        const k = keyFn(o)
+        const n = map.get(k)
+        if (!n || !keepNew(n, o)) map.set(k, o)
+      }
+      return [...map.values()]
+    }
+    months.splice(0, months.length, ...mergeInto(months, prevOut.months, (m) => m.period))
+    months.sort((a, b) => a.period.localeCompare(b.period))
+    quarters.splice(0, quarters.length, ...mergeInto(quarters, prevOut.quarters, (q) => `${q.period}|${q.months}`))
+    quarters.sort((a, b) => (a.period + a.months).localeCompare(b.period + b.months))
+  }
 
   if (months.length === 0 && quarters.length === 0) {
     console.log(`  ❌ ${symbol}: هیچ گزارشی پارس نشد`)
@@ -861,7 +902,7 @@ async function main() {
 }
 
 // codal-watch.js این ماژول را require می‌کند و فقط buildSymbol را صدا می‌زند
-module.exports = { buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR, parseMonthly }
+module.exports = { buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR, parseMonthly, faDate }
 
 if (require.main === module) {
   main().catch(e => { console.error(e); process.exit(1) })
