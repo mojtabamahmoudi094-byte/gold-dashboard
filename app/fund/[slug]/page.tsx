@@ -9,6 +9,26 @@ import { Skeleton, SkeletonBlock, SkeletonRows } from '../../components/ui/Skele
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
+import ChartModal, { type ChartModalPoint } from '../../../components/ChartModal'
+
+type FundSnapshotRow = {
+  trade_date_shamsi: string
+  price_close: number | null; price_last: number | null; trade_value: number | null
+  market_value: number | null; market_value_usd: number | null; volume: number | null
+}
+// یک ردیف ممکن است دوره ریال یا تومان باشد (دو دوره داده متفاوت gold_funds) — تشخیص per-row مثل FundPriceChart
+const fundMetricSeries = (rows: FundSnapshotRow[], key: keyof FundSnapshotRow): ChartModalPoint[] =>
+  rows.map(r => {
+    const rowIsRial = safe(r.trade_value) > 1e6
+    let v = r[key] as number | null
+    if (v != null) {
+      if (key === 'price_close' || key === 'price_last') v = rowIsRial ? Math.round(v / 10) : v
+      else if (key === 'trade_value') v = Math.round(v / 1e9) // مطابق فرمول کارت «ارزش معاملات» بالای صفحه
+      else if (key === 'market_value') v = Math.round(v / 1e12)
+      else if (key === 'volume') v = Math.round((v / 1e6) * 100) / 100
+    }
+    return { t: r.trade_date_shamsi, v }
+  })
 
 
 // ارزش بازار دلاری — روزی یک‌بار ساعت ۱۳ تهران توسط sync-usd-market-value.js محاسبه می‌شود
@@ -31,6 +51,23 @@ export default function FundDetailPage() {
   const [historyPage, setHistoryPage] = useState(1)
   const historyPerPage = 10
   const [user, setUser] = useState<any>(null)
+
+  // تاریخچه روزانه کارت‌ها — برای مودال نمودار، فقط با کلیک کاربر فچ می‌شود
+  const [snapshotRows, setSnapshotRows] = useState<FundSnapshotRow[] | null>(null)
+  const [snapshotLoading, setSnapshotLoading] = useState(false)
+  const [modalMetric, setModalMetric] = useState<{ key: keyof FundSnapshotRow; label: string; color: string; unit?: string } | null>(null)
+
+  const openFundMetric = (key: keyof FundSnapshotRow, label: string, color: string, unit?: string) => {
+    setModalMetric({ key, label, color, unit })
+    if (snapshotRows === null && !snapshotLoading) {
+      setSnapshotLoading(true)
+      fetch(`/api/fund-snapshot?slug=${encodeURIComponent(slug)}`)
+        .then(r => r.json())
+        .then(j => setSnapshotRows(j.rows ?? []))
+        .catch(() => setSnapshotRows([]))
+        .finally(() => setSnapshotLoading(false))
+    }
+  }
 
   const t: any = isDark ? darkTheme : lightTheme
   const cream = isDark ? '#ddd5bd' : '#6B5A3A'
@@ -207,26 +244,32 @@ export default function FundDetailPage() {
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: 12 }}>
           <MetricCard t={t} label="قیمت پایانی"
             value={`${priceToman(safe(record.price_close)).toLocaleString('fa-IR')} تومان`}
-            tooltip={`قیمت دقیق: ${safe(record.price_close).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`} />
+            tooltip={`قیمت دقیق: ${safe(record.price_close).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`}
+            onClick={() => openFundMetric('price_close', 'قیمت پایانی', '#3b82f6', 'ت')} />
           <MetricCard t={t} label="آخرین قیمت"
             value={`${priceToman(safe(record.price_last)).toLocaleString('fa-IR')} تومان`}
-            tooltip={`قیمت دقیق: ${safe(record.price_last).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`} />
+            tooltip={`قیمت دقیق: ${safe(record.price_last).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`}
+            onClick={() => openFundMetric('price_last', 'آخرین قیمت', '#3b82f6', 'ت')} />
           <MetricCard t={t} label="ارزش معاملات"
             value={`${Math.round(safe(record.trade_value) / 1e9).toLocaleString('fa-IR')} م.ت`}
-            tooltip={`ارزش دقیق: ${safe(record.trade_value).toLocaleString('fa-IR')} ریال`} />
+            tooltip={`ارزش دقیق: ${safe(record.trade_value).toLocaleString('fa-IR')} ریال`}
+            onClick={() => openFundMetric('trade_value', 'ارزش معاملات', '#8b5cf6', 'م.ت')} />
           <MetricCard t={t} label="ارزش بازار"
             value={`${Math.round(safe(record.market_value) / 1e12).toLocaleString('fa-IR')} ه.م.ت`}
-            tooltip={`ارزش دقیق: ${safe(record.market_value).toLocaleString('fa-IR')} ریال`} />
+            tooltip={`ارزش دقیق: ${safe(record.market_value).toLocaleString('fa-IR')} ریال`}
+            onClick={() => openFundMetric('market_value', 'ارزش بازار', '#f59e0b', 'ه.م.ت')} />
           <MetricCard t={t} label="ارزش بازار (دلار)"
             value={record.market_value_usd != null ? usdFmt(record.market_value_usd) : '—'}
-            tooltip="ارزش بازار دلاری — نرخ دلار بازار آزاد، sync-usd-market-value.js" />
+            tooltip="ارزش بازار دلاری — نرخ دلار بازار آزاد، sync-usd-market-value.js"
+            onClick={() => openFundMetric('market_value_usd', 'ارزش بازار (دلار)', '#22c55e', '$')} />
         </div>
 
         {/* ردیف دوم کارت‌ها */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
           <MetricCard t={t} label="حجم معاملات"
             value={`${(safe(record.volume) / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} م.سهم`}
-            tooltip={`حجم دقیق: ${safe(record.volume).toLocaleString('fa-IR')} سهم`} />
+            tooltip={`حجم دقیق: ${safe(record.volume).toLocaleString('fa-IR')} سهم`}
+            onClick={() => openFundMetric('volume', 'حجم معاملات', '#3b82f6', 'م.سهم')} />
           <MetricCard t={t} label="جریان پول حقیقی"
             value={`${netFlowBillion >= 0 ? '+' : ''}${netFlowBillion.toLocaleString('fa-IR')} میلیارد`}
             color={netFlowBillion >= 0 ? '#00E5A0' : '#FF4D6A'}
@@ -237,6 +280,16 @@ export default function FundDetailPage() {
             color={Number(buyPower) > 1 ? '#00E5A0' : Number(buyPower) < 1 ? '#FF4D6A' : t.textBright}
             tooltip="نسبت سرانه خریدار به سرانه فروشنده. بالای ۱ یعنی خریداران قوی‌ترند" />
         </div>
+
+        <ChartModal
+          open={!!modalMetric}
+          onClose={() => setModalMetric(null)}
+          title={modalMetric?.label ?? ''}
+          unit={modalMetric?.unit}
+          color={modalMetric?.color ?? '#3b82f6'}
+          data={modalMetric && snapshotRows ? fundMetricSeries(snapshotRows, modalMetric.key) : []}
+          loading={snapshotLoading}
+        />
 
         {/* پورتفوی کدال + گزارش فصلی (در صورت وجود JSON در public/portfolio) */}
         <CodalSections t={t} slug={slug} isMobile={isMobile} />
@@ -1052,11 +1105,11 @@ function QuarterlySection({ t, data, isMobile }: { t: any, data: any, isMobile: 
   )
 }
 
-function MetricCard({ t, label, value, color, tooltip }: any) {
+function MetricCard({ t, label, value, color, tooltip, onClick }: any) {
   return (
-    <div title={tooltip || ''} style={{
+    <div title={tooltip || ''} onClick={onClick} style={{
       background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12,
-      padding: '14px 16px', backdropFilter: 'blur(12px)', cursor: tooltip ? 'help' : 'default',
+      padding: '14px 16px', backdropFilter: 'blur(12px)', cursor: onClick ? 'pointer' : (tooltip ? 'help' : 'default'),
     }}>
       <div style={{ fontSize: 10, color: t.muted, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 15, fontWeight: 700, color: color || t.textBright }}>{value}</div>

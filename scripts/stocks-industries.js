@@ -230,6 +230,27 @@ async function main() {
       else console.log(`✅ stock_per_capita_daily بروز شد (${perCapRows.length} نماد)`)
     }
 
+    // ── اسنپ‌شات روزانه کارت‌های صفحه نماد (قیمت/حجم/ارزش‌بازار/P.E) — برای نمودار تاریخچه کارت‌ها ──
+    const { gregorianToShamsi } = require('./candles-lib')
+    const todayShamsi = gregorianToShamsi(today)
+    const snapRows = []
+    for (const ind of industries) {
+      for (const s of ind.symbols) {
+        if (!s.l18) continue
+        snapRows.push({
+          symbol: s.l18, trade_date: today, trade_date_shamsi: todayShamsi,
+          pc: s.pc, pcp: s.pcp, pl: s.pl, plp: s.plp,
+          tval: s.tval, tvol: s.tvol, mv: s.mv, mv_usd: s.mv_usd ?? null, pe: s.pe,
+          updated: out.updated,
+        })
+      }
+    }
+    if (snapRows.length > 0) {
+      const { error: snapErr } = await sb.from('stock_snapshot_daily').upsert(snapRows, { onConflict: 'symbol,trade_date' })
+      if (snapErr) console.error(`[stocks-industries] stock_snapshot_daily: ${snapErr.message}`)
+      else console.log(`✅ stock_snapshot_daily بروز شد (${snapRows.length} نماد)`)
+    }
+
     // ── خالص ورود پول حقیقی هر صنعت امروز — برای فیلترهای «ورود/خروج پول» (/vip/money-flow) ──
     const flowRows = industries.map(ind => ({
       industry_key: String(ind.id ?? ind.name),

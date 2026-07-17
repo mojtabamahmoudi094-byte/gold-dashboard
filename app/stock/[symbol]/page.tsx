@@ -5,7 +5,15 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
+import ChartModal, { type ChartModalPoint } from '../../../components/ChartModal'
 import { buildInsights, monthLabel, growth, monthlyYoY, type RMonth, type RQuarter, type RHolding, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
+
+type SnapshotRow = {
+  trade_date_shamsi: string
+  pc: number | null; pcp: number | null; pl: number | null; plp: number | null
+  tval: number | null; tvol: number | null; mv: number | null; mv_usd: number | null; pe: number | null
+}
+const SNAPSHOT_UNITS: Record<string, string> = { pcp: '٪', plp: '٪', mv_usd: '$' }
 
 type Sym = {
   l18: string; l30: string
@@ -71,6 +79,30 @@ export default function StockPage() {
       .catch(() => setFailed(true))
   }, [])
 
+  // تاریخچه روزانه کارت‌ها — برای مودال نمودار، فقط وقتی کاربر روی یک کارت کلیک کرد فچ می‌شود
+  const [snapshotRows, setSnapshotRows] = useState<SnapshotRow[] | null>(null)
+  const [snapshotLoading, setSnapshotLoading] = useState(false)
+  const [modalMetric, setModalMetric] = useState<{ key: string; label: string; color: string } | null>(null)
+
+  const openMetric = (key: string, label: string, color: string) => {
+    setModalMetric({ key, label, color })
+    if (snapshotRows === null && !snapshotLoading) {
+      setSnapshotLoading(true)
+      fetch(`/api/stock-snapshot?symbol=${encodeURIComponent(symbol)}`)
+        .then(r => r.json())
+        .then(j => setSnapshotRows(j.rows ?? []))
+        .catch(() => setSnapshotRows([]))
+        .finally(() => setSnapshotLoading(false))
+    }
+  }
+
+  useEffect(() => { setSnapshotRows(null); setModalMetric(null) }, [symbol])
+
+  const modalData: ChartModalPoint[] = useMemo(() => {
+    if (!modalMetric || !snapshotRows) return []
+    return snapshotRows.map(r => ({ t: r.trade_date_shamsi, v: (r as any)[modalMetric.key] }))
+  }, [modalMetric, snapshotRows])
+
   const [reports, setReports] = useState<Reports | null>(null)
   useEffect(() => {
     if (!symbol) return
@@ -129,18 +161,18 @@ export default function StockPage() {
 
         {found && (() => {
           const { s, ind } = found
-          const cards: [string, string, string][] = [
-            ['قیمت پایانی', s.pc === null ? '—' : s.pc.toLocaleString('fa-IR'), pcColor(s.pcp) as string],
-            ['٪ پایانی', pct(s.pcp), pcColor(s.pcp) as string],
-            ['آخرین معامله', s.pl === null ? '—' : s.pl.toLocaleString('fa-IR'), pcColor(s.plp) as string],
-            ['٪ آخرین', pct(s.plp), pcColor(s.plp) as string],
-            ['ارزش معاملات', s.tval === null ? '—' : hemat(s.tval), text],
+          const cards: [string, string, string, string][] = [
+            ['قیمت پایانی', s.pc === null ? '—' : s.pc.toLocaleString('fa-IR'), pcColor(s.pcp) as string, 'pc'],
+            ['٪ پایانی', pct(s.pcp), pcColor(s.pcp) as string, 'pcp'],
+            ['آخرین معامله', s.pl === null ? '—' : s.pl.toLocaleString('fa-IR'), pcColor(s.plp) as string, 'pl'],
+            ['٪ آخرین', pct(s.plp), pcColor(s.plp) as string, 'plp'],
+            ['ارزش معاملات', s.tval === null ? '—' : hemat(s.tval), text, 'tval'],
             ['حجم معاملات', s.tvol === null ? '—' : s.tvol >= 1e6
               ? `${(s.tvol / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م`
-              : s.tvol.toLocaleString('fa-IR'), text],
-            ['ارزش بازار', s.mv === null ? '—' : hemat(s.mv), text],
-            ['ارزش بازار (دلار)', husd(s.mv_usd) ?? '—', text],
-            ['P/E', s.pe === null ? '—' : s.pe.toLocaleString('fa-IR', { maximumFractionDigits: 1 }), text],
+              : s.tvol.toLocaleString('fa-IR'), text, 'tvol'],
+            ['ارزش بازار', s.mv === null ? '—' : hemat(s.mv), text, 'mv'],
+            ['ارزش بازار (دلار)', husd(s.mv_usd) ?? '—', text, 'mv_usd'],
+            ['P/E', s.pe === null ? '—' : s.pe.toLocaleString('fa-IR', { maximumFractionDigits: 1 }), text, 'pe'],
           ]
           const up = (s.pcp ?? 0) > 0, down = (s.pcp ?? 0) < 0
           const chgC = up ? GREEN : down ? RED : muted
@@ -226,11 +258,11 @@ export default function StockPage() {
                 gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
                 gap: 10, marginBottom: 20,
               }}>
-                {cards.map(([k, v, c]) => {
+                {cards.map(([k, v, c, metricKey]) => {
                   const accent = c === (GREEN as string) || c === (RED as string)
                   return (
-                    <div key={k} style={{
-                      position: 'relative', overflow: 'hidden',
+                    <div key={k} onClick={() => openMetric(metricKey, k, accent ? c : '#3b82f6')} style={{
+                      position: 'relative', overflow: 'hidden', cursor: 'pointer',
                       background: panel, border: `0.5px solid ${accent ? `${c}33` : line}`, borderRadius: 14,
                       padding: '14px 16px', backdropFilter: 'blur(12px)', minWidth: 0,
                     }}>
@@ -241,6 +273,16 @@ export default function StockPage() {
                   )
                 })}
               </div>
+
+              <ChartModal
+                open={!!modalMetric}
+                onClose={() => setModalMetric(null)}
+                title={modalMetric?.label ?? ''}
+                unit={modalMetric ? SNAPSHOT_UNITS[modalMetric.key] : undefined}
+                color={modalMetric?.color ?? '#3b82f6'}
+                data={modalData}
+                loading={snapshotLoading}
+              />
 
               <div style={{ fontSize: 10.5, color: muted }}>
                 داده تابلو مربوط به آخرین به‌روزرسانی صنایع است
