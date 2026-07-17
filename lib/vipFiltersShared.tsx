@@ -202,8 +202,8 @@ export function FilterTable({ card, isDark, compact }: { card: Card; isDark: boo
         <span style={{ width: 18 }} />
       </div>
 
-      <div style={{ overflowX: compact ? 'visible' : 'auto', overflowY: compact ? 'visible' : 'auto', maxHeight: compact ? 'none' : 430, flex: 1 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: compact ? 11 : 12, tableLayout: compact ? 'fixed' : 'auto' }}>
+      <div style={{ overflowX: 'auto', overflowY: compact ? 'visible' : 'auto', maxHeight: compact ? 'none' : 430, flex: 1 }}>
+        <table style={{ width: '100%', minWidth: compact ? card.cols.length * 90 : undefined, borderCollapse: 'collapse', fontSize: compact ? 11 : 12, tableLayout: compact ? 'fixed' : 'auto' }}>
           <thead>
             <tr>
               {card.cols.map((c, i) => (

@@ -1638,7 +1638,7 @@ export default function SignalsPage() {
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
                     {['تاریخ', 'دسته', 'نوع', 'اعتماد', `نتیجه ${showDays} روزه`, 'جریان پول', 'دلیل'].map(h => (

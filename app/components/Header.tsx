@@ -213,7 +213,7 @@ export default function Header() {
     ? isDark ? '0 4px 40px rgba(0,0,0,0.7)' : '0 4px 20px rgba(0,0,0,0.1)'
     : 'none'
   const TEXT_NAV   = isDark ? '#6b7280' : '#7A6A50'
-  const MOBILE_BG  = isDark ? 'rgba(8,10,16,0.99)' : 'rgba(252,249,242,0.99)'
+  const MOBILE_BG  = isDark ? '#080a10' : '#fcf9f2'
 
   const renderIdxRows = (compact = false) => {
     if (idxLoading && !idxItems) {
@@ -581,12 +581,12 @@ export default function Header() {
           style={{
             position: 'absolute', top: '100%', left: 0, right: 0,
             background: MOBILE_BG,
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
             borderBottom: `1px solid ${BORDER}`,
             padding: '8px 16px 20px',
             direction: 'rtl',
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            maxHeight: 'calc(100dvh - 61px)',
+            overflowY: 'auto',
           }}
         >
           <nav aria-label="منوی اصلی موبایل">
