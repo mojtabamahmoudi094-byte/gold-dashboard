@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useIsMobile } from '../../lib/useIsMobile'
+import { clean } from '../../lib/vipFiltersShared'
 import type { Theme } from '../../lib/theme'
 import { TutorialPanel } from '../components/ui/TutorialPanel'
 
@@ -31,6 +32,10 @@ const PALETTE = [
   'oklch(0.76 0.12 55)',   // نارنجی ملایم
   'oklch(0.75 0.12 180)',  // سبزآبی
 ]
+
+// نرمال‌سازی برای جستجو: clean مشترک (ي→ی، ك→ک) + یکسان‌سازی الف/ه عربی
+const norm = (s: unknown) =>
+  clean(s).replace(/[آأإ]/g, 'ا').replace(/ة/g, 'ه').replace(/ؤ/g, 'و')
 
 // همت = هزار میلیارد تومان (۱e13 ریال)
 const hemat = (rial: number) =>
@@ -79,11 +84,43 @@ export default function StocksPage() {
     cardShadow: '0 4px 24px rgba(0,0,0,0.3)',
   }
 
+  // فهرست یکپارچه نمادها با نام نرمال‌شده (ي→ی، ك→ک) — یک بار بعد از لود دیتا
+  const allSymbols = useMemo(() => {
+    const out: { s: Sym; indId: number | null; indName: string; nSym: string; nName: string }[] = []
+    for (const ind of data?.industries ?? [])
+      for (const s of ind.symbols ?? [])
+        out.push({ s, indId: ind.id, indName: ind.name, nSym: norm(s.l18), nName: norm(s.l30) })
+    return out
+  }, [data])
+
+  const nq = norm(query)
+
   const industries = useMemo(() => {
     const list = data?.industries ?? []
-    const q = query.trim()
-    return q ? list.filter(ind => ind.name.includes(q)) : list
-  }, [data, query])
+    return nq ? list.filter(ind => norm(ind.name).includes(nq)) : list
+  }, [data, nq])
+
+  const symbolMatches = useMemo(() => {
+    if (!nq) return []
+    // تطبیق زیررشته + fallback زیردنباله (حروف به‌ترتیب) تا «کفا» هم «کفرا» را پیدا کند
+    const isSubseq = (s: string) => {
+      let i = 0
+      for (const ch of s) if (ch === nq[i]) i++
+      return i === nq.length
+    }
+    const rank = (x: { nSym: string; nName: string }) =>
+      x.nSym.startsWith(nq) ? 0
+      : x.nSym.includes(nq) ? 1
+      : x.nName.includes(nq) ? 2
+      : nq.length >= 2 && isSubseq(x.nSym) ? 3
+      : -1
+    return allSymbols
+      .map(x => ({ x, r: rank(x) }))
+      .filter(m => m.r >= 0)
+      .sort((a, b) => (a.r !== b.r ? a.r - b.r : (b.x.s.tval ?? 0) - (a.x.s.tval ?? 0)))
+      .slice(0, 30)
+      .map(m => m.x)
+  }, [allSymbols, nq])
 
   const totalTval = useMemo(
     () => (data?.industries ?? []).reduce((s, x) => s + x.tval, 0),
@@ -122,7 +159,7 @@ export default function StocksPage() {
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="جستجوی صنعت… (مثلاً فلزات، خودرو، دارو)"
+            placeholder="جستجوی نماد یا صنعت… (مثلاً کفرا، فولاد، خودرو)"
             style={{
               width: '100%', boxSizing: 'border-box',
               padding: '11px 16px', marginBottom: 20,
@@ -147,6 +184,52 @@ export default function StocksPage() {
         {!data && !failed && (
           <div style={{ color: muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>
             در حال بارگذاری…
+          </div>
+        )}
+
+        {/* نتایج جستجوی نماد — بالای کارت صنایع */}
+        {data && symbolMatches.length > 0 && (
+          <div style={{
+            background: panel, border: `0.5px solid ${line}`, borderRadius: 16,
+            marginBottom: 20, overflow: 'hidden',
+          }}>
+            <div style={{ padding: '10px 16px', fontSize: 11.5, color: muted, borderBottom: `0.5px solid ${line}` }}>
+              نمادها ({symbolMatches.length.toLocaleString('fa-IR')})
+            </div>
+            {symbolMatches.map(({ s, indName }) => {
+              const up = (s.plp ?? 0) > 0
+              const down = (s.plp ?? 0) < 0
+              return (
+                <Link
+                  key={s.l18}
+                  href={`/stock/${encodeURIComponent(s.l18)}`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 16px', textDecoration: 'none',
+                    borderBottom: `0.5px solid ${line}`,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,30,46,0.04)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                >
+                  <span style={{ fontSize: 13.5, fontWeight: 700, color: text, flexShrink: 0 }}>{s.l18}</span>
+                  <span style={{
+                    fontSize: 11.5, color: muted, flex: 1, minWidth: 0,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {s.l30}
+                  </span>
+                  {!isMobile && (
+                    <span style={{ fontSize: 10.5, color: muted, flexShrink: 0 }}>{indName}</span>
+                  )}
+                  <span style={{
+                    fontSize: 12, fontWeight: 700, flexShrink: 0, direction: 'ltr' as const,
+                    color: up ? green : down ? red : muted,
+                  }}>
+                    {s.plp == null ? '—' : `${s.plp > 0 ? '+' : ''}${s.plp.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪`}
+                  </span>
+                </Link>
+              )
+            })}
           </div>
         )}
 
@@ -231,9 +314,9 @@ export default function StocksPage() {
           </div>
         )}
 
-        {data && industries.length === 0 && (
+        {data && industries.length === 0 && symbolMatches.length === 0 && (
           <div style={{ color: muted, fontSize: 13, padding: '30px 0', textAlign: 'center' }}>
-            صنعتی با این نام پیدا نشد
+            نماد یا صنعتی با این نام پیدا نشد
           </div>
         )}
       </div>
