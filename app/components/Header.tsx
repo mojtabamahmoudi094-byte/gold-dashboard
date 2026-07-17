@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import GlobalSearch from './GlobalSearch'
 
 type NavItem = { label: string; href: string; menu?: { label: string; href: string }[] }
 
@@ -457,6 +458,8 @@ export default function Header() {
               margin: '0 8px',
             }} />
 
+            <GlobalSearch isDark={isDark} />
+
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
@@ -545,6 +548,7 @@ export default function Header() {
         {/* Mobile controls */}
         {(
           <div className="nav-mobile" style={{ alignItems: 'center', gap: 8 }}>
+            <GlobalSearch isDark={isDark} compact />
             <button
               onClick={toggleTheme}
               aria-label={isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب'}
