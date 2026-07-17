@@ -21,7 +21,7 @@ const idxNum = (v: unknown): number | null => {
 const faInt = (v: number) => Math.round(v).toLocaleString('fa-IR')
 const faPct = (v: number) => Math.abs(v).toLocaleString('fa-IR', { maximumFractionDigits: 2 })
 
-const NAV: NavItem[] = [
+export const NAV: NavItem[] = [
   { label: 'خانه',          href: '/' },
   { label: 'سهام',          href: '/stocks' },
   { label: 'صندوق‌ها',      href: '/funds', menu: [

@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import Script from 'next/script'
 import Header from './components/Header'
+import Breadcrumb from './components/Breadcrumb'
 import Footer from './components/Footer'
 import ChatWidget from './components/ChatWidget'
 import ScrollProgress from './components/ScrollProgress'
@@ -82,6 +83,7 @@ export default function RootLayout({
         <ScrollProgress />
         <ToastProvider>
           <Header />
+          <Breadcrumb />
           {children}
           <Footer />
           <ChatWidget />
