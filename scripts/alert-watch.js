@@ -46,7 +46,9 @@ if (!TOKEN) { console.error('[alert-watch] TELEGRAM_PORTFOLIO_BOT_TOKEN تنظی
 if (!SUPABASE_URL || !SUPABASE_KEY) { console.error('[alert-watch] SUPABASE_URL/SUPABASE_KEY تنظیم نشده'); process.exit(1) }
 
 const { createClient } = require('@supabase/supabase-js')
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+let wsTransport
+try { wsTransport = require('ws') } catch { /* Node 22+ */ }
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, wsTransport ? { realtime: { transport: wsTransport } } : {})
 const { fetchPriceMap } = require('../lib/portfolioValuation')
 
 const includeBubble = process.argv.includes('--bubble')
