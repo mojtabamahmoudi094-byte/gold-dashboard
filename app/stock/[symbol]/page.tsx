@@ -35,13 +35,6 @@ const husd = (v: number | null | undefined) =>
 // مقادیر گزارش‌های کدال به میلیون ریال هستند
 const mrial = (v: number | null | undefined) => (v == null ? '—' : hemat(v * 1e6))
 
-// ارزش دلاری قیمت هر سهم — قیمت (ریال) ÷ نرخ دلار آزاد (ریال)، همان نرخ sync-usd-market-value.js
-const priceUsd = (rial: number | null | undefined, rate: number | null | undefined) =>
-  rial == null || rate == null ? null : rial / rate
-
-const fmtUsdPrice = (v: number | null) =>
-  v == null ? '—' : `$${v.toLocaleString('en-US', { maximumFractionDigits: v < 1 ? 4 : 2 })}`
-
 const gPct = (v: number | null) =>
   v === null ? '—' : `${v > 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}٪`
 
@@ -138,7 +131,6 @@ export default function StockPage() {
           const { s, ind } = found
           const cards: [string, string, string][] = [
             ['قیمت پایانی', s.pc === null ? '—' : s.pc.toLocaleString('fa-IR'), pcColor(s.pcp) as string],
-            ['ارزش دلاری', fmtUsdPrice(priceUsd(s.pc, data?.usdRate)), text],
             ['٪ پایانی', pct(s.pcp), pcColor(s.pcp) as string],
             ['آخرین معامله', s.pl === null ? '—' : s.pl.toLocaleString('fa-IR'), pcColor(s.plp) as string],
             ['٪ آخرین', pct(s.plp), pcColor(s.plp) as string],
@@ -146,7 +138,8 @@ export default function StockPage() {
             ['حجم معاملات', s.tvol === null ? '—' : s.tvol >= 1e6
               ? `${(s.tvol / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م`
               : s.tvol.toLocaleString('fa-IR'), text],
-            ['ارزش بازار', s.mv === null ? '—' : husd(s.mv_usd) ? `${hemat(s.mv)} (${husd(s.mv_usd)})` : hemat(s.mv), text],
+            ['ارزش بازار', s.mv === null ? '—' : hemat(s.mv), text],
+            ['ارزش بازار (دلار)', husd(s.mv_usd) ?? '—', text],
             ['P/E', s.pe === null ? '—' : s.pe.toLocaleString('fa-IR', { maximumFractionDigits: 1 }), text],
           ]
           const up = (s.pcp ?? 0) > 0, down = (s.pcp ?? 0) < 0

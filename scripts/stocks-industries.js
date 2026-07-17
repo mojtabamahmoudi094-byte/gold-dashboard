@@ -173,6 +173,30 @@ async function main() {
       updated: new Date().toISOString(),
       industries,
     }
+
+    // ارزش دلاری (mv_usd/usdRate) را sync-usd-market-value.js جدا و روزی یک‌بار می‌نویسد؛
+    // این‌جا فقط قیمت/ارزش ریالی بازسازی می‌شود — بدون merge، هر تیک ۵ دقیقه‌ای آن مقادیر را پاک می‌کرد
+    try {
+      const { data: prevRow } = await sb.from('stock_industries').select('data').eq('id', 1).single()
+      const prevInd = prevRow?.data?.industries
+      if (prevRow?.data?.usdRate != null && Array.isArray(prevInd)) {
+        const prevByL18 = new Map()
+        for (const ind of prevInd) for (const s of ind.symbols) if (s.mv_usd != null) prevByL18.set(s.l18, s.mv_usd)
+        for (const ind of industries) {
+          let mvUsdSum = 0
+          for (const s of ind.symbols) {
+            const carried = prevByL18.get(s.l18)
+            if (carried != null) { s.mv_usd = carried; mvUsdSum += carried }
+          }
+          if (mvUsdSum > 0) ind.mv_usd = mvUsdSum
+        }
+        out.usdRate = prevRow.data.usdRate
+        out.usdUpdated = prevRow.data.usdUpdated
+      }
+    } catch (e) {
+      console.warn('[stocks-industries] carry-forward mv_usd ناموفق:', e.message)
+    }
+
     const file = path.join(__dirname, 'stocks-industries.json')
     fs.writeFileSync(file, JSON.stringify(out))
     console.log(`\n✅ ذخیره شد: ${file} (${(fs.statSync(file).size / 1024).toFixed(0)} KB)`)
