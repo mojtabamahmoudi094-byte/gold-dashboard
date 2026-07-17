@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { darkTheme, lightTheme } from '../../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { SkeletonBlock } from '../../components/ui/Skeleton'
 
@@ -42,8 +42,7 @@ export default function FundamentalsPage() {
   const [data, setData] = useState<Fundamentals | null | 'missing'>(null)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

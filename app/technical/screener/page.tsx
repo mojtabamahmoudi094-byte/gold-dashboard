@@ -11,6 +11,7 @@ import { useIsMobile } from '../../../lib/useIsMobile'
 import { CANDLE_PATTERN_LABELS } from '../../../lib/candlePatternLabels'
 import { GREEN, RED } from '../colors'
 import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
+import { shouldUseDark } from '../../../lib/theme'
 
 type Row = {
   symbol: string
@@ -140,8 +141,7 @@ export default function ScreenerPage() {
   }, [explainPreset])
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

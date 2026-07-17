@@ -43,3 +43,11 @@ export const lightTheme = {
 }
 
 export type Theme = typeof darkTheme
+
+// اگر کاربر قبلاً دستی حالت رو انتخاب نکرده، ترجیح سیستم‌عامل رو معیار قرار بده
+export const shouldUseDark = (): boolean => {
+  const saved = window.localStorage.getItem('theme')
+  if (saved === 'light') return false
+  if (saved === 'dark') return true
+  return !(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
+}

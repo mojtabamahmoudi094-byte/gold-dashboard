@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { Skeleton, SkeletonRows } from '../../components/ui/Skeleton'
+import { shouldUseDark } from '../../../lib/theme'
 
 type Sym = {
   l18: string; l30: string
@@ -47,8 +48,7 @@ export default function IndustryPage() {
   const isMobile = useIsMobile()
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

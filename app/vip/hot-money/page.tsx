@@ -17,6 +17,7 @@ import {
   type M, buildMetrics, type Col, type Card, cSym, cPl, FilterTable,
 } from '../../../lib/vipFiltersShared'
 import AuthGate from '../../../components/AuthGate'
+import { shouldUseDark } from '../../../lib/theme'
 
 // ── جدول ۱و۲: معاملات سنگین/میلیاردی از hot_trades ──────────────────────────
 type HotRow = { key: string; sym: string; price: number; tickCount: number; value: number; time: string }
@@ -122,8 +123,7 @@ export default function HotMoneyPage() {
   const [updated, setUpdated] = useState<string | null>(null)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

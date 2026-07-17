@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { darkTheme, lightTheme } from '../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { Skeleton, SkeletonBlock, SkeletonRows } from '../components/ui/Skeleton'
 import { TutorialPanel } from '../components/ui/TutorialPanel'
@@ -35,8 +35,7 @@ export default function TrackRecordPage() {
   const cream = isDark ? '#ddd5bd' : '#6B5A3A'
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

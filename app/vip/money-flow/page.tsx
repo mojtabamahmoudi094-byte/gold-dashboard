@@ -20,6 +20,7 @@ import {
   type M, buildMetrics, type Col, type Card, cSym, cPl, FilterTable,
 } from '../../../lib/vipFiltersShared'
 import AuthGate from '../../../components/AuthGate'
+import { shouldUseDark } from '../../../lib/theme'
 
 // عدد از قبل به تومان ذخیره‌شده (بدون تبدیل ریال) — برای مقادیر تاریخچه industry_moneyflow_daily
 const fTomanT = (t: number | null) => {
@@ -177,8 +178,7 @@ export default function MoneyFlowPage() {
   const [symLegalIn66, setSymLegalIn66] = useState<Map<string, number> | null>(null)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

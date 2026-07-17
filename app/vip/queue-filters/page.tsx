@@ -15,6 +15,7 @@ import {
   type M, buildMetrics, type Col, type Card, cSym, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
 import AuthGate from '../../../components/AuthGate'
+import { shouldUseDark } from '../../../lib/theme'
 
 const cLastPct: Col = { label: 'درصد آخرین قیمت', key: 'plp', fmt: (r) => fPct(r.plp, 2), num: (r) => r.plp }
 const cClosePct: Col = { label: 'درصد قیمت پایانی', key: 'pcp', fmt: (r) => fPct(r.pcp, 2), num: (r) => r.pcp }
@@ -120,8 +121,7 @@ export default function QueueFiltersPage() {
   const [marketClosed] = useState(() => isTehranMarketClosedDay())
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

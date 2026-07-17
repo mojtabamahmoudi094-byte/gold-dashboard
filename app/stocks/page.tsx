@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { clean } from '../../lib/vipFiltersShared'
 import type { Theme } from '../../lib/theme'
+import { shouldUseDark } from '../../lib/theme'
 import { TutorialPanel } from '../components/ui/TutorialPanel'
 
 type Sym = {
@@ -51,8 +52,7 @@ export default function StocksPage() {
   const isMobile = useIsMobile()
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

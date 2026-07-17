@@ -14,7 +14,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
 } from 'recharts'
 import { supabase } from '../../lib/supabase'
-import { darkTheme, lightTheme } from '../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, fmtNum, fmtPct, todayShamsi } from '../../lib/format'
 
@@ -177,8 +177,7 @@ export default function PortfolioPage() {
   const [tgMsg, setTgMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
 

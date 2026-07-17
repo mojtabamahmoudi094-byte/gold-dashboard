@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import GlobalSearch from './GlobalSearch'
+import { shouldUseDark } from '../../lib/theme'
 
 type NavItem = { label: string; href: string; menu?: { label: string; href: string }[] }
 
@@ -175,8 +176,7 @@ export default function Header() {
   }
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
 
     const onScroll = () => setScrolled(window.scrollY > 6)
     window.addEventListener('scroll', onScroll, { passive: true })

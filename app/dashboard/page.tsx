@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
-import { darkTheme, lightTheme } from '../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../lib/format'
 import dynamic from 'next/dynamic'
@@ -58,8 +58,7 @@ export default function TerminalPage() {
 
   // خواندن قالب از حافظه و گوش دادن به تغییرات هدر
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => {
       const th = window.localStorage.getItem('theme')
       setIsDark(th !== 'light')

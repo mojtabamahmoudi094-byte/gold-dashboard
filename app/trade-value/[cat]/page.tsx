@@ -12,6 +12,7 @@ import { Skeleton } from '../../components/ui/Skeleton'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe } from '../../../lib/format'
 import TimeRangeSelector, { RANGE_DAYS, type RangeKey } from '../../components/TimeRangeSelector'
+import { shouldUseDark } from '../../../lib/theme'
 
 const TerminalChart = dynamic(() => import('../../dashboard/TerminalChart'), { ssr: false })
 
@@ -196,8 +197,7 @@ export default function TradeValueDetailPage() {
   const [customRange, setCustomRange] = useState<[string, string] | null>(null)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => {

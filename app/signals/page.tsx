@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
-import { darkTheme, lightTheme } from '../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, todayShamsi } from '../../lib/format'
 import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, computeSilverBubble, silverFundBubbleZati, SILVER_FUND_WEIGHTS, type MarketBubbles } from '../../lib/goldBubbles'
@@ -544,8 +544,7 @@ export default function SignalsPage() {
   const t: any = isDark ? darkTheme : lightTheme
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => {

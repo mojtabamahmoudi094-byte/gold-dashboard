@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { shouldUseDark } from '../../lib/theme'
 
 const TerminalChart = dynamic(() => import('../dashboard/TerminalChart'), { ssr: false })
 
@@ -136,8 +137,7 @@ export default function TradeValuePage() {
   const [showTrend, setShowTrend] = useState(false)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

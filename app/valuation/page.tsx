@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import AuthGate from '../../components/AuthGate'
-import { darkTheme, lightTheme } from '../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { Skeleton, SkeletonBlock } from '../components/ui/Skeleton'
 
@@ -53,8 +53,7 @@ export default function ValuationCalculatorPage() {
   const [gTerm, setGTerm] = useState(12)     // نرخ رشد پایدار بعد از دوره فوق‌العاده٪
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

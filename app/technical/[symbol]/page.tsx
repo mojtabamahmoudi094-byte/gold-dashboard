@@ -12,6 +12,7 @@ import { CANDLE_PATTERN_LABELS } from '../../../lib/candlePatternLabels'
 import { downloadCSV } from '../../../lib/csvExport'
 import { GREEN, RED } from '../colors'
 import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
+import { shouldUseDark } from '../../../lib/theme'
 
 const KlineChart = dynamic(() => import('../KlineChart'), { ssr: false })
 const TechnicalSummary = dynamic(() => import('../TechnicalSummary'), { ssr: false })
@@ -50,8 +51,7 @@ export default function TechnicalSymbolPage() {
   const [candlePattern, setCandlePattern] = useState<{ pattern: string; bias: string | null } | null>(null)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

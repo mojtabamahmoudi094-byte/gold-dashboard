@@ -8,6 +8,7 @@ import CodalAnnouncements from '../../components/CodalAnnouncements'
 import ChartModal, { type ChartModalPoint } from '../../../components/ChartModal'
 import { downloadCSV } from '../../../lib/csvExport'
 import { buildInsights, monthLabel, growth, monthlyYoY, type RMonth, type RQuarter, type RHolding, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
+import { shouldUseDark } from '../../../lib/theme'
 
 type SnapshotRow = {
   trade_date_shamsi: string
@@ -66,8 +67,7 @@ export default function StockPage() {
   const isMobile = useIsMobile()
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

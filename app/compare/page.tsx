@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../lib/format'
-import { darkTheme, lightTheme } from '../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { TutorialPanel } from '../components/ui/TutorialPanel'
 
 
@@ -22,8 +22,7 @@ export default function ComparePage() {
   const t: any = isDark ? darkTheme : lightTheme
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => {

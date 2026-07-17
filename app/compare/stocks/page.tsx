@@ -11,7 +11,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { supabase } from '../../../lib/supabase'
-import { darkTheme, lightTheme } from '../../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { rsi } from '../../../lib/indicators'
 
@@ -43,8 +43,7 @@ export default function CompareStocksPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

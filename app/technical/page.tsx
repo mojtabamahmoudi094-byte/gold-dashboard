@@ -10,6 +10,7 @@ import AuthGate from '../../components/AuthGate'
 import { supabase } from '../../lib/supabase'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { GREEN, RED } from './colors'
+import { shouldUseDark } from '../../lib/theme'
 
 type IdxRow = { index_name: string; trade_date: string; trade_date_shamsi: string; value: number; change_pct: number | null }
 type SymRow = { l18: string; pcp: number | null }
@@ -79,8 +80,7 @@ export default function TechnicalIndexPage() {
   const isOpen = marketOpen()
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

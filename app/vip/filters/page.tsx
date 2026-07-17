@@ -24,6 +24,7 @@ import {
   type M, buildMetrics, type Col, type Card, cSym, cPl, cRatioM, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
 import AuthGate from '../../../components/AuthGate'
+import { shouldUseDark } from '../../../lib/theme'
 
 const cBp: Col = { label: 'قدرت خرید', key: 'bp', fmt: (r) => fX(r.bp), num: (r) => r.bp ?? 0 }
 const cVal: Col = { label: 'ارزش', key: 'tval', fmt: (r) => fToman(r.tval), num: (r) => r.tval }
@@ -190,8 +191,7 @@ export default function VipFiltersPage() {
   const [marketClosed] = useState(() => isTehranMarketClosedDay())
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useIsMobile } from '../lib/useIsMobile'
 import { safe, fmtCompact as fmtVal } from '../lib/format'
-import { darkTheme, lightTheme } from '../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../lib/theme'
 
 type TickerItem = { name: string; slug: string; price: number; changePct: number }
 
@@ -262,8 +262,7 @@ export default function HomePage() {
   const [radarTop, setRadarTop] = useState<RadarNetBuy[]>([])
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)

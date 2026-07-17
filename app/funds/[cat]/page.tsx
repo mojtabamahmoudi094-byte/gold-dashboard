@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import AuthGate from '../../../components/AuthGate'
-import { darkTheme, lightTheme } from '../../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtCompact as fmtVal, fmtHomat } from '../../../lib/format'
 
@@ -41,8 +41,7 @@ export default function FundsCatPage() {
   const tvStr = (rial: number) => isCommodity ? `${fmtHomat(rial)} همت` : `${fmtVal(rial / 1e10)} م.ت`
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
 

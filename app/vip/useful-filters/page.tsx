@@ -20,6 +20,7 @@ import {
   type M, buildMetrics, type Col, type Card, cSym, cPl, cRatioM, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
 import AuthGate from '../../../components/AuthGate'
+import { shouldUseDark } from '../../../lib/theme'
 
 // سرانه خرید روزانه از قبل به تومان ذخیره شده (بدون تقسیم بر ۱۰) — همان فرمت fToman ولی بدون تبدیل ریال
 const fTomanT = (t: number | null) => {
@@ -272,8 +273,7 @@ export default function UsefulFiltersPage() {
   const [marketClosed] = useState(() => isTehranMarketClosedDay())
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('theme')
-    if (saved === 'light') setIsDark(false)
+    if (!shouldUseDark()) setIsDark(false)
     const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
     window.addEventListener('themechange', handler)
     return () => window.removeEventListener('themechange', handler)
