@@ -25,12 +25,13 @@ const RANGE_LABELS: { key: Exclude<RangeKey, 'custom'>; label: string }[] = [
   { key: '1y', label: '۱ سال' },
 ]
 
-function shamsiToGregorianIso(d: DateObject): string {
-  try {
-    return d.convert(gregorian).format('YYYY-MM-DD')
-  } catch {
-    return ''
-  }
+function toIso(d: DateObject | null): string {
+  if (!d) return ''
+  try { return d.convert(gregorian).format('YYYY-MM-DD') } catch { return '' }
+}
+
+function isoToPersianLabel(iso: string): string {
+  try { return new DateObject({ date: iso, calendar: gregorian }).convert(persian).format('YYYY/MM/DD') } catch { return iso }
 }
 
 export default function TimeRangeSelector({
@@ -46,81 +47,116 @@ export default function TimeRangeSelector({
   isDark: boolean
   accentColor?: string
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [draftRange, setDraftRange] = useState<DateObject[]>([])
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [fromDate, setFromDate] = useState<DateObject | null>(
+    customRange ? new DateObject({ date: customRange[0], calendar: gregorian }).convert(persian) : null
+  )
+  const [toDate, setToDate] = useState<DateObject | null>(
+    customRange ? new DateObject({ date: customRange[1], calendar: gregorian }).convert(persian) : null
+  )
 
-  const text = isDark ? '#E8F4FF' : '#0F1E2E'
-  const muted = isDark ? '#ddd5bd' : '#6B7F90'
-  const panelBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'
-  const border = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+  // پس‌زمینه‌ی روشن‌تر از خود مودال (نه شفافیت خیلی کم) + مرز واضح — تشخیص «این دکمه‌ست» برای چشم ضعیف راحت‌تر باشد
+  const cardBg = isDark ? '#0F1B2E' : '#fff'
+  const text = isDark ? '#F2F6FA' : '#0F1E2E'
+  const muted = isDark ? '#ddd5bd' : '#5B6B7A'
+  const border = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)'
 
-  const btnStyle = (active: boolean): React.CSSProperties => ({
-    padding: '7px 14px',
-    borderRadius: 8,
-    fontSize: 12.5,
-    fontWeight: 600,
+  const rangeBtnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '12px 18px',
+    minHeight: 46,
+    borderRadius: 10,
+    fontSize: 15,
+    fontWeight: active ? 800 : 600,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    border: `0.5px solid ${active ? accentColor : border}`,
-    background: active ? `${accentColor}1F` : panelBg,
-    color: active ? accentColor : muted,
+    border: `1.5px solid ${active ? accentColor : border}`,
+    background: active ? accentColor : cardBg,
+    color: active ? '#fff' : text,
     whiteSpace: 'nowrap',
   })
 
   const customLabel = value === 'custom' && customRange
-    ? `${new DateObject({ date: customRange[0], calendar: gregorian }).convert(persian).format('YYYY/MM/DD')} تا ${new DateObject({ date: customRange[1], calendar: gregorian }).convert(persian).format('YYYY/MM/DD')}`
+    ? `${isoToPersianLabel(customRange[0])} تا ${isoToPersianLabel(customRange[1])}`
     : 'بازه دلخواه'
 
-  return (
-    <div style={{ position: 'relative', display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-      {RANGE_LABELS.map(r => (
-        <button key={r.key} type="button" style={btnStyle(value === r.key)} onClick={() => onChange(r.key)}>
-          {r.label}
-        </button>
-      ))}
-      <button
-        type="button"
-        style={btnStyle(value === 'custom')}
-        onClick={() => setPickerOpen(o => !o)}
-      >
-        📅 {customLabel}
-      </button>
+  const canApply = !!fromDate && !!toDate
 
-      {pickerOpen && (
+  const apply = () => {
+    if (!fromDate || !toDate) return
+    const from = toIso(fromDate)
+    const to = toIso(toDate)
+    if (!from || !to) return
+    onChange('custom', from <= to ? [from, to] : [to, from])
+    setPanelOpen(false)
+  }
+
+  return (
+    <div style={{ position: 'relative', marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {RANGE_LABELS.map(r => (
+          <button key={r.key} type="button" style={rangeBtnStyle(value === r.key)} onClick={() => { onChange(r.key); setPanelOpen(false) }}>
+            {r.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          style={rangeBtnStyle(value === 'custom')}
+          onClick={() => setPanelOpen(o => !o)}
+        >
+          {customLabel}
+        </button>
+      </div>
+
+      {panelOpen && (
         <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 8, zIndex: 20,
-          background: isDark ? '#0A1220' : '#fff', border: `0.5px solid ${border}`,
-          borderRadius: 12, padding: 14, boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-          display: 'flex', flexDirection: 'column', gap: 10, minWidth: 240,
+          position: 'relative', marginTop: 12, zIndex: 20,
+          background: cardBg, border: `1.5px solid ${border}`,
+          borderRadius: 14, padding: 18, boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
+          display: 'flex', flexDirection: 'column', gap: 14,
         }}>
-          <span style={{ fontSize: 12, color: muted }}>از تاریخ تا تاریخ (شمسی)</span>
-          <DatePicker
-            calendar={persian}
-            locale={persian_fa}
-            range
-            value={draftRange}
-            onChange={(v: any) => setDraftRange(Array.isArray(v) ? v : [])}
-            inputClass="db-input"
-          />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: text, marginBottom: 8 }}>از تاریخ</div>
+              <DatePicker
+                calendar={persian}
+                locale={persian_fa}
+                value={fromDate}
+                onChange={(v: any) => setFromDate(v || null)}
+                inputClass="db-input db-input-lg"
+                placeholder="انتخاب تاریخ"
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: text, marginBottom: 8 }}>تا تاریخ</div>
+              <DatePicker
+                calendar={persian}
+                locale={persian_fa}
+                value={toDate}
+                onChange={(v: any) => setToDate(v || null)}
+                inputClass="db-input db-input-lg"
+                placeholder="انتخاب تاریخ"
+              />
+            </div>
+          </div>
           <button
             type="button"
-            disabled={draftRange.length < 2}
-            onClick={() => {
-              const from = shamsiToGregorianIso(draftRange[0])
-              const to = shamsiToGregorianIso(draftRange[1])
-              if (!from || !to) return
-              onChange('custom', from <= to ? [from, to] : [to, from])
-              setPickerOpen(false)
-            }}
+            disabled={!canApply}
+            onClick={apply}
             style={{
-              padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700,
-              cursor: draftRange.length < 2 ? 'not-allowed' : 'pointer',
-              opacity: draftRange.length < 2 ? 0.5 : 1,
+              padding: '14px 18px', borderRadius: 10, fontSize: 16, fontWeight: 800,
+              cursor: canApply ? 'pointer' : 'not-allowed',
+              opacity: canApply ? 1 : 0.45,
               background: accentColor, color: '#fff', border: 'none', fontFamily: 'inherit',
+              width: '100%',
             }}
           >
             اعمال بازه
           </button>
+          {!canApply && (
+            <div style={{ fontSize: 12.5, color: muted, textAlign: 'center' }}>
+              اول تاریخ شروع، بعد تاریخ پایان رو انتخاب کن
+            </div>
+          )}
         </div>
       )}
     </div>

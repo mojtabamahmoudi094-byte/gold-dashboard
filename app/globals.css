@@ -426,3 +426,27 @@ input[type="range"].vs-slider::-moz-range-thumb {
 .cw-input:focus { outline: none; border-color: #3b82f670 !important; box-shadow: 0 0 0 3px #3b82f622 }
 .cw-hbtn { transition: background .15s ease; background: transparent }
 .cw-hbtn:hover { background: rgba(255,255,255,0.15) }
+
+/* تقویم شمسی بازه دلخواه — سلول/فونت بزرگ‌تر و کنتراست بالاتر برای کاربران سالمند/کم‌بینا */
+.db-input-lg {
+  font-size: 16px !important;
+  font-family: Vazirmatn, Arial, sans-serif !important;
+  padding: 12px 14px !important;
+  min-height: 46px !important;
+  border-radius: 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  background: #0A1220 !important;
+  color: #F2F6FA !important;
+  border: 1.5px solid rgba(255,255,255,0.25) !important;
+}
+.db-input-lg::placeholder { color: #ddd5bd !important; opacity: 0.8 !important; }
+.rmdp-wrapper { font-family: Vazirmatn, Arial, sans-serif !important; }
+.rmdp-calendar { padding: 10px !important; }
+.rmdp-day, .rmdp-week-day { height: 40px !important; width: 40px !important; font-size: 15px !important; }
+.rmdp-day span { font-size: 15px !important; }
+.rmdp-header-values { font-size: 17px !important; font-weight: 800 !important; }
+.rmdp-day.rmdp-selected span:not(.highlight) { background-color: #3b82f6 !important; color: #fff !important; font-weight: 800 !important; }
+.rmdp-day.rmdp-today span { border: 1.5px solid #3b82f6 !important; font-weight: 700 !important; }
+.rmdp-arrow-container { width: 32px !important; height: 32px !important; }
+.rmdp-arrow { border-width: 2.5px !important; }
