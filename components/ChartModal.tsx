@@ -6,11 +6,26 @@
  * تفاوت: دیتا لحظه‌ای/۵دقیقه‌ای نیست، یک ردیف روزانه‌ست — بدون liveDot تپنده، فقط dot ثابت آخر خط.
  */
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useMemo, useState } from 'react'
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
 } from 'recharts'
+import { toGregorian } from 'jalaali-js'
 import { useIsMobile } from '../lib/useIsMobile'
+
+// «1405/04/24» → شماره روز پیوسته (برای فیلتر بازه‌ی زمانی روی محور تقویم واقعی، نه شمارش ردیف)
+function shamsiDayNum(s: string): number | null {
+  const m = s.match(/^(\d{4})\/(\d{2})\/(\d{2})$/)
+  if (!m) return null
+  try {
+    const { gy, gm, gd } = toGregorian(+m[1], +m[2], +m[3])
+    return Date.UTC(gy, gm - 1, gd) / 86400000
+  } catch { return null }
+}
+
+type RangeKey = '1w' | '1m' | '3m' | '1y' | 'custom'
+const RANGE_DAYS: Record<Exclude<RangeKey, 'custom'>, number> = { '1w': 7, '1m': 30, '3m': 90, '1y': 365 }
+const RANGE_LABELS: Record<Exclude<RangeKey, 'custom'>, string> = { '1w': '۱ هفته', '1m': '۱ ماه', '3m': '۳ ماه', '1y': '۱ سال' }
 
 const FONT = 'Vazirmatn, Arial, sans-serif'
 const C = { text: '#a9b0c2', cream: '#ddd5bd', border: 'rgba(255,255,255,0.09)', bg: '#0a0d14', panel: '#12161f' }
@@ -47,6 +62,9 @@ export default function ChartModal({
 }) {
   const isMobile = useIsMobile()
   const close = useCallback(() => onClose(), [onClose])
+  const [range, setRange] = useState<RangeKey>('1m')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -56,10 +74,29 @@ export default function ChartModal({
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = '' }
   }, [open, close])
 
+  // بازه پیش‌فرض هر بار که مودال برای یک کارت جدید باز می‌شود: ۱ ماه اخیر
+  useEffect(() => {
+    if (open) { setRange('1m'); setCustomFrom(''); setCustomTo('') }
+  }, [open, title])
+
+  const filteredData = useMemo(() => {
+    if (data.length === 0) return data
+    const lastDay = shamsiDayNum(data[data.length - 1].t)
+    if (range === 'custom') {
+      const fromDay = shamsiDayNum(customFrom)
+      const toDay = shamsiDayNum(customTo)
+      if (fromDay == null || toDay == null) return data
+      return data.filter(p => { const d = shamsiDayNum(p.t); return d != null && d >= fromDay && d <= toDay })
+    }
+    if (lastDay == null) return data
+    const cutoff = lastDay - RANGE_DAYS[range]
+    return data.filter(p => { const d = shamsiDayNum(p.t); return d != null && d >= cutoff })
+  }, [data, range, customFrom, customTo])
+
   if (!open) return null
 
   const lastValidIndex = (() => {
-    for (let i = data.length - 1; i >= 0; i--) if (data[i].v != null) return i
+    for (let i = filteredData.length - 1; i >= 0; i--) if (filteredData[i].v != null) return i
     return -1
   })()
 
@@ -86,6 +123,45 @@ export default function ChartModal({
             fontSize: 16, fontWeight: 700,
           }}>✕</button>
         </div>
+
+        {/* انتخاب بازه زمانی */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10, padding: '0 8px' }}>
+          {(Object.keys(RANGE_DAYS) as (keyof typeof RANGE_DAYS)[]).map(k => (
+            <button key={k} onClick={() => setRange(k)} style={{
+              all: 'unset', cursor: 'pointer', padding: '5px 12px', borderRadius: 8, fontSize: 11.5,
+              fontFamily: FONT, fontWeight: range === k ? 800 : 500,
+              color: range === k ? '#eef1f8' : C.text,
+              background: range === k ? `${color}26` : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${range === k ? `${color}66` : C.border}`,
+            }}>{RANGE_LABELS[k]}</button>
+          ))}
+          <button onClick={() => setRange('custom')} style={{
+            all: 'unset', cursor: 'pointer', padding: '5px 12px', borderRadius: 8, fontSize: 11.5,
+            fontFamily: FONT, fontWeight: range === 'custom' ? 800 : 500,
+            color: range === 'custom' ? '#eef1f8' : C.text,
+            background: range === 'custom' ? `${color}26` : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${range === 'custom' ? `${color}66` : C.border}`,
+          }}>بازه دلخواه</button>
+
+          {range === 'custom' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
+              <input value={customFrom} onChange={e => setCustomFrom(e.target.value)} placeholder="از ۱۴۰۴/۰۱/۰۱"
+                style={{
+                  width: 108, fontSize: 11.5, fontFamily: FONT, direction: 'ltr', textAlign: 'center',
+                  background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: '#eef1f8', padding: '5px 6px',
+                }} />
+              <span style={{ color: C.text, fontSize: 11 }}>تا</span>
+              <input value={customTo} onChange={e => setCustomTo(e.target.value)} placeholder={data[data.length - 1]?.t ?? ''}
+                style={{
+                  width: 108, fontSize: 11.5, fontFamily: FONT, direction: 'ltr', textAlign: 'center',
+                  background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: '#eef1f8', padding: '5px 6px',
+                }} />
+            </div>
+          )}
+        </div>
+
         <div style={{ flex: 1, minHeight: 0 }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.text, fontSize: 13 }}>
@@ -95,9 +171,13 @@ export default function ChartModal({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.cream, fontSize: 13 }}>
               هنوز داده کافی برای نمودار ثبت نشده — ثبت روزانه همین امروز شروع شد
             </div>
+          ) : filteredData.length < 2 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.cream, fontSize: 13 }}>
+              داده‌ای در این بازه زمانی ثبت نشده
+            </div>
           ) : (
             <ResponsiveContainer>
-              <ComposedChart data={data} margin={{ top: 6, left: 4, right: 6, bottom: 0 }}>
+              <ComposedChart data={filteredData} margin={{ top: 6, left: 4, right: 6, bottom: 0 }}>
                 <defs>
                   <linearGradient id="chartmodal-grad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={color} stopOpacity={0.42} />
