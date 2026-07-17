@@ -15,7 +15,7 @@ import { darkTheme, lightTheme } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { rsi } from '../../../lib/indicators'
 
-type CandleRow = { trade_date: string; trade_date_shamsi: string; close: number }
+type CandleRow = { trade_date: string; trade_date_shamsi: string; close: number; adj_close: number | null }
 type SymSeries = { symbol: string; rows: CandleRow[]; color: string }
 
 const COLORS = ['#00C8FF', '#F59E0B', '#00E5A0', '#EF476F']
@@ -27,6 +27,10 @@ const RANGES = [
 ] as const
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
+
+// قیمت تعدیل‌شده (افزایش سرمایه/سود نقدی) — همان روش app/technical/[symbol]/page.tsx؛ بدون این، بازده نمادی که
+// افزایش سرمایه داده (افت مصنوعی قیمت) در چارت به‌شدت منفی و نادرست نمایش داده می‌شود
+const effClose = (r: CandleRow) => (r.adj_close != null && r.adj_close > 0) ? r.adj_close : r.close
 
 export default function CompareStocksPage() {
   const isMobile = useIsMobile()
@@ -61,12 +65,22 @@ export default function CompareStocksPage() {
     if (missing.length === 0) return
     setLoading(true)
     Promise.all(missing.map(async (symbol, i) => {
-      const { data } = await supabase
+      let { data, error } = await supabase
         .from('stock_candles')
-        .select('trade_date, trade_date_shamsi, close')
+        .select('trade_date, trade_date_shamsi, close, adj_close')
         .eq('symbol', symbol)
         .order('trade_date', { ascending: false })
         .limit(280)
+      if (error) {
+        // ستون adj_close هنوز ساخته نشده (migration اجرا نشده) — بدون تعدیل ادامه بده
+        const fallback = await supabase
+          .from('stock_candles')
+          .select('trade_date, trade_date_shamsi, close')
+          .eq('symbol', symbol)
+          .order('trade_date', { ascending: false })
+          .limit(280)
+        data = (fallback.data ?? []).map(r => ({ ...r, adj_close: null })) as any
+      }
       const rows = ((data ?? []) as CandleRow[]).slice().reverse()
       return { symbol, rows, color: COLORS[(Object.keys(series).length + i) % COLORS.length] } as SymSeries
     })).then(results => {
@@ -100,13 +114,13 @@ export default function CompareStocksPage() {
     sliced.forEach(s => s.rows.forEach(r => dateSet.add(r.trade_date_shamsi)))
     const dates = [...dateSet].sort()
     const baseline: Record<string, number | null> = {}
-    sliced.forEach(s => { baseline[s.symbol] = s.rows[0]?.close ?? null })
+    sliced.forEach(s => { baseline[s.symbol] = s.rows[0] ? effClose(s.rows[0]) : null })
     return dates.map(date => {
       const point: Record<string, number | string | null> = { date }
       for (const s of sliced) {
         const row = s.rows.find(r => r.trade_date_shamsi === date)
         const base = baseline[s.symbol]
-        point[s.symbol] = row && base ? Math.round(((row.close - base) / base) * 1000) / 10 : null
+        point[s.symbol] = row && base ? Math.round(((effClose(row) - base) / base) * 1000) / 10 : null
       }
       return point
     })
@@ -115,15 +129,19 @@ export default function CompareStocksPage() {
   const summary = useMemo(() => selected.map(sym => {
     const s = series[sym]
     if (!s || s.rows.length < 15) return { symbol: sym, close: null, changePct: null, rsiVal: null, color: s?.color ?? COLORS[0] }
-    const closes = s.rows.map(r => r.close)
-    const rsiSeries = rsi(closes, 14)
-    const last = closes[closes.length - 1]
-    const prev = closes[closes.length - 2]
+    // بازه نمایش (چند ماه انتخاب‌شده) — تغییر روزانه/RSI را هم روی همان بازه بگیریم، نه کل ۲۸۰ روز
+    const rangeRows = s.rows.slice(-rangeDays)
+    const effCloses = rangeRows.map(effClose)
+    const rsiSeries = rsi(effCloses, 14)
+    const lastRow = rangeRows[rangeRows.length - 1]
+    const prevEff = effCloses[effCloses.length - 2]
+    const lastEff = effCloses[effCloses.length - 1]
     return {
-      symbol: sym, close: last, changePct: prev ? ((last - prev) / prev) * 100 : null,
+      symbol: sym, close: lastRow?.close ?? null,
+      changePct: prevEff ? ((lastEff - prevEff) / prevEff) * 100 : null,
       rsiVal: rsiSeries[rsiSeries.length - 1], color: s.color,
     }
-  }), [selected, series])
+  }), [selected, series, rangeDays])
 
   const line = t.border, muted = t.muted, panel = t.panel
 

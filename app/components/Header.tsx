@@ -36,7 +36,10 @@ const NAV: NavItem[] = [
     { label: 'ماشین‌حساب ارزش‌گذاری', href: '/valuation' },
   ] },
   { label: 'ارزش معاملات',  href: '/trade-value' },
-  { label: 'مقایسه',        href: '/compare' },
+  { label: 'مقایسه',        href: '/compare', menu: [
+    { label: 'مقایسه صندوق‌ها', href: '/compare' },
+    { label: 'مقایسه سهام', href: '/compare/stocks' },
+  ] },
   { label: 'سیگنال‌ها',     href: '/signals' },
   { label: 'فیلترها',       href: '/vip/filters', menu: [
     { label: 'فیلترهای VIP', href: '/vip/filters' },
