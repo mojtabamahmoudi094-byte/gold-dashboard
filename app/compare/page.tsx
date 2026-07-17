@@ -100,8 +100,16 @@ export default function ComparePage() {
           <span>مقایسه</span>
         </div>
 
-        <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: t.textBright }}>
-          مقایسه‌ی صندوق‌ها
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: t.textBright }}>
+            مقایسه‌ی صندوق‌ها
+          </div>
+          <Link href="/compare/stocks" style={{
+            fontSize: 12.5, color: t.accent, textDecoration: 'none', fontWeight: 700,
+            padding: '7px 14px', borderRadius: 9, border: `1px solid ${t.accent}44`, background: `${t.accent}0e`,
+          }}>
+            مقایسه سهام ←
+          </Link>
         </div>
 
         <TutorialPanel t={t} isDark={isDark} storageKey="compare_tutorial_open" title="چطور از این صفحه استفاده کنم؟">
