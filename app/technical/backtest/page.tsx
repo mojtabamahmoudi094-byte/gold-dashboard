@@ -66,9 +66,11 @@ export default function BacktestPage() {
       g.byHorizon.set(r.horizon_days, r)
     }
     return [...map.values()].sort((a, b) => {
-      const ac = a.byHorizon.get(10)?.sample_count ?? 0
-      const bc = b.byHorizon.get(10)?.sample_count ?? 0
-      return bc - ac
+      const as = a.byHorizon.get(10), bs = b.byHorizon.get(10)
+      // نمونه‌های کم (زیر ۵ رخداد) قابل اتکا نیستند — به انتهای فهرست می‌روند، نه اول
+      const aReliable = (as?.sample_count ?? 0) >= 5, bReliable = (bs?.sample_count ?? 0) >= 5
+      if (aReliable !== bReliable) return aReliable ? -1 : 1
+      return (bs?.win_rate ?? -1) - (as?.win_rate ?? -1)
     })
   }, [rows])
 
@@ -115,7 +117,8 @@ export default function BacktestPage() {
 
         <p style={{ fontSize: 13, color: muted, margin: '0 0 20px', lineHeight: 1.8, ...enterAnim(1) }}>
           هر بار این سیگنال در ۳ سال اخیر (روی کل تاریخچه نمادها) رخ داده، بازده ۵/۱۰/۲۰ روز بعد چقدر بوده —
-          نرخ برد یعنی چند درصد رخدادها هم‌جهت با بایاس سیگنال جواب داده‌اند.
+          نرخ برد یعنی چند درصد رخدادها هم‌جهت با بایاس سیگنال جواب داده‌اند. فهرست بر اساس نرخ برد ۱۰روزه
+          مرتب شده (سیگنال‌های با کمتر از ۵ رخداد، غیرقابل‌اتکا و در انتها هستند).
         </p>
 
         <div style={{ ...glass, borderRadius: 20, overflowX: 'auto', ...enterAnim(2) }}>

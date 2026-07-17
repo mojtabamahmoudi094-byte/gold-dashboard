@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { darkTheme, lightTheme } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
@@ -48,6 +48,16 @@ export default function TrackRecordPage() {
       .then(setData)
       .catch(() => setFailed(true))
   }, [])
+
+  // برترین سیگنال‌های اخیر تسویه‌شده — بر اساس بازده واقعی هم‌جهت با بایاس سیگنال (خرید مثبت، فروش منفی بهتر است)
+  const topRecent = useMemo(() => {
+    if (!data) return []
+    return data.recent
+      .filter(r => r.outcomePct !== null)
+      .map(r => ({ ...r, rankScore: r.type === 'فروش' ? -(r.outcomePct as number) : (r.outcomePct as number) }))
+      .sort((a, b) => b.rankScore - a.rankScore)
+      .slice(0, 5)
+  }, [data])
 
   const panelStyle = (accent: string): React.CSSProperties => ({
     background: `linear-gradient(160deg, ${accent}0e, transparent 45%), ${t.panel}`,
@@ -163,6 +173,33 @@ export default function TrackRecordPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {topRecent.length > 0 && (
+              <div style={{ ...panelStyle(t.green), marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 10 }}>
+                  🏆 برترین سیگنال‌های اخیر (تسویه‌شده)
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {topRecent.map((r, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                      fontSize: 12.5, padding: '7px 4px', borderTop: i > 0 ? `0.5px solid ${t.border}` : 'none',
+                    }}>
+                      <span style={{ color: t.muted, fontFamily: 'system-ui, sans-serif', width: 18 }}>{fa(i + 1)}</span>
+                      <span style={{ color: t.muted }}>{r.date}</span>
+                      <span>{r.categoryLabel}{r.symbol ? ` · ${r.symbol}` : ''}</span>
+                      <span style={{ fontWeight: 700, color: r.type === 'خرید' ? t.green : t.red }}>{r.type}</span>
+                      <span style={{
+                        marginInlineStart: 'auto', fontWeight: 800, fontFamily: 'system-ui, sans-serif',
+                        color: r.rankScore >= 0 ? t.green : t.red,
+                      }}>
+                        {r.rankScore >= 0 ? '+' : ''}{fa(r.rankScore, 1)}٪ سود
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
