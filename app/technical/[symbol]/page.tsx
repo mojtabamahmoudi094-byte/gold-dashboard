@@ -9,6 +9,7 @@ import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { rsi, macd, type Candle } from '../../../lib/indicators'
 import { CANDLE_PATTERN_LABELS } from '../../../lib/candlePatternLabels'
+import { downloadCSV } from '../../../lib/csvExport'
 import { GREEN, RED } from '../colors'
 import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
 
@@ -320,6 +321,23 @@ export default function TechnicalSymbolPage() {
               )}
               {summary && <span style={{ fontSize: 11, color: muted }}>{summary.last.shamsi}</span>}
             </>
+          )}
+
+          {rows && rows.length > 0 && (
+            <button
+              onClick={() => downloadCSV(`${symbol}-candles.csv`, rows.map(r => ({
+                تاریخ: r.trade_date_shamsi, میلادی: r.trade_date,
+                باز: r.open, بالا: r.high, پایین: r.low, پایانی: r.close, حجم: r.volume,
+                پایانی_تعدیل: r.adj_close,
+              })))}
+              style={{
+                fontSize: 12, color: muted, cursor: 'pointer', whiteSpace: 'nowrap',
+                padding: '7px 12px', borderRadius: 9,
+                background: panel, border: `1px solid ${line}`,
+              }}
+            >
+              دانلود CSV
+            </button>
           )}
 
           <Link href={`/stock/${toSlug(symbol)}`} style={{

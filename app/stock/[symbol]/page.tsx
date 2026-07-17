@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
 import ChartModal, { type ChartModalPoint } from '../../../components/ChartModal'
+import { downloadCSV } from '../../../lib/csvExport'
 import { buildInsights, monthLabel, growth, monthlyYoY, type RMonth, type RQuarter, type RHolding, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
 
 type SnapshotRow = {
@@ -290,7 +291,32 @@ export default function StockPage() {
               </div>
 
               {reports && (reports.months.length > 0 || reports.quarters.length > 0) && (
-                <AnalysisSection months={reports.months} quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => downloadCSV(`${symbol}-codal-reports.csv`, [
+                        ...reports.months.map(m => ({
+                          نوع: 'ماهانه', دوره: m.period, انتشار: m.publish,
+                          فروش_ماه: m.month, فروش_تجمعی: m.cum, تجمعی_سال_قبل: m.lastYearCum,
+                        })),
+                        ...reports.quarters.map(q => ({
+                          نوع: 'فصلی', دوره: q.period, انتشار: q.publish,
+                          فروش: q.revenue, فروش_سال_قبل: q.revenue_ly,
+                          سود_ناخالص: q.gross, سود_خالص: q.net, سود_خالص_سال_قبل: q.net_ly,
+                          eps: q.eps, سرمایه: q.capital,
+                        })),
+                      ])}
+                      style={{
+                        fontSize: 11.5, color: muted, cursor: 'pointer',
+                        padding: '6px 12px', borderRadius: 8,
+                        background: panel, border: `1px solid ${line}`,
+                      }}
+                    >
+                      دانلود گزارش‌های کدال (CSV)
+                    </button>
+                  </div>
+                  <AnalysisSection months={reports.months} quarters={reports.quarters} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
+                </>
               )}
               {reports && reports.months.length > 0 && (
                 reports.months[reports.months.length - 1].kind === 'portfolio'

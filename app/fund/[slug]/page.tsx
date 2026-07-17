@@ -10,6 +10,7 @@ import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
 import ChartModal, { type ChartModalPoint } from '../../../components/ChartModal'
+import { downloadCSV } from '../../../lib/csvExport'
 
 type FundSnapshotRow = {
   trade_date_shamsi: string
@@ -519,8 +520,24 @@ export default function FundDetailPage() {
         {/* تاریخچه */}
         {history.length > 1 && (
           <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
-            <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 12 }}>
-              تاریخچه‌ی معاملات · {history.length} روز
+            <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <span>تاریخچه‌ی معاملات · {history.length} روز</span>
+              <button
+                onClick={() => downloadCSV(`${asset?.slug || slug}-history.csv`, history.map((r: any) => ({
+                  تاریخ: r.trade_date_shamsi,
+                  قیمت_پایانی: safe(r.trade_value) > 1e6 ? Math.round(safe(r.price_close) / 10) : safe(r.price_close),
+                  تغییر_درصد: safe(r.price_change_pct),
+                  ارزش_معاملات: r.trade_value,
+                  حجم: r.volume,
+                })))}
+                style={{
+                  fontSize: 11, color: t.muted, cursor: 'pointer',
+                  padding: '5px 10px', borderRadius: 7,
+                  background: 'transparent', border: `0.5px solid ${t.border}`,
+                }}
+              >
+                دانلود CSV
+              </button>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
