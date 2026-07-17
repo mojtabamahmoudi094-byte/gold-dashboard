@@ -14,6 +14,7 @@ import {
   BRSAPI_KEY, num, faN, fPct, fX, fBn, fToman, clean, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
+import AuthGate from '../../../components/AuthGate'
 
 const cLastPct: Col = { label: 'درصد آخرین قیمت', key: 'plp', fmt: (r) => fPct(r.plp, 2), num: (r) => r.plp }
 const cClosePct: Col = { label: 'درصد قیمت پایانی', key: 'pcp', fmt: (r) => fPct(r.pcp, 2), num: (r) => r.pcp }
@@ -173,12 +174,12 @@ export default function QueueFiltersPage() {
   )
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
-
+    <AuthGate title="فیلترها">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
           <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight: 800, margin: 0 }}>فیلترهای صف خرید و فروش</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -232,7 +233,8 @@ export default function QueueFiltersPage() {
             <div><FilterTable card={cards[3]} isDark={isDark} compact /></div>
           </div>
         )}
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthGate>
   )
 }

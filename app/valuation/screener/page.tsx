@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import AuthGate from '../../../components/AuthGate'
 import { darkTheme, lightTheme } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { SkeletonBlock, SkeletonRows } from '../../components/ui/Skeleton'
@@ -83,40 +84,41 @@ export default function ValuationScreenerPage() {
   )
 
   return (
-    <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '24px 16px 60px' : '32px 24px 64px' }}>
+    <AuthGate title="ماشین‌حساب ارزش‌گذاری">
+      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '24px 16px 60px' : '32px 24px 64px' }}>
 
-        <Link href="/valuation" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← ماشین‌حساب ارزش‌گذاری</Link>
-        <h1 style={{ fontSize: isMobile ? 19 : 22, fontWeight: 800, color: t.textBright, margin: '10px 0 4px' }}>
-          اسکرینر ارزش‌گذاری
-        </h1>
-        <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 20 }}>
-          مدل رشد گوردون روی همه نمادهای دارای EPS سالانه واقعی کدال — با فرضیات پیش‌فرض یکسان برای مقایسه سریع
-        </div>
+          <Link href="/valuation" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← ماشین‌حساب ارزش‌گذاری</Link>
+          <h1 style={{ fontSize: isMobile ? 19 : 22, fontWeight: 800, color: t.textBright, margin: '10px 0 4px' }}>
+            اسکرینر ارزش‌گذاری
+          </h1>
+          <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 20 }}>
+            مدل رشد گوردون روی همه نمادهای دارای EPS سالانه واقعی کدال — با فرضیات پیش‌فرض یکسان برای مقایسه سریع
+          </div>
 
-        <TutorialPanel t={t} isDark={isDark} storageKey="valuation_screener_tutorial_open" title="این عددها یعنی چی؟">
+          <TutorialPanel t={t} isDark={isDark} storageKey="valuation_screener_tutorial_open" title="این عددها یعنی چی؟">
           برای هر نماد، ارزش ذاتی با مدل رشد گوردون (P = D₁ / (r − g)) با فرضیات یکسان محاسبه می‌شود:
           {data && ` بازده مورد انتظار ${fa(data.assumptions.expectedReturnPct)}٪، نسبت تقسیم سود ${fa(data.assumptions.payoutPct)}٪،`}
           {' '}و نرخ رشد از میانگین رشد واقعی EPS همان شرکت در گزارش‌های کدال. ستون «نسبت» یعنی ارزش ذاتی تقسیم بر
           قیمت روز — بالای ۱٫۰۸ یعنی سهم زیر ارزش ذاتی‌اش معامله می‌شود، زیر ۰٫۹۲ یعنی بالای ارزش ذاتی. این فرضیات
           پیش‌فرض برای مقایسه سریع همه نمادهاست؛ برای بررسی دقیق یک نماد با فرضیات دلخواه خودتان،
           از <Link href="/valuation" style={{ color: t.accent }}>ماشین‌حساب</Link> استفاده کنید.
-        </TutorialPanel>
+          </TutorialPanel>
 
-        {failed && (
-          <div style={{ color: t.muted, fontSize: 13, padding: '50px 0', textAlign: 'center' }}>
-            داده اسکرینر در دسترس نیست
-          </div>
-        )}
+          {failed && (
+            <div style={{ color: t.muted, fontSize: 13, padding: '50px 0', textAlign: 'center' }}>
+              داده اسکرینر در دسترس نیست
+            </div>
+          )}
 
-        {!data && !failed && (
-          <div style={{ margin: '20px 0' }}>
-            <SkeletonBlock height={40} style={{ marginBottom: 16 }} />
-            <SkeletonRows rows={10} height={40} />
-          </div>
-        )}
+          {!data && !failed && (
+            <div style={{ margin: '20px 0' }}>
+              <SkeletonBlock height={40} style={{ marginBottom: 16 }} />
+              <SkeletonRows rows={10} height={40} />
+            </div>
+          )}
 
-        {data && (
+          {data && (
           <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
               {chip(`همه (${fa(data.count)})`, 'all')}
@@ -180,7 +182,8 @@ export default function ValuationScreenerPage() {
             </div>
           </>
         )}
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthGate>
   )
 }

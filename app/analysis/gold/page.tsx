@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { Skeleton } from '../../components/ui/Skeleton'
+import AuthGate from '../../../components/AuthGate'
 
 const fmt = (n: number | null, decimals = 0) =>
   n == null ? '—' : Math.round(n).toLocaleString('fa-IR', { maximumFractionDigits: decimals })
@@ -138,15 +139,16 @@ export default function GoldAnalysisPage() {
   const text   = '#E8F4FF'
 
   return (
-    <main style={{
-      minHeight: '100vh', color: text,
-      background: `
-        radial-gradient(ellipse 60% 40% at 85% -5%, rgba(255,201,74,0.06), transparent 60%),
-        radial-gradient(ellipse 55% 35% at 10% 0%, rgba(0,200,255,0.07), transparent 60%),
-        ${bg}`,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <style>{`
+    <AuthGate title="تحلیل بازارها">
+      <main style={{
+        minHeight: '100vh', color: text,
+        background: `
+          radial-gradient(ellipse 60% 40% at 85% -5%, rgba(255,201,74,0.06), transparent 60%),
+          radial-gradient(ellipse 55% 35% at 10% 0%, rgba(0,200,255,0.07), transparent 60%),
+          ${bg}`,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <style>{`
         @keyframes popIn { from { opacity: 0; transform: translateY(16px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .pop-col > * { opacity: 0; animation: popIn .6s cubic-bezier(.16,1,.3,1) forwards; }
         .pop-col > *:nth-child(1) { animation-delay: .02s }
@@ -455,12 +457,13 @@ export default function GoldAnalysisPage() {
         </div>
       </div>
 
-      <style>{`
-        input[type=number] { -moz-appearance: textfield; }
-        input[type=number]::-webkit-inner-spin-button,
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-      `}</style>
-    </main>
+        <style>{`
+          input[type=number] { -moz-appearance: textfield; }
+          input[type=number]::-webkit-inner-spin-button,
+          input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        `}</style>
+      </main>
+    </AuthGate>
   )
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import AuthGate from '../../../components/AuthGate'
 
 const SUBCATS = [
   {
@@ -72,16 +73,17 @@ export default function BourseFundsPage() {
   const muted = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '40px 24px' }}>
+    <AuthGate title="دیده‌بان صندوق‌ها">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '40px 24px' }}>
 
-        <div style={{ marginBottom: 32 }}>
-          <Link href="/funds" style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
-            ← بازگشت به دیدبان صندوق‌ها
-          </Link>
+          <div style={{ marginBottom: 32 }}>
+            <Link href="/funds" style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
+              ← بازگشت به دیدبان صندوق‌ها
+            </Link>
           <div style={{ fontSize: 22, fontWeight: 700, color: text, margin: '10px 0 6px' }}>صندوق‌های بورسی</div>
           <div style={{ fontSize: 13, color: muted }}>
             صندوق‌های سرمایه‌گذاری مبتنی بر سهام — اهرمی، بخشی و سهامی
@@ -152,5 +154,6 @@ export default function BourseFundsPage() {
         </div>
       </div>
     </main>
+    </AuthGate>
   )
 }

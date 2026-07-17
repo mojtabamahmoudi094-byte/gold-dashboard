@@ -19,6 +19,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ReferenceLine,
 } from 'recharts'
 import { useIsMobile } from '../../../lib/useIsMobile'
+import AuthGate from '../../../components/AuthGate'
 
 type Row = {
   ts: string; t: string; count: number
@@ -383,8 +384,9 @@ export default function MarketMonitorPage() {
   const expandedDef = expanded ? DEFS.find(d => d.id === expanded) : null
 
   return (
-    <main style={{ minHeight: '100vh', background: C.bg, color: '#eef1f8', fontFamily: FONT, direction: 'rtl', padding: isMobile ? '20px 12px 40px' : '28px 3vw 60px' }}>
-      <div style={{ maxWidth: 1500, margin: '0 auto' }}>
+    <AuthGate title="نمودار لحظه‌ای رصد بازارها">
+      <main style={{ minHeight: '100vh', background: C.bg, color: '#eef1f8', fontFamily: FONT, direction: 'rtl', padding: isMobile ? '20px 12px 40px' : '28px 3vw 60px' }}>
+        <div style={{ maxWidth: 1500, margin: '0 auto' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 22 }}>
           <div>
@@ -533,5 +535,6 @@ export default function MarketMonitorPage() {
         </div>
       )}
     </main>
+    </AuthGate>
   )
 }

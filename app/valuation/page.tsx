@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import AuthGate from '../../components/AuthGate'
 import { darkTheme, lightTheme } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { Skeleton, SkeletonBlock } from '../components/ui/Skeleton'
@@ -207,27 +208,28 @@ export default function ValuationCalculatorPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '24px 16px 60px' : '32px 24px 64px' }}>
+    <AuthGate title="ماشین‌حساب ارزش‌گذاری">
+      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '24px 16px 60px' : '32px 24px 64px' }}>
 
-        <Link href="/analysis" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← بازگشت به تحلیل</Link>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', margin: '10px 0 4px' }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: t.textBright, margin: 0 }}>ماشین‌حساب ارزش‌گذاری سهام</h1>
-          <span style={{
-            fontSize: 11, color: '#F5B93E', fontWeight: 800, background: '#F5B93E16',
-            border: '0.5px solid #F5B93E4d', borderRadius: 999, padding: '3px 11px',
-          }}>مدل‌های تنزیل سود نقدی</span>
-        </div>
-        <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 10 }}>
-          ارزش ذاتی سهم را با مدل رشد گوردون، مدل چندمرحله‌ای و NPVGO تخمین بزنید — EPS از گزارش‌های واقعی کدال، فرضیات رشد و بازده با اسلایدر
-        </div>
-        <div style={{ marginBottom: 22 }}>
-          <Link href="/valuation/screener" style={{ fontSize: 11.5, color: t.accent, textDecoration: 'none' }}>
-            اسکرینر همه نمادها با این مدل ←
-          </Link>
-        </div>
+          <Link href="/analysis" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← بازگشت به تحلیل</Link>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', margin: '10px 0 4px' }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: t.textBright, margin: 0 }}>ماشین‌حساب ارزش‌گذاری سهام</h1>
+            <span style={{
+              fontSize: 11, color: '#F5B93E', fontWeight: 800, background: '#F5B93E16',
+              border: '0.5px solid #F5B93E4d', borderRadius: 999, padding: '3px 11px',
+            }}>مدل‌های تنزیل سود نقدی</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 10 }}>
+            ارزش ذاتی سهم را با مدل رشد گوردون، مدل چندمرحله‌ای و NPVGO تخمین بزنید — EPS از گزارش‌های واقعی کدال، فرضیات رشد و بازده با اسلایدر
+          </div>
+          <div style={{ marginBottom: 22 }}>
+            <Link href="/valuation/screener" style={{ fontSize: 11.5, color: t.accent, textDecoration: 'none' }}>
+              اسکرینر همه نمادها با این مدل ←
+            </Link>
+          </div>
 
-        {/* ── آموزش استفاده ── */}
+          {/* ── آموزش استفاده ── */}
         <div style={{ ...panelStyle(t.green), marginBottom: 20 }}>
           <button
             type="button"
@@ -422,7 +424,8 @@ export default function ValuationCalculatorPage() {
             </div>
           </>
         )}
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthGate>
   )
 }

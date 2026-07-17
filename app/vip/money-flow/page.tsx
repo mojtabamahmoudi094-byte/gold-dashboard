@@ -19,6 +19,7 @@ import {
   BRSAPI_KEY, num, faN, fToman, fX, fPct, clean, NOT_STOCK_CS, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cPl, FilterTable,
 } from '../../../lib/vipFiltersShared'
+import AuthGate from '../../../components/AuthGate'
 
 // عدد از قبل به تومان ذخیره‌شده (بدون تبدیل ریال) — برای مقادیر تاریخچه industry_moneyflow_daily
 const fTomanT = (t: number | null) => {
@@ -499,12 +500,12 @@ export default function MoneyFlowPage() {
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
-
+    <AuthGate title="فیلترها">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
           <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight: 800, margin: 0 }}>فیلترهای ورود/خروج پول</h1>
           {updated && <span style={{ fontSize: 11.5, color: cream }}>آخرین به‌روزرسانی: {updated}</span>}
@@ -708,7 +709,8 @@ export default function MoneyFlowPage() {
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
           )}
         </div>
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthGate>
   )
 }

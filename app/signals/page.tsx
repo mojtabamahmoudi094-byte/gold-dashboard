@@ -8,6 +8,7 @@ import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, todayShamsi } from '../../lib/format'
 import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, computeSilverBubble, silverFundBubbleZati, SILVER_FUND_WEIGHTS, type MarketBubbles } from '../../lib/goldBubbles'
 import { computeStockSignal, type Reports } from '../../lib/stockInsights'
+import AuthGate from '../../components/AuthGate'
 
 type PriceSeries = { dates: string[]; priceMap: Record<string, number> }
 const EMPTY_SERIES: PriceSeries = { dates: [], priceMap: {} }
@@ -944,14 +945,14 @@ export default function SignalsPage() {
   const RED    = t.red
 
   return (
-    <main style={{
-      minHeight: '100vh', background: BG, color: TEXT,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-      transition: 'background 0.3s, color 0.3s',
-    }}>
-      <div style={{ maxWidth: 1060, margin: '0 auto', padding: '28px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-        {/* ── Header ── */}
+    <AuthGate title="سیگنال‌ها">
+      <main style={{
+        minHeight: '100vh', background: BG, color: TEXT,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+        transition: 'background 0.3s, color 0.3s',
+      }}>
+        <div style={{ maxWidth: 1060, margin: '0 auto', padding: '28px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: isDark ? '#FFFFFF' : t.textBright }}>
@@ -1768,7 +1769,8 @@ export default function SignalsPage() {
           سیگنال‌های این صفحه صرفاً جنبه اطلاع‌رسانی دارند و توصیه سرمایه‌گذاری نیستند
         </div>
 
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthGate>
   )
 }

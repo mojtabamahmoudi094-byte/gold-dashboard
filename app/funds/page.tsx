@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import AuthGate from '../../components/AuthGate'
 
 const CATS = [
   {
@@ -106,11 +107,12 @@ export default function FundsPage() {
   const muted = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '40px 24px' }}>
+    <AuthGate title="دیده‌بان صندوق‌ها">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '40px 24px' }}>
 
         <div style={{ marginBottom: 32 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: text, marginBottom: 6 }}>دیدبان صندوق‌های کالایی</div>
@@ -275,5 +277,6 @@ export default function FundsPage() {
         </div>
       </div>
     </main>
+    </AuthGate>
   )
 }

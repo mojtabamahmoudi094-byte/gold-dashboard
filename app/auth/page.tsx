@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { PROVINCES } from '../../lib/iranRegions'
@@ -10,8 +10,18 @@ type Tab = 'login' | 'register' | 'forgot' | 'otp'
 type Msg = { type: 'success' | 'error'; text: string }
 
 export default function AuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuthPageInner />
+    </Suspense>
+  )
+}
+
+function AuthPageInner() {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('register')
+  const searchParams = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'login' ? 'login' : 'register'
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<Msg | null>(null)
   const [registered, setRegistered] = useState(false)

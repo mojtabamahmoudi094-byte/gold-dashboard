@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import AuthGate from '../../components/AuthGate'
 import { supabase } from '../../lib/supabase'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { GREEN, RED } from './colors'
@@ -266,11 +267,12 @@ export default function TechnicalIndexPage() {
   ] : []
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-      position: 'relative', overflow: 'hidden',
-    }}>
+    <AuthGate title="تحلیل تکنیکال">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+        position: 'relative', overflow: 'hidden',
+      }}>
       {/* keyframes سراسری صفحه */}
       <style>{`
         @keyframes taIn { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
@@ -514,5 +516,6 @@ export default function TechnicalIndexPage() {
         </p>
       </div>
     </main>
+    </AuthGate>
   )
 }

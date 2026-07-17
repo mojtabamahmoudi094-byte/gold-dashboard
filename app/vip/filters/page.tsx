@@ -23,6 +23,7 @@ import {
   BRSAPI_KEY, num, faN, fVol, fToman, fPct, fX, clean, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cPl, cRatioM, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
+import AuthGate from '../../../components/AuthGate'
 
 const cBp: Col = { label: 'قدرت خرید', key: 'bp', fmt: (r) => fX(r.bp), num: (r) => r.bp ?? 0 }
 const cVal: Col = { label: 'ارزش', key: 'tval', fmt: (r) => fToman(r.tval), num: (r) => r.tval }
@@ -246,12 +247,12 @@ export default function VipFiltersPage() {
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
-
+    <AuthGate title="فیلترها">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
           <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight: 800, margin: 0 }}>
             فیلترهای <span style={{
@@ -311,7 +312,8 @@ export default function VipFiltersPage() {
         }}>
           {cards.map((c) => <FilterTable key={c.id} card={c} isDark={isDark} />)}
         </div>
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthGate>
   )
 }

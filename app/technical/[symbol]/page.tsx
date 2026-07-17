@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import AuthGate from '../../../components/AuthGate'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { rsi, macd, type Candle } from '../../../lib/indicators'
@@ -205,20 +206,21 @@ export default function TechnicalSymbolPage() {
   const shownPct = showLive ? (liveRow!.plp ?? null) : summary?.chg ?? null
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <style>{TA_KEYFRAMES}</style>
+    <AuthGate title="تحلیل تکنیکال">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <style>{TA_KEYFRAMES}</style>
 
-      {/* aurora پس‌زمینه — همان زبان طراحی هاب */}
-      <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
-        <div style={{ position: 'absolute', top: '2%', right: '6%', width: 440, height: 440, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
-        <div style={{ position: 'absolute', top: '38%', left: '14%', width: 380, height: 380, borderRadius: '50%', background: '#8b5cf6', opacity: 0.1, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
-      </div>
+        {/* aurora پس‌زمینه — همان زبان طراحی هاب */}
+        <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
+          <div style={{ position: 'absolute', top: '2%', right: '6%', width: 440, height: 440, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
+          <div style={{ position: 'absolute', top: '38%', left: '14%', width: 380, height: 380, borderRadius: '50%', background: '#8b5cf6', opacity: 0.1, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
+        </div>
 
-      <div className="ta-anim" style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '20px 12px' : '28px 24px', position: 'relative' }}>
+        <div className="ta-anim" style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '20px 12px' : '28px 24px', position: 'relative' }}>
 
         {/* هدر شیشه‌ای: نماد + قیمت زنده + سوییچ سریع */}
         <div style={{
@@ -382,6 +384,7 @@ export default function TechnicalSymbolPage() {
           معاملاتی با خود شماست.
         </p>
       </div>
-    </main>
+      </main>
+    </AuthGate>
   )
 }

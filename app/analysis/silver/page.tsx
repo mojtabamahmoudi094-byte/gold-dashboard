@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { Skeleton } from '../../components/ui/Skeleton'
+import AuthGate from '../../../components/AuthGate'
 
 const GRAMS_PER_OZ = 31.103431
 
@@ -149,15 +150,16 @@ export default function SilverAnalysisPage() {
   const totalNetFlow = funds.reduce((s, f) => s + ((f.buy_i_volume || 0) - (f.sell_i_volume || 0)), 0)
 
   return (
-    <main style={{
-      minHeight: '100vh', color: text,
-      background: `
-        radial-gradient(ellipse 60% 40% at 85% -5%, rgba(192,200,216,0.07), transparent 60%),
-        radial-gradient(ellipse 55% 35% at 10% 0%, rgba(0,200,255,0.05), transparent 60%),
-        ${bg}`,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <style>{`
+    <AuthGate title="تحلیل بازارها">
+      <main style={{
+        minHeight: '100vh', color: text,
+        background: `
+          radial-gradient(ellipse 60% 40% at 85% -5%, rgba(192,200,216,0.07), transparent 60%),
+          radial-gradient(ellipse 55% 35% at 10% 0%, rgba(0,200,255,0.05), transparent 60%),
+          ${bg}`,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <style>{`
         @keyframes popIn { from { opacity: 0; transform: translateY(16px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .pop-col > * { opacity: 0; animation: popIn .6s cubic-bezier(.16,1,.3,1) forwards; }
         .pop-col > *:nth-child(1) { animation-delay: .02s }
@@ -423,7 +425,8 @@ export default function SilverAnalysisPage() {
           داده‌های این صفحه جنبه اطلاع‌رسانی دارند و توصیه سرمایه‌گذاری نیستند
         </div>
       </div>
-    </main>
+      </main>
+    </AuthGate>
   )
 }
 

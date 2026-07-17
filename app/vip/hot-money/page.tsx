@@ -16,6 +16,7 @@ import {
   BRSAPI_KEY, num, faN, fToman, clean, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cPl, FilterTable,
 } from '../../../lib/vipFiltersShared'
+import AuthGate from '../../../components/AuthGate'
 
 // ── جدول ۱و۲: معاملات سنگین/میلیاردی از hot_trades ──────────────────────────
 type HotRow = { key: string; sym: string; price: number; tickCount: number; value: number; time: string }
@@ -221,12 +222,12 @@ export default function HotMoneyPage() {
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
-
+    <AuthGate title="فیلترها">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
           <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight: 800, margin: 0 }}>پول داغ</h1>
           {(hotUpdated || updated) && <span style={{ fontSize: 11.5, color: cream }}>آخرین به‌روزرسانی: {hotUpdated ?? updated}</span>}
@@ -279,7 +280,8 @@ export default function HotMoneyPage() {
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
           )}
         </div>
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthGate>
   )
 }

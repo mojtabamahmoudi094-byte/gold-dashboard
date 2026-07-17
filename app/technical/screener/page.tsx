@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import AuthGate from '../../../components/AuthGate'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { CANDLE_PATTERN_LABELS } from '../../../lib/candlePatternLabels'
@@ -276,20 +277,21 @@ export default function ScreenerPage() {
   }
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <style>{TA_KEYFRAMES}</style>
+    <AuthGate title="تحلیل تکنیکال">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <style>{TA_KEYFRAMES}</style>
 
-      {/* aurora پس‌زمینه — همان زبان طراحی هاب */}
-      <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
-        <div style={{ position: 'absolute', top: '3%', left: '10%', width: 460, height: 460, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
-        <div style={{ position: 'absolute', bottom: '5%', right: '8%', width: 400, height: 400, borderRadius: '50%', background: '#8b5cf6', opacity: 0.11, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
-      </div>
+        {/* aurora پس‌زمینه — همان زبان طراحی هاب */}
+        <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
+          <div style={{ position: 'absolute', top: '3%', left: '10%', width: 460, height: 460, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
+          <div style={{ position: 'absolute', bottom: '5%', right: '8%', width: 400, height: 400, borderRadius: '50%', background: '#8b5cf6', opacity: 0.11, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
+        </div>
 
-      <div className="ta-anim" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '28px 14px' : '40px 24px', position: 'relative' }}>
+        <div className="ta-anim" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '28px 14px' : '40px 24px', position: 'relative' }}>
 
         <Link href="/technical" style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
           ← تحلیل تکنیکال
@@ -456,40 +458,41 @@ export default function ScreenerPage() {
           این سیگنال‌ها صرفاً خروجی فرمول‌های تکنیکال است و توصیه خرید یا فروش نیست؛
           مسئولیت تصمیم‌های معاملاتی با خود شماست.
         </p>
-      </div>
+        </div>
 
-      {explainPreset && (
-        <div
-          onClick={() => setExplainPreset(null)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(4,8,14,0.6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-          }}
-        >
+        {explainPreset && (
           <div
-            onClick={e => e.stopPropagation()}
+            onClick={() => setExplainPreset(null)}
             style={{
-              ...glass, maxWidth: 440, width: '100%', borderRadius: 16, padding: 22,
-              direction: 'rtl',
+              position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(4,8,14,0.6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: text }}>{explainPreset.label}</span>
-              <button
-                onClick={() => setExplainPreset(null)}
-                style={{ background: 'none', border: 'none', color: muted, fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 4 }}
-                aria-label="بستن"
-              >×</button>
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                ...glass, maxWidth: 440, width: '100%', borderRadius: 16, padding: 22,
+                direction: 'rtl',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 800, color: text }}>{explainPreset.label}</span>
+                <button
+                  onClick={() => setExplainPreset(null)}
+                  style={{ background: 'none', border: 'none', color: muted, fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 4 }}
+                  aria-label="بستن"
+                >×</button>
+              </div>
+              <p style={{ fontSize: 13, color: muted, lineHeight: 2, minHeight: 78, margin: 0 }}>
+                {typedDesc}
+                {typedDesc.length < explainPreset.desc.length && (
+                  <span style={{ opacity: 0.6, animation: 'taPing 1s ease-in-out infinite' }}>▍</span>
+                )}
+              </p>
             </div>
-            <p style={{ fontSize: 13, color: muted, lineHeight: 2, minHeight: 78, margin: 0 }}>
-              {typedDesc}
-              {typedDesc.length < explainPreset.desc.length && (
-                <span style={{ opacity: 0.6, animation: 'taPing 1s ease-in-out infinite' }}>▍</span>
-              )}
-            </p>
           </div>
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </AuthGate>
   )
 }

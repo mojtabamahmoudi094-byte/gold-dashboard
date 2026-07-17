@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import AuthGate from '../../../components/AuthGate'
 import { darkTheme, lightTheme } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtCompact as fmtVal, fmtHomat } from '../../../lib/format'
@@ -184,13 +185,14 @@ export default function FundsCatPage() {
   }, 0)
 
   return (
-    <main style={{
-      minHeight: '100vh', background: t.bg, color: t.text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-      transition: 'background 0.3s, color 0.3s',
-    }}>
+    <AuthGate title="دیده‌بان صندوق‌ها">
+      <main style={{
+        minHeight: '100vh', background: t.bg, color: t.text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+        transition: 'background 0.3s, color 0.3s',
+      }}>
 
-      <div id="fund-list" style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div id="fund-list" style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: t.muted }}>
@@ -903,6 +905,7 @@ export default function FundsCatPage() {
       </div>
 
     </main>
+    </AuthGate>
   )
 }
 

@@ -19,6 +19,7 @@ import {
   BRSAPI_KEY, num, clean, fPct, fX, faN, fToman as fTomanShared, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cPl, cRatioM, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
+import AuthGate from '../../../components/AuthGate'
 
 // سرانه خرید روزانه از قبل به تومان ذخیره شده (بدون تقسیم بر ۱۰) — همان فرمت fToman ولی بدون تبدیل ریال
 const fTomanT = (t: number | null) => {
@@ -386,12 +387,12 @@ export default function UsefulFiltersPage() {
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-    }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
-
+    <AuthGate title="فیلترها">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+      }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '24px 14px' : '36px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
           <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight: 800, margin: 0 }}>فیلترهای کاربردی</h1>
           {(perCapUpdated || updated) && <span style={{ fontSize: 11.5, color: cream }}>آخرین به‌روزرسانی: {perCapUpdated ?? updated}</span>}
@@ -490,7 +491,8 @@ export default function UsefulFiltersPage() {
             {codeCountCards.map((c) => <FilterTable key={c.id} card={c} isDark={isDark} />)}
           </div>
         )}
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthGate>
   )
 }

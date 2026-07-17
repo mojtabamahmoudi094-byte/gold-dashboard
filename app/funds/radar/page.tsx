@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import AuthGate from '../../../components/AuthGate'
 import { darkTheme, lightTheme } from '../../../lib/theme'
 import { Skeleton, SkeletonBlock } from '../../components/ui/Skeleton'
 import { TutorialPanel } from '../../components/ui/TutorialPanel'
@@ -82,8 +83,9 @@ export default function SmartMoneyRadarPage() {
 
   if (loading) {
     return (
-      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <AuthGate title="رادار پول هوشمند">
+        <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Skeleton width={180} height={12} />
           <Skeleton width={280} height={30} radius={10} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
@@ -92,14 +94,17 @@ export default function SmartMoneyRadarPage() {
           <SkeletonBlock height={320} />
         </div>
       </main>
+      </AuthGate>
     )
   }
 
   if (!data || !views) {
     return (
-      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', color: t.muted, fontSize: 13 }}>داده رادار در دسترس نیست.</div>
-      </main>
+      <AuthGate title="رادار پول هوشمند">
+        <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: t.muted, fontSize: 13 }}>داده رادار در دسترس نیست.</div>
+        </main>
+      </AuthGate>
     )
   }
 
@@ -193,8 +198,9 @@ export default function SmartMoneyRadarPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 64px' }}>
+    <AuthGate title="رادار پول هوشمند">
+      <main style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 64px' }}>
 
         {/* ── سربرگ ── */}
         <Link href="/funds" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← بازگشت به دیدبان صندوق‌ها</Link>
@@ -403,5 +409,6 @@ export default function SmartMoneyRadarPage() {
         </div>
       </div>
     </main>
+    </AuthGate>
   )
 }

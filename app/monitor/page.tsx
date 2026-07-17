@@ -7,6 +7,7 @@
 
 import Link from 'next/link'
 import { useIsMobile } from '../../lib/useIsMobile'
+import AuthGate from '../../components/AuthGate'
 
 const CATS = [
   {
@@ -39,36 +40,38 @@ const CATS = [
 export default function MonitorPage() {
   const isMobile = useIsMobile()
   return (
-    <main style={{ minHeight: '100vh', background: '#0a0d14', color: '#eef1f8', fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl', padding: isMobile ? '32px 16px' : '60px 6vw' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 44 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6', marginBottom: 12 }}>نمودار</div>
-          <h1 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4vw,44px)', fontWeight: 900, margin: '0 0 14px' }}>رصد لحظه‌ای بازارها</h1>
-          <p style={{ color: '#a9b0c2', fontSize: 17 }}>سنجه‌های کل بازار، هر ۵ دقیقه در ساعت معاملات</p>
-        </div>
+    <AuthGate title="نمودار لحظه‌ای رصد بازارها">
+      <main style={{ minHeight: '100vh', background: '#0a0d14', color: '#eef1f8', fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl', padding: isMobile ? '32px 16px' : '60px 6vw' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6', marginBottom: 12 }}>نمودار</div>
+            <h1 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4vw,44px)', fontWeight: 900, margin: '0 0 14px' }}>رصد لحظه‌ای بازارها</h1>
+            <p style={{ color: '#a9b0c2', fontSize: 17 }}>سنجه‌های کل بازار، هر ۵ دقیقه در ساعت معاملات</p>
+          </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-          {CATS.map((c, i) => (
-            <Link key={i} href={c.href} aria-disabled={!c.ready} style={{
-              textDecoration: 'none', display: 'flex', flexDirection: 'column',
-              background: 'linear-gradient(165deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-              border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20,
-              padding: '26px 24px', transition: 'transform 0.25s, border-color 0.25s',
-              cursor: c.ready ? 'pointer' : 'default',
-              opacity: c.ready ? 1 : 0.55, pointerEvents: c.ready ? 'auto' : 'none',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.borderColor = `${c.color}66` }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 4, background: c.color, flexShrink: 0 }} />
-                <h3 style={{ fontSize: 19, fontWeight: 800, margin: 0, color: '#eef1f8' }}>{c.title}</h3>
-                {!c.ready && <span style={{ fontSize: 11, fontWeight: 700, color: '#a9b0c2', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8, padding: '3px 9px', marginRight: 'auto' }}>به‌زودی</span>}
-              </div>
-              <p style={{ color: '#a9b0c2', fontSize: 14, lineHeight: 1.8, margin: 0 }}>{c.desc}</p>
-            </Link>
-          ))}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+            {CATS.map((c, i) => (
+              <Link key={i} href={c.href} aria-disabled={!c.ready} style={{
+                textDecoration: 'none', display: 'flex', flexDirection: 'column',
+                background: 'linear-gradient(165deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+                border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20,
+                padding: '26px 24px', transition: 'transform 0.25s, border-color 0.25s',
+                cursor: c.ready ? 'pointer' : 'default',
+                opacity: c.ready ? 1 : 0.55, pointerEvents: c.ready ? 'auto' : 'none',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.borderColor = `${c.color}66` }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 4, background: c.color, flexShrink: 0 }} />
+                  <h3 style={{ fontSize: 19, fontWeight: 800, margin: 0, color: '#eef1f8' }}>{c.title}</h3>
+                  {!c.ready && <span style={{ fontSize: 11, fontWeight: 700, color: '#a9b0c2', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8, padding: '3px 9px', marginRight: 'auto' }}>به‌زودی</span>}
+                </div>
+                <p style={{ color: '#a9b0c2', fontSize: 14, lineHeight: 1.8, margin: 0 }}>{c.desc}</p>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </AuthGate>
   )
 }

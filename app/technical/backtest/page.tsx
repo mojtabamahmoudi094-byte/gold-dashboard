@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import AuthGate from '../../../components/AuthGate'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { CANDLE_PATTERN_LABELS } from '../../../lib/candlePatternLabels'
@@ -84,19 +85,20 @@ export default function BacktestPage() {
   )
 
   return (
-    <main style={{
-      minHeight: '100vh', background: bg, color: text,
-      fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <style>{TA_KEYFRAMES}</style>
+    <AuthGate title="تحلیل تکنیکال">
+      <main style={{
+        minHeight: '100vh', background: bg, color: text,
+        fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <style>{TA_KEYFRAMES}</style>
 
-      <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
-        <div style={{ position: 'absolute', top: '3%', left: '10%', width: 460, height: 460, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
-        <div style={{ position: 'absolute', bottom: '5%', right: '8%', width: 400, height: 400, borderRadius: '50%', background: '#8b5cf6', opacity: 0.11, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
-      </div>
+        <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
+          <div style={{ position: 'absolute', top: '3%', left: '10%', width: 460, height: 460, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
+          <div style={{ position: 'absolute', bottom: '5%', right: '8%', width: 400, height: 400, borderRadius: '50%', background: '#8b5cf6', opacity: 0.11, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
+        </div>
 
-      <div className="ta-anim" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '28px 14px' : '40px 24px', position: 'relative' }}>
+        <div className="ta-anim" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '28px 14px' : '40px 24px', position: 'relative' }}>
 
         <Link href="/technical/screener" style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
           ← دیده‌بان تکنیکال
@@ -167,6 +169,7 @@ export default function BacktestPage() {
           و تضمینی برای آینده نیست؛ توصیه خرید یا فروش نیست، مسئولیت تصمیم‌های معاملاتی با خود شماست.
         </p>
       </div>
-    </main>
+      </main>
+    </AuthGate>
   )
 }
