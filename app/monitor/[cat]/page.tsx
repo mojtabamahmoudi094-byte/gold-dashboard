@@ -99,7 +99,10 @@ const tooltipStyle = {
   background: 'rgba(18,22,31,0.96)', border: `1px solid ${C.border}`, borderRadius: 12,
   fontFamily: FONT, fontSize: 12, direction: 'rtl' as const,
   boxShadow: '0 12px 40px rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)',
+  color: C.cream,
 }
+const tooltipLabelStyle = { color: C.cream, fontFamily: FONT, fontWeight: 700 }
+const tooltipItemStyle = { color: C.cream, fontFamily: FONT }
 
 // ── تعریف نمودارها ────────────────────────────────────────────────
 type Series = { key: keyof Datum; name: string; color: string; kind: 'line' | 'bar' | 'area' }
@@ -308,6 +311,8 @@ export default function MarketMonitorPage() {
           {def.refZero && <ReferenceLine y={0} stroke={C.text} strokeDasharray="4 4" />}
           <ReTooltip
             contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
             cursor={{ stroke: 'rgba(255,255,255,0.28)', strokeDasharray: '4 4' }}
             formatter={(v: any, n: any) => [`${fa(Number(v), dec)}${def.unit ?? ''}`, n]}
           />
@@ -357,6 +362,8 @@ export default function MarketMonitorPage() {
           <YAxis tick={tickBig} tickFormatter={(v: number) => fa(v)} width={big ? 50 : 40} orientation="right" allowDecimals={false} />
           <ReTooltip
             contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
             cursor={{ fill: 'rgba(255,255,255,0.06)' }}
             formatter={(v: any) => [fa(Number(v)), 'تعداد نماد']}
           />
