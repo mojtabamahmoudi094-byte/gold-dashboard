@@ -3,6 +3,8 @@ import StockPageClient from './StockPageClient'
 import { getStocksIndustries } from '../../../lib/stocksIndustriesData'
 import { getStockReport } from '../../../lib/stockReportsData'
 import type { Reports } from '../../../lib/stockInsights'
+import JsonLd from '../../../components/JsonLd'
+import { SITE_URL } from '../../../lib/site'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,15 +31,42 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
 
 export default async function StockPage({ params }: { params: Promise<{ symbol: string }> }) {
   const symbol = decodeURIComponent((await params).symbol)
-  const [{ data }, reportsRaw] = await Promise.all([
+  const [{ s, ind, data }, reportsRaw] = await Promise.all([
     findSymbolData(symbol),
     getStockReport(symbol),
   ])
+
+  const jsonLd: object[] = []
+  if (s && ind) {
+    jsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'خانه', item: `${SITE_URL}/` },
+        { '@type': 'ListItem', position: 2, name: 'سهام', item: `${SITE_URL}/stocks` },
+        { '@type': 'ListItem', position: 3, name: ind.name, item: `${SITE_URL}/stocks/${ind.id}` },
+        { '@type': 'ListItem', position: 4, name: s.l18, item: `${SITE_URL}/stock/${encodeURIComponent(symbol)}` },
+      ],
+    })
+    jsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'Dataset',
+      name: `داده‌های لحظه‌ای و بنیادی نماد ${s.l18}`,
+      description: `قیمت لحظه‌ای، ارزش بازار و گزارش‌های کدال نماد ${s.l18} (${s.l30}) در صنعت ${ind.name}`,
+      url: `${SITE_URL}/stock/${encodeURIComponent(symbol)}`,
+      creator: { '@type': 'Organization', name: 'بورس سنج', url: SITE_URL },
+      inLanguage: 'fa-IR',
+    })
+  }
+
   return (
-    <StockPageClient
-      symbol={symbol}
-      initialData={data}
-      initialReports={reportsRaw as Reports | null}
-    />
+    <>
+      {jsonLd.length > 0 && <JsonLd data={jsonLd} />}
+      <StockPageClient
+        symbol={symbol}
+        initialData={data}
+        initialReports={reportsRaw as Reports | null}
+      />
+    </>
   )
 }
