@@ -315,6 +315,40 @@ async function buildDeepAnalysisText(symbol, q, extracted) {
   return null
 }
 
+// پست تحلیل عمیق میاندوره‌ای (۳/۶/۹ ماهه، حسابرسی‌شده یا نشده) — همون الگوی buildDeepAnalysisText
+// ولی بدون نامهٔ حسابرس (فقط اعداد صورت‌های مالی که parser از قبل استخراج/محاسبه کرده)
+async function buildDeepQuarterlyText(symbol, q) {
+  try {
+    const res = await fetch(`${SITE}/api/quarterly-deep-narrative`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol,
+        period: q.period,
+        months: q.months,
+        audited: !!q.audited,
+        revenue: q.revenue, revenueYoY: pctChange(q.revenue, q.revenue_ly),
+        gross: q.gross, grossYoY: pctChange(q.gross, q.gross_ly),
+        op: q.op, opYoY: pctChange(q.op, q.op_ly),
+        net: q.net, netYoY: pctChange(q.net, q.net_ly),
+        eps: q.eps,
+        finCost: q.fin_cost, finCostYoY: pctChange(q.fin_cost, q.fin_cost_ly),
+        ratios: q.ratios,
+        cashFlow: q.cash_flow,
+        workingCapital: {
+          receivablesChange: pctChange(q.receivables, q.receivables_prev),
+          inventoryChange: pctChange(q.inventory, q.inventory_prev),
+        },
+      }),
+      signal: AbortSignal.timeout(60_000),
+    })
+    const data = await res.json()
+    if (data.ok && data.html) return sanitizeTelegramHtml(data.html)
+    log(`⚠️ ${symbol}: تحلیل عمیق میاندوره‌ای پاسخ نامعتبر — ${data.error || 'نامشخص'}`)
+  } catch (e) { log(`⚠️ ${symbol}: تحلیل عمیق میاندوره‌ای Gemini شکست خورد — ${e.message}`) }
+  return null
+}
+
 async function sendTelegram(text, opts = {}) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — اعلان ارسال نشد'); return }
   const parseModeField = opts.html ? { parse_mode: 'HTML' } : {}
@@ -698,6 +732,12 @@ async function main() {
                   }
                 }
               } catch (e) { log(`⚠️ ${s}: پست تحلیل عمیق سالانهٔ حسابرسی‌شده شکست خورد (نادیده گرفته شد) — ${e.message}`) }
+            } else if (latestQuarter && [3, 6, 9].includes(latestQuarter.months)) {
+              // میاندوره‌ای معمولی — بدون نامهٔ حسابرس، مستقیم از اعداد پارس‌شده
+              try {
+                const deepText = await buildDeepQuarterlyText(s, latestQuarter)
+                if (deepText) await sendTelegram(deepText, { html: true })
+              } catch (e) { log(`⚠️ ${s}: پست تحلیل عمیق میاندوره‌ای شکست خورد (نادیده گرفته شد) — ${e.message}`) }
             }
 
             // اگه عکس واقعاً نرفت (خطا/عدم داده)، متن قدیمی جایگزینش می‌شه — گزارش نباید کامل از دست بره

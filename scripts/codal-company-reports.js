@@ -40,7 +40,7 @@ const OUT_DIR = path.join(__dirname, 'reports-out')
 // نسخهٔ پارسر — با هر تغییر منطق پارس یکی بالا برود.
 // خروجی قدیمی‌تر از این نسخه دوباره ساخته می‌شود، حتی بدون --force؛ وگرنه بعد از
 // اصلاح پارسر، نمادهایی که فایل کهنه دارند برای همیشه skip می‌شوند.
-const PARSER_VERSION = 10
+const PARSER_VERSION = 11
 
 // خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
 // SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
@@ -588,6 +588,10 @@ const BS_MAP = [
   ['cash',                /^موجودینقد$/],
   ['debt_lt',             /^تسهیلاتمالیبلندمدت$/],
   ['debt_st',             /^تسهیلاتمالی$/],
+  // ✅ تأیید شده روی داده واقعی کزغال (میاندوره‌ای ۳ ماهه): «دریافتنی‌های تجاری و سایر
+  // دریافتنی‌ها»، «موجودی مواد و کالا» — برای پست تحلیل عمیق فصلی (رشد سرمایه در گردش)
+  ['receivables',         /^دریافتنیهایتجاریوسایردریافتنیها$/],
+  ['inventory',           /^موجودیموادوکالا$/],
 ]
 
 function parseBS(wb) {
@@ -828,7 +832,6 @@ async function buildSymbol(symbol, opts = {}) {
     const dur = t.match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
     const months = dur ? faNum(dur[1]) : 12
     const audited = /حسابرسی شده/.test(t)
-    const isAnnualAudited = months === 12 && audited
     quarters.push({
       period: faDate(t),
       months,
@@ -836,10 +839,12 @@ async function buildSymbol(symbol, opts = {}) {
       consolidated: /تلفیقی/.test(t),
       publish: faDate(r.a.date_publish),
       ...r.p,
-      // این سه فیلد فقط برای سالانهٔ حسابرسی‌شده پر می‌شوند (پست تحلیل عمیق تلگرام)؛
-      // بقیهٔ دوره‌ها عمداً خالی می‌مانند تا اندازهٔ JSON و ابهام «صفر یعنی چی» زیاد نشود.
-      cash_flow: isAnnualAudited ? (r.p.cash_flow ?? null) : null,
-      ratios: isAnnualAudited ? computeRatios(r.p) : null,
+      // cash_flow/ratios از همون workbook محاسبه می‌شن، بدون I/O اضافه — برای هر دوره‌ای
+      // (فصلی/سالانه، حسابرسی‌شده یا نشده) پر می‌شن، چون هم CF هم BS ستون «پایان دوره
+      // جاری» درست دارن (تأیید شده روی کزغال ۳ماههٔ حسابرسی‌نشده). red_flags فقط از نامهٔ
+      // حسابرس میاد که تنها برای سالانهٔ حسابرسی‌شده استخراج می‌شود.
+      cash_flow: r.p.cash_flow ?? null,
+      ratios: computeRatios(r.p),
       red_flags: [],
     })
   }
