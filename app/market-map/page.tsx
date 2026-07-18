@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { shouldUseDark } from '../../lib/theme'
@@ -496,14 +496,25 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
   }, [open])
 
   // موقعیت پنل با position:fixed محاسبه می‌شود — چون نوار ابزار در موبایل overflow-x:auto دارد
-  // و طبق مشخصات CSS همین باعث می‌شود overflow-y هم به auto تبدیل شود و پاپ‌آور absolute را ببرد
-  const toggleOpen = () => {
-    if (!open && wrapRef.current) {
-      const r = wrapRef.current.getBoundingClientRect()
-      setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
+  // و طبق مشخصات CSS همین باعث می‌شود overflow-y هم به auto تبدیل شود و پاپ‌آور absolute را ببرد.
+  // این صفحه دیتای async زیادی لود می‌کند که می‌تواند بعد از باز شدن منو layout را جابجا کند،
+  // پس موقعیت فقط لحظه کلیک محاسبه نمی‌شود؛ تا وقتی باز است با اسکرول/ریسایز هم به‌روز می‌شود.
+  useLayoutEffect(() => {
+    if (!open) return
+    const recompute = () => {
+      const r = wrapRef.current?.getBoundingClientRect()
+      if (r) setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
     }
-    setOpen(v => !v)
-  }
+    recompute()
+    window.addEventListener('scroll', recompute, true)
+    window.addEventListener('resize', recompute)
+    return () => {
+      window.removeEventListener('scroll', recompute, true)
+      window.removeEventListener('resize', recompute)
+    }
+  }, [open])
+
+  const toggleOpen = () => setOpen(v => !v)
 
   const available = ASSET_TYPES.filter(t => t.available)
   const allChecked = available.every(t => value[t.key])
