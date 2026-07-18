@@ -972,6 +972,21 @@ export default function SignalsPage() {
   const GREEN  = t.green
   const RED    = t.red
 
+  // رنگ ثابت هر دسته دارایی — مستقل از نوع سیگنال (خرید/فروش) تا هر بخش صفحه یک هویت رنگی دائمی داشته باشه
+  const CATEGORY_COLORS: Record<string, string> = {
+    gold: GOLD, silver: isDark ? '#B9C2CC' : '#7C8896',
+    leveraged: '#F0654A', sector: '#38BDF8', equity: '#A78BFA', stock: '#22D3EE',
+  }
+  const CATEGORY_ICONS: Record<string, string> = {
+    gold: '🟡', silver: '⚪', leveraged: '🟠', sector: '🔵', equity: '🟣', stock: '🔷',
+  }
+  const navItems = [
+    autoSignal && { id: 'sec-gold', label: 'طلا' },
+    silverSignal && { id: 'sec-silver', label: 'نقره' },
+    bourseSections.length > 0 && { id: 'sec-bourse', label: 'صندوق‌های بورسی' },
+    (stockBuys.length > 0 || stockSells.length > 0) && { id: 'sec-stock', label: 'سهام' },
+  ].filter(Boolean) as { id: string; label: string }[]
+
   return (
     <AuthGate title="سیگنال‌ها">
       <main style={{
@@ -997,7 +1012,29 @@ export default function SignalsPage() {
           )}
         </div>
 
-        {/* ── Live auto signal ── */}
+        {/* ── Quick nav — دسته‌بندی روشن بخش‌های صفحه ── */}
+        {!loading && navItems.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {navItems.map(n => {
+              const catKey = n.id === 'sec-gold' ? 'gold' : n.id === 'sec-silver' ? 'silver' : n.id === 'sec-stock' ? 'stock' : 'bourse'
+              const color = catKey === 'bourse' ? t.accent : CATEGORY_COLORS[catKey]
+              return (
+                <a key={n.id} href={`#${n.id}`} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 11.5, fontWeight: 700, color,
+                  background: `${color}14`, border: `1px solid ${color}35`,
+                  borderRadius: 8, padding: '6px 14px', textDecoration: 'none',
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block' }} />
+                  {n.label}
+                </a>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── Live auto signal — طلا ── */}
+        <div id="sec-gold" />
         {loading ? (
           <div className="skeleton" style={{ height: 200, borderRadius: 14 }} />
         ) : autoSignal ? (
@@ -1017,7 +1054,12 @@ export default function SignalsPage() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 16 : 28, alignItems: 'flex-start' }}>
               {/* badge + confidence */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 140 }}>
-                <span style={{ fontSize: 10, color: MUTED, letterSpacing: '0.06em' }}>سیگنال لحظه‌ای</span>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+                  fontSize: 10, fontWeight: 700, color: GOLD,
+                  background: `${GOLD}16`, border: `1px solid ${GOLD}30`,
+                  borderRadius: 5, padding: '2px 8px', marginBottom: 2,
+                }}>🟡 طلا · لحظه‌ای</span>
                 <span style={{
                   fontSize: isMobile ? 26 : 30, fontWeight: 700,
                   color: autoSignal.color,
@@ -1102,22 +1144,32 @@ export default function SignalsPage() {
           .map(sec => {
           const secBuy = sec.sig.type === 'خرید' || sec.sig.type === 'تمایل خرید'
           const secSell = sec.sig.type === 'فروش' || sec.sig.type === 'احتیاط'
+          const catColor = CATEGORY_COLORS[sec.key]
           return (
-          <div key={sec.key} style={{
+          <div key={sec.key} id={sec.key === 'silver' ? 'sec-silver' : undefined} style={{
             background: PANEL,
-            border: `1px solid ${secBuy ? '#10B98122' : secSell ? '#EF444422' : BORDER}`,
+            border: `1px solid ${catColor}30`,
             borderRadius: 14,
             padding: isMobile ? '18px 16px' : '20px 24px',
             backdropFilter: 'blur(12px)',
+            position: 'relative', overflow: 'hidden',
           }}>
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+              background: `linear-gradient(90deg, ${catColor}, transparent)`,
+            }} />
             {/* header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <div style={{
-                width: 3, height: 20, borderRadius: 2,
-                background: secBuy ? GREEN : secSell ? RED : t.accent,
-              }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
-                {secBuy ? `این صندوق‌های ${sec.label} رو بخر` : secSell ? `این صندوق‌های ${sec.label} رو بفروش` : `با این صندوق‌های ${sec.label} بمان`}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 13, fontWeight: 700, color: catColor,
+                background: `${catColor}16`, border: `1px solid ${catColor}35`,
+                borderRadius: 7, padding: '4px 12px',
+              }}>
+                {CATEGORY_ICONS[sec.key]} صندوق‌های {sec.label}
+              </span>
+              <span style={{ fontSize: 12.5, color: TEXT }}>
+                {secBuy ? 'بخر' : secSell ? 'بفروش' : 'بمان'}
               </span>
               <span style={{
                 fontSize: 10, fontWeight: 700, color: sec.sig.color,
@@ -1267,17 +1319,26 @@ export default function SignalsPage() {
 
         {/* ── Bourse funds signals (اهرمی / بخشی / سهامی) ── */}
         {!loading && bourseSections.length > 0 && (
-          <div style={{
+          <div id="sec-bourse" style={{
             background: PANEL,
-            border: `0.5px solid ${BORDER}`,
+            border: `1px solid ${t.accent}30`,
             borderRadius: 14,
             padding: isMobile ? '18px 16px' : '20px 24px',
             backdropFilter: 'blur(12px)',
+            position: 'relative', overflow: 'hidden',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <div style={{ width: 3, height: 20, borderRadius: 2, background: t.accent }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
-                سیگنال صندوق‌های بورسی
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+              background: `linear-gradient(90deg, ${t.accent}, transparent)`,
+            }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 13, fontWeight: 700, color: t.accent,
+                background: `${t.accent}16`, border: `1px solid ${t.accent}35`,
+                borderRadius: 7, padding: '4px 12px',
+              }}>
+                📦 صندوق‌های بورسی
               </span>
               <span style={{
                 fontSize: 10, color: MUTED, marginRight: 'auto',
@@ -1433,14 +1494,25 @@ export default function SignalsPage() {
 
         {/* ── Stock signals (سیگنال سهام) — قانون‌محور از گزارش‌های ماهانه/فصلی کدال ── */}
         {(stockBuys.length > 0 || stockSells.length > 0) && (
-          <div style={{
-            background: PANEL, border: `0.5px solid ${BORDER}`,
+          <div id="sec-stock" style={{
+            background: PANEL, border: `1px solid ${CATEGORY_COLORS.stock}30`,
             borderRadius: 14, padding: isMobile ? '18px 16px' : '20px 24px',
             backdropFilter: 'blur(12px)',
+            position: 'relative', overflow: 'hidden',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <div style={{ width: 3, height: 20, borderRadius: 2, background: t.accent }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>سیگنال سهام</span>
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+              background: `linear-gradient(90deg, ${CATEGORY_COLORS.stock}, transparent)`,
+            }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 13, fontWeight: 700, color: CATEGORY_COLORS.stock,
+                background: `${CATEGORY_COLORS.stock}16`, border: `1px solid ${CATEGORY_COLORS.stock}35`,
+                borderRadius: 7, padding: '4px 12px',
+              }}>
+                🔷 سهام
+              </span>
               <span style={{
                 fontSize: 10, color: MUTED, marginRight: 'auto',
                 background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
@@ -1558,8 +1630,8 @@ export default function SignalsPage() {
                   return (
                     <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{ width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <span style={{ fontSize: 11, color: TEXT, fontWeight: 600 }}>
-                          {CATEGORY_LABELS[cat] ?? cat}{cat === 'stock' && s.symbol ? ` · ${s.symbol}` : ''}
+                        <span style={{ fontSize: 11, color: CATEGORY_COLORS[cat] ?? TEXT, fontWeight: 600 }}>
+                          {CATEGORY_ICONS[cat]} {CATEGORY_LABELS[cat] ?? cat}{cat === 'stock' && s.symbol ? ` · ${s.symbol}` : ''}
                         </span>
                         <span style={{ fontSize: 9.5, color: FAINT }}>{s.signal_date_shamsi} · {s.signal_type}</span>
                       </div>
@@ -1624,22 +1696,26 @@ export default function SignalsPage() {
             {([
               ['all', 'همه'], ['gold', 'طلا'], ['silver', 'نقره'],
               ['leveraged', 'اهرمی'], ['sector', 'بخشی'], ['equity', 'سهامی'], ['stock', 'سهام'],
-            ] as const).map(([key, label]) => (
+            ] as const).map(([key, label]) => {
+              const kColor = key === 'all' ? t.accent : (CATEGORY_COLORS[key] ?? t.accent)
+              return (
               <button
                 key={key}
                 onClick={() => setHistoryCat(key)}
                 style={{
                   fontSize: 10.5, padding: '4px 11px', borderRadius: 6, cursor: 'pointer',
                   fontFamily: 'inherit',
-                  background: historyCat === key ? 'rgba(59,130,246,0.14)' : 'transparent',
-                  border: `1px solid ${historyCat === key ? 'rgba(59,130,246,0.4)' : BORDER}`,
-                  color: historyCat === key ? '#60A5FA' : MUTED,
+                  background: historyCat === key ? `${kColor}18` : 'transparent',
+                  border: `1px solid ${historyCat === key ? `${kColor}55` : BORDER}`,
+                  color: historyCat === key ? kColor : MUTED,
+                  fontWeight: historyCat === key ? 700 : 400,
                   transition: 'all 0.18s',
                 }}
               >
-                {label}
+                {key !== 'all' && CATEGORY_ICONS[key]} {label}
               </button>
-            ))}
+              )
+            })}
           </div>
 
           {loading ? (
@@ -1704,7 +1780,9 @@ export default function SignalsPage() {
                           {s.signal_date_shamsi}
                         </td>
                         <td style={{ padding: '11px 10px', whiteSpace: 'nowrap' }}>
-                          <span style={{ fontSize: 11, color: MUTED }}>{CATEGORY_LABELS[cat] ?? cat}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: CATEGORY_COLORS[cat] ?? MUTED }}>
+                            {CATEGORY_ICONS[cat]} {CATEGORY_LABELS[cat] ?? cat}
+                          </span>
                           {cat === 'stock' && s.symbol && (
                             <Link href={`/stock/${encodeURIComponent(s.symbol)}`} style={{ fontSize: 10.5, color: '#60A5FA', textDecoration: 'none', marginRight: 6 }}>
                               {s.symbol}
