@@ -13,6 +13,7 @@ import { downloadCSV } from '../../../lib/csvExport'
 import { GREEN, RED } from '../colors'
 import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
 import { shouldUseDark } from '../../../lib/theme'
+import RsiBar from '../../components/ui/RsiBar'
 
 const KlineChart = dynamic(() => import('../KlineChart'), { ssr: false })
 const TechnicalSummary = dynamic(() => import('../TechnicalSummary'), { ssr: false })
@@ -217,8 +218,8 @@ export default function TechnicalSymbolPage() {
 
         {/* aurora پس‌زمینه — همان زبان طراحی هاب */}
         <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
-          <div style={{ position: 'absolute', top: '2%', right: '6%', width: 440, height: 440, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
-          <div style={{ position: 'absolute', top: '38%', left: '14%', width: 380, height: 380, borderRadius: '50%', background: '#8b5cf6', opacity: 0.1, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
+          <div style={{ position: 'absolute', top: '2%', right: '6%', width: 440, height: 440, borderRadius: '50%', background: '#d9b45b', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
+          <div style={{ position: 'absolute', top: '38%', left: '14%', width: 380, height: 380, borderRadius: '50%', background: '#f4d795', opacity: 0.1, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
         </div>
 
         <div className="ta-anim" style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '20px 12px' : '28px 24px', position: 'relative' }}>
@@ -242,7 +243,7 @@ export default function TechnicalSymbolPage() {
 
           <h1 style={{
             fontSize: isMobile ? 20 : 26, fontWeight: 800, margin: 0,
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
           }}>
             {symbol}
@@ -292,6 +293,7 @@ export default function TechnicalSymbolPage() {
               {showLive && <span style={{ fontSize: 10, color: muted }}>آخرین معامله لحظه‌ای</span>}
               {summary && summary.rsi !== null && (
                 <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
                   fontSize: 11.5, padding: '4px 10px', borderRadius: 8,
                   background: panel, border: `1px solid ${line}`, color: muted,
                 }}>
@@ -300,6 +302,7 @@ export default function TechnicalSymbolPage() {
                     {fa(summary!.rsi!, 1)}
                   </b>
                   {summary!.rsi! >= 70 ? ' اشباع خرید' : summary!.rsi! <= 30 ? ' اشباع فروش' : ''}
+                  <RsiBar value={summary!.rsi!} width={50} overboughtColor={RED} oversoldColor={GREEN} />
                 </span>
               )}
               {summary && summary.macdHist !== null && (
@@ -313,8 +316,8 @@ export default function TechnicalSymbolPage() {
               {candlePattern && (
                 <span style={{
                   fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 8,
-                  color: candlePattern.bias === 'bull' ? GREEN : candlePattern.bias === 'bear' ? RED : '#3b82f6',
-                  background: candlePattern.bias === 'bull' ? 'rgba(38,166,154,0.12)' : candlePattern.bias === 'bear' ? 'rgba(239,83,80,0.12)' : 'rgba(59,130,246,0.12)',
+                  color: candlePattern.bias === 'bull' ? GREEN : candlePattern.bias === 'bear' ? RED : '#d9b45b',
+                  background: candlePattern.bias === 'bull' ? 'rgba(38,166,154,0.12)' : candlePattern.bias === 'bear' ? 'rgba(239,83,80,0.12)' : 'rgba(217,180,91,0.12)',
                 }}>
                   {CANDLE_PATTERN_LABELS[candlePattern.pattern] ?? candlePattern.pattern}
                 </span>
@@ -342,9 +345,9 @@ export default function TechnicalSymbolPage() {
 
           <Link href={`/stock/${toSlug(symbol)}`} style={{
             marginInlineStart: 'auto',
-            fontSize: 12, color: '#3b82f6', textDecoration: 'none', whiteSpace: 'nowrap',
+            fontSize: 12, color: '#d9b45b', textDecoration: 'none', whiteSpace: 'nowrap',
             padding: '7px 12px', borderRadius: 9,
-            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+            background: 'rgba(217,180,91,0.08)', border: '1px solid rgba(217,180,91,0.2)',
           }}>
             بنیادی و کدال ←
           </Link>

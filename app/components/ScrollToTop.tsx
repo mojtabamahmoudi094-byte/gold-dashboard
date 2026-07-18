@@ -26,7 +26,7 @@ export default function ScrollToTop() {
         width: 42,
         height: 42,
         borderRadius: '50%',
-        border: '1px solid rgba(59,130,246,0.3)',
+        border: '1px solid rgba(217,180,91,0.3)',
         background: 'rgba(13,16,23,0.9)',
         color: '#eef1f8',
         display: 'flex',

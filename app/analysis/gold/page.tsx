@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { Skeleton } from '../../components/ui/Skeleton'
+import BubbleBar from '../../components/ui/BubbleBar'
 import AuthGate from '../../../components/AuthGate'
 
 const fmt = (n: number | null, decimals = 0) =>
@@ -581,12 +582,15 @@ function GoldRow({ label, fair, market, bubble, impliedDollar, dailyChange, bord
         <DailyChangeBadge pct={dailyChange} />
       </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <span className="gbadge" style={{
-          display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
-          background: `${bc}18`, boxShadow: `0 0 10px ${bc}30`, borderRadius: 4, padding: '2px 8px', fontFamily: 'system-ui',
-        }}>
-          {fmtPct(bubble)}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="gbadge" style={{
+            display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
+            background: `${bc}18`, boxShadow: `0 0 10px ${bc}30`, borderRadius: 4, padding: '2px 8px', fontFamily: 'system-ui',
+          }}>
+            {fmtPct(bubble)}
+          </span>
+          <BubbleBar value={bubble != null ? bubble * 100 : null} maxPct={10} width={56} posColor="#FF4D6A" negColor="#00E5A0" />
+        </div>
       </td>
       <td style={{ padding: '10px 12px', color: bc, fontSize: 11, fontWeight: 600 }}>{bubbleLabel(bubble)}</td>
       <td style={{ padding: '10px 12px', color: muted, fontFamily: 'system-ui', fontSize: 11 }}>
@@ -622,12 +626,15 @@ function CoinRow({ label, weight, fair, market, bubble, dailyChange, marketNote,
       </td>
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         {bubble != null ? (
-          <span className="gbadge" style={{
-            display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
-            background: `${bc}18`, boxShadow: `0 0 10px ${bc}30`, borderRadius: 4, padding: '2px 8px', fontFamily: 'system-ui',
-          }}>
-            {fmtPct(bubble)}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="gbadge" style={{
+              display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
+              background: `${bc}18`, boxShadow: `0 0 10px ${bc}30`, borderRadius: 4, padding: '2px 8px', fontFamily: 'system-ui',
+            }}>
+              {fmtPct(bubble)}
+            </span>
+            <BubbleBar value={bubble * 100} maxPct={10} width={56} posColor="#FF4D6A" negColor="#00E5A0" />
+          </div>
         ) : <span style={{ color: muted }}>—</span>}
       </td>
       <td style={{ padding: '10px 12px', color: bc, fontSize: 11, fontWeight: 600 }}>{bubbleLabel(bubble)}</td>

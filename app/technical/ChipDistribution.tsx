@@ -122,11 +122,11 @@ export default function ChipDistribution({ symbol, isDark }: Props) {
         {/* خط میانگین بهای تمام‌شده */}
         <div style={{
           position: 'absolute', insetInline: 0, top: `${yPct(row.avg_cost)}%`,
-          borderTop: `2px dashed #3b82f6`, opacity: 0.85,
+          borderTop: `2px dashed #d9b45b`, opacity: 0.85,
         }}>
           <span style={{
             position: 'absolute', insetInlineEnd: 0, top: 2, fontSize: 10, fontWeight: 700,
-            padding: '1px 6px', borderRadius: 6, background: isDark ? '#060B14' : '#F4F7FB', color: '#3b82f6',
+            padding: '1px 6px', borderRadius: 6, background: isDark ? '#060B14' : '#F4F7FB', color: '#d9b45b',
           }}>
             میانگین بها {fa(row.avg_cost)}
           </span>

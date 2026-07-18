@@ -210,8 +210,8 @@ export default function TechnicalIndexPage() {
         },
       })
       const s = chart.addSeries(AreaSeries, {
-        lineColor: '#3b82f6', lineWidth: 2,
-        topColor: 'rgba(59,130,246,0.28)', bottomColor: 'rgba(59,130,246,0)',
+        lineColor: '#d9b45b', lineWidth: 2,
+        topColor: 'rgba(217,180,91,0.28)', bottomColor: 'rgba(217,180,91,0)',
         priceLineVisible: false,
       })
       s.setData(idxHistory.map(r => ({ time: r.trade_date as import('lightweight-charts').Time, value: r.value })))
@@ -243,7 +243,7 @@ export default function TechnicalIndexPage() {
     borderRadius: 16,
     boxShadow: isDark
       ? '0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)'
-      : '0 8px 24px rgba(59,130,246,0.08)',
+      : '0 8px 24px rgba(217,180,91,0.08)',
   }
   const cardHover = (e: React.MouseEvent<HTMLElement>, on: boolean) => {
     e.currentTarget.style.transform = on ? 'translateY(-3px)' : 'translateY(0)'
@@ -287,8 +287,8 @@ export default function TechnicalIndexPage() {
 
       {/* aurora پس‌زمینه */}
       <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
-        <div style={{ position: 'absolute', top: '4%', right: '8%', width: 480, height: 480, borderRadius: '50%', background: '#3b82f6', opacity: 0.16, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
-        <div style={{ position: 'absolute', top: '32%', left: '22%', width: 420, height: 420, borderRadius: '50%', background: '#8b5cf6', opacity: 0.12, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
+        <div style={{ position: 'absolute', top: '4%', right: '8%', width: 480, height: 480, borderRadius: '50%', background: '#d9b45b', opacity: 0.16, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
+        <div style={{ position: 'absolute', top: '32%', left: '22%', width: 420, height: 420, borderRadius: '50%', background: '#f4d795', opacity: 0.12, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
         <div style={{ position: 'absolute', bottom: '-6%', left: '-4%', width: 360, height: 360, borderRadius: '50%', background: '#06b6d4', opacity: 0.08, filter: 'blur(90px)', animation: 'taBlob3 30s ease-in-out infinite alternate' }} />
       </div>
 
@@ -298,7 +298,7 @@ export default function TechnicalIndexPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 16, ...enter(0) }}>
           <h1 style={{
             fontSize: isMobile ? 23 : 28, fontWeight: 800, margin: 0,
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
           }}>
             تحلیل تکنیکال
@@ -337,7 +337,7 @@ export default function TechnicalIndexPage() {
                 padding: '12px 16px', outline: 'none',
                 ...glass, borderRadius: 99, color: text, transition: 'border-color 0.2s',
               }}
-              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.55)' }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(217,180,91,0.55)' }}
               onBlur={e => { e.currentTarget.style.borderColor = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.08)' }}
             />
             {matches.length > 0 && (
@@ -352,7 +352,7 @@ export default function TechnicalIndexPage() {
                     padding: '10px 13px', borderRadius: 10, textDecoration: 'none',
                     fontSize: 13, color: text, fontFamily: 'inherit', transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.12)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(217,180,91,0.12)' }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
                     <span>{m.l18}</span>
                     {m.pcp !== null && (
@@ -402,7 +402,7 @@ export default function TechnicalIndexPage() {
               const inner = (
                 <button onClick={() => setSelIndex(ix.index_name)} style={{
                   ...glass,
-                  ...(active ? { border: '1px solid transparent', boxShadow: '0 0 24px rgba(139,92,246,0.25)' } : {}),
+                  ...(active ? { border: '1px solid transparent', boxShadow: '0 0 24px rgba(244,215,149,0.25)' } : {}),
                   width: '100%', textAlign: 'right', cursor: 'pointer', fontFamily: 'inherit',
                   padding: '13px 15px 8px', transition: 'transform 0.2s, border-color 0.2s',
                 }}
@@ -410,7 +410,7 @@ export default function TechnicalIndexPage() {
                 onMouseLeave={e => { if (!active) cardHover(e, false) }}>
                   <div style={{
                     fontSize: 11.5, fontWeight: 600, marginBottom: 7,
-                    color: active ? '#3b82f6' : muted,
+                    color: active ? '#d9b45b' : muted,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
                     {ix.index_name}
@@ -431,7 +431,7 @@ export default function TechnicalIndexPage() {
                 </button>
               )
               return active ? (
-                <div key={ix.index_name} style={{ borderRadius: 17, padding: 1, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', ...enter(2 + i) }}>
+                <div key={ix.index_name} style={{ borderRadius: 17, padding: 1, background: 'linear-gradient(135deg, #d9b45b, #f4d795)', ...enter(2 + i) }}>
                   {inner}
                 </div>
               ) : (
@@ -465,12 +465,12 @@ export default function TechnicalIndexPage() {
             padding: 20, minHeight: isMobile ? 150 : undefined,
             transition: 'transform 0.2s, box-shadow 0.2s', ...enter(4),
           }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(139,92,246,0.4)' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(244,215,149,0.4)' }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = (glass.boxShadow as string) }}>
             <div>
               <div style={{
                 width: 38, height: 38, borderRadius: 11, marginBottom: 14,
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" style={{ pointerEvents: 'none' }}>
@@ -483,7 +483,7 @@ export default function TechnicalIndexPage() {
               </div>
             </div>
             <div style={{
-              fontSize: 12.5, fontWeight: 700, color: '#3b82f6',
+              fontSize: 12.5, fontWeight: 700, color: '#d9b45b',
               display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 14,
             }}>
               مشاهده سیگنال‌ها

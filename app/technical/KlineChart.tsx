@@ -86,7 +86,7 @@ const SMC_ITEMS = [
   { name: 'swings', label: 'سقف/کف سوئینگ' },
 ]
 
-const CMP_COLORS = ['#3b82f6', '#d97706', '#ec4899', '#0891b2', '#8b5cf6']
+const CMP_COLORS = ['#d9b45b', '#d97706', '#ec4899', '#0891b2', '#f4d795']
 
 // سرعت‌های بازپخش — فاصله هر کندل به میلی‌ثانیه
 const REPLAY_SPEEDS = [
@@ -228,7 +228,7 @@ function ensureOverlays() {
       return [{
         type: 'rect',
         attrs: { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) },
-        styles: { style: 'stroke_fill', color: 'rgba(59,130,246,0.12)', borderColor: '#3b82f6', borderSize: 1 },
+        styles: { style: 'stroke_fill', color: 'rgba(217,180,91,0.12)', borderColor: '#d9b45b', borderSize: 1 },
       }]
     },
   })
@@ -243,7 +243,7 @@ function ensureOverlays() {
       return [{
         type: 'circle',
         attrs: { x: a.x, y: a.y, r },
-        styles: { style: 'stroke_fill', color: 'rgba(139,92,246,0.12)', borderColor: '#8b5cf6', borderSize: 1 },
+        styles: { style: 'stroke_fill', color: 'rgba(244,215,149,0.12)', borderColor: '#f4d795', borderSize: 1 },
       }]
     },
   })
@@ -259,8 +259,8 @@ function ensureOverlays() {
       const p1 = { x: b.x - L * Math.cos(ang - Math.PI / 7), y: b.y - L * Math.sin(ang - Math.PI / 7) }
       const p2 = { x: b.x - L * Math.cos(ang + Math.PI / 7), y: b.y - L * Math.sin(ang + Math.PI / 7) }
       return [
-        { type: 'line', attrs: { coordinates: [a, b] }, styles: { color: '#3b82f6', size: 2 } },
-        { type: 'polygon', attrs: { coordinates: [b, p1, p2] }, styles: { style: 'fill', color: '#3b82f6' } },
+        { type: 'line', attrs: { coordinates: [a, b] }, styles: { color: '#d9b45b', size: 2 } },
+        { type: 'polygon', attrs: { coordinates: [b, p1, p2] }, styles: { style: 'fill', color: '#d9b45b' } },
       ]
     },
   })
@@ -455,10 +455,10 @@ function chartStyles(isDark: boolean, candleType: CandleType, s: ChartSettings) 
         upWickColor: GREEN, downWickColor: RED, noChangeWickColor: text,
       },
       area: {
-        lineColor: '#3b82f6', lineSize: 2,
+        lineColor: '#d9b45b', lineSize: 2,
         backgroundColor: [
-          { offset: 0, color: 'rgba(59,130,246,0.01)' },
-          { offset: 1, color: 'rgba(59,130,246,0.2)' },
+          { offset: 0, color: 'rgba(217,180,91,0.01)' },
+          { offset: 1, color: 'rgba(217,180,91,0.2)' },
         ],
       },
       priceMark: {
@@ -1235,8 +1235,8 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
     fontSize: 12, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
     padding: '7px 12px', borderRadius: 9, minHeight: 32,
     border: '1px solid transparent',
-    background: active ? 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(139,92,246,0.18))' : 'transparent',
-    color: active ? '#3b82f6' : muted,
+    background: active ? 'linear-gradient(135deg, rgba(217,180,91,0.22), rgba(244,215,149,0.18))' : 'transparent',
+    color: active ? '#d9b45b' : muted,
     transition: 'all 0.15s',
   })
 
@@ -1260,7 +1260,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
     width: '100%', textAlign: 'right', cursor: 'pointer', fontFamily: 'inherit',
     fontSize: 12.5, padding: '9px 11px', borderRadius: 6, border: 'none',
     background: 'transparent',
-    color: active ? '#3b82f6' : text,
+    color: active ? '#d9b45b' : text,
   })
 
   const sectionTitle: React.CSSProperties = {
@@ -1270,9 +1270,9 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
   const railBtn = (active: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
-    background: active ? 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(139,92,246,0.18))' : 'transparent',
+    background: active ? 'linear-gradient(135deg, rgba(217,180,91,0.22), rgba(244,215,149,0.18))' : 'transparent',
     border: '1px solid transparent',
-    color: active ? '#3b82f6' : muted,
+    color: active ? '#d9b45b' : muted,
     transition: 'all 0.15s', flexShrink: 0,
   })
 
@@ -1322,7 +1322,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
       height: isFull ? '100vh' : undefined,
       background: chartBg,
       border: `1px solid ${line}`, borderRadius: isFull ? 0 : 16, overflow: 'hidden',
-      boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.35)' : '0 8px 24px rgba(59,130,246,0.08)',
+      boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.35)' : '0 8px 24px rgba(217,180,91,0.08)',
     }}>
       {/* ── هدر بالا — مثل TradingView */}
       <div style={{
@@ -1519,7 +1519,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
                     color: text, border: `1px solid ${line}`,
                   }}
                 />
-                <button onClick={addCompare} style={{ ...btn(true), border: `1px solid rgba(59,130,246,0.4)` }}>افزودن</button>
+                <button onClick={addCompare} style={{ ...btn(true), border: `1px solid rgba(217,180,91,0.4)` }}>افزودن</button>
               </div>
               {compares.map((sym, i) => (
                 <div key={sym} style={{ ...menuItem(false), cursor: 'default' }}>
@@ -1587,7 +1587,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
                       borderRadius: 6, outline: 'none', background: 'transparent',
                       color: text, border: `1px solid ${line}`,
                     }} />
-                  <button onClick={saveLayout} style={{ ...btn(true), border: '1px solid rgba(59,130,246,0.4)' }}>ذخیره</button>
+                  <button onClick={saveLayout} style={{ ...btn(true), border: '1px solid rgba(217,180,91,0.4)' }}>ذخیره</button>
                 </div>
                 {layouts.map((l, i) => (
                   <div key={`${l.name}-${i}`} style={{ ...menuItem(false), cursor: 'default' }}>
@@ -1740,7 +1740,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
             value={replayIdx}
             onChange={e => scrubReplay(Number(e.target.value))}
             aria-label="پیمایش بازپخش"
-            style={{ flex: 1, accentColor: '#3b82f6', cursor: 'pointer' }}
+            style={{ flex: 1, accentColor: '#d9b45b', cursor: 'pointer' }}
           />
           <span style={{ fontSize: 11, color: muted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
             {fa(replayIdx)} / {fa(totalBars)}
@@ -1771,8 +1771,8 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
               style={railBtn(activeTool === t.name)}
               onMouseEnter={e => {
                 if (activeTool === t.name) return
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59,130,246,0.16), rgba(139,92,246,0.12))'
-                e.currentTarget.style.color = '#3b82f6'
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(217,180,91,0.16), rgba(244,215,149,0.12))'
+                e.currentTarget.style.color = '#d9b45b'
               }}
               onMouseLeave={e => {
                 if (activeTool === t.name) return
@@ -1845,7 +1845,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
       }}>
         {RANGES.map(r => (
           <button key={r.label} onClick={() => applyRange(r.months)} style={{ ...btn(false), padding: '4px 9px', minHeight: 26 }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#3b82f6' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#d9b45b' }}
             onMouseLeave={e => { e.currentTarget.style.color = muted }}>
             {r.label}
           </button>

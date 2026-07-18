@@ -8,8 +8,8 @@ import { useIsMobile } from '../../lib/useIsMobile'
 // از سمت کلاینت به‌جای زدن مستقیم به بات خارجی، از پروکسی خودمان عبور می‌کند
 // تا rate limit و اعتبارسنجی ورودی سمت سرور اعمال شود
 const AI_API = '/api/chat'
-const ACCENT = '#3b82f6'
-const ACCENT2 = '#8b5cf6'
+const ACCENT = '#d9b45b'
+const ACCENT2 = '#f4d795'
 const GRAD = `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})`
 
 type ChatMsg = { role: 'user' | 'ai'; text: string }
@@ -151,7 +151,7 @@ function ContactForm({ isDark, TEXT, MUTED, PANEL_BORDER, INPUT_BG, INPUT_BORDER
           style={{
             fontSize: 11.5, padding: '9px 18px', borderRadius: 999, cursor: 'pointer',
             background: `${ACCENT}12`, border: `1px solid ${ACCENT}35`,
-            color: isDark ? '#93c5fd' : '#2563eb', fontFamily: 'inherit',
+            color: isDark ? '#93c5fd' : '#b8860b', fontFamily: 'inherit',
           }}
         >
           ارسال پیام جدید
@@ -312,10 +312,10 @@ export default function ChatWidget() {
 
   // رنگ‌های تم
   const PANEL_BG = isDark ? '#0d1017' : '#fdfaf4'
-  const PANEL_BORDER = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(59,130,246,0.18)'
+  const PANEL_BORDER = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(217,180,91,0.18)'
   const TEXT = isDark ? '#dbe2ef' : '#3d3425'
   const MUTED = isDark ? '#6b7280' : '#8a7a5e'
-  const AI_BUBBLE = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(59,130,246,0.06)'
+  const AI_BUBBLE = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(217,180,91,0.06)'
   const INPUT_BG = isDark ? 'rgba(255,255,255,0.04)' : '#fff'
   const INPUT_BORDER = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)'
 
@@ -396,7 +396,7 @@ export default function ChatWidget() {
                 style={{
                   flex: 1, padding: '11px 0', border: 'none', cursor: 'pointer',
                   background: tab === t2.id ? `${ACCENT}10` : 'transparent',
-                  color: tab === t2.id ? (isDark ? '#93c5fd' : '#2563eb') : MUTED,
+                  color: tab === t2.id ? (isDark ? '#93c5fd' : '#b8860b') : MUTED,
                   fontSize: 11.5, fontWeight: tab === t2.id ? 700 : 500, fontFamily: 'inherit',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   borderBottom: tab === t2.id ? `2px solid ${ACCENT}` : '2px solid transparent',
@@ -442,7 +442,7 @@ export default function ChatWidget() {
                       style={{
                         fontSize: 11, padding: '8px 13px', borderRadius: 999, cursor: 'pointer',
                         background: `${ACCENT}12`, border: `1px solid ${ACCENT}35`,
-                        color: isDark ? '#93c5fd' : '#2563eb', fontFamily: 'inherit',
+                        color: isDark ? '#93c5fd' : '#b8860b', fontFamily: 'inherit',
                       }}
                     >
                       {q}
@@ -545,7 +545,7 @@ export default function ChatWidget() {
           border: 'none', cursor: 'pointer',
           background: GRAD,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 6px 24px rgba(59,130,246,0.45)',
+          boxShadow: '0 6px 24px rgba(217,180,91,0.45)',
           animation: open ? undefined : 'cwPulse 3s ease-in-out infinite',
         }}
       >

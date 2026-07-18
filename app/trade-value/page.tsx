@@ -179,11 +179,11 @@ export default function TradeValuePage() {
 
         {/* کارت ارزش معاملات کل بازار — سهام + همه صندوق‌ها */}
         <div style={{
-          background: panel, border: '0.5px solid rgba(59,130,246,0.3)', borderRadius: 18,
+          background: panel, border: '0.5px solid rgba(217,180,91,0.3)', borderRadius: 18,
           padding: '22px 26px', marginBottom: 20, backdropFilter: 'blur(12px)',
           position: 'relative', overflow: 'hidden',
         }}>
-          <div style={{ position: 'absolute', top: 0, right: 0, left: 0, height: 3, background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, transparent)' }} />
+          <div style={{ position: 'absolute', top: 0, right: 0, left: 0, height: 3, background: 'linear-gradient(90deg, #d9b45b, #f4d795, transparent)' }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: text, marginBottom: 6 }}>ارزش کل معاملات بازار</div>
@@ -234,7 +234,7 @@ export default function TradeValuePage() {
                 onClick={() => setShowTrend(true)}
                 style={{
                   padding: '10px 20px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none',
+                  background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', border: 'none',
                   fontFamily: 'inherit', flexShrink: 0,
                 }}
               >
@@ -256,7 +256,7 @@ export default function TradeValuePage() {
             <div
               onClick={e => e.stopPropagation()}
               style={{
-                background: panel, border: '0.5px solid rgba(59,130,246,0.3)', borderRadius: 18,
+                background: panel, border: '0.5px solid rgba(217,180,91,0.3)', borderRadius: 18,
                 padding: '22px 26px', maxWidth: 760, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
               }}
             >

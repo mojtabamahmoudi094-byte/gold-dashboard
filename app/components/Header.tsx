@@ -213,7 +213,7 @@ export default function Header() {
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
 
   const BG      = isDark ? 'rgba(8,10,16,0.95)' : 'rgba(252,249,242,0.97)'
-  const BORDER  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(59,130,246,0.12)'
+  const BORDER  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(217,180,91,0.12)'
   const SHADOW  = scrolled
     ? isDark ? '0 4px 40px rgba(0,0,0,0.7)' : '0 4px 20px rgba(0,0,0,0.1)'
     : 'none'
@@ -236,7 +236,7 @@ export default function Header() {
           display: 'flex', alignItems: 'center', gap: 12,
           padding: compact ? '9px 16px' : '10px 14px',
           borderRadius: 9,
-          borderBottom: i < idxItems.length - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(59,130,246,0.08)'}` : 'none',
+          borderBottom: i < idxItems.length - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(217,180,91,0.08)'}` : 'none',
         }}>
           <span style={{
             flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -268,14 +268,14 @@ export default function Header() {
     textDecoration: 'none',
     fontSize: 13.5,
     fontWeight: active ? 600 : 400,
-    color: active ? '#3b82f6' : TEXT_NAV,
+    color: active ? '#d9b45b' : TEXT_NAV,
     padding: '7px 14px',
     borderRadius: 8,
-    background: active ? 'rgba(59,130,246,0.1)' : 'transparent',
+    background: active ? 'rgba(217,180,91,0.1)' : 'transparent',
     fontFamily: 'inherit',
     transition: 'color 0.18s, background 0.18s',
     letterSpacing: '0.01em',
-    borderBottom: active ? '1.5px solid rgba(59,130,246,0.5)' : '1.5px solid transparent',
+    borderBottom: active ? '1.5px solid rgba(217,180,91,0.5)' : '1.5px solid transparent',
   })
 
   return (
@@ -294,7 +294,7 @@ export default function Header() {
       {/* Top accent stripe — blue→purple gradient */}
       <div style={{
         height: 2,
-        background: 'linear-gradient(90deg, #3b82f6 0%, #6366f1 40%, #8b5cf6 70%, #a78bfa 100%)',
+        background: 'linear-gradient(90deg, #d9b45b 0%, #6366f1 40%, #f4d795 70%, #a78bfa 100%)',
       }} />
 
       <div style={{ height: 1, background: BORDER }} />
@@ -317,7 +317,7 @@ export default function Header() {
             <div className="brand-title" style={{
               fontSize: 17,
               fontWeight: 700,
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
@@ -328,7 +328,7 @@ export default function Header() {
             </div>
             <div style={{
               fontSize: 9,
-              color: isDark ? 'rgba(59,130,246,0.5)' : 'rgba(37,99,235,0.6)',
+              color: isDark ? 'rgba(217,180,91,0.5)' : 'rgba(184,134,11,0.6)',
               marginTop: 1,
               letterSpacing: '0.06em',
               fontWeight: 500,
@@ -352,8 +352,8 @@ export default function Header() {
                     style={{ ...navLink(isActive(item.href)), display: 'inline-flex', alignItems: 'center', gap: 5 }}
                     onMouseEnter={e => {
                       if (!isActive(item.href)) {
-                        e.currentTarget.style.color = '#3b82f6'
-                        e.currentTarget.style.background = 'rgba(59,130,246,0.08)'
+                        e.currentTarget.style.color = '#d9b45b'
+                        e.currentTarget.style.background = 'rgba(217,180,91,0.08)'
                       }
                     }}
                     onMouseLeave={e => {
@@ -390,7 +390,7 @@ export default function Header() {
                         <div style={{
                           minWidth: 250,
                           background: isDark ? '#12161f' : '#fffdf8',
-                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(59,130,246,0.15)'}`,
+                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(217,180,91,0.15)'}`,
                           borderRadius: 14, padding: 6,
                           boxShadow: isDark ? '0 18px 50px rgba(0,0,0,0.6)' : '0 14px 40px rgba(0,0,0,0.14)',
                         }}>
@@ -404,8 +404,8 @@ export default function Header() {
                               transition: 'background 0.15s, color 0.15s',
                             }}
                             onMouseEnter={e => {
-                              e.currentTarget.style.background = 'rgba(59,130,246,0.1)'
-                              e.currentTarget.style.color = '#3b82f6'
+                              e.currentTarget.style.background = 'rgba(217,180,91,0.1)'
+                              e.currentTarget.style.color = '#d9b45b'
                             }}
                             onMouseLeave={e => {
                               e.currentTarget.style.background = 'transparent'
@@ -433,8 +433,8 @@ export default function Header() {
                   ...navLink(false),
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                   border: 'none', borderBottom: '1.5px solid transparent',
-                  background: openDrop === '__idx__' ? 'rgba(59,130,246,0.08)' : 'transparent',
-                  color: openDrop === '__idx__' ? '#3b82f6' : TEXT_NAV,
+                  background: openDrop === '__idx__' ? 'rgba(217,180,91,0.08)' : 'transparent',
+                  color: openDrop === '__idx__' ? '#d9b45b' : TEXT_NAV,
                   cursor: 'pointer',
                 }}
               >
@@ -449,7 +449,7 @@ export default function Header() {
                   <div style={{
                     minWidth: 300,
                     background: isDark ? '#12161f' : '#fffdf8',
-                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(59,130,246,0.15)'}`,
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(217,180,91,0.15)'}`,
                     borderRadius: 14, padding: 6,
                     boxShadow: isDark ? '0 18px 50px rgba(0,0,0,0.6)' : '0 14px 40px rgba(0,0,0,0.14)',
                     direction: 'rtl',
@@ -462,7 +462,7 @@ export default function Header() {
 
             <div style={{
               width: 1, height: 22,
-              background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(59,130,246,0.15)',
+              background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(217,180,91,0.15)',
               margin: '0 8px',
             }} />
 
@@ -482,9 +482,9 @@ export default function Header() {
                 transition: 'all 0.2s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(59,130,246,0.1)'
-                e.currentTarget.style.color = '#3b82f6'
-                e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'
+                e.currentTarget.style.background = 'rgba(217,180,91,0.1)'
+                e.currentTarget.style.color = '#d9b45b'
+                e.currentTarget.style.borderColor = 'rgba(217,180,91,0.3)'
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.background = 'transparent'
@@ -502,8 +502,8 @@ export default function Header() {
                   display: 'flex', alignItems: 'center', gap: 6,
                   fontSize: 11.5,
                   color: isDark ? '#a9b0c2' : '#6B5A3A',
-                  background: isDark ? 'rgba(59,130,246,0.06)' : 'rgba(59,130,246,0.08)',
-                  border: `1px solid ${isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.2)'}`,
+                  background: isDark ? 'rgba(217,180,91,0.06)' : 'rgba(217,180,91,0.08)',
+                  border: `1px solid ${isDark ? 'rgba(217,180,91,0.15)' : 'rgba(217,180,91,0.2)'}`,
                   borderRadius: 8, padding: '5px 12px',
                   maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
@@ -531,19 +531,19 @@ export default function Header() {
                 className="cta-pulse btn-shine"
                 style={{
                   fontSize: 12.5, padding: '7px 18px', borderRadius: 8,
-                  background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                  background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
                   border: 'none',
                   color: '#fff', textDecoration: 'none', fontWeight: 600,
                   marginRight: 4, transition: 'all 0.2s',
                   letterSpacing: '0.01em',
-                  boxShadow: '0 2px 16px rgba(59,130,246,0.3)',
+                  boxShadow: '0 2px 16px rgba(217,180,91,0.3)',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.boxShadow = '0 4px 24px rgba(59,130,246,0.5)'
+                  e.currentTarget.style.boxShadow = '0 4px 24px rgba(217,180,91,0.5)'
                   e.currentTarget.style.opacity = '0.92'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.boxShadow = '0 2px 16px rgba(59,130,246,0.3)'
+                  e.currentTarget.style.boxShadow = '0 2px 16px rgba(217,180,91,0.3)'
                   e.currentTarget.style.opacity = '1'
                 }}
               >
@@ -577,9 +577,9 @@ export default function Header() {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
-                background: menuOpen ? 'rgba(59,130,246,0.1)' : 'transparent',
-                border: `1px solid ${menuOpen ? 'rgba(59,130,246,0.35)' : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
-                color: menuOpen ? '#3b82f6' : isDark ? '#6b7280' : '#7A6A50',
+                background: menuOpen ? 'rgba(217,180,91,0.1)' : 'transparent',
+                border: `1px solid ${menuOpen ? 'rgba(217,180,91,0.35)' : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
+                color: menuOpen ? '#d9b45b' : isDark ? '#6b7280' : '#7A6A50',
                 transition: 'all 0.2s',
               }}
             >
@@ -613,11 +613,11 @@ export default function Header() {
                   display: 'flex', alignItems: 'center',
                   textDecoration: 'none', fontSize: 14,
                   fontWeight: active ? 600 : 400,
-                  color: active ? '#3b82f6' : isDark ? '#8A9BAE' : '#7A6A50',
+                  color: active ? '#d9b45b' : isDark ? '#8A9BAE' : '#7A6A50',
                   padding: '13px 16px', borderRadius: 10,
-                  background: active ? 'rgba(59,130,246,0.08)' : 'transparent',
+                  background: active ? 'rgba(217,180,91,0.08)' : 'transparent',
                   fontFamily: 'inherit', marginBottom: 2,
-                  borderRight: active ? '2.5px solid rgba(59,130,246,0.6)' : '2.5px solid transparent',
+                  borderRight: active ? '2.5px solid rgba(217,180,91,0.6)' : '2.5px solid transparent',
                   transition: 'all 0.15s',
                 }}>
                   {item.label}
@@ -631,9 +631,9 @@ export default function Header() {
                         <Link key={m.href} href={m.href} aria-current={mActive ? 'page' : undefined} style={{
                           display: 'block', textDecoration: 'none', fontSize: 12.5,
                           fontWeight: mActive ? 600 : 400,
-                          color: mActive ? '#3b82f6' : isDark ? '#6b7a8c' : '#8a7a5a',
+                          color: mActive ? '#d9b45b' : isDark ? '#6b7a8c' : '#8a7a5a',
                           padding: '9px 16px 9px 16px', margin: '0 16px 0 0', borderRadius: 8,
-                          background: mActive ? 'rgba(59,130,246,0.07)' : 'transparent',
+                          background: mActive ? 'rgba(217,180,91,0.07)' : 'transparent',
                           fontFamily: 'inherit',
                         }}>
                           · {m.label}
@@ -650,7 +650,7 @@ export default function Header() {
           <div style={{ height: 1, background: BORDER, margin: '10px 0' }} />
 
           {/* شاخص‌های بازار در منوی موبایل — هاور وجود ندارد، همیشه نمایش داده می‌شود */}
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6', padding: '4px 16px 6px' }}>شاخص‌های بازار</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#d9b45b', padding: '4px 16px 6px' }}>شاخص‌های بازار</div>
           <div>{renderIdxRows(true)}</div>
 
           <div style={{ height: 1, background: BORDER, margin: '10px 0' }} />
@@ -672,7 +672,7 @@ export default function Header() {
             <Link href="/auth" style={{
               display: 'block', fontSize: 14, fontWeight: 600,
               color: '#fff', padding: '13px 16px', borderRadius: 10,
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
               border: 'none',
               textDecoration: 'none', textAlign: 'center',
               marginTop: 2,

@@ -186,7 +186,7 @@ function PerCapTable({ card, isDark }: { card: PCard; isDark: boolean }) {
   }, [card, sortI, asc])
 
   const line = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.08)'
-  const headBg = isDark ? 'rgba(59,130,246,0.12)' : 'rgba(59,130,246,0.14)'
+  const headBg = isDark ? 'rgba(217,180,91,0.12)' : 'rgba(217,180,91,0.14)'
   const text = isDark ? '#E8F4FF' : '#0F1E2E'
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
@@ -199,11 +199,11 @@ function PerCapTable({ card, isDark }: { card: PCard; isDark: boolean }) {
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 14px', borderBottom: `2px solid rgba(59,130,246,0.35)`,
+        padding: '12px 14px', borderBottom: `2px solid rgba(217,180,91,0.35)`,
       }}>
         <span title={card.desc} style={{
           width: 18, height: 18, borderRadius: '50%', flexShrink: 0, cursor: 'help',
-          background: '#3b82f6', color: '#fff', fontSize: 12, fontWeight: 700,
+          background: '#d9b45b', color: '#fff', fontSize: 12, fontWeight: 700,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         }}>؟</span>
         <span style={{ fontSize: 14, fontWeight: 700, color: 'oklch(0.74 0.16 150)', textAlign: 'center', flex: 1 }}>
@@ -226,7 +226,7 @@ function PerCapTable({ card, isDark }: { card: PCard; isDark: boolean }) {
                     backdropFilter: 'blur(6px)',
                   }}>
                   {c.label}{' '}
-                  <span style={{ fontSize: 8, color: sortI === i ? '#3b82f6' : cream }}>
+                  <span style={{ fontSize: 8, color: sortI === i ? '#d9b45b' : cream }}>
                     {sortI === i ? (asc ? '▲' : '▼') : '▲▼'}
                   </span>
                 </th>
@@ -241,9 +241,9 @@ function PerCapTable({ card, isDark }: { card: PCard; isDark: boolean }) {
             ) : rows.map((r) => (
               <tr key={r.sym} style={{ borderBottom: `1px solid ${line}` }}>
                 {card.cols.map((c, i) => (
-                  <td key={i} style={{ padding: '7px 8px', textAlign: 'center', whiteSpace: 'nowrap', color: i === 0 ? '#3b82f6' : cream }}>
+                  <td key={i} style={{ padding: '7px 8px', textAlign: 'center', whiteSpace: 'nowrap', color: i === 0 ? '#d9b45b' : cream }}>
                     {i === 0 ? (
-                      <Link href={`/technical/${encodeURIComponent(r.sym)}`} style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 700 }}>
+                      <Link href={`/technical/${encodeURIComponent(r.sym)}`} style={{ color: '#d9b45b', textDecoration: 'none', fontWeight: 700 }}>
                         {r.sym}
                       </Link>
                     ) : (

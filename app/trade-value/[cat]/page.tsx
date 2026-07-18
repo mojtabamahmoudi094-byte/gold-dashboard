@@ -384,13 +384,13 @@ export default function TradeValueDetailPage() {
 
         {/* Breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28, fontSize: 13, color: t.muted }}>
-          <Link href="/" style={{ color: '#3b82f6', textDecoration: 'none' }}>خانه</Link>
+          <Link href="/" style={{ color: '#d9b45b', textDecoration: 'none' }}>خانه</Link>
           <span>/</span>
-          <Link href="/trade-value" style={{ color: '#3b82f6', textDecoration: 'none' }}>ارزش معاملات</Link>
+          <Link href="/trade-value" style={{ color: '#d9b45b', textDecoration: 'none' }}>ارزش معاملات</Link>
           <span>/</span>
           {['leveraged', 'sector', 'equity'].includes(slug) && (
             <>
-              <Link href="/trade-value/bourse" style={{ color: '#3b82f6', textDecoration: 'none' }}>صندوق‌های بورسی</Link>
+              <Link href="/trade-value/bourse" style={{ color: '#d9b45b', textDecoration: 'none' }}>صندوق‌های بورسی</Link>
               <span>/</span>
             </>
           )}

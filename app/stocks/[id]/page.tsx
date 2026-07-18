@@ -198,7 +198,7 @@ export default function IndustryPage() {
                           background: i % 2 ? (isDark ? 'rgba(255,255,255,0.015)' : 'rgba(15,30,46,0.02)') : 'transparent',
                           cursor: 'pointer',
                         }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(59,130,246,0.07)' : 'rgba(59,130,246,0.06)' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(217,180,91,0.07)' : 'rgba(217,180,91,0.06)' }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = i % 2 ? (isDark ? 'rgba(255,255,255,0.015)' : 'rgba(15,30,46,0.02)') : 'transparent' }}
                       >
                         <td style={{ padding: '10px 14px', borderBottom: `1px solid ${line}` }}>

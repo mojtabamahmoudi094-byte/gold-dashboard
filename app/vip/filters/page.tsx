@@ -264,8 +264,8 @@ export default function VipFiltersPage() {
             {updated && <span style={{ fontSize: 11.5, color: cream }}>آخرین به‌روزرسانی: {updated}</span>}
             <button onClick={load} disabled={loading} style={{
               fontSize: 12, padding: '6px 16px', borderRadius: 8, cursor: loading ? 'wait' : 'pointer',
-              background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
-              color: '#3b82f6', fontFamily: 'inherit', fontWeight: 600,
+              background: 'rgba(217,180,91,0.1)', border: '1px solid rgba(217,180,91,0.3)',
+              color: '#d9b45b', fontFamily: 'inherit', fontWeight: 600,
             }}>{loading ? 'در حال دریافت…' : 'به‌روزرسانی'}</button>
           </div>
         </div>

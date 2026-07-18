@@ -19,7 +19,7 @@ const ToastContext = createContext<ToastContextValue | null>(null)
 const KIND_STYLE: Record<ToastKind, { border: string; icon: string }> = {
   success: { border: '#059669', icon: '✓' },
   error: { border: '#DC2626', icon: '✕' },
-  info: { border: '#3b82f6', icon: 'ℹ' },
+  info: { border: '#d9b45b', icon: 'ℹ' },
 }
 
 export function useToast() {

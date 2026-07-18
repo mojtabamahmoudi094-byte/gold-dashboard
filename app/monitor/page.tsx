@@ -13,12 +13,12 @@ const CATS = [
   {
     href: '/monitor/stocks', ready: true,
     title: 'سهام', desc: 'هیجان، تحرک قیمتی، ارزش معاملات خرد، صف‌ها، سرانه‌ها و ورود پول حقیقی — ۹:۰۰ تا ۱۲:۳۰',
-    color: '#3b82f6',
+    color: '#d9b45b',
   },
   {
     href: '/monitor/bourse-funds', ready: true,
     title: 'صندوق‌های بورسی', desc: 'رصد لحظه‌ای صندوق‌های اهرمی، بخشی و سهامی — ۹:۰۰ تا ۱۲:۳۰',
-    color: '#8b5cf6',
+    color: '#f4d795',
   },
   {
     href: '/monitor/gold', ready: true,
@@ -44,7 +44,7 @@ export default function MonitorPage() {
       <main style={{ minHeight: '100vh', background: '#0a0d14', color: '#eef1f8', fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl', padding: isMobile ? '32px 16px' : '60px 6vw' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 44 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6', marginBottom: 12 }}>نمودار</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#d9b45b', marginBottom: 12 }}>نمودار</div>
             <h1 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4vw,44px)', fontWeight: 900, margin: '0 0 14px' }}>رصد لحظه‌ای بازارها</h1>
             <p style={{ color: '#a9b0c2', fontSize: 17 }}>سنجه‌های کل بازار، هر ۵ دقیقه در ساعت معاملات</p>
           </div>

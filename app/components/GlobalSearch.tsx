@@ -114,9 +114,9 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: compact ? 36 : 34, height: compact ? 36 : 34, borderRadius: 8, cursor: 'pointer',
-          background: open ? 'rgba(59,130,246,0.1)' : 'transparent',
-          border: `1px solid ${open ? 'rgba(59,130,246,0.35)' : border}`,
-          color: open ? '#3b82f6' : muted,
+          background: open ? 'rgba(217,180,91,0.1)' : 'transparent',
+          border: `1px solid ${open ? 'rgba(217,180,91,0.35)' : border}`,
+          color: open ? '#d9b45b' : muted,
           transition: 'all 0.2s',
         }}
       >
@@ -128,7 +128,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
           position: 'absolute', top: '110%', insetInlineEnd: 0,
           width: 300, maxWidth: '90vw', zIndex: 400,
           background: isDark ? '#12161f' : '#fffdf8',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(59,130,246,0.15)'}`,
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(217,180,91,0.15)'}`,
           borderRadius: 14, padding: 8,
           boxShadow: isDark ? '0 18px 50px rgba(0,0,0,0.6)' : '0 14px 40px rgba(0,0,0,0.14)',
           direction: 'rtl',

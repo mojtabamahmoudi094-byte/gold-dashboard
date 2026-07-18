@@ -190,8 +190,8 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                 marginTop: 14, marginBottom: 16, padding: isMobile ? '18px 18px' : '22px 26px',
                 borderRadius: 20, border: `0.5px solid ${line}`,
                 background: isDark
-                  ? 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.08) 55%, rgba(10,18,30,0.4))'
-                  : 'linear-gradient(135deg, rgba(59,130,246,0.09), rgba(139,92,246,0.06) 55%, rgba(255,255,255,0.7))',
+                  ? 'linear-gradient(135deg, rgba(217,180,91,0.12), rgba(244,215,149,0.08) 55%, rgba(10,18,30,0.4))'
+                  : 'linear-gradient(135deg, rgba(217,180,91,0.09), rgba(244,215,149,0.06) 55%, rgba(255,255,255,0.7))',
                 backdropFilter: 'blur(12px)',
               }}>
                 <div style={{
@@ -203,7 +203,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{
                         fontSize: isMobile ? 24 : 30, fontWeight: 800, letterSpacing: '-0.01em',
-                        background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                        background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
                         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
                       }}>{s.l18}</span>
                       <span style={{ fontSize: 12.5, color: muted, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.l30}</span>
@@ -213,7 +213,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                         display: 'inline-block',
                         fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
                         padding: '4px 11px', borderRadius: 8,
-                        background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.28)',
+                        background: 'rgba(217,180,91,0.1)', border: '0.5px solid rgba(217,180,91,0.28)',
                       }}>
                         {ind.name}
                       </Link>
@@ -221,7 +221,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                         display: 'inline-block',
                         fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
                         padding: '4px 11px', borderRadius: 8,
-                        background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.28)',
+                        background: 'rgba(217,180,91,0.1)', border: '0.5px solid rgba(217,180,91,0.28)',
                       }}>
                         نمودار تکنیکال
                       </Link>
@@ -229,7 +229,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                         display: 'inline-block',
                         fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
                         padding: '4px 11px', borderRadius: 8,
-                        background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.28)',
+                        background: 'rgba(217,180,91,0.1)', border: '0.5px solid rgba(217,180,91,0.28)',
                       }}>
                         نسبت‌های مالی
                       </Link>
@@ -267,7 +267,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                 {cards.map(([k, v, c, metricKey]) => {
                   const accent = c === (GREEN as string) || c === (RED as string)
                   return (
-                    <div key={k} onClick={() => openMetric(metricKey, k, accent ? c : '#3b82f6')} style={{
+                    <div key={k} onClick={() => openMetric(metricKey, k, accent ? c : '#d9b45b')} style={{
                       position: 'relative', overflow: 'hidden', cursor: 'pointer',
                       background: panel, border: `0.5px solid ${accent ? `${c}33` : line}`, borderRadius: 14,
                       padding: '14px 16px', backdropFilter: 'blur(12px)', minWidth: 0,
@@ -285,7 +285,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                 onClose={() => setModalMetric(null)}
                 title={modalMetric?.label ?? ''}
                 unit={modalMetric ? SNAPSHOT_UNITS[modalMetric.key] : undefined}
-                color={modalMetric?.color ?? '#3b82f6'}
+                color={modalMetric?.color ?? '#d9b45b'}
                 data={modalData}
                 loading={snapshotLoading}
               />

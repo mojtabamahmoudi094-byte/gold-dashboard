@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { Skeleton } from '../../components/ui/Skeleton'
+import BubbleBar from '../../components/ui/BubbleBar'
 import AuthGate from '../../../components/AuthGate'
 
 const GRAMS_PER_OZ = 31.103431
@@ -324,11 +325,14 @@ export default function SilverAnalysisPage() {
                       </td>
                       <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
                         {f.bubbleAsmi != null ? (
-                          <span className="sbadge" style={{
-                            display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
-                            background: `${bc}18`, border: `0.5px solid ${bc}30`, boxShadow: `0 0 10px ${bc}30`,
-                            borderRadius: 6, padding: '2px 10px', fontFamily: 'system-ui',
-                          }}>{fmtPct(f.bubbleAsmi)}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className="sbadge" style={{
+                              display: 'inline-block', fontSize: 11, fontWeight: 700, color: bc,
+                              background: `${bc}18`, border: `0.5px solid ${bc}30`, boxShadow: `0 0 10px ${bc}30`,
+                              borderRadius: 6, padding: '2px 10px', fontFamily: 'system-ui',
+                            }}>{fmtPct(f.bubbleAsmi)}</span>
+                            <BubbleBar value={f.bubbleAsmi} maxPct={8} width={56} posColor={red} negColor={green} />
+                          </div>
                         ) : <span style={{ color: muted }}>—</span>}
                       </td>
                       <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}

@@ -130,7 +130,7 @@ const FEATURES: { href: string; title: string; desc: string; color: string; icon
     href: '/stocks',
     title: 'سهام بازار',
     desc: 'قیمت لحظه‌ای بیش از ۶۰۰ نماد در ۴۵ صنعت — هر ۵ دقیقه در ساعت بازار به‌روز می‌شود',
-    color: '#3b82f6',
+    color: '#d9b45b',
     icon: ICON.candles,
     badge: 'جدید',
   },
@@ -239,7 +239,7 @@ const FEATURES: { href: string; title: string; desc: string; color: string; icon
     href: '/compare',
     title: 'مقایسه صندوق‌ها',
     desc: 'مقایسه‌ی عملکرد دو تا پنج صندوق کنار هم به صورت بصری',
-    color: '#8b5cf6',
+    color: '#f4d795',
     icon: ICON.compare,
   },
 ]
@@ -355,8 +355,8 @@ export default function HomePage() {
   const softMuted = isDark ? 'rgba(221,213,189,0.75)' : '#7a6845'
   const cardBg = isDark ? 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))' : t.panel
   const cardBorder = isDark ? '1px solid rgba(255,255,255,0.08)' : `1px solid ${t.border}`
-  const rowBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(59,130,246,0.05)'
-  const divider = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(59,130,246,0.1)'
+  const rowBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(217,180,91,0.05)'
+  const divider = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(217,180,91,0.1)'
 
   return (
     <main style={{
@@ -370,8 +370,8 @@ export default function HomePage() {
 
       {/* ═══════ TICKER TAPE (داده‌ی زنده صندوق‌ها) ═══════ */}
       <div style={{
-        background: isDark ? 'rgba(59,130,246,0.05)' : 'rgba(37,99,235,0.05)',
-        borderBottom: `1px solid ${isDark ? 'rgba(59,130,246,0.12)' : 'rgba(37,99,235,0.14)'}`,
+        background: isDark ? 'rgba(217,180,91,0.05)' : 'rgba(184,134,11,0.05)',
+        borderBottom: `1px solid ${isDark ? 'rgba(217,180,91,0.12)' : 'rgba(184,134,11,0.14)'}`,
         height: 36, overflow: 'hidden', display: 'flex', alignItems: 'center',
       }}>
         {ticker.length === 0 ? (
@@ -414,8 +414,8 @@ export default function HomePage() {
         padding: isMobile ? '48px 20px 40px' : '56px 6vw 40px',
         direction: 'rtl',
       }}>
-        <div style={{ position: 'absolute', top: -220, right: -140, width: 640, height: 640, borderRadius: '50%', background: `radial-gradient(circle, rgba(59,130,246,${isDark ? 0.2 : 0.1}) 0%, transparent 65%)`, filter: 'blur(40px)', pointerEvents: 'none', animation: 'bs-glow 9s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', top: 280, left: -180, width: 560, height: 560, borderRadius: '50%', background: `radial-gradient(circle, rgba(139,92,246,${isDark ? 0.18 : 0.09}) 0%, transparent 65%)`, filter: 'blur(46px)', pointerEvents: 'none', animation: 'bs-glow 11s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: -220, right: -140, width: 640, height: 640, borderRadius: '50%', background: `radial-gradient(circle, rgba(217,180,91,${isDark ? 0.2 : 0.1}) 0%, transparent 65%)`, filter: 'blur(40px)', pointerEvents: 'none', animation: 'bs-glow 9s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: 280, left: -180, width: 560, height: 560, borderRadius: '50%', background: `radial-gradient(circle, rgba(244,215,149,${isDark ? 0.18 : 0.09}) 0%, transparent 65%)`, filter: 'blur(46px)', pointerEvents: 'none', animation: 'bs-glow 11s ease-in-out infinite' }} />
 
         <div style={{
           maxWidth: 1400, margin: '0 auto', position: 'relative',
@@ -427,7 +427,7 @@ export default function HomePage() {
         }}>
           {/* ── Text (RTL: right side) ── */}
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '7px 14px', borderRadius: 999, background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(37,99,235,0.06)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(37,99,235,0.16)'}`, fontSize: 13, fontWeight: 600, color: muted, marginBottom: 24 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '7px 14px', borderRadius: 999, background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(184,134,11,0.06)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(184,134,11,0.16)'}`, fontSize: 13, fontWeight: 600, color: muted, marginBottom: 24 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.green, display: 'inline-block', animation: 'bs-pulse 2s infinite' }} />
               سهام لحظه‌ای + صندوق‌های کالایی + گزارش‌های کدال
             </div>
@@ -444,15 +444,15 @@ export default function HomePage() {
             </p>
 
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 34, justifyContent: isMobile ? 'center' : 'flex-start' }}>
-              <Link href="/funds" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 17, padding: '15px 28px', borderRadius: 15, background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, boxShadow: '0 16px 40px rgba(59,130,246,0.42)', cursor: 'pointer', fontFamily: 'Vazirmatn, inherit', transition: 'transform 0.2s' }}
+              <Link href="/funds" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 17, padding: '15px 28px', borderRadius: 15, background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, boxShadow: '0 16px 40px rgba(217,180,91,0.42)', cursor: 'pointer', fontFamily: 'Vazirmatn, inherit', transition: 'transform 0.2s' }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8 L12 16 M9 12 L15 12"/></svg>
                 حباب صندوق‌ها را ببینید
               </Link>
-              <Link href="/stocks" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: t.text, textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '15px 26px', borderRadius: 15, border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : t.borderStrong}`, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(37,99,235,0.04)', cursor: 'pointer', fontFamily: 'Vazirmatn, inherit', transition: 'background 0.2s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(37,99,235,0.09)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(37,99,235,0.04)' }}>
+              <Link href="/stocks" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: t.text, textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '15px 26px', borderRadius: 15, border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : t.borderStrong}`, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(184,134,11,0.04)', cursor: 'pointer', fontFamily: 'Vazirmatn, inherit', transition: 'background 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(184,134,11,0.09)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(184,134,11,0.04)' }}>
                 نبض بازار سهام
               </Link>
             </div>
@@ -484,7 +484,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div style={{ position: 'relative', borderRadius: 16, background: isDark ? 'rgba(0,0,0,0.25)' : 'rgba(37,99,235,0.06)', padding: '14px 8px 6px', marginBottom: 16, overflow: 'hidden' }}>
+                <div style={{ position: 'relative', borderRadius: 16, background: isDark ? 'rgba(0,0,0,0.25)' : 'rgba(184,134,11,0.06)', padding: '14px 8px 6px', marginBottom: 16, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '0 10px 6px' }}>
                     <span style={{ fontSize: 22, fontWeight: 800 }}>{market ? fmtRial(market.tval) : '—'}</span>
                     {market && (
@@ -497,11 +497,11 @@ export default function HomePage() {
                   <svg viewBox="0 0 600 200" width="100%" height="120" preserveAspectRatio="none" style={{ display: 'block' }}>
                     <defs>
                       <linearGradient id="bsArea" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                        <stop offset="0%" stopColor="#d9b45b" stopOpacity="0.35" />
+                        <stop offset="100%" stopColor="#d9b45b" stopOpacity="0" />
                       </linearGradient>
                       <linearGradient id="bsLine" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="0%" stopColor="#d9b45b" />
                         <stop offset="100%" stopColor="oklch(0.74 0.17 155)" />
                       </linearGradient>
                     </defs>
@@ -517,7 +517,7 @@ export default function HomePage() {
                     const iconColors = ['oklch(0.82 0.15 70)', 'oklch(0.86 0.03 240)', 'oklch(0.74 0.19 40)']
                     return (
                       <Link key={i} href={row.slug ? `/fund/${row.slug}` : '/funds'} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 13, background: rowBg, textDecoration: 'none', color: t.text, cursor: 'pointer' }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 8, background: `${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(37,99,235,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: iconColors[i], flexShrink: 0 }}>{row.name.slice(0, 1)}</div>
+                        <div style={{ width: 30, height: 30, borderRadius: 8, background: `${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(184,134,11,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: iconColors[i], flexShrink: 0 }}>{row.name.slice(0, 1)}</div>
                         <div style={{ fontWeight: 700, fontSize: 14, flexShrink: 0 }}>{row.name}</div>
                         <div style={{ marginInlineStart: 'auto', textAlign: 'left' }}>
                           <div style={{ fontWeight: 700, fontSize: 14, fontFamily: 'system-ui, sans-serif' }}>{row.price.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}</div>
@@ -566,11 +566,11 @@ export default function HomePage() {
               label: 'ارزش معاملات بازار سهام',
               render: market ? () => <CountUp value={market.tval / 1e13} format={n => `${n.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} همت`} /> : null,
               icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d9b45b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/>
                 </svg>
               ),
-              color: '#3b82f6',
+              color: '#d9b45b',
             },
             {
               label: 'نمادهای مثبت بازار',
@@ -586,11 +586,11 @@ export default function HomePage() {
               label: 'ارزش معاملات صندوق‌های کالایی',
               render: stats ? () => <><CountUp value={stats.totalTV / 1e10} format={fmtVal} /> م.ت</> : null,
               icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f4d795" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
                 </svg>
               ),
-              color: '#8b5cf6',
+              color: '#f4d795',
             },
             {
               label: 'صندوق‌های فعال',
@@ -661,7 +661,7 @@ export default function HomePage() {
               </div>
             ) : gainers.map((s, i) => (
               <Link key={s.l18} href={`/stock/${encodeURIComponent(s.l18)}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, textDecoration: 'none', color: t.text, cursor: 'pointer', marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent', overflow: 'hidden', transition: 'background 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.1)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(184,134,11,0.1)' }}
                 onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
                 <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.l18}</span>
@@ -677,7 +677,7 @@ export default function HomePage() {
           {/* بیشترین ارزش معاملات */}
           <div style={{ background: cardBg, border: cardBorder, borderRadius: 18, padding: '18px 18px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <span style={{ width: 30, height: 30, borderRadius: 9, background: isDark ? 'rgba(59,130,246,0.15)' : 'rgba(37,99,235,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: isDark ? 'rgba(217,180,91,0.15)' : 'rgba(184,134,11,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.brand} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>
               </span>
               <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: 0, color: t.text }}>بیشترین ارزش معاملات</h3>
@@ -690,7 +690,7 @@ export default function HomePage() {
               const pos = s.plp >= 0
               return (
                 <Link key={s.l18} href={`/stock/${encodeURIComponent(s.l18)}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, textDecoration: 'none', color: t.text, cursor: 'pointer', marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent', overflow: 'hidden', transition: 'background 0.15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.1)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(184,134,11,0.1)' }}
                   onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
                   <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.l18}</span>
@@ -707,7 +707,7 @@ export default function HomePage() {
           {/* صنایع پیشرو */}
           <div style={{ background: cardBg, border: cardBorder, borderRadius: 18, padding: '18px 18px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <span style={{ width: 30, height: 30, borderRadius: 9, background: isDark ? 'rgba(139,92,246,0.15)' : 'rgba(124,58,237,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: isDark ? 'rgba(244,215,149,0.15)' : 'rgba(212,160,23,0.1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.brand2} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="7" height="18" rx="1"/><rect x="9.5" y="8" width="5" height="13" rx="1"/><rect x="17" y="5" width="5" height="16" rx="1"/></svg>
               </span>
               <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: 0, color: t.text }}>صنایع پیشروی امروز</h3>
@@ -721,7 +721,7 @@ export default function HomePage() {
               const upRatio = total > 0 ? ind.up / total : 0.5
               return (
                 <Link key={ind.id || ind.name} href={`/stocks/${ind.id ?? encodeURIComponent(ind.name)}`} style={{ display: 'block', padding: '9px 10px', borderRadius: 11, textDecoration: 'none', color: t.text, cursor: 'pointer', marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent', transition: 'background 0.15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.1)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(184,134,11,0.1)' }}
                   onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                     <span style={{ fontWeight: 700, fontSize: 13.5, flexShrink: 0 }}>{ind.name}</span>
@@ -803,7 +803,7 @@ export default function HomePage() {
             }}
             onMouseLeave={e => {
               e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(59,130,246,0.14)'
+              e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(217,180,91,0.14)'
             }}>
               {feat.badge && (
                 <span style={{ position: 'absolute', top: 16, left: 16, fontSize: 11, fontWeight: 800, color: '#04140b', background: `linear-gradient(135deg, oklch(0.78 0.16 155), oklch(0.85 0.14 150))`, padding: '3px 10px', borderRadius: 999 }}>{feat.badge}</span>
@@ -834,15 +834,15 @@ export default function HomePage() {
           کاملاً تحت‌وب و بدون نصب. حساب بسازید و همین حالا سهام، گزارش‌های کدال و حباب صندوق‌ها را زیر نظر بگیرید.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 17, padding: '16px 32px', borderRadius: 15, background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, boxShadow: '0 16px 42px rgba(59,130,246,0.42)', fontFamily: 'Vazirmatn, inherit', cursor: 'pointer', transition: 'transform 0.2s' }}
+          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 17, padding: '16px 32px', borderRadius: 15, background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, boxShadow: '0 16px 42px rgba(217,180,91,0.42)', fontFamily: 'Vazirmatn, inherit', cursor: 'pointer', transition: 'transform 0.2s' }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)' }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5 L12 19 M5 12 L19 12"/></svg>
             ثبت‌نام رایگان
           </Link>
-          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: t.text, textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '16px 30px', borderRadius: 15, border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : t.borderStrong}`, background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(37,99,235,0.04)', fontFamily: 'Vazirmatn, inherit', cursor: 'pointer', transition: 'background 0.2s' }}
-          onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.09)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(37,99,235,0.04)' }}>
+          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: t.text, textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '16px 30px', borderRadius: 15, border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : t.borderStrong}`, background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(184,134,11,0.04)', fontFamily: 'Vazirmatn, inherit', cursor: 'pointer', transition: 'background 0.2s' }}
+          onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(184,134,11,0.09)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(184,134,11,0.04)' }}>
             ورود به حساب کاربری
           </Link>
         </div>

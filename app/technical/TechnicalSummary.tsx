@@ -8,7 +8,7 @@ import type { Candle } from '../../lib/indicators'
 import { GREEN, RED } from './colors'
 import { glassStyle } from './uiTokens'
 
-const toneColor = (t: SummaryTone) => (t === 'pos' ? GREEN : t === 'neg' ? RED : '#3b82f6')
+const toneColor = (t: SummaryTone) => (t === 'pos' ? GREEN : t === 'neg' ? RED : '#d9b45b')
 const fa = (v: number) => v.toLocaleString('fa-IR')
 
 type Props = { symbol: string; candles: Candle[]; isDark: boolean }

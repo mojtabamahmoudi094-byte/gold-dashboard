@@ -868,7 +868,7 @@ ${txs.map(tx => row([
         </p>
         <Link href="/auth" style={{
           display: 'inline-block', padding: '10px 28px', borderRadius: 10, fontSize: 13.5, fontWeight: 600,
-          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', textDecoration: 'none',
+          background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', textDecoration: 'none',
         }}>ورود / ثبت‌نام</Link>
       </div>
     )
@@ -882,7 +882,7 @@ ${txs.map(tx => row([
         <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>راه‌اندازی اولیه لازم است</h1>
         <p style={{ fontSize: 13, color: t.muted, lineHeight: 2 }}>
           جدول پورتفوی هنوز در دیتابیس ساخته نشده. فایل
-          <code style={{ margin: '0 6px', padding: '2px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', color: t.brand, fontSize: 12 }}>
+          <code style={{ margin: '0 6px', padding: '2px 8px', borderRadius: 6, background: 'rgba(217,180,91,0.1)', color: t.brand, fontSize: 12 }}>
             scripts/sql/portfolio.sql
           </code>
           را در Supabase SQL Editor اجرا کنید و صفحه را رفرش کنید.
@@ -907,7 +907,7 @@ ${txs.map(tx => row([
             style={{
               padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600,
               cursor: instruments.length === 0 ? 'not-allowed' : 'pointer',
-              background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)',
+              background: 'rgba(217,180,91,0.08)', border: '1px solid rgba(217,180,91,0.3)',
               color: t.brand, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center',
               opacity: instruments.length === 0 ? 0.5 : 1,
             }}>
@@ -943,8 +943,8 @@ ${txs.map(tx => row([
             onClick={() => { setShowTelegram(!showTelegram); setTgMsg(null) }}
             style={{
               padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-              background: tgLinked ? 'rgba(16,185,129,0.08)' : 'rgba(59,130,246,0.08)',
-              border: `1px solid ${tgLinked ? 'rgba(16,185,129,0.3)' : 'rgba(59,130,246,0.3)'}`,
+              background: tgLinked ? 'rgba(16,185,129,0.08)' : 'rgba(217,180,91,0.08)',
+              border: `1px solid ${tgLinked ? 'rgba(16,185,129,0.3)' : 'rgba(217,180,91,0.3)'}`,
               color: tgLinked ? t.green : t.brand, fontFamily: 'inherit',
             }}
           >
@@ -963,7 +963,7 @@ ${txs.map(tx => row([
             onClick={() => setShowForm(!showForm)}
             style={{
               padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              background: showForm ? 'transparent' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              background: showForm ? 'transparent' : 'linear-gradient(135deg, #d9b45b, #f4d795)',
               color: showForm ? t.brand : '#fff',
               border: showForm ? `1px solid ${t.brand}` : 'none',
               fontFamily: 'inherit',
@@ -1012,7 +1012,7 @@ ${txs.map(tx => row([
               )}
               <button type="button" onClick={requestTelegramCode} disabled={tgLoading} style={{
                 padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none',
+                background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', border: 'none',
                 fontFamily: 'inherit', opacity: tgLoading ? 0.6 : 1,
               }}>{tgLoading ? 'در حال دریافت…' : tgCode ? 'دریافت کد جدید' : 'دریافت کد اتصال'}</button>
               {tgMsg && <p style={{ fontSize: 12, color: t.red, margin: '10px 0 0' }}>{tgMsg}</p>}
@@ -1069,7 +1069,7 @@ ${txs.map(tx => row([
                       onClick={() => pickInstrument({ symbol: query.trim(), name: query.trim(), type: 'stock', price: 0, changePct: 0 })}
                       style={{
                         display: 'block', width: '100%', padding: '9px 12px', fontSize: 12, cursor: 'pointer',
-                        background: 'rgba(59,130,246,0.06)', border: 'none',
+                        background: 'rgba(217,180,91,0.06)', border: 'none',
                         color: t.brand, fontFamily: 'inherit', textAlign: 'right',
                       }}
                     >
@@ -1127,7 +1127,7 @@ ${txs.map(tx => row([
             <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 4', display: 'flex', alignItems: 'flex-end', gap: 12 }}>
               <button type="submit" disabled={saving} style={{
                 padding: '10px 32px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none',
+                background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', border: 'none',
                 fontFamily: 'inherit', opacity: saving ? 0.6 : 1,
               }}>
                 {saving ? 'در حال ثبت…' : 'ثبت تراکنش'}
@@ -1235,7 +1235,7 @@ ${txs.map(tx => row([
               </p>
               <button type="button" onClick={confirmImport} disabled={importing} style={{
                 padding: '10px 28px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none',
+                background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', border: 'none',
                 fontFamily: 'inherit', opacity: importing ? 0.6 : 1,
               }}>
                 {importing ? 'در حال ثبت…' : `تایید و افزودن ${importRows.length} ردیف`}
@@ -1599,8 +1599,8 @@ ${txs.map(tx => row([
               <AreaChart data={growthData} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
                 <defs>
                   <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor="#d9b45b" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#d9b45b" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke={t.border} strokeDasharray="3 3" vertical={false} />
@@ -1619,7 +1619,7 @@ ${txs.map(tx => row([
                 {totals.priced && totals.value > 0 && (
                   <ReferenceLine y={totals.value} stroke={t.green} strokeDasharray="6 4" />
                 )}
-                <Area type="stepAfter" dataKey="invested" stroke="#3b82f6" strokeWidth={2} fill="url(#growthFill)" />
+                <Area type="stepAfter" dataKey="invested" stroke="#d9b45b" strokeWidth={2} fill="url(#growthFill)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -1719,7 +1719,7 @@ ${txs.map(tx => row([
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={submitQuickTx} disabled={qtSaving} style={{
                 flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: quickTx.side === 'sell' ? 'linear-gradient(135deg, #ef4444, #f97316)' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                background: quickTx.side === 'sell' ? 'linear-gradient(135deg, #ef4444, #f97316)' : 'linear-gradient(135deg, #d9b45b, #f4d795)',
                 color: '#fff', border: 'none', fontFamily: 'inherit', opacity: qtSaving ? 0.6 : 1,
               }}>
                 {qtSaving ? 'در حال ثبت…' : quickTx.side === 'sell' ? 'ثبت فروش' : 'ثبت خرید'}

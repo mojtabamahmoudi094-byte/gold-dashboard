@@ -91,7 +91,7 @@ function Table<T extends { key: string; name: string }>({ card, isDark }: { card
   }, [card, sortI, asc])
 
   const line = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.08)'
-  const headBg = isDark ? 'rgba(59,130,246,0.12)' : 'rgba(59,130,246,0.14)'
+  const headBg = isDark ? 'rgba(217,180,91,0.12)' : 'rgba(217,180,91,0.14)'
   const text = isDark ? '#E8F4FF' : '#0F1E2E'
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
@@ -103,11 +103,11 @@ function Table<T extends { key: string; name: string }>({ card, isDark }: { card
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 14px', borderBottom: '2px solid rgba(59,130,246,0.35)',
+        padding: '12px 14px', borderBottom: '2px solid rgba(217,180,91,0.35)',
       }}>
         <span title={card.desc} style={{
           width: 18, height: 18, borderRadius: '50%', flexShrink: 0, cursor: 'help',
-          background: '#3b82f6', color: '#fff', fontSize: 12, fontWeight: 700,
+          background: '#d9b45b', color: '#fff', fontSize: 12, fontWeight: 700,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         }}>؟</span>
         <span style={{ fontSize: 14, fontWeight: 700, color: 'oklch(0.74 0.16 150)', textAlign: 'center', flex: 1 }}>
@@ -129,7 +129,7 @@ function Table<T extends { key: string; name: string }>({ card, isDark }: { card
                     whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none', backdropFilter: 'blur(6px)',
                   }}>
                   {c.label}{' '}
-                  <span style={{ fontSize: 8, color: sortI === i ? '#3b82f6' : cream }}>
+                  <span style={{ fontSize: 8, color: sortI === i ? '#d9b45b' : cream }}>
                     {sortI === i ? (asc ? '▲' : '▼') : '▲▼'}
                   </span>
                 </th>

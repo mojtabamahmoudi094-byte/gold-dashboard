@@ -247,15 +247,15 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
           <MetricCard t={t} label="قیمت پایانی"
             value={`${priceToman(safe(record.price_close)).toLocaleString('fa-IR')} تومان`}
             tooltip={`قیمت دقیق: ${safe(record.price_close).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`}
-            onClick={() => openFundMetric('price_close', 'قیمت پایانی', '#3b82f6', 'ت')} />
+            onClick={() => openFundMetric('price_close', 'قیمت پایانی', '#d9b45b', 'ت')} />
           <MetricCard t={t} label="آخرین قیمت"
             value={`${priceToman(safe(record.price_last)).toLocaleString('fa-IR')} تومان`}
             tooltip={`قیمت دقیق: ${safe(record.price_last).toLocaleString('fa-IR')} ${priceIsRial ? 'ریال' : 'تومان'}`}
-            onClick={() => openFundMetric('price_last', 'آخرین قیمت', '#3b82f6', 'ت')} />
+            onClick={() => openFundMetric('price_last', 'آخرین قیمت', '#d9b45b', 'ت')} />
           <MetricCard t={t} label="ارزش معاملات"
             value={`${Math.round(safe(record.trade_value) / 1e9).toLocaleString('fa-IR')} م.ت`}
             tooltip={`ارزش دقیق: ${safe(record.trade_value).toLocaleString('fa-IR')} ریال`}
-            onClick={() => openFundMetric('trade_value', 'ارزش معاملات', '#8b5cf6', 'م.ت')} />
+            onClick={() => openFundMetric('trade_value', 'ارزش معاملات', '#f4d795', 'م.ت')} />
           <MetricCard t={t} label="ارزش بازار"
             value={`${Math.round(safe(record.market_value) / 1e12).toLocaleString('fa-IR')} ه.م.ت`}
             tooltip={`ارزش دقیق: ${safe(record.market_value).toLocaleString('fa-IR')} ریال`}
@@ -271,7 +271,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
           <MetricCard t={t} label="حجم معاملات"
             value={`${(safe(record.volume) / 1e6).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} م.سهم`}
             tooltip={`حجم دقیق: ${safe(record.volume).toLocaleString('fa-IR')} سهم`}
-            onClick={() => openFundMetric('volume', 'حجم معاملات', '#3b82f6', 'م.سهم')} />
+            onClick={() => openFundMetric('volume', 'حجم معاملات', '#d9b45b', 'م.سهم')} />
           <MetricCard t={t} label="جریان پول حقیقی"
             value={`${netFlowBillion >= 0 ? '+' : ''}${netFlowBillion.toLocaleString('fa-IR')} میلیارد`}
             color={netFlowBillion >= 0 ? '#00E5A0' : '#FF4D6A'}
@@ -288,7 +288,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
           onClose={() => setModalMetric(null)}
           title={modalMetric?.label ?? ''}
           unit={modalMetric?.unit}
-          color={modalMetric?.color ?? '#3b82f6'}
+          color={modalMetric?.color ?? '#d9b45b'}
           data={modalMetric && snapshotRows ? fundMetricSeries(snapshotRows, modalMetric.key) : []}
           loading={snapshotLoading}
         />

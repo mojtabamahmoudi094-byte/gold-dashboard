@@ -28,7 +28,7 @@ const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigi
 const rial = (v: number) => `${fa(v)} ریال`
 const normQ = (s: string) => s.replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim()
 const ORANGE = '#f59e0b'
-const BLUE = '#3b82f6'
+const BLUE = '#d9b45b'
 
 export default function ValuationCalculatorPage() {
   const [isDark, setIsDark] = useState(true)

@@ -26,10 +26,10 @@ export default function ScrollProgress() {
         style={{
           height: '100%',
           width: `${pct}%`,
-          background: 'linear-gradient(90deg, #3b82f6, #6366f1, #8b5cf6, #a78bfa)',
+          background: 'linear-gradient(90deg, #d9b45b, #6366f1, #f4d795, #a78bfa)',
           backgroundSize: '200% 100%',
           animation: 'bs-shimmer 3s linear infinite',
-          boxShadow: pct > 0.5 ? '0 0 12px rgba(139,92,246,0.6)' : 'none',
+          boxShadow: pct > 0.5 ? '0 0 12px rgba(244,215,149,0.6)' : 'none',
           transition: 'width 0.12s ease-out',
         }}
       />

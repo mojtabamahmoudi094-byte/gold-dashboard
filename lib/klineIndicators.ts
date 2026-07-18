@@ -57,7 +57,7 @@ export function registerCustomIndicators() {
     ],
     styles: {
       lines: [
-        { color: '#3b82f6' }, { color: '#d97706' },
+        { color: '#d9b45b' }, { color: '#d97706' },
         { color: 'rgba(38,166,154,0.9)' }, { color: 'rgba(239,83,80,0.9)' },
         { color: '#8b93a7' },
       ],
@@ -173,7 +173,7 @@ export function registerCustomIndicators() {
     precision: 2,
     calcParams: [14],
     figures: [{ key: 'mfi', title: 'MFI: ', type: 'line' }],
-    styles: { lines: [{ color: '#3b82f6' }] },
+    styles: { lines: [{ color: '#d9b45b' }] },
     calc: (dataList, indicator) => {
       const [period] = indicator.calcParams as number[]
       const n = dataList.length

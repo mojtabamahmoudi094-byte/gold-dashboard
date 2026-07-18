@@ -195,9 +195,9 @@ export default function FundsCatPage() {
 
         {/* Breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: t.muted }}>
-          <Link href="/" style={{ color: '#3b82f6', textDecoration: 'none' }}>خانه</Link>
+          <Link href="/" style={{ color: '#d9b45b', textDecoration: 'none' }}>خانه</Link>
           <span>/</span>
-          <Link href="/funds" style={{ color: '#3b82f6', textDecoration: 'none' }}>صندوق‌ها</Link>
+          <Link href="/funds" style={{ color: '#d9b45b', textDecoration: 'none' }}>صندوق‌ها</Link>
           <span>/</span>
           <span style={{ color: t.text }}>{catInfo.label}</span>
         </div>
@@ -525,8 +525,8 @@ export default function FundsCatPage() {
                       transition: 'background 0.15s, border-color 0.15s',
                     }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = isDark ? 'rgba(59,130,246,0.06)' : 'rgba(59,130,246,0.04)'
-                      e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'
+                      e.currentTarget.style.background = isDark ? 'rgba(217,180,91,0.06)' : 'rgba(217,180,91,0.04)'
+                      e.currentTarget.style.borderColor = 'rgba(217,180,91,0.3)'
                     }}
                     onMouseLeave={e => {
                       e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'

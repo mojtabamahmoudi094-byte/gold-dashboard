@@ -39,7 +39,7 @@ export default function TimeRangeSelector({
   customRange,
   onChange,
   isDark,
-  accentColor = '#3b82f6',
+  accentColor = '#d9b45b',
 }: {
   value: RangeKey
   customRange: [string, string] | null

@@ -93,8 +93,8 @@ const distTick = (big: boolean) =>
 
 const fa = (n: number, d = 0) => n.toLocaleString('fa-IR', { maximumFractionDigits: d })
 const C = {
-  green: '#22c55e', red: '#ef4444', purple: '#8b5cf6',
-  orange: '#f59e0b', blue: '#3b82f6', text: '#a9b0c2', cream: '#ddd5bd',
+  green: '#22c55e', red: '#ef4444', purple: '#f4d795',
+  orange: '#f59e0b', blue: '#d9b45b', text: '#a9b0c2', cream: '#ddd5bd',
   border: 'rgba(255,255,255,0.09)', bg: '#0a0d14', panel: '#12161f',
 }
 const FONT = 'Vazirmatn, Arial, sans-serif'
@@ -107,8 +107,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   fund_equity: 'صندوق سهامی', fund_fixed_income: 'صندوق درآمدثابت', fund_commodity: 'صندوق کالایی',
 }
 const SEGMENT_COLORS: Record<string, string> = {
-  bourse: '#3b82f6', fara_bourse: '#22c55e', option: '#ef4444',
-  fund_equity: '#f59e0b', fund_fixed_income: '#8b5cf6', fund_commodity: '#eab308',
+  bourse: '#d9b45b', fara_bourse: '#22c55e', option: '#ef4444',
+  fund_equity: '#f59e0b', fund_fixed_income: '#f4d795', fund_commodity: '#eab308',
 }
 
 const axisTick = { fontSize: 10, fill: C.text, fontFamily: FONT }

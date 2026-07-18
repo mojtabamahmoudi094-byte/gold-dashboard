@@ -12,6 +12,7 @@ import { CANDLE_PATTERN_LABELS } from '../../../lib/candlePatternLabels'
 import { GREEN, RED } from '../colors'
 import { glassStyle, marketOpen, TA_KEYFRAMES, enterAnim } from '../uiTokens'
 import { shouldUseDark } from '../../../lib/theme'
+import RsiBar from '../../components/ui/RsiBar'
 
 type Row = {
   symbol: string
@@ -214,7 +215,7 @@ export default function ScreenerPage() {
   const glass = glassStyle(isDark)
 
   const chip = (active: boolean, tone?: 'pos' | 'neg'): React.CSSProperties => {
-    const clr = tone === 'pos' ? GREEN : tone === 'neg' ? RED : '#3b82f6'
+    const clr = tone === 'pos' ? GREEN : tone === 'neg' ? RED : '#d9b45b'
     return {
       fontSize: 12, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
       padding: '7px 14px', borderRadius: 99, minHeight: 34,
@@ -240,8 +241,8 @@ export default function ScreenerPage() {
   const badge = (label: string, tone: 'pos' | 'neg' | 'mid') => (
     <span key={label} style={{
       fontSize: 10, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, whiteSpace: 'nowrap',
-      color: tone === 'pos' ? GREEN : tone === 'neg' ? RED : '#3b82f6',
-      background: tone === 'pos' ? 'rgba(38,166,154,0.12)' : tone === 'neg' ? 'rgba(239,83,80,0.12)' : 'rgba(59,130,246,0.12)',
+      color: tone === 'pos' ? GREEN : tone === 'neg' ? RED : '#d9b45b',
+      background: tone === 'pos' ? 'rgba(38,166,154,0.12)' : tone === 'neg' ? 'rgba(239,83,80,0.12)' : 'rgba(217,180,91,0.12)',
     }}>
       {label}
     </span>
@@ -287,8 +288,8 @@ export default function ScreenerPage() {
 
         {/* aurora پس‌زمینه — همان زبان طراحی هاب */}
         <div aria-hidden className="ta-anim" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.35 }}>
-          <div style={{ position: 'absolute', top: '3%', left: '10%', width: 460, height: 460, borderRadius: '50%', background: '#3b82f6', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
-          <div style={{ position: 'absolute', bottom: '5%', right: '8%', width: 400, height: 400, borderRadius: '50%', background: '#8b5cf6', opacity: 0.11, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
+          <div style={{ position: 'absolute', top: '3%', left: '10%', width: 460, height: 460, borderRadius: '50%', background: '#d9b45b', opacity: 0.14, filter: 'blur(90px)', animation: 'taBlob1 18s ease-in-out infinite alternate' }} />
+          <div style={{ position: 'absolute', bottom: '5%', right: '8%', width: 400, height: 400, borderRadius: '50%', background: '#f4d795', opacity: 0.11, filter: 'blur(90px)', animation: 'taBlob2 24s ease-in-out infinite alternate' }} />
         </div>
 
         <div className="ta-anim" style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '28px 14px' : '40px 24px', position: 'relative' }}>
@@ -300,7 +301,7 @@ export default function ScreenerPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', margin: '12px 0 6px', ...enterAnim(0) }}>
           <h1 style={{
             fontSize: isMobile ? 23 : 28, fontWeight: 800, margin: 0,
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
           }}>
             دیده‌بان تکنیکال
@@ -322,9 +323,9 @@ export default function ScreenerPage() {
 
           <Link href="/technical/backtest" style={{
             marginInlineStart: 'auto',
-            fontSize: 12, color: '#3b82f6', textDecoration: 'none', whiteSpace: 'nowrap',
+            fontSize: 12, color: '#d9b45b', textDecoration: 'none', whiteSpace: 'nowrap',
             padding: '7px 12px', borderRadius: 9,
-            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+            background: 'rgba(217,180,91,0.08)', border: '1px solid rgba(217,180,91,0.2)',
           }}>
             بازده تاریخی سیگنال‌ها ←
           </Link>
@@ -384,7 +385,7 @@ export default function ScreenerPage() {
             ...glass, borderRadius: 99, color: text, transition: 'border-color 0.2s',
             ...enterAnim(3),
           }}
-          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.55)' }}
+          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(217,180,91,0.55)' }}
           onBlur={e => { e.currentTarget.style.borderColor = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.08)' }}
         />
 
@@ -415,7 +416,7 @@ export default function ScreenerPage() {
                     onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)' }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
                     <td style={{ padding: '9px 12px' }}>
-                      <Link href={`/technical/${toSlug(r.symbol)}`} style={{ color: '#3b82f6', textDecoration: 'none', fontSize: 13.5, fontWeight: 700 }}>
+                      <Link href={`/technical/${toSlug(r.symbol)}`} style={{ color: '#d9b45b', textDecoration: 'none', fontSize: 13.5, fontWeight: 700 }}>
                         {r.symbol}
                       </Link>
                     </td>
@@ -430,7 +431,10 @@ export default function ScreenerPage() {
                       padding: '9px 12px', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
                       color: r.rsi === null ? muted : r.rsi >= 70 ? RED : r.rsi <= 30 ? GREEN : text,
                     }}>
-                      {r.rsi === null ? '—' : fa(r.rsi, 1)}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{r.rsi === null ? '—' : fa(r.rsi, 1)}</span>
+                        <RsiBar value={r.rsi} width={40} overboughtColor={RED} oversoldColor={GREEN} />
+                      </div>
                     </td>
                     <td style={{ padding: '9px 12px', fontSize: 12.5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: (r.vol_ratio ?? 0) >= 2.5 ? '#d97706' : text }}>
                       {r.vol_ratio === null ? '—' : `${fa(r.vol_ratio, 1)}×`}
