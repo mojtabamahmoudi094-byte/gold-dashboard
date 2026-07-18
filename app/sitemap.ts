@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { SITE_URL } from '../lib/site'
 import { supabase } from '../lib/supabase'
+import { getStocksIndustries } from '../lib/stocksIndustriesData'
 
 const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: '', priority: 1 },
@@ -36,6 +37,8 @@ const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: '/signals', priority: 0.7 },
   { path: '/track-record', priority: 0.6 },
   { path: '/vip/filters', priority: 0.6 },
+  { path: '/market-map', priority: 0.7 },
+  { path: '/alerts', priority: 0.5 },
 ]
 
 async function fundSlugs(): Promise<string[]> {
@@ -43,15 +46,10 @@ async function fundSlugs(): Promise<string[]> {
   return (data ?? []).map((r) => r.slug as string).filter(Boolean)
 }
 
-async function stockSymbols(): Promise<string[]> {
-  const { data } = await supabase
-    .from('stock_industries')
-    .select('data')
-    .eq('id', 1)
-    .maybeSingle()
-  const industries = (data?.data?.industries ?? []) as { symbols?: { l18: string }[] }[]
+async function stockSymbols(): Promise<{ symbols: string[]; updated: Date }> {
+  const { industries, updated } = await getStocksIndustries()
   const symbols = industries.flatMap((ind) => (ind.symbols ?? []).map((s) => s.l18))
-  return Array.from(new Set(symbols)).filter(Boolean)
+  return { symbols: Array.from(new Set(symbols)).filter(Boolean), updated: updated ? new Date(updated) : new Date() }
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -64,7 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority,
   }))
 
-  const [slugs, symbols] = await Promise.all([fundSlugs(), stockSymbols()])
+  const [slugs, { symbols, updated }] = await Promise.all([fundSlugs(), stockSymbols()])
 
   const fundEntries = slugs.map((slug) => ({
     url: `${SITE_URL}/fund/${encodeURIComponent(slug)}`,
@@ -75,17 +73,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const stockEntries = symbols.map((symbol) => ({
     url: `${SITE_URL}/stock/${encodeURIComponent(symbol)}`,
-    lastModified,
+    lastModified: updated,
     changeFrequency: 'hourly' as const,
     priority: 0.5,
   }))
 
   const technicalEntries = symbols.map((symbol) => ({
     url: `${SITE_URL}/technical/${encodeURIComponent(symbol)}`,
-    lastModified,
+    lastModified: updated,
     changeFrequency: 'daily' as const,
     priority: 0.4,
   }))
 
-  return [...staticEntries, ...fundEntries, ...stockEntries, ...technicalEntries]
+  const fundamentalsEntries = symbols.map((symbol) => ({
+    url: `${SITE_URL}/fundamentals/${encodeURIComponent(symbol)}`,
+    lastModified: updated,
+    changeFrequency: 'daily' as const,
+    priority: 0.4,
+  }))
+
+  return [...staticEntries, ...fundEntries, ...stockEntries, ...technicalEntries, ...fundamentalsEntries]
 }
