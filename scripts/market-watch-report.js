@@ -66,7 +66,7 @@ function buildBlock(label, emoji, mpath, row) {
   const lines = [`${emoji} ${label}`]
   if (row.money_in != null) {
     const flow = row.money_in / 1e10
-    lines.push(`${flow >= 0 ? '💚' : '❤️'} ورود پول حقیقی: ${faNum(flow, 1)} میلیارد تومان`)
+    lines.push(`${flow >= 0 ? '💚' : '❤️'} ${flow >= 0 ? 'ورود' : 'خروج'} پول حقیقی: ${faNum(Math.abs(flow), 1)} میلیارد تومان`)
   }
   if (row.buyq != null || row.sellq != null)
     lines.push(`🟢 صف خرید: ${faNum(row.buyq)}   🔴 صف فروش: ${faNum(row.sellq)}`)

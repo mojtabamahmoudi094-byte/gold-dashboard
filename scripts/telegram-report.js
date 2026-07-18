@@ -133,7 +133,7 @@ function computeFacts(d) {
   // فیلدهای خام market_watch → واحدهای صفحه مانیتور (see app/monitor/[cat]/page.tsx)
   if (d.money_in != null) {
     const flow = Number(d.money_in) / 1e10 // میلیارد تومان
-    highlight = { label: 'ورود پول حقیقی (میلیارد تومان)', value: `${flow >= 0 ? '+' : ''}${num(flow, 1)}`, tone: flow >= 0 ? 'up' : 'down' }
+    highlight = { label: 'ورود / خروج پول حقیقی (میلیارد تومان)', value: `${flow >= 0 ? '+' : ''}${num(flow, 1)}`, tone: flow >= 0 ? 'up' : 'down' }
   }
   if (d.buyq != null || d.sellq != null)
     rows.push({ label: 'صف خرید / فروش', value: `${num(d.buyq)} / ${num(d.sellq)}` })
@@ -152,7 +152,7 @@ async function buildCaption(cat, facts) {
   const c = CATS[cat]
   const head = `${c.emoji} ${c.title} — بورس سنج`
   const when = `🕘 ${faTime()} — ${faDate()}`
-  const allRows = facts.highlight ? [{ label: 'ورود پول حقیقی', value: `${facts.highlight.value} میلیارد تومان` }, ...facts.rows] : facts.rows
+  const allRows = facts.highlight ? [{ label: 'ورود / خروج پول حقیقی', value: `${facts.highlight.value} میلیارد تومان` }, ...facts.rows] : facts.rows
   const factLines = allRows.length ? allRows.map(r => `• ${r.label}: ${r.value}`) : ['— داده لحظه‌ای در دسترس نیست —']
 
   const lines = [head, when, '']

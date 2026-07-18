@@ -154,20 +154,29 @@ function areaPathStr(data, w, h, min, max, padY = 8) {
 }
 
 // چارت خطی «علامت‌دار»: بالای صفر سبز، زیر صفر قرمز — حتی وسط چارت هم علامت عوض شود رنگ عوض می‌شود
+// روی هر نقطه، عدد همان لحظه نوشته می‌شود (نه فقط آخرین نقطه)
 function signedChartSvg(id, data, w, h) {
   if (!data.length) return ''
   const min = Math.min(...data, 0)
   const max = Math.max(...data, 0)
-  const padY = 8
+  const padY = 18 // فضای اضافه برای برچسب عددی بالا/پایین هر نقطه
   const y = (v) => h - padY - ((v - min) / (max - min || 1)) * (h - padY * 2)
   const zeroY = y(0)
   const areaD = areaPathStr(data, w, h, min, max, padY)
   const lineD = linePathStr(data, w, h, min, max, padY)
+  const n = data.length
   const dots = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w
+    const x = (i / (n - 1)) * w
     const c = v >= 0 ? UP : DOWN
-    const last = i === data.length - 1
+    const last = i === n - 1
     return `<circle cx="${x.toFixed(1)}" cy="${y(v).toFixed(1)}" r="${last ? 4.5 : 2.5}" fill="${last ? c : BG}" stroke="${c}" stroke-width="2"/>`
+  }).join('')
+  const labels = data.map((v, i) => {
+    const x = (i / (n - 1)) * w
+    const c = v >= 0 ? UP : DOWN
+    const ly = v >= 0 ? y(v) - 7 : y(v) + 13
+    const anchor = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'
+    return `<text x="${x.toFixed(1)}" y="${ly.toFixed(1)}" font-size="10.5" font-weight="700" fill="${c}" text-anchor="${anchor}">${fmtSigned(v)}</text>`
   }).join('')
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="chartSvg">
     <defs>
@@ -180,6 +189,7 @@ function signedChartSvg(id, data, w, h) {
     <path d="${lineD}" fill="none" stroke="${UP}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#${id}Up)"/>
     <path d="${lineD}" fill="none" stroke="${DOWN}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#${id}Down)"/>
     ${dots}
+    ${labels}
   </svg>`
 }
 
@@ -356,7 +366,7 @@ function renderMarketCardHtml({ emoji = '📊', title, subtitle, times = [], flo
     <div class="charts">
       <div class="mainChart">
         <div class="chartHead">
-          <span class="chartLabel">ورود پول حقیقی (میلیارد تومان)</span>
+          <span class="chartLabel">ورود / خروج پول حقیقی (میلیارد تومان)</span>
           ${lastFlow != null ? `<span class="chartValue ${lastFlow >= 0 ? 'up' : 'down'}">${fmtSigned(lastFlow)}</span>` : ''}
         </div>
         <div class="chartBody">${signedChartSvg('flow', flow, CHART_W, BIG_H)}</div>
