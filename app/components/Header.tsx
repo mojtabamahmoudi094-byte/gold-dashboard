@@ -38,6 +38,7 @@ export const NAV: NavItem[] = [
     { label: 'ماشین‌حساب ارزش‌گذاری', href: '/valuation' },
   ] },
   { label: 'ارزش معاملات',  href: '/trade-value' },
+  { label: 'نقشه بازار',    href: '/market-map' },
   { label: 'مقایسه',        href: '/compare', menu: [
     { label: 'مقایسه صندوق‌ها', href: '/compare' },
     { label: 'مقایسه سهام', href: '/compare/stocks' },

@@ -12,7 +12,7 @@ const PRODUCT_LINKS = [
   { label: 'صندوق‌های طلا، نقره و زعفران', href: '/funds' },
   { label: 'دیدبان',                        href: '/funds' },
   { label: 'تحلیل',                         href: '/analysis/gold' },
-  { label: 'نقشه بازار',                    href: '/funds' },
+  { label: 'نقشه بازار',                    href: '/market-map' },
 ]
 
 const COMPANY_LINKS = [
