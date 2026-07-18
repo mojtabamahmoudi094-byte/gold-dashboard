@@ -229,6 +229,23 @@ function summarizeQuarter(symbol, q) {
   return { tag, body: lines.join('\n') }
 }
 
+// هشتگ نماد + لینک سایت/کانال — همیشه قطعی و کد اضافه می‌شود، نه از Gemini خواسته می‌شود
+// (تا لینک/هشتگ هرگز اشتباه یا نصفه از مدل درنیاید). routeها خودشان html را تا ۴۰۹۶ کاراکتر
+// کوتاه می‌کنند غافل از این فوتر اضافه — پس اینجا دوباره کل پیام را به سقف تلگرام محدود می‌کنیم.
+function deepPostFooter(symbol, html) {
+  const tag = `#${symbol.replace(/\s+/g, '_')}`
+  const link = `${SITE}/stock/${encodeURIComponent(symbol)}\n${TELEGRAM_CHANNEL}`
+  const LIMIT = 4096
+  const reserved = tag.length + link.length + 4 // دو جفت \n\n اطراف html
+  let body = html
+  if (tag.length + body.length + link.length + 4 > LIMIT) {
+    const cut = body.slice(0, LIMIT - reserved)
+    const lastBreak = cut.lastIndexOf('\n')
+    body = (lastBreak > 0 ? cut.slice(0, lastBreak) : cut).trim()
+  }
+  return [tag, body, link].join('\n\n')
+}
+
 // symbol, و عناوین اطلاعیه‌هایی که برای همین اجرا «تازه» تشخیص داده شدند (تعیین می‌کند ماهانه/فصلی کدام‌یک واقعاً جدیدند)
 function buildKeyPoints(symbol, payload, freshTitles, opts = {}) {
   const hasMonthly   = freshTitles.some(isMonthlyTitle) && !opts.skipMonthly
@@ -726,7 +743,7 @@ async function main() {
                   const extracted = await fetchAuditLetter(letterAnnouncement.url, browser)
                   if (extracted) {
                     const deepText = await buildDeepAnalysisText(s, latestQuarter, extracted)
-                    if (deepText) await sendTelegram(deepText, { html: true })
+                    if (deepText) await sendTelegram(deepPostFooter(s, deepText), { html: true })
                   } else {
                     log(`ℹ️ ${s}: نامهٔ حسابرسی قابل استخراج نبود — پست تحلیل عمیق رد شد`)
                   }
@@ -736,7 +753,7 @@ async function main() {
               // میاندوره‌ای معمولی — بدون نامهٔ حسابرس، مستقیم از اعداد پارس‌شده
               try {
                 const deepText = await buildDeepQuarterlyText(s, latestQuarter)
-                if (deepText) await sendTelegram(deepText, { html: true })
+                if (deepText) await sendTelegram(deepPostFooter(s, deepText), { html: true })
               } catch (e) { log(`⚠️ ${s}: پست تحلیل عمیق میاندوره‌ای شکست خورد (نادیده گرفته شد) — ${e.message}`) }
             }
 
