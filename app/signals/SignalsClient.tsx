@@ -872,10 +872,22 @@ export default function SignalsPage() {
       })
     }
     if (bestStockCandidate) {
-      candidates.push({
-        category: 'stock', sig: bestStockCandidate.sig, date: todayShamsi(), symbol: bestStockCandidate.symbol,
-        note: '[v2] موتور قاعده‌محور گزارش‌های کدال',
-      })
+      // cooldown سهام — اگه همین نماد با همین نوع سیگنال تو ۳ روز اخیر (که سیگنال سهام ثبت شده) قبلاً درج شده، دوباره ثبت نکن
+      // (اندیکاتورهای تکنیکال مثل RSI/روند MA سطحی‌اند و چند روز پشت‌سرهم بالاترین امتیاز می‌مونن — بدون این شرط هر روز دوباره ثبت می‌شد)
+      const STOCK_COOLDOWN_DAYS = 3
+      const recentStockDates = Array.from(new Set(
+        signals.filter(s => (s.category || 'gold') === 'stock').map(s => s.signal_date_shamsi)
+      )).sort().reverse().slice(0, STOCK_COOLDOWN_DAYS)
+      const alreadySignaled = signals.some(s =>
+        (s.category || 'gold') === 'stock' && s.symbol === bestStockCandidate.symbol &&
+        s.signal_type === bestStockCandidate.sig.type && recentStockDates.includes(s.signal_date_shamsi)
+      )
+      if (!alreadySignaled) {
+        candidates.push({
+          category: 'stock', sig: bestStockCandidate.sig, date: todayShamsi(), symbol: bestStockCandidate.symbol,
+          note: '[v2] موتور قاعده‌محور گزارش‌های کدال',
+        })
+      }
     }
 
     const toInsert = candidates.filter(c =>
