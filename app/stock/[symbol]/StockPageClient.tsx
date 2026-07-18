@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
+import { supabase } from '../../../lib/supabase'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
 import { type ChartModalPoint } from '../../../components/ChartModal'
 
@@ -356,7 +357,8 @@ const M_ACCENT = '#FACC15'   // زرد طلایی — فعالیت ماهانه
 const Q_ACCENT = '#F59E0B'   // کهربایی — گزارش فصلی
 const A_ACCENT = '#A78BFA'   // بنفش — تحلیل هوشمند
 const AI_ACCENT = '#2DD4BF'  // فیروزه‌ای — دستیار تحلیلگر
-const AI_API = 'https://newbot.dadashchekhabare.qzz.io/ai/ask'
+// از پروکسی خودمان عبور می‌کند (نه مستقیم به بات خارجی) تا rate limit و لاگ سوال/جواب اعمال شود
+const AI_API = '/api/chat'
 
 
 const toneColor = (tone: Tone) => tone === 'pos' ? GREEN : tone === 'neg' ? RED : '#94A3B8'
@@ -1029,9 +1031,13 @@ function AiChatSection({ symbol, t, isMobile }: { symbol: string; t: Theme; isMo
     try {
       // اگر کاربر نماد را نگفته، به سوال اضافه کن تا داده کدال درست وصل شود
       const full = q.includes(symbol) ? q : `درباره نماد ${symbol}: ${q}`
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(AI_API, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ question: full }),
       })
       const data = await res.json()

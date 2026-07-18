@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useIsMobile } from '../../lib/useIsMobile'
+import { supabase } from '../../lib/supabase'
 
 // ————— چت‌باکس شناور سراسری (مثل Chatwoot) — دستیار هوشمند بورس سنج —————
 
@@ -290,9 +291,13 @@ export default function ChatWidget() {
     setMessages(m => [...m, { role: 'user', text: q }])
     setLoading(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(AI_API, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ question: q }),
       })
       const data = await res.json()
