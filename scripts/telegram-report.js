@@ -64,6 +64,7 @@ async function fetchDay(cat) {
   try {
     const res = await fetch(`${SITE}/api/market-watch?cat=${encodeURIComponent(cat)}`, {
       headers: { 'cache-control': 'no-store' },
+      signal: AbortSignal.timeout(90_000), // کلد-استارت Render
     })
     if (!res.ok) return null
     const data = await res.json()
@@ -268,8 +269,15 @@ async function main() {
         continue
       }
 
-      const facts = computeFacts((snap && snap.rows) || [])
-      const series = computeSeries((snap && snap.rows) || [])
+      // اگر fetch شکست خورد یا هیچ ردیفی نبود، گزارش خالی نفرست — ساکت رد شو
+      // if the fetch failed or there are zero rows, don't send a hollow report — skip silently
+      if (!snap || !snap.rows.length) {
+        console.log(`[report] skip ${cat}: هیچ دادهٔ لحظه‌ای در دسترس نیست`)
+        continue
+      }
+
+      const facts = computeFacts(snap.rows)
+      const series = computeSeries(snap.rows)
       const buf = await screenshotCard(browser, buildCardHtml(cat, series))
       await sendPhoto(buf, await buildCaption(cat, facts))
       console.log(`[report] ✅ sent ${cat}`)
