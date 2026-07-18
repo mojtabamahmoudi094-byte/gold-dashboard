@@ -61,6 +61,7 @@ try { wsTransport = require('ws') } catch { /* Node 22+ */ }
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, wsTransport ? { realtime: { transport: wsTransport } } : {})
 
 const { computePortfolioSummary, fetchStockMarketData, fetchFundMarketData } = require('../lib/portfolioValuation')
+const { computePortfolioOptimization } = require('../lib/portfolioOptimize')
 
 const todayISO = () =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran' }).format(new Date()) // YYYY-MM-DD برای ستون trade_date (date)
@@ -95,8 +96,9 @@ async function tg(method, params) {
 }
 
 const BTN_PORTFOLIO = '📊 پورتفوی من'
+const BTN_OPTIMIZE = '⚖️ بهینه‌سازی پرتفوی'
 const BTN_CONNECT = '🔗 اتصال حساب'
-const KEYBOARD = { keyboard: [[BTN_PORTFOLIO], [BTN_CONNECT]], resize_keyboard: true }
+const KEYBOARD = { keyboard: [[BTN_PORTFOLIO], [BTN_OPTIMIZE], [BTN_CONNECT]], resize_keyboard: true }
 
 const sendMessage = (chatId, text) =>
   tg('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', reply_markup: KEYBOARD })
@@ -158,6 +160,19 @@ async function handleStart(chatId, from, code) {
   }, { onConflict: 'user_id' })
 
   await sendMessage(chatId, `اتصال با موفقیت انجام شد ✅\nبرای دیدن پورتفو، «${BTN_PORTFOLIO}» را بزنید.`)
+}
+
+// پیام تلگرام حداکثر ۴۰۹۶ کاراکتر می‌پذیرد — هدر+ردیف‌ها را به چند پیام تقسیم می‌کند
+async function sendChunked(chatId, header, rows) {
+  const MAX = 3800
+  let chunk = header
+  const chunks = []
+  for (const row of rows) {
+    if ((chunk + '\n\n' + row).length > MAX) { chunks.push(chunk); chunk = row }
+    else chunk += '\n\n' + row
+  }
+  chunks.push(chunk)
+  for (const c of chunks) await sendMessage(chatId, c)
 }
 
 async function handlePortfolio(chatId) {
@@ -230,16 +245,55 @@ async function handlePortfolio(chatId) {
     return lines.join('\n')
   })
 
-  // پیام تلگرام حداکثر ۴۰۹۶ کاراکتر می‌پذیرد — پورتفوی بزرگ را به چند پیام تقسیم می‌کنیم
-  const MAX = 3800
-  let chunk = header
-  const chunks = []
-  for (const row of rows) {
-    if ((chunk + '\n\n' + row).length > MAX) { chunks.push(chunk); chunk = row }
-    else chunk += '\n\n' + row
+  await sendChunked(chatId, header, rows)
+}
+
+async function handleOptimize(chatId) {
+  const { data: link } = await sb
+    .from('telegram_links')
+    .select('user_id')
+    .eq('telegram_chat_id', chatId)
+    .maybeSingle()
+
+  if (!link) {
+    await sendMessage(chatId, `ابتدا حساب خود را وصل کنید — روی «${BTN_CONNECT}» بزنید.`)
+    return
   }
-  chunks.push(chunk)
-  for (const c of chunks) await sendMessage(chatId, c)
+
+  let result
+  try {
+    result = await computePortfolioOptimization(sb, link.user_id, SITE)
+  } catch (e) {
+    console.error('[telegram-portfolio-bot] computePortfolioOptimization failed:', e.message)
+    await sendMessage(chatId, 'خطا در محاسبه بهینه‌سازی. کمی بعد دوباره تلاش کنید.')
+    return
+  }
+
+  if (result.error === 'insufficient_symbols') {
+    await sendMessage(chatId, 'برای بهینه‌سازی حداقل به ۲ سهم در پورتفوی نیاز است (صندوق و طلا/نقره در این محاسبه لحاظ نمی‌شوند).')
+    return
+  }
+  if (result.error === 'insufficient_history' || result.error === 'singular_matrix') {
+    await sendMessage(chatId, 'تاریخچه قیمتی کافی برای نمادهای شما در دسترس نیست (نمادهای تازه‌عرضه یا کم‌سابقه).')
+    return
+  }
+
+  const header = [
+    '⚖️ <b>پیشنهاد وزن‌دهی پرتفوی (کمترین ریسک)</b>',
+    'بر اساس نوسان ۱۵۰ روز اخیر قیمت سهام شما — صرفاً یک محاسبه آماری است و توصیه سرمایه‌گذاری نیست.',
+    result.excludedSymbols?.length ? `⚠️ به‌دلیل تاریخچه کم از محاسبه کنار گذاشته شدند: ${result.excludedSymbols.join('، ')}` : '',
+  ].filter(Boolean).join('\n')
+
+  const rows = result.rows.map((r) => {
+    const dir = r.diffValue > 0 ? '🔺 خرید' : r.diffValue < 0 ? '🔻 فروش' : '⏸ بدون تغییر'
+    return [
+      `<b>#${r.symbol}</b>`,
+      `وزن فعلی: ${fa(r.currentWeight * 100, 1)}٪  →  وزن پیشنهادی: ${fa(r.suggestedWeight * 100, 1)}٪`,
+      `${dir}: ${toToman(Math.abs(r.diffValue))} تومان`,
+    ].join('\n')
+  })
+
+  await sendChunked(chatId, header, rows)
 }
 
 async function handleUpdate(update) {
@@ -253,12 +307,14 @@ async function handleUpdate(update) {
     await handleStart(chatId, msg.from, code)
   } else if (text.startsWith('/portfolio') || text === BTN_PORTFOLIO) {
     await handlePortfolio(chatId)
+  } else if (text.startsWith('/optimize') || text === BTN_OPTIMIZE) {
+    await handleOptimize(chatId)
   } else if (text === BTN_CONNECT) {
     await handleStart(chatId, msg.from, null)
   } else if (/^\d{4,8}$/.test(text) && awaitingCode.has(chatId)) {
     await handleStart(chatId, msg.from, text)
   } else {
-    await sendMessage(chatId, `از دکمه‌های پایین صفحه استفاده کنید: «${BTN_PORTFOLIO}» یا «${BTN_CONNECT}»`)
+    await sendMessage(chatId, `از دکمه‌های پایین صفحه استفاده کنید: «${BTN_PORTFOLIO}»، «${BTN_OPTIMIZE}» یا «${BTN_CONNECT}»`)
   }
 }
 
