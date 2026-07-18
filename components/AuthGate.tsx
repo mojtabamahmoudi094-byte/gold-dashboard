@@ -73,7 +73,7 @@ export default function AuthGate({
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/auth?tab=register" style={{
               display: 'inline-block', padding: '10px 28px', borderRadius: 10, fontSize: 13.5, fontWeight: 600,
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', textDecoration: 'none',
+              background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#0A0805', textDecoration: 'none',
             }}>ثبت‌نام</Link>
             <Link href="/auth?tab=login" style={{
               display: 'inline-block', padding: '10px 28px', borderRadius: 10, fontSize: 13.5, fontWeight: 600,
