@@ -868,7 +868,7 @@ ${txs.map(tx => row([
         </p>
         <Link href="/auth" style={{
           display: 'inline-block', padding: '10px 28px', borderRadius: 10, fontSize: 13.5, fontWeight: 600,
-          background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', textDecoration: 'none',
+          background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff', textDecoration: 'none',
         }}>ورود / ثبت‌نام</Link>
       </div>
     )
@@ -963,7 +963,7 @@ ${txs.map(tx => row([
             onClick={() => setShowForm(!showForm)}
             style={{
               padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              background: showForm ? 'transparent' : 'linear-gradient(135deg, #d9b45b, #f4d795)',
+              background: showForm ? 'transparent' : `linear-gradient(135deg, ${t.brand}, ${t.brand2})`,
               color: showForm ? t.brand : '#fff',
               border: showForm ? `1px solid ${t.brand}` : 'none',
               fontFamily: 'inherit',
@@ -1012,7 +1012,7 @@ ${txs.map(tx => row([
               )}
               <button type="button" onClick={requestTelegramCode} disabled={tgLoading} style={{
                 padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', border: 'none',
+                background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff', border: 'none',
                 fontFamily: 'inherit', opacity: tgLoading ? 0.6 : 1,
               }}>{tgLoading ? 'در حال دریافت…' : tgCode ? 'دریافت کد جدید' : 'دریافت کد اتصال'}</button>
               {tgMsg && <p style={{ fontSize: 12, color: t.red, margin: '10px 0 0' }}>{tgMsg}</p>}
@@ -1127,7 +1127,7 @@ ${txs.map(tx => row([
             <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 4', display: 'flex', alignItems: 'flex-end', gap: 12 }}>
               <button type="submit" disabled={saving} style={{
                 padding: '10px 32px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', border: 'none',
+                background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff', border: 'none',
                 fontFamily: 'inherit', opacity: saving ? 0.6 : 1,
               }}>
                 {saving ? 'در حال ثبت…' : 'ثبت تراکنش'}
@@ -1235,7 +1235,7 @@ ${txs.map(tx => row([
               </p>
               <button type="button" onClick={confirmImport} disabled={importing} style={{
                 padding: '10px 28px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#fff', border: 'none',
+                background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff', border: 'none',
                 fontFamily: 'inherit', opacity: importing ? 0.6 : 1,
               }}>
                 {importing ? 'در حال ثبت…' : `تایید و افزودن ${importRows.length} ردیف`}
@@ -1719,7 +1719,7 @@ ${txs.map(tx => row([
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={submitQuickTx} disabled={qtSaving} style={{
                 flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: quickTx.side === 'sell' ? 'linear-gradient(135deg, #ef4444, #f97316)' : 'linear-gradient(135deg, #d9b45b, #f4d795)',
+                background: quickTx.side === 'sell' ? 'linear-gradient(135deg, #ef4444, #f97316)' : `linear-gradient(135deg, ${t.brand}, ${t.brand2})`,
                 color: '#fff', border: 'none', fontFamily: 'inherit', opacity: qtSaving ? 0.6 : 1,
               }}>
                 {qtSaving ? 'در حال ثبت…' : quickTx.side === 'sell' ? 'ثبت فروش' : 'ثبت خرید'}
