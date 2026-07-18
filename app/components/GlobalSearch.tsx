@@ -139,6 +139,11 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
             onChange={e => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="نماد یا نام شرکت… (مثلاً فولاد)"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={!!nq && results.length > 0}
+            aria-controls="global-search-listbox"
+            aria-activedescendant={nq && results[activeIdx] ? `global-search-option-${results[activeIdx].s.l18}` : undefined}
             style={{
               width: '100%', boxSizing: 'border-box',
               padding: '9px 12px', borderRadius: 10,
@@ -150,7 +155,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
           />
 
           {nq && (
-            <div style={{ marginTop: 6, maxHeight: 320, overflowY: 'auto' }}>
+            <div id="global-search-listbox" role="listbox" style={{ marginTop: 6, maxHeight: 320, overflowY: 'auto' }}>
               {results.length === 0 ? (
                 <div style={{ padding: '14px 8px', fontSize: 12, color: muted, textAlign: 'center' }}>نمادی یافت نشد</div>
               ) : results.map(({ s, indName }, i) => {
@@ -159,6 +164,9 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
                 return (
                   <div
                     key={s.l18}
+                    id={`global-search-option-${s.l18}`}
+                    role="option"
+                    aria-selected={i === activeIdx}
                     onMouseDown={() => goTo(s.l18)}
                     onMouseEnter={() => setActiveIdx(i)}
                     style={{

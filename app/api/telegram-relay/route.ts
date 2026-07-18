@@ -1,4 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
 
 // رله تلگرام برای سرور ایران — api.telegram.org از داخل ایران فیلتر است،
 // ولی سرور ایران به این سایت (خارج از ایران) می‌رسد و این سایت به تلگرام.
@@ -21,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 })
   }
 
-  if (body.token !== token) {
+  if (!body.token || !timingSafeEqual(body.token, token)) {
     return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 })
   }
   // مقصد از فرستنده (مثلاً کانال عمومی)؛ پیش‌فرض همان چت env سایت.
@@ -36,7 +44,7 @@ export async function POST(req: NextRequest) {
       form.append('chat_id', target)
       if (body.caption) form.append('caption', body.caption.slice(0, 1024))
       form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'report.jpg')
-      const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form })
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(10_000) })
       const data = await res.json()
       if (!data.ok) return NextResponse.json({ ok: false, error: data.description || 'sendPhoto failed' }, { status: 502 })
       return NextResponse.json({ ok: true, message_id: data.result?.message_id })
@@ -59,6 +67,7 @@ export async function POST(req: NextRequest) {
         text,
         ...(body.parse_mode ? { parse_mode: body.parse_mode } : {}),
       }),
+      signal: AbortSignal.timeout(10_000),
     })
     const data = await res.json()
     if (!data.ok) {

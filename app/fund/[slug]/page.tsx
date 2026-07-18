@@ -5,7 +5,7 @@ import { safe } from '../../../lib/format'
 import JsonLd from '../../../components/JsonLd'
 import { SITE_URL } from '../../../lib/site'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const slug = decodeURIComponent((await params).slug)
@@ -50,7 +50,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   return (
     <>
       {jsonLd.length > 0 && <JsonLd data={jsonLd} />}
-      <FundDetailPage slug={slug} initialAsset={asset} initialRecord={record} />
+      <FundDetailPage key={slug} slug={slug} initialAsset={asset} initialRecord={record} />
     </>
   )
 }

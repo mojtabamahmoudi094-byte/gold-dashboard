@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text }),
+      signal: AbortSignal.timeout(10_000),
     })
     const data = await res.json() as { ok: boolean; description?: string }
     if (!data.ok) {

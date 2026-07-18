@@ -130,10 +130,16 @@ function AuthPageInner() {
     }
 
     setOtpUserId(userId)
+    const accessToken = data.session?.access_token
+    if (!accessToken) {
+      setLoading(false)
+      setMsg({ type: 'error', text: 'خطا در ثبت‌نام. لطفاً دوباره تلاش کنید' })
+      return
+    }
     const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, phone }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ phone }),
     })
     setLoading(false)
     if (!res.ok) {
@@ -149,10 +155,17 @@ function AuthPageInner() {
     e.preventDefault()
     setLoading(true)
     setMsg(null)
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token
+    if (!accessToken) {
+      setLoading(false)
+      setMsg({ type: 'error', text: 'نشست شما منقضی شده. دوباره وارد شوید' })
+      return
+    }
     const res = await fetch('/api/auth/verify-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: otpUserId, phone, code: otpCode }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ phone, code: otpCode }),
     })
     setLoading(false)
     if (!res.ok) {
@@ -166,10 +179,17 @@ function AuthPageInner() {
   const handleResendOtp = async () => {
     setOtpResending(true)
     setMsg(null)
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token
+    if (!accessToken) {
+      setOtpResending(false)
+      setMsg({ type: 'error', text: 'نشست شما منقضی شده. دوباره وارد شوید' })
+      return
+    }
     const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: otpUserId, phone }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ phone }),
     })
     setOtpResending(false)
     if (!res.ok) {
@@ -529,7 +549,7 @@ function AuthPageInner() {
             <div style={{ textAlign: 'center', fontSize: 12, color: '#ddd5bd', marginTop: 4 }}>
               کد نیامد؟{' '}
               {resendCooldown > 0 ? (
-                <span style={{ color: '#5A7088' }}>ارسال مجدد کد ({resendCooldown} ثانیه)</span>
+                <span style={{ color: '#ddd5bd' }}>ارسال مجدد کد ({resendCooldown} ثانیه)</span>
               ) : (
                 <button type="button" disabled={otpResending} onClick={handleResendOtp} style={{
                   background: 'none', border: 'none', color: '#00C8FF', fontSize: 12,

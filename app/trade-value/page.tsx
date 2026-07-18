@@ -171,7 +171,7 @@ export default function TradeValuePage() {
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '40px 24px' }}>
 
         <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: text, marginBottom: 6 }}>ارزش معاملات</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: text, margin: '0 0 6px' }}>ارزش معاملات</h1>
           <div style={{ fontSize: 13, color: muted }}>
             ارزش کل معاملات روزانه صندوق‌های طلا، نقره و زعفران — نمودار تاریخی با میانگین متحرک
           </div>

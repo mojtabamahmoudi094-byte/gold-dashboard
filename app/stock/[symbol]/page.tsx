@@ -6,7 +6,9 @@ import type { Reports } from '../../../lib/stockInsights'
 import JsonLd from '../../../components/JsonLd'
 import { SITE_URL } from '../../../lib/site'
 
-export const dynamic = 'force-dynamic'
+// ISR به‌جای force-dynamic: دیتای زنده هرچند دقیقه آپدیت می‌شود، کلاینت هم خودش رفرش دارد —
+// نیازی به هیت Supabase در هر ریکوئست SSR نیست (روی Render رایگان صرفه‌جویی CPU/تاخیر می‌کند)
+export const revalidate = 60
 
 async function findSymbolData(symbol: string) {
   const data = await getStocksIndustries()
@@ -63,6 +65,7 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
     <>
       {jsonLd.length > 0 && <JsonLd data={jsonLd} />}
       <StockPageClient
+        key={symbol}
         symbol={symbol}
         initialData={data}
         initialReports={reportsRaw as Reports | null}

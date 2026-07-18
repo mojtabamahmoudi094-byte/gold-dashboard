@@ -157,7 +157,7 @@ export default function ValuationScreenerPage() {
                           <Link href={`/stock/${encodeURIComponent(r.symbol)}`} style={{ color: t.text, textDecoration: 'none', fontWeight: 700 }}>
                             {r.symbol}
                           </Link>
-                          <div style={{ fontSize: 10, color: cream, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
+                          <div style={{ fontSize: 10, color: cream, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
                         </td>
                         <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fa(r.price)}</td>
                         <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fa(r.eps)}</td>

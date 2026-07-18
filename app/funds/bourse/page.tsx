@@ -84,7 +84,7 @@ export default function BourseFundsPage() {
             <Link href="/funds" style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
               ← بازگشت به دیدبان صندوق‌ها
             </Link>
-          <div style={{ fontSize: 22, fontWeight: 700, color: text, margin: '10px 0 6px' }}>صندوق‌های بورسی</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: text, margin: '10px 0 6px' }}>صندوق‌های بورسی</h1>
           <div style={{ fontSize: 13, color: muted }}>
             صندوق‌های سرمایه‌گذاری مبتنی بر سهام — اهرمی، بخشی و سهامی
           </div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '../../../lib/rateLimit'
 
 // Gemini با ورودی تصویری (چارت کندلی) — تفسیر فنی فارسی می‌نویسد
 // الگوی AI-Kline: LLM مستقیم عکس چارت را می‌بیند، نه فقط اعداد خام
@@ -17,6 +18,11 @@ const SYSTEM = `تو دستیار «بورس سنج» هستی. یک عکس نم
 - فقط همان JSON را برگردان، بدون Markdown fence یا توضیح اضافه.`
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  if (!rateLimit(`chart-narrative:${ip}`, 10, 60_000)) {
+    return NextResponse.json({ ok: false, error: 'تعداد درخواست‌ها زیاد است' }, { status: 429 })
+  }
+
   const KEY = process.env.GEMINI_API_KEY
   if (!KEY) {
     return NextResponse.json({ ok: false, error: 'GEMINI_API_KEY تنظیم نشده' }, { status: 500 })

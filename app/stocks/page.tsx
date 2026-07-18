@@ -135,9 +135,9 @@ export default function StocksPage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '28px 16px' : '40px 24px' }}>
 
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: isMobile ? 19 : 22, fontWeight: 700, color: text, marginBottom: 6 }}>
+          <h1 style={{ fontSize: isMobile ? 19 : 22, fontWeight: 700, color: text, margin: '0 0 6px' }}>
             سهام به تفکیک صنعت
-          </div>
+          </h1>
           <div style={{ fontSize: 12.5, color: muted, lineHeight: 1.8 }}>
             همه صنایع بورس و فرابورس بر اساس طبقه‌بندی رسمی سازمان بورس — مرتب بر اساس ارزش معاملات
             {data && totalTval > 0 && (

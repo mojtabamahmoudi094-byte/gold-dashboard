@@ -79,12 +79,15 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
         />
+        <a href="#main-content" className="skip-link">
+          پرش به محتوای اصلی
+        </a>
         <PageViewLogger />
         <ScrollProgress />
         <ToastProvider>
           <Header />
           <Breadcrumb />
-          {children}
+          <div id="main-content">{children}</div>
           <Footer />
           <ChatWidget />
           <ScrollToTop />

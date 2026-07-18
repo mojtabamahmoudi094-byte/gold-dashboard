@@ -1,10 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
-import ChartModal, { type ChartModalPoint } from '../../../components/ChartModal'
+import { type ChartModalPoint } from '../../../components/ChartModal'
+
+const ChartModal = dynamic(() => import('../../../components/ChartModal'), { ssr: false })
 import { downloadCSV } from '../../../lib/csvExport'
 import { buildInsights, monthLabel, growth, monthlyYoY, type RMonth, type RQuarter, type RHolding, type Reports, type Tone, type Insight } from '../../../lib/stockInsights'
 import { shouldUseDark } from '../../../lib/theme'

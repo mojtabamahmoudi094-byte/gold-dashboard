@@ -3,6 +3,10 @@ import { SITE_URL } from '../lib/site'
 import { supabase } from '../lib/supabase'
 import { getStocksIndustries } from '../lib/stocksIndustriesData'
 
+// بدون این، fetch داخلی Supabase توسط Data Cache نکست کش می‌شود و lastmod چند روز کهنه می‌ماند
+// (ناهماهنگ با /api/stocks-industries که force-dynamic است) — هر ۵ دقیقه کافیست چون دیتای زنده هم با همین کادنس آپدیت می‌شود
+export const revalidate = 300
+
 const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: '', priority: 1 },
   { path: '/stocks', priority: 0.7 },

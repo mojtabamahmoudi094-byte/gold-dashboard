@@ -1,4 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
 
 // رله تلگرام برای بات پورتفوی شخصی — مشابه app/api/telegram-relay (کدال هم مثل تلگرام از IP
 // غیرایرانی بلاک نیست ولی دلیل رله اینجا فرق دارد: codal-portfolio-notify.js روی سرور ایران
@@ -21,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 })
   }
 
-  if (body.token !== token) {
+  if (!body.token || !timingSafeEqual(body.token, token)) {
     return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 })
   }
 
@@ -40,6 +48,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+      signal: AbortSignal.timeout(10_000),
     })
     const data = await res.json()
     if (!data.ok) {

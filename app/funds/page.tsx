@@ -115,7 +115,7 @@ export default function FundsPage() {
         <div style={{ maxWidth: 1000, margin: '0 auto', padding: '40px 24px' }}>
 
         <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: text, marginBottom: 6 }}>دیدبان صندوق‌های کالایی</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: text, margin: '0 0 6px' }}>دیدبان صندوق‌های کالایی</h1>
           <div style={{ fontSize: 13, color: muted }}>
             مشاهده و تحلیل صندوق‌های سرمایه‌گذاری طلا، نقره و زعفران — جریان پول، رتبه‌بندی و هشدار آنومالی
           </div>

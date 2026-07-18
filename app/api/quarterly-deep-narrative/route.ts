@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callOpenRouter, callGemini } from '@/lib/llmNarrate'
+import { rateLimit } from '../../../lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +59,11 @@ const GEMINI_SCHEMA = { type: 'OBJECT', properties: { html: { type: 'STRING' } }
 const OPENROUTER_SCHEMA = { type: 'object', properties: { html: { type: 'string' } }, required: ['html'], additionalProperties: false }
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  if (!rateLimit(`quarterly-deep-narrative:${ip}`, 10, 60_000)) {
+    return NextResponse.json({ ok: false, error: 'تعداد درخواست‌ها زیاد است' }, { status: 429 })
+  }
+
   const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY
   const GEMINI_KEY = process.env.GEMINI_API_KEY
   if (!OPENROUTER_KEY && !GEMINI_KEY) {

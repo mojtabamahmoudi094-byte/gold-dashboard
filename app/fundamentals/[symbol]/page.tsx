@@ -3,18 +3,20 @@ import FundamentalsPage from './FundamentalsClient'
 import { getFundamentals } from '../../../lib/fundamentalsData'
 import JsonLd from '../../../components/JsonLd'
 import { SITE_URL } from '../../../lib/site'
+import { pageMetadata } from '../../../lib/pageMetadata'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }): Promise<Metadata> {
   const raw = decodeURIComponent((await params).symbol).replace(/-/g, ' ')
   const data = await getFundamentals(raw)
-  if (!data) return { title: `نسبت‌های مالی ${raw}` }
+  if (!data) return pageMetadata({ title: `نسبت‌های مالی ${raw}`, description: `نسبت‌های مالی نماد ${raw}`, path: `/fundamentals/${encodeURIComponent(raw)}` })
   const ratio = (v: number | null) => (v == null ? '—' : v.toLocaleString('fa-IR', { maximumFractionDigits: 2 }))
-  return {
+  return pageMetadata({
     title: `نسبت‌های مالی ${data.symbol}`,
     description: `نسبت‌های مالی نماد ${data.symbol} — P/E ${ratio(data.pe)}, P/B ${ratio(data.pb)}, ROE، ROA، حاشیه سود و اهرم مالی، محاسبه‌شده از صورت‌های مالی سالانه کدال (دوره ${data.period}).`,
-  }
+    path: `/fundamentals/${encodeURIComponent(raw)}`,
+  })
 }
 
 export default async function Page({ params }: { params: Promise<{ symbol: string }> }) {
@@ -46,7 +48,7 @@ export default async function Page({ params }: { params: Promise<{ symbol: strin
   return (
     <>
       {jsonLd.length > 0 && <JsonLd data={jsonLd} />}
-      <FundamentalsPage symbol={raw} initialData={data} />
+      <FundamentalsPage key={raw} symbol={raw} initialData={data} />
     </>
   )
 }

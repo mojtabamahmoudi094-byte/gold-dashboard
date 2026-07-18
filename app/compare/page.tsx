@@ -100,9 +100,9 @@ export default function ComparePage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: t.textBright }}>
+          <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: t.textBright, margin: 0 }}>
             مقایسه‌ی صندوق‌ها
-          </div>
+          </h1>
           <Link href="/compare/stocks" style={{
             fontSize: 12.5, color: t.accent, textDecoration: 'none', fontWeight: 700,
             padding: '7px 14px', borderRadius: 9, border: `1px solid ${t.accent}44`, background: `${t.accent}0e`,

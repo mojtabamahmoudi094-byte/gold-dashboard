@@ -12,7 +12,6 @@ import persian from 'react-date-object/calendars/persian'
 import persian_fa from 'react-date-object/locales/persian_fa'
 import DateObject from 'react-date-object'
 import gregorian from 'react-date-object/calendars/gregorian'
-import * as XLSX from 'xlsx'
 
 const DatePicker = dynamic(() => import('react-multi-date-picker'), { ssr: false })
 const TerminalChart = dynamic(() => import('./TerminalChart'), { ssr: false })
@@ -158,6 +157,7 @@ export default function TerminalPage() {
     setImporting(true)
 
     try {
+      const XLSX = await import('xlsx')
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: 'array' })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
@@ -321,9 +321,9 @@ export default function TerminalPage() {
         {/* هیرو */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: t.textBright }}>
+            <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: t.textBright, margin: 0 }}>
               ارزش معاملات صندوق‌های طلا
-            </div>
+            </h1>
             <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>
               تحلیل هوشمند روند ارزش معاملات · {records.length > 0 ? `${records.length} روز داده` : ''}
             </div>

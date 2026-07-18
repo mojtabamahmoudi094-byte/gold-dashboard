@@ -376,7 +376,14 @@ export default function Header() {
                 return (
                   <div key={item.href} style={{ position: 'relative' }}
                     onMouseEnter={() => setOpenDrop(item.href)}
-                    onMouseLeave={() => setOpenDrop(null)}>
+                    onMouseLeave={() => setOpenDrop(null)}
+                    onFocus={() => setOpenDrop(item.href)}
+                    onBlur={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpenDrop(null)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setOpenDrop(null)
+                    }}>
                     {link}
                     {openDrop === item.href && (
                       <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, paddingTop: 10 }}>

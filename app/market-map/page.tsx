@@ -218,9 +218,9 @@ export default function MarketMapPage() {
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '20px 12px 40px' : '32px 24px 48px' }}>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: isMobile ? 19 : 22, fontWeight: 700, color: text, marginBottom: 6 }}>
+          <h1 style={{ fontSize: isMobile ? 19 : 22, fontWeight: 700, color: text, margin: '0 0 6px' }}>
             نقشه بازار
-          </div>
+          </h1>
           <div style={{ fontSize: 12.5, color: muted, lineHeight: 1.8 }}>
             نقشه حرارتی سهام بورس و فرابورس — اندازه هر جعبه بر اساس {applied.size === 'tval' ? 'ارزش معاملات' : 'ارزش بازار'} و
             رنگ آن بر اساس درصد تغییر {applied.colorBy === 'plp' ? 'قیمت آخرین' : 'قیمت پایانی'}

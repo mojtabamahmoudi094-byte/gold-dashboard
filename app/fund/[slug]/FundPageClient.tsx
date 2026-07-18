@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { darkTheme, lightTheme, shouldUseDark } from '../../../lib/theme'
@@ -8,7 +9,9 @@ import { Skeleton, SkeletonBlock, SkeletonRows } from '../../components/ui/Skele
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
-import ChartModal, { type ChartModalPoint } from '../../../components/ChartModal'
+import { type ChartModalPoint } from '../../../components/ChartModal'
+
+const ChartModal = dynamic(() => import('../../../components/ChartModal'), { ssr: false })
 import { downloadCSV } from '../../../lib/csvExport'
 
 type FundSnapshotRow = {

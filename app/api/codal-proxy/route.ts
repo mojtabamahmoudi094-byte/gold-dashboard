@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '../../../lib/rateLimit'
 
 // پروکسی کدال برای هرمس (ایجنت خارجی) — کدال/BrsAPI به IP خارج جواب نمی‌دهد،
 // این سایت (Render) هم خارج از ایرانه ولی هرمس فقط به همین می‌رسه، پس واسط می‌شویم.
 // فیلدها و فیلتر دسته دقیقاً طبق درخواست هرمس (سشن e17840c0b5a7).
+// تماس سرور-به-سرور است، نه از مرورگر — CORS لازم نیست، rate-limit جلوی مصرف بی‌رویه کلید BrsAPI را می‌گیرد.
 
 export const dynamic = 'force-dynamic'
 
@@ -21,22 +23,33 @@ type RawItem = {
 }
 
 export async function GET(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  if (!rateLimit(`codal-proxy:${ip}`, 20, 60_000)) {
+    return NextResponse.json({ error: 'تعداد درخواست‌ها زیاد است' }, { status: 429, headers: { 'Cache-Control': 'no-store' } })
+  }
+
   const qs = new URLSearchParams()
   for (const k of PASS_PARAMS) {
     const v = req.nextUrl.searchParams.get(k)
     if (v) qs.set(k, v)
   }
 
-  const res = await fetch(`https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}&${qs}`, {
-    signal: AbortSignal.timeout(30_000),
-  })
-  const data = await res.json()
-  if (data?.successful === false) {
-    return NextResponse.json({ error: data.message_error || 'BrsAPI error' }, {
-      status: 502, headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+  let data: unknown
+  try {
+    const res = await fetch(`https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}&${qs}`, {
+      signal: AbortSignal.timeout(30_000),
+    })
+    data = await res.json()
+  } catch {
+    return NextResponse.json({ error: 'خطا در ارتباط با کدال/BrsAPI' }, { status: 502, headers: { 'Cache-Control': 'no-store' } })
+  }
+
+  if ((data as { successful?: boolean })?.successful === false) {
+    return NextResponse.json({ error: (data as { message_error?: string }).message_error || 'BrsAPI error' }, {
+      status: 502, headers: { 'Cache-Control': 'no-store' },
     })
   }
-  const list: RawItem[] = Array.isArray(data) ? data : (data?.announcement ?? [])
+  const list: RawItem[] = Array.isArray(data) ? data : ((data as { announcement?: RawItem[] })?.announcement ?? [])
 
   const announcement = list
     .filter(a => a.title && !SKIP_TITLE.test(a.title))
@@ -47,6 +60,6 @@ export async function GET(req: NextRequest) {
     }))
 
   return NextResponse.json({ announcement }, {
-    headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+    headers: { 'Cache-Control': 'no-store' },
   })
 }

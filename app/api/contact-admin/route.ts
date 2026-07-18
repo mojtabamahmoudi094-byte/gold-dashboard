@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '../../../lib/rateLimit'
 
 // پیام کاربر به مدیر — ارسال خودکار به ایمیل (formsubmit.co، بدون نیاز به API key)
 // + یک کپی به تلگرام اگر بات تنظیم شده باشد
@@ -6,6 +7,11 @@ import { NextRequest, NextResponse } from 'next/server'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'mojtabamahmoudi093@gmail.com'
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  if (!rateLimit(`contact-admin:${ip}`, 5, 60_000)) {
+    return NextResponse.json({ ok: false, error: 'تعداد درخواست‌ها زیاد است' }, { status: 429 })
+  }
+
   let body: { name?: string; email?: string; message?: string }
   try {
     body = await req.json()
@@ -70,6 +76,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text }),
+        signal: AbortSignal.timeout(10_000),
       })
       const data = await res.json() as { ok: boolean }
       telegramOk = data.ok

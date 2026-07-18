@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { createClient } from '@supabase/supabase-js'
 import { supabaseAdmin as sb } from '../../../../lib/supabaseAdmin'
 import { sendOtpSms } from '../../../../lib/smsIr'
+import { publicEnv } from '../../../../lib/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,18 +16,27 @@ function hashCode(code: string) {
   return crypto.createHash('sha256').update(code).digest('hex')
 }
 
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => null)
-  const userId = body?.userId as string | undefined
-  const phone = body?.phone as string | undefined
+async function requireUser(req: Request): Promise<string | null> {
+  const auth = req.headers.get('authorization') || ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+  if (!token) return null
+  const anon = createClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  const { data, error } = await anon.auth.getUser(token)
+  if (error || !data?.user) return null
+  return data.user.id
+}
 
-  if (!userId || !phone || !PHONE_RE.test(phone)) {
-    return NextResponse.json({ error: 'شماره موبایل نامعتبر است' }, { status: 400 })
+export async function POST(req: Request) {
+  const userId = await requireUser(req)
+  if (!userId) {
+    return NextResponse.json({ error: 'ابتدا وارد حساب کاربری شوید' }, { status: 401 })
   }
 
-  const { data: userRes, error: userErr } = await sb.auth.admin.getUserById(userId)
-  if (userErr || !userRes?.user) {
-    return NextResponse.json({ error: 'کاربر یافت نشد' }, { status: 404 })
+  const body = await req.json().catch(() => null)
+  const phone = body?.phone as string | undefined
+
+  if (!phone || !PHONE_RE.test(phone)) {
+    return NextResponse.json({ error: 'شماره موبایل نامعتبر است' }, { status: 400 })
   }
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
