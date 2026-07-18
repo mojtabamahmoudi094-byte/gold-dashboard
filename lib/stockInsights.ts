@@ -2,6 +2,8 @@
 // این ماژول از app/stock/[symbol]/page.tsx استخراج شده تا صفحه سیگنال‌ها هم بتواند
 // همان منطق را برای تولید سیگنال خرید/فروش سهام استفاده کند.
 
+import { sma, rsi, macd } from './indicators'
+
 export type RProduct = {
   name: string; unit: string | null
   prod_m: number | null; qty_m: number | null; rate_m: number | null
@@ -47,6 +49,9 @@ export type Reports = { symbol: string; updated: string; months: RMonth[]; quart
 
 export type Tone = 'pos' | 'neg' | 'neutral'
 export type Insight = { tone: Tone; text: string }
+
+export type SigReason = { text: string; dir: 'pos' | 'neg' | 'neu' }
+export type TechInput = { score: number; reasons: SigReason[] }
 
 const MONTH_NAMES = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
 export const monthLabel = (period: string) => {
@@ -186,11 +191,66 @@ export function buildInsights(months: RMonth[], quarters: RQuarter[]): { verdict
   return { verdict, items, score }
 }
 
+// تحلیل تکنیکال سبک از کندل‌های اخیر (نزدیک ۱۳۰ روز کاری) — برای ترکیب با سیگنال بنیادی کدال
+// هر آیتم مستقیم از قیمت/حجم محاسبه می‌شود؛ چیزی اختراع نمی‌شود
+export function computeTechnicalScore(closes: number[], volumes: number[]): TechInput {
+  const n = closes.length
+  const reasons: SigReason[] = []
+  let score = 0
+  if (n < 30) return { score, reasons }
+
+  const last = closes[n - 1]
+  const s20 = sma(closes, 20), s50 = sma(closes, 50)
+  const s20v = s20[n - 1], s50v = s50[n - 1]
+  if (s20v != null && s50v != null) {
+    if (last > s20v && s20v > s50v) { score += 1; reasons.push({ text: 'روند تکنیکال کوتاه‌مدت صعودی — قیمت بالای MA۲۰ و MA۲۰ بالای MA۵۰', dir: 'pos' }) }
+    else if (last < s20v && s20v < s50v) { score -= 1; reasons.push({ text: 'روند تکنیکال کوتاه‌مدت نزولی — قیمت زیر MA۲۰ و MA۲۰ زیر MA۵۰', dir: 'neg' }) }
+  }
+
+  const r = rsi(closes)
+  const rv = r[n - 1]
+  if (rv != null) {
+    if (rv >= 70) { score -= 0.7; reasons.push({ text: `RSI تکنیکال ${rv.toFixed(0)} — اشباع خرید`, dir: 'neg' }) }
+    else if (rv <= 30) { score += 0.7; reasons.push({ text: `RSI تکنیکال ${rv.toFixed(0)} — اشباع فروش`, dir: 'pos' }) }
+  }
+
+  const m = macd(closes)
+  const hist = m.map(x => x.hist)
+  const hv = hist[n - 1], hprev = hist[n - 2]
+  if (hv != null) {
+    if (hprev != null && hv > 0 && hprev <= 0) { score += 1; reasons.push({ text: 'تقاطع صعودی مکدی به‌تازگی رخ داده', dir: 'pos' }) }
+    else if (hprev != null && hv < 0 && hprev >= 0) { score -= 1; reasons.push({ text: 'تقاطع نزولی مکدی به‌تازگی رخ داده', dir: 'neg' }) }
+    else score += hv >= 0 ? 0.3 : -0.3
+  }
+
+  if (n >= 21 && closes[n - 2]) {
+    const avg20 = volumes.slice(n - 21, n - 1).reduce((a, b) => a + b, 0) / 20
+    const chg1 = (last - closes[n - 2]) / closes[n - 2]
+    if (avg20 > 0) {
+      const ratio = volumes[n - 1] / avg20
+      if (ratio >= 2 && chg1 > 0) { score += 1; reasons.push({ text: `حجم ${ratio.toFixed(1)} برابر میانگین همراه با رشد قیمت — ورود پول`, dir: 'pos' }) }
+      else if (ratio >= 2 && chg1 < 0) { score -= 1; reasons.push({ text: `حجم ${ratio.toFixed(1)} برابر میانگین همراه با افت قیمت — خروج پول`, dir: 'neg' }) }
+    }
+  }
+
+  if (n > 23 && closes[n - 22]) {
+    const m1 = (last - closes[n - 22]) / closes[n - 22] * 100
+    if (m1 > 8) { score += 0.5; reasons.push({ text: `بازده یک ماه اخیر تکنیکال +${m1.toFixed(1)}٪`, dir: 'pos' }) }
+    else if (m1 < -8) { score -= 0.5; reasons.push({ text: `بازده یک ماه اخیر تکنیکال ${m1.toFixed(1)}٪`, dir: 'neg' }) }
+  }
+
+  return { score, reasons }
+}
+
 // سیگنال خرید/فروش سهام برای صفحه سیگنال‌های بازار — هم‌شکل با موتورهای دیگر (طلا/نقره/بورسی)
-export function computeStockSignal(months: RMonth[], quarters: RQuarter[]) {
-  const { items, score } = buildInsights(months, quarters)
+// tech: امتیاز تکنیکال اختیاری از computeTechnicalScore — با وزن کمتر روی امتیاز بنیادی کدال اضافه می‌شود
+export function computeStockSignal(months: RMonth[], quarters: RQuarter[], tech?: TechInput) {
+  const { items, score: fundScore } = buildInsights(months, quarters)
   if (items.length === 0) return null
-  const reasons = items.map(it => ({ text: it.text, dir: (it.tone === 'pos' ? 'pos' : it.tone === 'neg' ? 'neg' : 'neu') as 'pos' | 'neg' | 'neu' }))
+  const fundReasons = items.map(it => ({ text: it.text, dir: (it.tone === 'pos' ? 'pos' : it.tone === 'neg' ? 'neg' : 'neu') as 'pos' | 'neg' | 'neu' }))
+  const techScore = tech?.score ?? 0
+  const score = fundScore + techScore * 0.7
+  const reasons = [...fundReasons, ...(tech?.reasons ?? [])]
 
   let type: string, color: string, confidence: number
   if (score >= 3) { type = 'خرید'; color = '#10B981'; confidence = Math.min(85, Math.round(50 + score * 7)) }
@@ -199,5 +259,5 @@ export function computeStockSignal(months: RMonth[], quarters: RQuarter[]) {
   else if (score <= -1) { type = 'احتیاط'; color = '#F59E0B'; confidence = Math.round(40 + Math.abs(score) * 6) }
   else { type = 'نگه‌داری'; color = '#00C8FF'; confidence = Math.round(45 + Math.abs(score) * 4) }
 
-  return { type, color, confidence, score, reasons }
+  return { type, color, confidence, score, fundScore, techScore, reasons }
 }

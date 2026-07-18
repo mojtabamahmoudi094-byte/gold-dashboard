@@ -7,7 +7,7 @@ import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, todayShamsi } from '../../lib/format'
 import { computeMarketBubbles, fundBubbleZati, fundBubbleAsmi, computeSilverBubble, silverFundBubbleZati, SILVER_FUND_WEIGHTS, type MarketBubbles } from '../../lib/goldBubbles'
-import { computeStockSignal, type Reports } from '../../lib/stockInsights'
+import { computeStockSignal, computeTechnicalScore, type Reports } from '../../lib/stockInsights'
 import AuthGate from '../../components/AuthGate'
 
 type PriceSeries = { dates: string[]; priceMap: Record<string, number> }
@@ -783,19 +783,36 @@ export default function SignalsPage() {
         }
 
         const CONCURRENCY = 20
+        // ۱۳۰ روز کاری تقریباً ۲۰۰ روز تقویمی است — برای اندیکاتورهای تکنیکال کافی (نیازمند حداقل ۳۰ کندل)
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - 200)
+        const cutoffStr = cutoff.toISOString().slice(0, 10)
         const results: { symbol: string; name: string; chg: number; sig: NonNullable<ReturnType<typeof computeStockSignal>> }[] = []
         for (let i = 0; i < (reportSymbols?.length ?? 0); i += CONCURRENCY) {
           const batch: string[] = reportSymbols.slice(i, i + CONCURRENCY)
-          const settled = await Promise.allSettled(batch.map((sym: string) =>
-            fetch(`/reports/${encodeURIComponent(sym.replace(/\s+/g, '-'))}.json`).then(r => {
-              if (!r.ok) throw new Error('report fetch failed')
-              return r.json()
-            })
-          ))
+          const [settled, candleRes] = await Promise.all([
+            Promise.allSettled(batch.map((sym: string) =>
+              fetch(`/reports/${encodeURIComponent(sym.replace(/\s+/g, '-'))}.json`).then(r => {
+                if (!r.ok) throw new Error('report fetch failed')
+                return r.json()
+              })
+            )),
+            supabase.from('stock_candles')
+              .select('symbol, trade_date, close, volume')
+              .in('symbol', batch)
+              .gte('trade_date', cutoffStr)
+              .order('trade_date', { ascending: true }),
+          ])
+          const candlesBySym: Record<string, { close: number; volume: number }[]> = {}
+          ;(candleRes.data ?? []).forEach((r: any) => {
+            (candlesBySym[r.symbol] ??= []).push({ close: safe(r.close), volume: safe(r.volume) })
+          })
           settled.forEach((r, idx) => {
             if (r.status !== 'fulfilled') return
             const rep: Reports = r.value
-            const sig = computeStockSignal(rep.months ?? [], rep.quarters ?? [])
+            const rows = candlesBySym[batch[idx]] ?? []
+            const tech = rows.length >= 30 ? computeTechnicalScore(rows.map(x => x.close), rows.map(x => x.volume)) : undefined
+            const sig = computeStockSignal(rep.months ?? [], rep.quarters ?? [], tech)
             if (!sig || sig.type === 'نگه‌داری') return
             const meta = bySymbol.get(batch[idx]) ?? { name: batch[idx], chg: 0 }
             results.push({ symbol: batch[idx], name: meta.name, chg: meta.chg, sig })
