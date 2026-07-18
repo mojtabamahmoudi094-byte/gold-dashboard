@@ -138,6 +138,8 @@ async function main() {
     if (!isStock(it)) {
       const l18c = clean(it.l18)
       if (EQUITY_FUND_NAMES.has(l18c)) { watchItems.push(it); fundSymbols.push(symOf(it)) }
+      // صندوق درآمد ثابت — فقط برای نقشه بازار، در «رصد لحظه‌ای» (watchItems) حساب نمی‌شود
+      else if (FIXED_INCOME_FUND_NAMES.has(l18c)) fundSymbols.push(symOf(it))
       // حق تقدم: نمادی که با «ح» تمام می‌شود و نماد پایه‌اش هم در فهرست هست (مثل کگهرح ← کگهر)
       else if (l18c.endsWith('ح') && allL18.has(l18c.slice(0, -1))) rightSymbols.push(symOf(it))
       else if (/حق تقدم|حق‌تقدم/.test(clean(it.l30))) rightsItems.push(it)
