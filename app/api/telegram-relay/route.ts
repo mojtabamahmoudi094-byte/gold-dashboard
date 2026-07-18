@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Telegram env vars not set' }, { status: 500 })
   }
 
-  let body: { token?: string; text?: string; chat_id?: string; photo?: string; caption?: string }
+  let body: { token?: string; text?: string; chat_id?: string; photo?: string; caption?: string; parse_mode?: string }
   try {
     body = await req.json()
   } catch {
@@ -54,7 +54,11 @@ export async function POST(req: NextRequest) {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: target, text }),
+      body: JSON.stringify({
+        chat_id: target,
+        text,
+        ...(body.parse_mode ? { parse_mode: body.parse_mode } : {}),
+      }),
     })
     const data = await res.json()
     if (!data.ok) {

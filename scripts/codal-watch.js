@@ -28,6 +28,7 @@ const path = require('path')
 const fs   = require('fs')
 
 const { buildSymbol, sbClient, OUT_DIR, faDate } = require('./codal-company-reports.js')
+const { fetchAuditLetter } = require('./codal-letter-extract.js')
 const { buildMonthlyReportData, renderMonthlyReportCardHtml, screenshotMonthlyReportCard } = require('./monthly-report-card.js')
 const { buildQuarterlyReportData, renderQuarterlyReportCardHtml, screenshotQuarterlyReportCard } = require('./quarterly-report-card.js')
 const { TELEGRAM_CHANNEL } = require('./brand-assets.js')
@@ -266,14 +267,63 @@ async function narrate(symbol, facts) {
   return null
 }
 
-async function sendTelegram(text) {
+// تلگرام روی تگ ناقص/غیرمجاز کل پیام را با خطای ۴۰۰ رد می‌کند، بدون partial-send —
+// فقط تگ‌های مجاز HTML تلگرام باقی می‌مانند، بقیه حذف می‌شوند (متن داخلشان می‌ماند)
+function sanitizeTelegramHtml(html) {
+  let out = String(html || '').replace(/<br\s*\/?>/gi, '\n')
+  out = out.replace(/<\/?([a-zA-Z0-9]+)([^>]*)>/g, (m, tag, attrs) => {
+    const t = tag.toLowerCase()
+    if (!['b', 'i', 'u', 's', 'code', 'pre', 'a'].includes(t)) return ''
+    if (t === 'a') {
+      if (m.startsWith('</')) return '</a>'
+      const hrefM = attrs.match(/href\s*=\s*"([^"]*)"/i)
+      return hrefM ? `<a href="${hrefM[1]}">` : ''
+    }
+    return m.startsWith('</') ? `</${t}>` : `<${t}>`
+  })
+  return out
+}
+
+// پست تحلیل عمیق سالانهٔ حسابرسی‌شده — فقط فیلدهای از قبل استخراج/محاسبه‌شده به Gemini می‌رود
+// (هرگز متن خام نامهٔ حسابرس). اگر Gemini شکست بخورد، بر خلاف narrate() به متن خام fallback
+// نمی‌کند — یه تحلیل ساختاریافتهٔ شکسته بدتر از هیچی‌نفرستادنه، فقط رد می‌شود.
+async function buildDeepAnalysisText(symbol, q, extracted) {
+  try {
+    const res = await fetch(`${SITE}/api/annual-audit-narrative`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol,
+        period: q.period,
+        opinionType: extracted.opinionType,
+        ratios: q.ratios,
+        revenueYoY: pctChange(q.revenue, q.revenue_ly),
+        netProfitYoY: pctChange(q.net, q.net_ly),
+        cashFlow: q.cash_flow,
+        redFlagSnippets: {
+          basisForQualified: extracted.basisForQualified,
+          notableClauses: extracted.notableClauses,
+          legalComplianceNotes: extracted.legalComplianceNotes,
+        },
+      }),
+      signal: AbortSignal.timeout(60_000),
+    })
+    const data = await res.json()
+    if (data.ok && data.html) return sanitizeTelegramHtml(data.html)
+    log(`⚠️ ${symbol}: تحلیل عمیق سالانه پاسخ نامعتبر — ${data.error || 'نامشخص'}`)
+  } catch (e) { log(`⚠️ ${symbol}: تحلیل عمیق سالانه Gemini شکست خورد — ${e.message}`) }
+  return null
+}
+
+async function sendTelegram(text, opts = {}) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — اعلان ارسال نشد'); return }
+  const parseModeField = opts.html ? { parse_mode: 'HTML' } : {}
   // مستقیم — از داخل ایران معمولاً فیلتر است، ولی اگر باز بود سریع‌ترین راه است
   try {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }),
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, ...parseModeField }),
       signal: AbortSignal.timeout(20_000),
     })
     const data = await res.json()
@@ -286,7 +336,7 @@ async function sendTelegram(text) {
     const res = await fetch(`${SITE}/api/telegram-relay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: TELEGRAM_CHAT_ID, text }),
+      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: TELEGRAM_CHAT_ID, text, ...parseModeField }),
       signal: AbortSignal.timeout(90_000), // کلد-استارت Render
     })
     const data = await res.json()
@@ -628,6 +678,26 @@ async function main() {
             if (latestQuarter) {
               try { quarterlyPhotoSent = await sendQuarterlyPhoto(s, payload, latestQuarter) }
               catch (e) { log(`⚠️ ${s}: کارت عکسی فصلی شکست خورد، ادامه با متن — ${e.message}`) }
+            }
+
+            // پست تحلیل عمیق سالانهٔ حسابرسی‌شده — اضافه بر کارت بالا، نه جایگزینش.
+            // کل بلوک try/catch است تا شکستش هرگز کارت/خلاصهٔ فعلی را متوقف نکند.
+            if (latestQuarter?.months === 12 && latestQuarter?.audited) {
+              try {
+                const letterAnnouncement = mine
+                  .filter(a => isQuarterlyTitle(norm(a.title)) && /حسابرسی شده/.test(norm(a.title)))
+                  .sort((x, y) => (y.publish || '').localeCompare(x.publish || ''))[0]
+                if (letterAnnouncement?.url) {
+                  const browser = await getBrowser()
+                  const extracted = await fetchAuditLetter(letterAnnouncement.url, browser)
+                  if (extracted) {
+                    const deepText = await buildDeepAnalysisText(s, latestQuarter, extracted)
+                    if (deepText) await sendTelegram(deepText, { html: true })
+                  } else {
+                    log(`ℹ️ ${s}: نامهٔ حسابرسی قابل استخراج نبود — پست تحلیل عمیق رد شد`)
+                  }
+                }
+              } catch (e) { log(`⚠️ ${s}: پست تحلیل عمیق سالانهٔ حسابرسی‌شده شکست خورد (نادیده گرفته شد) — ${e.message}`) }
             }
 
             // اگه عکس واقعاً نرفت (خطا/عدم داده)، متن قدیمی جایگزینش می‌شه — گزارش نباید کامل از دست بره

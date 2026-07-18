@@ -40,7 +40,7 @@ const OUT_DIR = path.join(__dirname, 'reports-out')
 // نسخهٔ پارسر — با هر تغییر منطق پارس یکی بالا برود.
 // خروجی قدیمی‌تر از این نسخه دوباره ساخته می‌شود، حتی بدون --force؛ وگرنه بعد از
 // اصلاح پارسر، نمادهایی که فایل کهنه دارند برای همیشه skip می‌شوند.
-const PARSER_VERSION = 9
+const PARSER_VERSION = 10
 
 // خروجی علاوه بر فایل، در جدول stock_reports هم upsert می‌شود تا سایت بدون rebuild به‌روز شود.
 // SUPABASE_KEY باید service-role باشد و فقط روی سرور بماند (هرگز NEXT_PUBLIC_).
@@ -580,12 +580,14 @@ function parsePL(wb) {
 // (بدهی غیرجاری)، «تسهيلات مالي» بدون پسوند (بدهی جاری) — ترتیب رجکس مهم نیست چون هر دو
 // دقیقاً منطبق (^...$) و مانع تداخل‌اند.
 const BS_MAP = [
-  ['assets',      /^جمعداراییها$|^جمعکلداراییها$/],
-  ['liabilities', /^جمعبدهیها$|^جمعکلبدهیها$/],
-  ['equity',      /^جمعحقوقصاحبانسهام$|^جمعحقوقمالکانه$/],
-  ['cash',        /^موجودینقد$/],
-  ['debt_lt',     /^تسهیلاتمالیبلندمدت$/],
-  ['debt_st',     /^تسهیلاتمالی$/],
+  ['assets',              /^جمعداراییها$|^جمعکلداراییها$/],
+  ['assets_current',      /^جمعداراییهایجاری$/],
+  ['liabilities',         /^جمعبدهیها$|^جمعکلبدهیها$/],
+  ['liabilities_current', /^جمعبدهیهایجاری$/],
+  ['equity',              /^جمعحقوقصاحبانسهام$|^جمعحقوقمالکانه$/],
+  ['cash',                /^موجودینقد$/],
+  ['debt_lt',             /^تسهیلاتمالیبلندمدت$/],
+  ['debt_st',             /^تسهیلاتمالی$/],
 ]
 
 function parseBS(wb) {
@@ -614,14 +616,60 @@ function parseBS(wb) {
   return null
 }
 
-// صورت سود و زیان + ترازنامه — هر دو از یک اکسل صورت‌های مالی
+// ═══ پارس صورت جریان‌های نقدی — همان اکسل، شیت جداگانه (فقط گزارش سالانهٔ حسابرسی‌شده استفاده می‌شود) ═══
+// ⚠️ برچسب دقیق ردیف‌ها روی داده واقعی تأیید نشده — قبل از تکیه در تولید با
+// «node codal-company-reports.js <نماد> --force» و بازبینی reports-out/<نماد>.json چک شود.
+const CF_MAP = [
+  ['operating', /^جریانخالصورود\(خروج\)نقدحاصلازفعالیتهایعملیاتی$/],
+  ['investing', /^جریانخالصورود\(خروج\)نقدحاصلازفعالیتهایسرمایهگذاری$/],
+  ['financing', /^جریانخالصورود\(خروج\)نقدحاصلازفعالیتهایتامینمالی$/],
+]
+
+function parseCF(wb) {
+  for (const sn of wb.SheetNames) {
+    const rows = sheetRows(wb, sn)
+    const labels = rows.map(r => label(r[0]))
+    if (!labels.some(l => CF_MAP.some(([, re]) => re.test(l)))) continue
+    const out = {}
+    rows.forEach((r, i) => {
+      const v = faNum(r[1])
+      if (v === null) return
+      for (const [key, re] of CF_MAP) {
+        if (out[key] === undefined && re.test(labels[i])) out[key] = v
+      }
+    })
+    if (Object.keys(out).length) {
+      for (const [key] of CF_MAP) if (out[key] === undefined) out[key] = null
+      return out
+    }
+  }
+  return null   // شیت جریان نقدی پیدا نشد — نامعلوم، نه صفر
+}
+
+// نسبت‌های مالی از صورت سود و زیان + ترازنامهٔ همان دوره — تابع خالص، بدون I/O
+function computeRatios(p) {
+  if (!p) return null
+  const num = (n) => (typeof n === 'number' && isFinite(n) ? n : null)
+  const div = (a, b) => (num(a) != null && num(b) && b !== 0) ? a / b : null
+  return {
+    gross_margin:   div(p.gross, p.revenue),
+    net_margin:     div(p.net, p.revenue),
+    current_ratio:  div(p.assets_current, p.liabilities_current),
+    debt_ratio:     div(p.liabilities, p.assets),
+    roe:            div(p.net, p.equity),
+  }
+}
+
+// صورت سود و زیان + ترازنامه + جریان نقدی — هر سه از یک اکسل صورت‌های مالی
 function parseFinancials(wb) {
   const pl = parsePL(wb)
   if (!pl) return null
   const bs = parseBS(wb) || Object.fromEntries(
     BS_MAP.flatMap(([key]) => [[key, null], [key + '_prev', null]]),
   )
-  return { ...pl, ...bs }
+  // محاسبهٔ ارزان (بدون I/O اضافه، همان wb) — فقط در حلقهٔ quarters بسته به
+  // سالانه/حسابرسی‌شده بودن دوره واقعاً روی خروجی نهایی نگه داشته می‌شود.
+  return { ...pl, ...bs, cash_flow: parseCF(wb) }
 }
 
 // ═══ انتخاب اطلاعیه‌ها ═══
@@ -778,13 +826,21 @@ async function buildSymbol(symbol, opts = {}) {
     if (r.reason) { console.log(`    ⚠️ فصلی ${g.key}: ${r.reason} ناموفق (${g.candidates.length} نسخه)`); continue }
     const t = norm(r.a.title)
     const dur = t.match(/دوره (۳|۶|۹|3|6|9|۱۲|12) ماهه/)
+    const months = dur ? faNum(dur[1]) : 12
+    const audited = /حسابرسی شده/.test(t)
+    const isAnnualAudited = months === 12 && audited
     quarters.push({
       period: faDate(t),
-      months: dur ? faNum(dur[1]) : 12,
-      audited: /حسابرسی شده/.test(t),
+      months,
+      audited,
       consolidated: /تلفیقی/.test(t),
       publish: faDate(r.a.date_publish),
       ...r.p,
+      // این سه فیلد فقط برای سالانهٔ حسابرسی‌شده پر می‌شوند (پست تحلیل عمیق تلگرام)؛
+      // بقیهٔ دوره‌ها عمداً خالی می‌مانند تا اندازهٔ JSON و ابهام «صفر یعنی چی» زیاد نشود.
+      cash_flow: isAnnualAudited ? (r.p.cash_flow ?? null) : null,
+      ratios: isAnnualAudited ? computeRatios(r.p) : null,
+      red_flags: [],
     })
   }
   quarters.sort((a, b) => (a.period + a.months).localeCompare(b.period + b.months))
