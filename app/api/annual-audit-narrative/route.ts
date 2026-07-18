@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { callOpenRouter, callGemini } from '@/lib/llmNarrate'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,10 +40,14 @@ interface Body {
   redFlagSnippets?: RedFlags | null
 }
 
+const GEMINI_SCHEMA = { type: 'OBJECT', properties: { html: { type: 'STRING' } }, required: ['html'] }
+const OPENROUTER_SCHEMA = { type: 'object', properties: { html: { type: 'string' } }, required: ['html'], additionalProperties: false }
+
 export async function POST(req: NextRequest) {
-  const KEY = process.env.GEMINI_API_KEY
-  if (!KEY) {
-    return NextResponse.json({ ok: false, error: 'GEMINI_API_KEY تنظیم نشده' }, { status: 500 })
+  const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY
+  const GEMINI_KEY = process.env.GEMINI_API_KEY
+  if (!OPENROUTER_KEY && !GEMINI_KEY) {
+    return NextResponse.json({ ok: false, error: 'OPENROUTER_API_KEY/GEMINI_API_KEY تنظیم نشده' }, { status: 500 })
   }
 
   let body: Body
@@ -68,43 +73,17 @@ export async function POST(req: NextRequest) {
     redFlagSnippets: body.redFlagSnippets ?? null,
   })
 
-  const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite'
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`
-
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: SYSTEM }] },
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 2000,
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'OBJECT',
-            properties: { html: { type: 'STRING' } },
-            required: ['html'],
-          },
-        },
-      }),
-      signal: AbortSignal.timeout(45_000),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      return NextResponse.json({ ok: false, error: data?.error?.message || `HTTP ${res.status}` }, { status: 502 })
-    }
-    const raw: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!raw) {
-      return NextResponse.json({ ok: false, error: 'پاسخ خالی از Gemini' }, { status: 502 })
-    }
+    const raw = OPENROUTER_KEY
+      ? await callOpenRouter(OPENROUTER_KEY, SYSTEM, userPrompt, OPENROUTER_SCHEMA, 'annual_audit_narrative', 2000)
+      : await callGemini(GEMINI_KEY!, SYSTEM, userPrompt, GEMINI_SCHEMA, 2000)
+    if (!raw.ok) return NextResponse.json({ ok: false, error: raw.error }, { status: 502 })
+
     let parsed: { html?: string }
     try {
-      parsed = JSON.parse(raw)
+      parsed = JSON.parse(raw.text)
     } catch {
-      return NextResponse.json({ ok: false, error: 'خروجی غیرقابل‌پردازش از Gemini' }, { status: 502 })
+      return NextResponse.json({ ok: false, error: 'خروجی غیرقابل‌پردازش از مدل' }, { status: 502 })
     }
     if (!parsed.html) {
       return NextResponse.json({ ok: false, error: 'پاسخ ناقص از Gemini' }, { status: 502 })

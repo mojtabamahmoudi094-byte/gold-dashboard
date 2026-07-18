@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { callOpenRouter, callGemini } from '@/lib/llmNarrate'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,10 +12,30 @@ const SYSTEM = `تو دستیار «بورس سنج» هستی. یک سیگنا�
 - "text": پاراگراف فارسی روان و طبیعی (۳ تا ۵ جمله) که دلایل را روایت می‌کند و همیشه با «این تحلیل صرفاً اطلاع‌رسانی است و توصیه مالی نیست.» تمام می‌شود.
 - فقط همان JSON را برگردان، بدون Markdown fence یا توضیح اضافه.`
 
+// Gemini مستقیم: type ها UPPERCASE — OpenRouter: JSON Schema استاندارد (lowercase)
+const GEMINI_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    headline: { type: 'STRING' },
+    text: { type: 'STRING' },
+  },
+  required: ['headline', 'text'],
+}
+const OPENROUTER_SCHEMA = {
+  type: 'object',
+  properties: {
+    headline: { type: 'string' },
+    text: { type: 'string' },
+  },
+  required: ['headline', 'text'],
+  additionalProperties: false,
+}
+
 export async function POST(req: NextRequest) {
-  const KEY = process.env.GEMINI_API_KEY
-  if (!KEY) {
-    return NextResponse.json({ ok: false, error: 'GEMINI_API_KEY تنظیم نشده' }, { status: 500 })
+  const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY
+  const GEMINI_KEY = process.env.GEMINI_API_KEY
+  if (!OPENROUTER_KEY && !GEMINI_KEY) {
+    return NextResponse.json({ ok: false, error: 'OPENROUTER_API_KEY/GEMINI_API_KEY تنظیم نشده' }, { status: 500 })
   }
 
   let body: { type?: string; category?: string; symbol?: string | null; reason?: string; confidence?: number }
@@ -38,46 +59,19 @@ export async function POST(req: NextRequest) {
     reason,
   ].filter(Boolean).join('\n')
 
-  const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite'
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`
-
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: SYSTEM }] },
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 400,
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'OBJECT',
-            properties: {
-              headline: { type: 'STRING' },
-              text: { type: 'STRING' },
-            },
-            required: ['headline', 'text'],
-          },
-        },
-      }),
-      signal: AbortSignal.timeout(30_000),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      return NextResponse.json({ ok: false, error: data?.error?.message || `HTTP ${res.status}` }, { status: 502 })
-    }
-    const raw: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!raw) {
-      return NextResponse.json({ ok: false, error: 'پاسخ خالی از Gemini' }, { status: 502 })
-    }
+    // OpenRouter (کلید شارژ‌شده، سقف بالاتر از رایگان Google) ترجیح دارد؛ اگر تنظیم نشده
+    // بود به کلید مستقیم Gemini fallback می‌شود — سرویس قطع نمی‌شود.
+    const raw = OPENROUTER_KEY
+      ? await callOpenRouter(OPENROUTER_KEY, SYSTEM, userPrompt, OPENROUTER_SCHEMA, 'signal_narrative', 400)
+      : await callGemini(GEMINI_KEY!, SYSTEM, userPrompt, GEMINI_SCHEMA, 400)
+    if (!raw.ok) return NextResponse.json({ ok: false, error: raw.error }, { status: 502 })
+
     let parsed: { headline?: string; text?: string }
     try {
-      parsed = JSON.parse(raw)
+      parsed = JSON.parse(raw.text)
     } catch {
-      return NextResponse.json({ ok: false, error: 'خروجی غیرقابل‌پردازش از Gemini' }, { status: 502 })
+      return NextResponse.json({ ok: false, error: 'خروجی غیرقابل‌پردازش از مدل' }, { status: 502 })
     }
     if (!parsed.text) {
       return NextResponse.json({ ok: false, error: 'پاسخ ناقص از Gemini' }, { status: 502 })
