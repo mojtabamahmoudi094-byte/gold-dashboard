@@ -104,7 +104,7 @@ export default function MarketMapPage() {
     ro.observe(el)
     window.addEventListener('resize', update)
     return () => { ro.disconnect(); window.removeEventListener('resize', update) }
-  }, [isMobile])
+  }, [isMobile, data])
 
   useEffect(() => {
     const onFsChange = () => setFullscreen(!!document.fullscreenElement)
