@@ -483,6 +483,7 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
   muted: string; line: string; panel: string; text: string
 }) {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -493,6 +494,16 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
+
+  // موقعیت پنل با position:fixed محاسبه می‌شود — چون نوار ابزار در موبایل overflow-x:auto دارد
+  // و طبق مشخصات CSS همین باعث می‌شود overflow-y هم به auto تبدیل شود و پاپ‌آور absolute را ببرد
+  const toggleOpen = () => {
+    if (!open && wrapRef.current) {
+      const r = wrapRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
+    }
+    setOpen(v => !v)
+  }
 
   const available = ASSET_TYPES.filter(t => t.available)
   const allChecked = available.every(t => value[t.key])
@@ -510,7 +521,7 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
     <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
       <Field label="دارایی" muted={muted}>
         <button
-          onClick={() => setOpen(v => !v)}
+          onClick={toggleOpen}
           style={{
             padding: '7px 10px', borderRadius: 9, border: `0.5px solid ${line}`,
             background: 'transparent', color: text, fontSize: 11.5, fontFamily: 'inherit',
@@ -522,9 +533,9 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
         </button>
       </Field>
 
-      {open && (
+      {open && pos && (
         <div style={{
-          position: 'absolute', top: '110%', right: 0, zIndex: 20, minWidth: 160,
+          position: 'fixed', top: pos.top, right: pos.right, zIndex: 1000, minWidth: 160,
           background: panel, border: `0.5px solid ${line}`, borderRadius: 12,
           padding: 8, backdropFilter: 'blur(12px)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
         }}>
