@@ -248,6 +248,26 @@ function barChartSvg(up, down, w, h) {
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="chartSvg">${bars}</svg>`
 }
 
+// یک چارت واحد برای هر ۴ سری: صف خرید/فروش (خط پیوسته) + نماد مثبت/منفی (خط‌چین) — هم‌مقیاس روی یک محور
+const COMBO_H = 56
+function comboChartSvg(queue, sym, w, h) {
+  if (!queue.buy.length) return ''
+  const n = queue.buy.length
+  const all = [...queue.buy, ...queue.sell, ...sym.pos, ...sym.neg, 0]
+  const min = Math.min(...all)
+  const max = Math.max(...all)
+  const padY = 6
+  const x = (i) => (i / (n - 1)) * w
+  const y = (v) => h - padY - ((v - min) / (max - min || 1)) * (h - padY * 2)
+  const path = (data) => data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="chartSvg">
+    <path d="${path(queue.sell)}" fill="none" stroke="${DOWN}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${path(queue.buy)}" fill="none" stroke="${UP}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${path(sym.neg)}" fill="none" stroke="${DOWN}" stroke-width="2" stroke-dasharray="5 3" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>
+    <path d="${path(sym.pos)}" fill="none" stroke="${UP}" stroke-width="2" stroke-dasharray="5 3" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>
+  </svg>`
+}
+
 // { emoji, title, subtitle, times: string[], flow: number[], tval: number[],
 //   queue: {buy:number[], sell:number[]}, sym: {pos:number[], neg:number[]}, pc: {buy:number[], sell:number[]}, footer }
 function renderMarketCardHtml({ emoji = '📊', title, subtitle, times = [], flow = [], tval = [], queue, sym, pc, footer }) {
@@ -265,19 +285,17 @@ function renderMarketCardHtml({ emoji = '📊', title, subtitle, times = [], flo
       </span>
     </div>`
 
-  const queueHtml = queue ? miniRow(
-    'صف خرید / فروش',
-    barChartSvg(queue.buy, queue.sell, MINI_W, MINI_H),
-    `${fmtNum(queue.buy.at(-1) ?? 0)} خرید`,
-    `${fmtNum(queue.sell.at(-1) ?? 0)} فروش`,
-  ) : ''
-
-  const symHtml = sym ? miniRow(
-    'نماد مثبت / منفی',
-    barChartSvg(sym.pos, sym.neg, MINI_W, MINI_H),
-    `${fmtNum(sym.pos.at(-1) ?? 0)} مثبت`,
-    `${fmtNum(sym.neg.at(-1) ?? 0)} منفی`,
-  ) : ''
+  const comboHtml = (queue && sym) ? `
+    <div class="miniRow combo">
+      <span class="rLabel">صف خرید/فروش و نماد مثبت/منفی</span>
+      <span class="rChart">${comboChartSvg(queue, sym, MINI_W, COMBO_H)}</span>
+      <span class="rLegend grid2">
+        <span class="legendItem" style="color:${UP}">🟢 ${fmtNum(queue.buy.at(-1) ?? 0)} صف خرید</span>
+        <span class="legendItem" style="color:${DOWN}">🔴 ${fmtNum(queue.sell.at(-1) ?? 0)} صف فروش</span>
+        <span class="legendItem" style="color:${UP}">📈 ${fmtNum(sym.pos.at(-1) ?? 0)} مثبت</span>
+        <span class="legendItem" style="color:${DOWN}">📉 ${fmtNum(sym.neg.at(-1) ?? 0)} منفی</span>
+      </span>
+    </div>` : ''
 
   const pcHtml = pc ? miniRow(
     'سرانه خرید/فروش حقیقی (م.ت)',
@@ -338,6 +356,7 @@ function renderMarketCardHtml({ emoji = '📊', title, subtitle, times = [], flo
   .chartBody { direction: ltr; width: 100%; }
   .chartSvg { display: block; width: 100%; height: ${BIG_H}px; }
   .miniRow .chartSvg { height: ${MINI_H}px; }
+  .miniRow.combo .chartSvg { height: ${COMBO_H}px; }
   .axis { display: flex; justify-content: space-between; margin-top: 1px; direction: ltr; }
   .axis span { color: #6b6455; font-size: 11px; }
 
@@ -345,6 +364,7 @@ function renderMarketCardHtml({ emoji = '📊', title, subtitle, times = [], flo
   .miniRow .rLabel { width: 190px; flex-shrink: 0; color: ${MUTED}; font-size: 15px; }
   .miniRow .rChart { flex: 1; direction: ltr; min-width: 0; display: block; }
   .miniRow .rLegend { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; width: 140px; flex-shrink: 0; }
+  .miniRow .rLegend.grid2 { display: grid; grid-template-columns: 1fr; gap: 2px; width: 160px; }
   .legendItem { font-size: 13px; font-weight: 700; direction: ltr; }
 
   .footer { z-index: 1; margin-top: auto; padding-top: 8px; color: ${MUTED}; font-size: 14px; text-align: center; }
@@ -382,8 +402,7 @@ function renderMarketCardHtml({ emoji = '📊', title, subtitle, times = [], flo
         <div class="axis">${axisHtml(times)}</div>
       </div>
 
-      ${queueHtml}
-      ${symHtml}
+      ${comboHtml}
       ${pcHtml}
     </div>
 

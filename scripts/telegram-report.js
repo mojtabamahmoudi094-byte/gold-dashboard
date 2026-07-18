@@ -124,26 +124,43 @@ async function narrate(title, facts) {
   return null
 }
 
+const signed = (v) => (v == null ? '—' : `${v > 0 ? '+' : ''}${num(v)}`)
+
+// تغییر یک سنجه نسبت به گزارش (ردیف) قبلی — null اگر یکی از دو مقدار موجود نباشد
+const deltaOf = (prev, cur) => (prev == null || cur == null ? null : Number(cur) - Number(prev))
+
 // اعداد خام market_watch → کارت/کپشن (یک‌بار محاسبه، هم برای عکس هم برای متن)
 // raw market_watch fields → card highlight + rows / caption facts (computed once, used by both the image and the text)
-function computeFacts(d) {
-  const rows = []
-  let highlight = null
-  if (!d) return { highlight, rows }
+// rows: همهٔ ردیف‌های امروز — آخری برای اعداد لحظه‌ای، یکی‌مانده‌به‌آخر برای «تغییر نسبت به گزارش قبلی»
+function computeFacts(rows) {
+  const empty = { highlight: null, rows: [], deltas: null }
+  if (!rows || !rows.length) return empty
+  const d = rows[rows.length - 1]
+  const out = { highlight: null, rows: [], deltas: null }
   // فیلدهای خام market_watch → واحدهای صفحه مانیتور (see app/monitor/[cat]/page.tsx)
   if (d.money_in != null) {
     const flow = Number(d.money_in) / 1e10 // میلیارد تومان
-    highlight = { label: 'ورود / خروج پول حقیقی (میلیارد تومان)', value: `${flow >= 0 ? '+' : ''}${num(flow, 1)}`, tone: flow >= 0 ? 'up' : 'down' }
+    out.highlight = { label: 'ورود / خروج پول حقیقی (میلیارد تومان)', value: `${flow >= 0 ? '+' : ''}${num(flow, 1)}`, tone: flow >= 0 ? 'up' : 'down' }
   }
   if (d.buyq != null || d.sellq != null)
-    rows.push({ label: 'صف خرید / فروش', value: `${num(d.buyq)} / ${num(d.sellq)}` })
+    out.rows.push({ label: 'صف خرید / فروش', value: `${num(d.buyq)} / ${num(d.sellq)}` })
   if (d.sym_pos != null || d.sym_neg != null)
-    rows.push({ label: 'نماد مثبت / منفی', value: `${num(d.sym_pos)} / ${num(d.sym_neg)}` })
+    out.rows.push({ label: 'نماد مثبت / منفی', value: `${num(d.sym_pos)} / ${num(d.sym_neg)}` })
   if (d.tval_total != null)
-    rows.push({ label: 'ارزش کل معاملات', value: `${num(Number(d.tval_total) / 1e10)} میلیارد تومان` })
+    out.rows.push({ label: 'ارزش کل معاملات', value: `${num(Number(d.tval_total) / 1e10)} میلیارد تومان` })
   if (d.ind_buy_pc != null || d.ind_sell_pc != null)
-    rows.push({ label: 'سرانه خرید/فروش حقیقی', value: `${num(Number(d.ind_buy_pc) / 1e7, 1)} / ${num(Number(d.ind_sell_pc) / 1e7, 1)} م.ت` })
-  return { highlight, rows }
+    out.rows.push({ label: 'سرانه خرید/فروش حقیقی', value: `${num(Number(d.ind_buy_pc) / 1e7, 1)} / ${num(Number(d.ind_sell_pc) / 1e7, 1)} م.ت` })
+
+  if (rows.length >= 2) {
+    const p = rows[rows.length - 2]
+    out.deltas = {
+      buyq: deltaOf(p.buyq, d.buyq),
+      sellq: deltaOf(p.sellq, d.sellq),
+      sym_pos: deltaOf(p.sym_pos, d.sym_pos),
+      sym_neg: deltaOf(p.sym_neg, d.sym_neg),
+    }
+  }
+  return out
 }
 
 // ساخت کپشن هوشمند از آخرین سنجه‌ها
@@ -160,7 +177,18 @@ async function buildCaption(cat, facts) {
     const narrated = await narrate(c.title, factLines.join('\n'))
     if (narrated) lines.push(narrated, '')
   }
-  lines.push(...factLines, '', CHANNEL_TAG, SITE)
+  lines.push(...factLines)
+
+  const dl = facts.deltas
+  if (dl && (dl.buyq != null || dl.sellq != null || dl.sym_pos != null || dl.sym_neg != null)) {
+    lines.push('', '🔄 تغییرات نسبت به گزارش قبلی:')
+    if (dl.buyq != null || dl.sellq != null)
+      lines.push(`• صف خرید / فروش: ${signed(dl.buyq)} / ${signed(dl.sellq)}`)
+    if (dl.sym_pos != null || dl.sym_neg != null)
+      lines.push(`• نماد مثبت / منفی: ${signed(dl.sym_pos)} / ${signed(dl.sym_neg)}`)
+  }
+
+  lines.push('', CHANNEL_TAG, SITE)
   return capCaption(lines.join('\n'))
 }
 
@@ -240,7 +268,7 @@ async function main() {
         continue
       }
 
-      const facts = computeFacts(snap && snap.last)
+      const facts = computeFacts((snap && snap.rows) || [])
       const series = computeSeries((snap && snap.rows) || [])
       const buf = await screenshotCard(browser, buildCardHtml(cat, series))
       await sendPhoto(buf, await buildCaption(cat, facts))
