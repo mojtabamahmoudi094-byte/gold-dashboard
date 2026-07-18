@@ -8,12 +8,14 @@ import { shouldUseDark } from '../../lib/theme'
 import { squarify, type Rect } from '../../lib/treemap'
 import { TutorialPanel } from '../components/ui/TutorialPanel'
 
+type Board = 'bourse' | 'fara-bourse' | 'other'
 type Sym = {
   l18: string; l30: string
   pl: number | null; plp: number | null
   pc: number | null; pcp: number | null
   tval: number | null; tvol: number | null
   mv: number | null; pe: number | null
+  board?: Board
 }
 type Industry = {
   id: number | null; name: string; count: number
@@ -21,7 +23,7 @@ type Industry = {
   symbols: Sym[]
 }
 type ExtraGroup = {
-  id: number; name: string; kind: 'fund' | 'right'; count: number
+  id: number; name: string; kind: 'fund' | 'right' | 'commodity'; count: number
   tval: number; mv: number; up: number; down: number
   symbols: Sym[]
 }
@@ -39,6 +41,16 @@ const ASSET_TYPES: { key: AssetType; label: string; available: boolean }[] = [
   { key: 'option',  label: 'آپشن',       available: true },
 ]
 
+type MarketType = 'bourse' | 'faraBourse' | 'option' | 'fund' | 'commodityFund'
+
+const MARKET_TYPES: { key: MarketType; label: string }[] = [
+  { key: 'bourse',        label: 'بورس' },
+  { key: 'faraBourse',    label: 'فرا بورس' },
+  { key: 'option',        label: 'آپشن' },
+  { key: 'fund',          label: 'صندوق‌ها' },
+  { key: 'commodityFund', label: 'صندوق کالایی' },
+]
+
 type Filters = {
   industryId: string        // 'all' یا id صنعت
   size: SizeMetric
@@ -46,6 +58,7 @@ type Filters = {
   groupBy: GroupBy
   showChange: boolean
   assetTypes: Record<AssetType, boolean>
+  markets: Record<MarketType, boolean>
 }
 
 const DEFAULT_FILTERS: Filters = {
@@ -55,6 +68,7 @@ const DEFAULT_FILTERS: Filters = {
   groupBy: 'industry',
   showChange: false,
   assetTypes: { stock: true, warrant: false, fund: false, option: false },
+  markets: { bourse: true, faraBourse: true, option: true, fund: true, commodityFund: true },
 }
 
 // رنگ حرارتی بر اساس درصد تغییر — سقف نمایش ۵٪ (بیشتر از آن هم به رنگ کاملاً اشباع می‌رسد)
@@ -150,6 +164,12 @@ export default function MarketMapPage() {
   const applyFilters = () => setApplied(pending)
 
   const groups = useMemo(() => {
+    // 'other' یعنی ISIN نماد با الگوی استاندارد بورس/فرابورس مطابقت نداشت (داده BrsApi همیشه کامل نیست) —
+    // به‌جای حذف نماد از نقشه، همیشه نمایش داده می‌شود تا فیلتر بازار باعث گم‌شدن سهم واقعی نشود
+    const boardOk = (b?: Board) =>
+      !b || b === 'other' ||
+      (b === 'bourse' && applied.markets.bourse) || (b === 'fara-bourse' && applied.markets.faraBourse)
+
     const stockGroups = applied.assetTypes.stock
       ? (() => {
           const industries = data?.industries ?? []
@@ -157,16 +177,18 @@ export default function MarketMapPage() {
             ? industries
             : industries.filter(ind => String(ind.id) === applied.industryId)
           return picked
+            .map(ind => ({ id: ind.id ?? -2, name: ind.name, symbols: ind.symbols.filter(s => boardOk(s.board)) }))
             .filter(ind => ind.symbols.length > 0)
-            .map(ind => ({ id: ind.id ?? -2, name: ind.name, symbols: ind.symbols }))
         })()
       : []
 
     const extra = (data?.extraGroups ?? []).filter(g =>
-      (g.kind === 'fund' && applied.assetTypes.fund) || (g.kind === 'right' && applied.assetTypes.warrant),
+      (g.kind === 'fund' && applied.assetTypes.fund && applied.markets.fund) ||
+      (g.kind === 'commodity' && applied.assetTypes.fund && applied.markets.commodityFund) ||
+      (g.kind === 'right' && applied.assetTypes.warrant),
     )
 
-    const option = applied.assetTypes.option && optionGroup ? [optionGroup] : []
+    const option = applied.assetTypes.option && applied.markets.option && optionGroup ? [optionGroup] : []
 
     const all = [...stockGroups, ...extra, ...option]
 
@@ -240,11 +262,11 @@ export default function MarketMapPage() {
               muted={muted} line={line} panel={panel} text={text}
             />
 
-            <Field label="بازار" muted={muted}>
-              <Select value="all" onChange={() => {}} line={line} panel={panel} text={text} disabled>
-                <option value="all">همه</option>
-              </Select>
-            </Field>
+            <MarketMenu
+              value={pending.markets}
+              onChange={v => setPending(p => ({ ...p, markets: v }))}
+              muted={muted} line={line} panel={panel} text={text}
+            />
 
             <Field label="صنعت" muted={muted}>
               <Select
@@ -581,6 +603,100 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
               />
               {t.label}
               {!t.available && <span style={{ fontSize: 10 }}>(به‌زودی)</span>}
+            </label>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
+
+function MarketMenu({ value, onChange, muted, line, panel, text }: {
+  value: Record<MarketType, boolean>
+  onChange: (v: Record<MarketType, boolean>) => void
+  muted: string; line: string; panel: string; text: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (wrapRef.current?.contains(t) || panelRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const recompute = () => {
+      const r = wrapRef.current?.getBoundingClientRect()
+      if (r) setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
+    }
+    recompute()
+    window.addEventListener('scroll', recompute, true)
+    window.addEventListener('resize', recompute)
+    return () => {
+      window.removeEventListener('scroll', recompute, true)
+      window.removeEventListener('resize', recompute)
+    }
+  }, [open])
+
+  const toggleOpen = () => setOpen(v => !v)
+
+  const allChecked = MARKET_TYPES.every(t => value[t.key])
+  const checkedCount = MARKET_TYPES.filter(t => value[t.key]).length
+  const summary = checkedCount === 0 ? 'هیچ‌کدام' : checkedCount === MARKET_TYPES.length ? 'همه' : MARKET_TYPES.find(t => value[t.key])?.label ?? ''
+
+  const toggleAll = () => {
+    const next = { ...value }
+    for (const t of MARKET_TYPES) next[t.key] = !allChecked
+    onChange(next)
+  }
+  const toggleOne = (key: MarketType) => onChange({ ...value, [key]: !value[key] })
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
+      <Field label="بازار" muted={muted}>
+        <button
+          onClick={toggleOpen}
+          style={{
+            padding: '7px 10px', borderRadius: 9, border: `0.5px solid ${line}`,
+            background: 'transparent', color: text, fontSize: 11.5, fontFamily: 'inherit',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+          }}
+        >
+          {summary}
+          <span style={{ fontSize: 9, color: muted }}>▾</span>
+        </button>
+      </Field>
+
+      {open && pos && createPortal(
+        <div ref={panelRef} style={{
+          position: 'fixed', top: pos.top, right: pos.right, zIndex: 1000, minWidth: 160,
+          background: panel, border: `0.5px solid ${line}`, borderRadius: 12,
+          padding: 8, backdropFilter: 'blur(12px)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+        }}>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', cursor: 'pointer',
+            fontSize: 12, color: text, fontWeight: 700, borderBottom: `0.5px solid ${line}`, marginBottom: 4,
+          }}>
+            <input type="checkbox" checked={allChecked} onChange={toggleAll} />
+            انتخاب همه
+          </label>
+          {MARKET_TYPES.map(t => (
+            <label
+              key={t.key}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 12, color: text }}
+            >
+              <input type="checkbox" checked={value[t.key]} onChange={() => toggleOne(t.key)} />
+              {t.label}
             </label>
           ))}
         </div>,

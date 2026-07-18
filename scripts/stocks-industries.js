@@ -133,6 +133,7 @@ async function main() {
     pe: num(it.pe),
     bi: num(it.Buy_I_Volume), si: num(it.Sell_I_Volume),   // حجم خرید/فروش حقیقی — برای badge خرید/فروش
     bn: num(it.Buy_N_Volume), sn: num(it.Sell_N_Volume),   // حجم خرید/فروش حقوقی
+    board: marketFromIsin(it.isin),                        // 'bourse' | 'fara-bourse' | 'other' — برای فیلتر «بازار» نقشه بازار
   })
   for (const it of arr) {
     if (!isStock(it)) {
@@ -194,6 +195,25 @@ async function main() {
   try { wsTransport = require('ws') } catch { /* Node 22+ نیازی ندارد */ }
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY,
     wsTransport ? { realtime: { transport: wsTransport } } : {})
+
+  // فهرست نمادهای صندوق کالایی (طلا/نقره/زعفران) از جدول assets — هم برای گروه «صندوق کالایی» نقشه بازار
+  // و هم برای دسته‌بندی cat جدا در market_watch و نمودار «تفکیک ارزش معاملات» زیر استفاده می‌شود
+  let commodityNames = new Set()
+  const CAT_MAP = { 'طلا': 'gold', 'نقره': 'silver', 'زعفران': 'saffron' }
+  const commoditySets = { gold: new Set(), silver: new Set(), saffron: new Set() }
+  const { data: assets, error: aErr } = await sb.from('assets').select('name, category')
+  if (aErr) {
+    console.error(`[stocks-industries] assets: ${aErr.message}`)
+  } else {
+    for (const a of assets) {
+      const c = CAT_MAP[a.category]
+      if (c) { commoditySets[c].add(clean(a.name)); commodityNames.add(clean(a.name)) }
+    }
+  }
+  if (commodityNames.size) {
+    const commoditySymbols = arr.filter(it => commodityNames.has(clean(it.l18))).map(symOf)
+    if (commoditySymbols.length) extraGroups.push(buildExtraGroup(-12, 'صندوق کالایی', 'commodity', commoditySymbols))
+  }
 
   // ── خروجی‌های مخصوص سهام — فقط تا ۱۲:۳۵ (بعدش قیمت سهام ثابت است) ──
   if (stocksOpen) {
@@ -322,22 +342,6 @@ async function main() {
       const { error: symLegalErr } = await sb.from('stock_legalflow_daily').upsert(symLegalRows, { onConflict: 'symbol,trade_date' })
       if (symLegalErr) console.error(`[stocks-industries] stock_legalflow_daily: ${symLegalErr.message}`)
       else console.log(`✅ stock_legalflow_daily بروز شد (${symLegalRows.length} نماد)`)
-    }
-  }
-
-  // فهرست نمادهای صندوق کالایی (طلا/نقره/زعفران) از جدول assets — برای cat جدا و برای نمودار «تفکیک ارزش معاملات»
-  let commodityNames = new Set()
-  const CAT_MAP = { 'طلا': 'gold', 'نقره': 'silver', 'زعفران': 'saffron' }
-  const commoditySets = { gold: new Set(), silver: new Set(), saffron: new Set() }
-  if (stocksOpen || fundsOpen) {
-    const { data: assets, error: aErr } = await sb.from('assets').select('name, category')
-    if (aErr) {
-      console.error(`[stocks-industries] assets: ${aErr.message}`)
-    } else {
-      for (const a of assets) {
-        const c = CAT_MAP[a.category]
-        if (c) { commoditySets[c].add(clean(a.name)); commodityNames.add(clean(a.name)) }
-      }
     }
   }
 
