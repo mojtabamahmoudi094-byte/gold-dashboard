@@ -118,28 +118,49 @@ async function main() {
   // فقط برای نمودار توزیع محدوده قیمتی کارت «سهام»: حق تقدم هم اضافه می‌شود (در watchItems اصلی نیست)
   const rightsItems = []
   const byIndustry = new Map()
+  // گروه‌های مصنوعی «نقشه بازار» — جدا از byIndustry نگه داشته می‌شوند تا روی
+  // ورودی‌های money-flow/per-capita/snapshot که روی industries اصلی حساب می‌شوند اثر نگذارند
+  const fundSymbols = []
+  const rightSymbols = []
+  const symOf = (it) => ({
+    l18: clean(it.l18),
+    l30: clean(it.l30),
+    pl: num(it.pl),   plp: num(it.plp),   // آخرین معامله + درصد
+    pc: num(it.pc),   pcp: num(it.pcp),   // قیمت پایانی + درصد
+    tval: num(it.tval),                    // ارزش معاملات (ریال)
+    tvol: num(it.tvol),
+    mv: num(it.mv),                        // ارزش بازار (ریال)
+    pe: num(it.pe),
+    bi: num(it.Buy_I_Volume), si: num(it.Sell_I_Volume),   // حجم خرید/فروش حقیقی — برای badge خرید/فروش
+    bn: num(it.Buy_N_Volume), sn: num(it.Sell_N_Volume),   // حجم خرید/فروش حقوقی
+  })
   for (const it of arr) {
     if (!isStock(it)) {
-      if (EQUITY_FUND_NAMES.has(clean(it.l18))) watchItems.push(it)
+      const l18c = clean(it.l18)
+      if (EQUITY_FUND_NAMES.has(l18c)) { watchItems.push(it); fundSymbols.push(symOf(it)) }
+      // حق تقدم: نمادی که با «ح» تمام می‌شود و نماد پایه‌اش هم در فهرست هست (مثل کگهرح ← کگهر)
+      else if (l18c.endsWith('ح') && allL18.has(l18c.slice(0, -1))) rightSymbols.push(symOf(it))
       else if (/حق تقدم|حق‌تقدم/.test(clean(it.l30))) rightsItems.push(it)
       continue
     }
     watchItems.push(it)
     const key = clean(it.cs) ? (num(it.cs_id) ?? clean(it.cs)) : 'سایر'
     if (!byIndustry.has(key)) byIndustry.set(key, { id: num(it.cs_id), name: clean(it.cs) || 'سایر', symbols: [] })
-    byIndustry.get(key).symbols.push({
-      l18: clean(it.l18),
-      l30: clean(it.l30),
-      pl: num(it.pl),   plp: num(it.plp),   // آخرین معامله + درصد
-      pc: num(it.pc),   pcp: num(it.pcp),   // قیمت پایانی + درصد
-      tval: num(it.tval),                    // ارزش معاملات (ریال)
-      tvol: num(it.tvol),
-      mv: num(it.mv),                        // ارزش بازار (ریال)
-      pe: num(it.pe),
-      bi: num(it.Buy_I_Volume), si: num(it.Sell_I_Volume),   // حجم خرید/فروش حقیقی — برای badge خرید/فروش
-      bn: num(it.Buy_N_Volume), sn: num(it.Sell_N_Volume),   // حجم خرید/فروش حقوقی
-    })
+    byIndustry.get(key).symbols.push(symOf(it))
   }
+
+  // گروه صنعت‌مانند برای صندوق سرمایه‌گذاری قابل معامله / حق تقدم — فقط برای نقشه بازار
+  function buildExtraGroup(id, name, kind, symbols) {
+    symbols.sort((a, b) => (b.tval ?? 0) - (a.tval ?? 0))
+    const tval = symbols.reduce((s, x) => s + (x.tval ?? 0), 0)
+    const mv   = symbols.reduce((s, x) => s + (x.mv ?? 0), 0)
+    const up   = symbols.filter(x => (x.pcp ?? 0) > 0).length
+    const down = symbols.filter(x => (x.pcp ?? 0) < 0).length
+    return { id, name, kind, count: symbols.length, tval, mv, up, down, symbols }
+  }
+  const extraGroups = []
+  if (fundSymbols.length) extraGroups.push(buildExtraGroup(-10, 'صندوق سرمایه‌گذاری قابل معامله', 'fund', fundSymbols))
+  if (rightSymbols.length) extraGroups.push(buildExtraGroup(-11, 'حق تقدم', 'right', rightSymbols))
 
   const industries = [...byIndustry.values()]
     .map(ind => {
@@ -177,6 +198,7 @@ async function main() {
     const out = {
       updated: new Date().toISOString(),
       industries,
+      extraGroups, // صندوق سرمایه‌گذاری قابل معامله + حق تقدم — فقط مصرف نقشه بازار
     }
 
     // ارزش دلاری (mv_usd/usdRate) را sync-usd-market-value.js جدا و روزی یک‌بار می‌نویسد؛

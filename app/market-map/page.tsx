@@ -19,7 +19,12 @@ type Industry = {
   tval: number; mv: number; up: number; down: number
   symbols: Sym[]
 }
-type Payload = { updated: string; industries: Industry[] }
+type ExtraGroup = {
+  id: number; name: string; kind: 'fund' | 'right'; count: number
+  tval: number; mv: number; up: number; down: number
+  symbols: Sym[]
+}
+type Payload = { updated: string; industries: Industry[]; extraGroups?: ExtraGroup[] }
 
 type SizeMetric = 'tval' | 'mv'
 type ColorMetric = 'plp' | 'pcp'
@@ -28,9 +33,9 @@ type AssetType = 'stock' | 'warrant' | 'fund' | 'option'
 
 const ASSET_TYPES: { key: AssetType; label: string; available: boolean }[] = [
   { key: 'stock',   label: 'سهام',       available: true },
-  { key: 'warrant', label: 'حق تقدم',    available: false },
-  { key: 'fund',    label: 'صندوق',      available: false },
-  { key: 'option',  label: 'آپشن',       available: false },
+  { key: 'warrant', label: 'حق تقدم',    available: true },
+  { key: 'fund',    label: 'صندوق',      available: true },
+  { key: 'option',  label: 'آپشن',       available: true },
 ]
 
 type Filters = {
@@ -75,6 +80,7 @@ const hemat = (rial: number) =>
 
 export default function MarketMapPage() {
   const [data, setData] = useState<Payload | null>(null)
+  const [optionGroup, setOptionGroup] = useState<ExtraGroup | null>(null)
   const [failed, setFailed] = useState(false)
   const [isDark, setIsDark] = useState(true)
   const isMobile = useIsMobile()
@@ -100,6 +106,10 @@ export default function MarketMapPage() {
       .then(r => { if (!r.ok) throw new Error(); return r.json() })
       .then(setData)
       .catch(() => setFailed(true))
+    fetch('/api/option-chain')
+      .then(r => { if (!r.ok) throw new Error(); return r.json() })
+      .then(d => setOptionGroup(d?.group ?? null))
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -139,21 +149,32 @@ export default function MarketMapPage() {
   const applyFilters = () => setApplied(pending)
 
   const groups = useMemo(() => {
-    // فعلاً فقط داده سهام در این جدول موجود است — حق تقدم/صندوق/آپشن هنوز وصل نشده
-    if (!applied.assetTypes.stock) return []
-    const industries = data?.industries ?? []
-    const picked = applied.industryId === 'all'
-      ? industries
-      : industries.filter(ind => String(ind.id) === applied.industryId)
+    const stockGroups = applied.assetTypes.stock
+      ? (() => {
+          const industries = data?.industries ?? []
+          const picked = applied.industryId === 'all'
+            ? industries
+            : industries.filter(ind => String(ind.id) === applied.industryId)
+          return picked
+            .filter(ind => ind.symbols.length > 0)
+            .map(ind => ({ id: ind.id ?? -2, name: ind.name, symbols: ind.symbols }))
+        })()
+      : []
+
+    const extra = (data?.extraGroups ?? []).filter(g =>
+      (g.kind === 'fund' && applied.assetTypes.fund) || (g.kind === 'right' && applied.assetTypes.warrant),
+    )
+
+    const option = applied.assetTypes.option && optionGroup ? [optionGroup] : []
+
+    const all = [...stockGroups, ...extra, ...option]
 
     if (applied.groupBy === 'flat') {
-      const symbols = picked.flatMap(ind => ind.symbols)
+      const symbols = all.flatMap(g => g.symbols)
       return symbols.length ? [{ id: -1, name: 'همه بازار', symbols }] : []
     }
-    return picked
-      .filter(ind => ind.symbols.length > 0)
-      .map(ind => ({ id: ind.id ?? -2, name: ind.name, symbols: ind.symbols }))
-  }, [data, applied])
+    return all
+  }, [data, optionGroup, applied])
 
   const sizeOf = (s: Sym) => Math.max(s[applied.size] ?? 0, 1)
 
