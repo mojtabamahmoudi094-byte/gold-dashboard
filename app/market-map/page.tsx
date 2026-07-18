@@ -24,6 +24,14 @@ type Payload = { updated: string; industries: Industry[] }
 type SizeMetric = 'tval' | 'mv'
 type ColorMetric = 'plp' | 'pcp'
 type GroupBy = 'industry' | 'flat'
+type AssetType = 'stock' | 'warrant' | 'fund' | 'option'
+
+const ASSET_TYPES: { key: AssetType; label: string; available: boolean }[] = [
+  { key: 'stock',   label: 'سهام',       available: true },
+  { key: 'warrant', label: 'حق تقدم',    available: false },
+  { key: 'fund',    label: 'صندوق',      available: false },
+  { key: 'option',  label: 'آپشن',       available: false },
+]
 
 type Filters = {
   industryId: string        // 'all' یا id صنعت
@@ -31,6 +39,7 @@ type Filters = {
   colorBy: ColorMetric
   groupBy: GroupBy
   showChange: boolean
+  assetTypes: Record<AssetType, boolean>
 }
 
 const DEFAULT_FILTERS: Filters = {
@@ -39,6 +48,7 @@ const DEFAULT_FILTERS: Filters = {
   colorBy: 'plp',
   groupBy: 'industry',
   showChange: false,
+  assetTypes: { stock: true, warrant: false, fund: false, option: false },
 }
 
 // رنگ حرارتی بر اساس درصد تغییر — سقف نمایش ۵٪ (بیشتر از آن هم به رنگ کاملاً اشباع می‌رسد)
@@ -129,6 +139,8 @@ export default function MarketMapPage() {
   const applyFilters = () => setApplied(pending)
 
   const groups = useMemo(() => {
+    // فعلاً فقط داده سهام در این جدول موجود است — حق تقدم/صندوق/آپشن هنوز وصل نشده
+    if (!applied.assetTypes.stock) return []
     const industries = data?.industries ?? []
     const picked = applied.industryId === 'all'
       ? industries
@@ -200,11 +212,11 @@ export default function MarketMapPage() {
               <CameraIcon />
             </IconBtn>
 
-            <Field label="دارایی" muted={muted}>
-              <Select value="stock" onChange={() => {}} line={line} panel={panel} text={text} disabled>
-                <option value="stock">سهام</option>
-              </Select>
-            </Field>
+            <AssetMenu
+              value={pending.assetTypes}
+              onChange={v => setPending(p => ({ ...p, assetTypes: v }))}
+              muted={muted} line={line} panel={panel} text={text}
+            />
 
             <Field label="بازار" muted={muted}>
               <Select value="all" onChange={() => {}} line={line} panel={panel} text={text} disabled>
@@ -440,6 +452,89 @@ function GroupBlock({ group, rect, applied, onHover }: {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function AssetMenu({ value, onChange, muted, line, panel, text }: {
+  value: Record<AssetType, boolean>
+  onChange: (v: Record<AssetType, boolean>) => void
+  muted: string; line: string; panel: string; text: string
+}) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  const available = ASSET_TYPES.filter(t => t.available)
+  const allChecked = available.every(t => value[t.key])
+  const checkedCount = available.filter(t => value[t.key]).length
+  const summary = checkedCount === 0 ? 'هیچ‌کدام' : checkedCount === available.length ? 'همه' : ASSET_TYPES.find(t => value[t.key])?.label ?? ''
+
+  const toggleAll = () => {
+    const next = { ...value }
+    for (const t of available) next[t.key] = !allChecked
+    onChange(next)
+  }
+  const toggleOne = (key: AssetType) => onChange({ ...value, [key]: !value[key] })
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
+      <Field label="دارایی" muted={muted}>
+        <button
+          onClick={() => setOpen(v => !v)}
+          style={{
+            padding: '7px 10px', borderRadius: 9, border: `0.5px solid ${line}`,
+            background: 'transparent', color: text, fontSize: 11.5, fontFamily: 'inherit',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+          }}
+        >
+          {summary}
+          <span style={{ fontSize: 9, color: muted }}>▾</span>
+        </button>
+      </Field>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '110%', right: 0, zIndex: 20, minWidth: 160,
+          background: panel, border: `0.5px solid ${line}`, borderRadius: 12,
+          padding: 8, backdropFilter: 'blur(12px)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+        }}>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', cursor: 'pointer',
+            fontSize: 12, color: text, fontWeight: 700, borderBottom: `0.5px solid ${line}`, marginBottom: 4,
+          }}>
+            <input type="checkbox" checked={allChecked} onChange={toggleAll} />
+            انتخاب همه
+          </label>
+          {ASSET_TYPES.map(t => (
+            <label
+              key={t.key}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
+                cursor: t.available ? 'pointer' : 'not-allowed',
+                fontSize: 12, color: t.available ? text : muted, opacity: t.available ? 1 : 0.55,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={value[t.key]}
+                disabled={!t.available}
+                onChange={() => t.available && toggleOne(t.key)}
+              />
+              {t.label}
+              {!t.available && <span style={{ fontSize: 10 }}>(به‌زودی)</span>}
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
