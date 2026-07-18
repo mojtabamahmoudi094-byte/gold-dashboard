@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import {
-  ResponsiveContainer, ComposedChart, BarChart, Line, Bar, Area, Cell, LabelList,
+  ResponsiveContainer, ComposedChart, BarChart, PieChart, Pie, Line, Bar, Area, Cell, LabelList,
   XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, Legend, ReferenceLine,
 } from 'recharts'
 import { useIsMobile } from '../../../lib/useIsMobile'
@@ -35,6 +35,11 @@ type Row = {
   money_in: number
   big_buy: number; big_sell: number
   plp_dist: number[]
+  // فقط برای cat=stocks — تفکیک ارزش معاملات بورس/فرابورس/آپشن/صندوق‌ها (ریال)
+  tval_by_segment?: {
+    bourse: number; fara_bourse: number; option: number
+    fund_equity: number; fund_fixed_income: number; fund_commodity: number
+  }
 }
 type Datum = Row & {
   tvalB: number; tval5m: number
@@ -93,6 +98,18 @@ const C = {
   border: 'rgba(255,255,255,0.09)', bg: '#0a0d14', panel: '#12161f',
 }
 const FONT = 'Vazirmatn, Arial, sans-serif'
+
+// تفکیک ارزش معاملات (کارت دوم دایره‌ای) — ترتیب و رنگ هر بخش
+const SEGMENT_ORDER: (keyof NonNullable<Row['tval_by_segment']>)[] =
+  ['bourse', 'fara_bourse', 'option', 'fund_equity', 'fund_fixed_income', 'fund_commodity']
+const SEGMENT_LABELS: Record<string, string> = {
+  bourse: 'بورس', fara_bourse: 'فرابورس', option: 'آپشن',
+  fund_equity: 'صندوق سهامی', fund_fixed_income: 'صندوق درآمدثابت', fund_commodity: 'صندوق کالایی',
+}
+const SEGMENT_COLORS: Record<string, string> = {
+  bourse: '#3b82f6', fara_bourse: '#22c55e', option: '#ef4444',
+  fund_equity: '#f59e0b', fund_fixed_income: '#8b5cf6', fund_commodity: '#eab308',
+}
 
 const axisTick = { fontSize: 10, fill: C.text, fontFamily: FONT }
 const tooltipStyle = {
@@ -379,6 +396,98 @@ export default function MarketMonitorPage() {
     )
   }
 
+  // برچسب داخل هر برش دایره‌ای: مقدار + درصد — هم‌راستا با کارت‌های دیگر (فونت وزیرمتن، رنگ کرم)
+  const pieSliceLabel = (big: boolean) =>
+    function PieSliceLabel(props: any) {
+    const { cx, cy, midAngle, innerRadius, outerRadius, value, percent } = props
+    if (!value) return null
+    const RAD = Math.PI / 180
+    const r = innerRadius + (outerRadius - innerRadius) * 0.62
+    const x = cx + r * Math.cos(-midAngle * RAD)
+    const y = cy + r * Math.sin(-midAngle * RAD)
+    return (
+      <text x={x} y={y} textAnchor="middle" dominantBaseline="central"
+        fontFamily={FONT} fontSize={big ? 14 : 11.5} fontWeight={800} fill="#fff"
+        style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.65))' }}>
+        {fa(value)} ({fa(Math.round(percent * 100))}٪)
+      </text>
+    )
+  }
+
+  // لجند سفارشی زیر نمودار دایره‌ای — نقطه رنگی + عنوان، به‌جای Legend پیش‌فرض recharts
+  const pieLegend = (entries: { name: string; value: number; color: string }[], big: boolean) => (
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: big ? '8px 18px' : '5px 12px',
+      marginTop: big ? 14 : 8, padding: '0 6px',
+    }}>
+      {entries.map(e => (
+        <span key={e.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: big ? 13 : 11.5, color: C.cream, fontWeight: 600 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 999, background: e.color, flex: 'none' }} />
+          {e.name}
+        </span>
+      ))}
+    </div>
+  )
+
+  // نمودار دایره‌ای «تعداد نماد مثبت و منفی» — از last.sym_pos/sym_neg (همه دسته‌ها)
+  const renderSymPie = (big: boolean) => {
+    if (!last) return null
+    const entries = [
+      { name: 'نمادهای مثبت', value: last.sym_pos, color: C.green },
+      { name: 'نمادهای منفی', value: last.sym_neg, color: C.red },
+    ].filter(e => e.value > 0)
+    if (entries.length === 0) return null
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie data={entries} dataKey="value" nameKey="name" innerRadius="52%" outerRadius="85%"
+                paddingAngle={3} stroke="none" isAnimationActive={animate} animationDuration={900}
+                label={pieSliceLabel(big)} labelLine={false}>
+                {entries.map(e => <Cell key={e.name} fill={e.color} />)}
+              </Pie>
+              <ReTooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
+                formatter={(v: any, n: any) => [`${fa(Number(v))} نماد`, n]} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        {pieLegend(entries, big)}
+      </div>
+    )
+  }
+
+  // نمودار دایره‌ای «تفکیک ارزش معاملات» — بورس/فرابورس/آپشن/صندوق‌ها — فقط cat=stocks
+  const renderSegPie = (big: boolean) => {
+    const seg = last?.tval_by_segment
+    if (!seg) return null
+    const entries = SEGMENT_ORDER
+      .map(k => ({ name: SEGMENT_LABELS[k], value: (seg[k] ?? 0) / 1e13, color: SEGMENT_COLORS[k] })) // ریال → همت
+      .filter(e => e.value > 0)
+    if (entries.length === 0) return null
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie data={entries} dataKey="value" nameKey="name" innerRadius="52%" outerRadius="85%"
+                paddingAngle={3} stroke="none" isAnimationActive={animate} animationDuration={900}
+                label={pieSliceLabel(big)} labelLine={false}>
+                {entries.map(e => <Cell key={e.name} fill={e.color} />)}
+              </Pie>
+              <ReTooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle}
+                formatter={(v: any, n: any) => [`${fa(Number(v), 1)} همت`, n]} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        {pieLegend(entries, big)}
+      </div>
+    )
+  }
+
+  const symPieTitle = 'تعداد نماد مثبت و منفی'
+  const segPieTitle = 'تفکیک ارزش معاملات بازار'
+
   if (!cfg) {
     return (
       <main style={{ minHeight: '100vh', background: C.bg, color: '#eef1f8', fontFamily: FONT, direction: 'rtl', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 18 }}>
@@ -454,6 +563,44 @@ export default function MarketMonitorPage() {
                 <div style={{ width: '100%', height: 240 }}>{renderDistChart(false)}</div>
               </button>
             )}
+            {last && last.sym_pos + last.sym_neg > 0 && (
+              <button className="chart-card" onClick={() => setExpanded('sym_pie')}
+                aria-label={`بزرگ‌نمایی ${symPieTitle}`}
+                style={{
+                  all: 'unset', boxSizing: 'border-box', cursor: 'zoom-in',
+                  background: `linear-gradient(165deg, ${C.green}0c, rgba(255,255,255,0.02))`,
+                  border: `1px solid ${C.border}`, borderTop: `2px solid ${C.green}55`,
+                  borderRadius: 18, padding: '18px 10px 8px',
+                  display: 'flex', flexDirection: 'column', minWidth: 0,
+                  transition: 'border-color 0.2s, transform 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = `${C.green}66` }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border }}>
+                <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                  <div style={{ fontSize: 15.5, fontWeight: 800, color: '#eef1f8' }}>{symPieTitle}</div>
+                </div>
+                <div style={{ width: '100%', height: 240 }}>{renderSymPie(false)}</div>
+              </button>
+            )}
+            {last?.tval_by_segment && (
+              <button className="chart-card" onClick={() => setExpanded('seg_pie')}
+                aria-label={`بزرگ‌نمایی ${segPieTitle}`}
+                style={{
+                  all: 'unset', boxSizing: 'border-box', cursor: 'zoom-in',
+                  background: `linear-gradient(165deg, ${C.purple}0c, rgba(255,255,255,0.02))`,
+                  border: `1px solid ${C.border}`, borderTop: `2px solid ${C.purple}55`,
+                  borderRadius: 18, padding: '18px 10px 8px',
+                  display: 'flex', flexDirection: 'column', minWidth: 0,
+                  transition: 'border-color 0.2s, transform 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = `${C.purple}66` }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border }}>
+                <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                  <div style={{ fontSize: 15.5, fontWeight: 800, color: '#eef1f8' }}>{segPieTitle}</div>
+                </div>
+                <div style={{ width: '100%', height: 240 }}>{renderSegPie(false)}</div>
+              </button>
+            )}
             {DEFS.map((def, i) => (
               <button key={def.id} className="chart-card" onClick={() => setExpanded(def.id)}
                 aria-label={`بزرگ‌نمایی ${def.title}`}
@@ -506,6 +653,60 @@ export default function MarketMonitorPage() {
               }}>✕</button>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>{renderDistChart(true)}</div>
+          </div>
+        </div>
+      )}
+      {expanded === 'sym_pie' && last && (
+        <div onClick={close} role="dialog" aria-modal="true" style={{
+          position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(4,6,10,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+          padding: isMobile ? 10 : 32,
+        }}>
+          <div className="chart-modal" onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 1200, height: isMobile ? '82vh' : '78vh',
+            background: `linear-gradient(165deg, ${C.green}0e, ${C.panel})`,
+            border: `1px solid ${C.border}`, borderTop: `2px solid ${C.green}77`,
+            borderRadius: 20, padding: isMobile ? '14px 8px 10px' : '20px 16px 14px',
+            display: 'flex', flexDirection: 'column', boxShadow: '0 30px 90px rgba(0,0,0,0.7)',
+            fontFamily: FONT, direction: 'rtl',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, padding: '0 8px' }}>
+              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{symPieTitle}</span>
+              <button onClick={close} aria-label="بستن" style={{
+                all: 'unset', cursor: 'pointer', width: 34, height: 34, borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: C.text, border: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.04)',
+                fontSize: 16, fontWeight: 700,
+              }}>✕</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>{renderSymPie(true)}</div>
+          </div>
+        </div>
+      )}
+      {expanded === 'seg_pie' && last?.tval_by_segment && (
+        <div onClick={close} role="dialog" aria-modal="true" style={{
+          position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(4,6,10,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+          padding: isMobile ? 10 : 32,
+        }}>
+          <div className="chart-modal" onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 1200, height: isMobile ? '82vh' : '78vh',
+            background: `linear-gradient(165deg, ${C.purple}0e, ${C.panel})`,
+            border: `1px solid ${C.border}`, borderTop: `2px solid ${C.purple}77`,
+            borderRadius: 20, padding: isMobile ? '14px 8px 10px' : '20px 16px 14px',
+            display: 'flex', flexDirection: 'column', boxShadow: '0 30px 90px rgba(0,0,0,0.7)',
+            fontFamily: FONT, direction: 'rtl',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, padding: '0 8px' }}>
+              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{segPieTitle}</span>
+              <button onClick={close} aria-label="بستن" style={{
+                all: 'unset', cursor: 'pointer', width: 34, height: 34, borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: C.text, border: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.04)',
+                fontSize: 16, fontWeight: 700,
+              }}>✕</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>{renderSegPie(true)}</div>
           </div>
         </div>
       )}
