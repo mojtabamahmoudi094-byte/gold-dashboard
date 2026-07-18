@@ -10,7 +10,7 @@
  *   node stocks-industries.js --probe    → فقط فهرست صنایع و تعداد نماد هر کدام
  *
  * خروجی به جدول stock_industries در Supabase هم upsert می‌شود (سایت از /api/stocks-industries می‌خواند)
- * cron: هر ۵ دقیقه، شنبه–چهارشنبه — سهام ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی ۱۲:۳۰–۱۸:۰۰ (گارد ساعت داخل خود اسکریپت است، --force برای رد کردن)
+ * cron: هر ۵ دقیقه، شنبه–چهارشنبه — سهام ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی ۱۲:۰۰–۱۸:۰۰ (گارد ساعت داخل خود اسکریپت است، --force برای رد کردن)
  *
  * fallback دستی از مک:
  *   scp root@45.94.215.115:/opt/stocks-industries.json public/stocks/industries.json
@@ -38,7 +38,7 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_RO
 const PROBE = process.argv.includes('--probe')
 const FORCE = process.argv.includes('--force')
 
-// ساعت بازار تهران — سهام/صندوق‌های بورسی ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی (طلا/نقره/زعفران) ۱۲:۳۰–۱۸:۰۰
+// ساعت بازار تهران — سهام/صندوق‌های بورسی ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی (طلا/نقره/زعفران) ۱۲:۰۰–۱۸:۰۰
 function tehranClock() {
   const tehran = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tehran' }))
   return { day: tehran.getDay(), mins: tehran.getHours() * 60 + tehran.getMinutes() } // 0=یکشنبه … 6=شنبه
@@ -50,7 +50,7 @@ function tehranDateStr() {
 }
 const STOCKS_OPEN  = 9 * 60
 const STOCKS_CLOSE = 12 * 60 + 30
-const FUNDS_OPEN   = 12 * 60 + 30
+const FUNDS_OPEN   = 12 * 60
 const FUNDS_CLOSE  = 18 * 60
 const isMarketDay = (day) => [6, 0, 1, 2, 3].includes(day) // شنبه تا چهارشنبه
 

@@ -10,12 +10,12 @@ const tehranDay = (iso: string) =>
   new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' })
 
 // ساعت واقعی هر بازار (تهران) — رصد لحظه‌ای نباید ردیف بیرون این بازه را نشان دهد
-// (سهام ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی طلا/نقره/زعفران ۱۲:۳۰–۱۸:۰۰ — مطابق scripts/stocks-industries.js)
+// (سهام ۹:۰۰–۱۲:۳۰، صندوق‌های کالایی طلا/نقره/زعفران ۱۲:۰۰–۱۸:۰۰ — مطابق scripts/stocks-industries.js)
 const CAT_HOURS: Record<string, [number, number]> = {
   stocks:  [9 * 60, 12 * 60 + 30],
-  gold:    [12 * 60 + 30, 18 * 60],
-  silver:  [12 * 60 + 30, 18 * 60],
-  saffron: [12 * 60 + 30, 18 * 60],
+  gold:    [12 * 60, 18 * 60],
+  silver:  [12 * 60, 18 * 60],
+  saffron: [12 * 60, 18 * 60],
 }
 const tehranMinutes = (iso: string) => {
   const t = new Date(iso).toLocaleTimeString('en-US', { timeZone: 'Asia/Tehran', hour12: false })

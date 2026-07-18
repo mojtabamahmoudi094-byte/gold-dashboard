@@ -51,9 +51,9 @@ type Datum = Row & {
 const CATS: Record<string, { title: string; hours: string }> = {
   stocks:         { title: 'بازار سهام',       hours: '۹:۰۰ تا ۱۲:۳۰' },
   'bourse-funds': { title: 'صندوق‌های بورسی',  hours: '۹:۰۰ تا ۱۲:۳۰' },
-  gold:           { title: 'صندوق‌های طلا',    hours: '۱۲:۳۰ تا ۱۸:۰۰' },
-  silver:         { title: 'صندوق‌های نقره',   hours: '۱۲:۳۰ تا ۱۸:۰۰' },
-  saffron:        { title: 'صندوق‌های زعفران', hours: '۱۲:۳۰ تا ۱۸:۰۰' },
+  gold:           { title: 'صندوق‌های طلا',    hours: '۱۲:۰۰ تا ۱۸:۰۰' },
+  silver:         { title: 'صندوق‌های نقره',   hours: '۱۲:۰۰ تا ۱۸:۰۰' },
+  saffron:        { title: 'صندوق‌های زعفران', hours: '۱۲:۰۰ تا ۱۸:۰۰' },
 }
 
 // عنوان کارت «محدوده قیمتی آخرین معاملات» — برای سهام شامل حق تقدم و ص.سهامی هم می‌شود
