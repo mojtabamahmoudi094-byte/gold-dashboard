@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { shouldUseDark } from '../../lib/theme'
@@ -485,20 +486,26 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
+    // پنل با createPortal بیرون از wrapRef در DOM رندر می‌شود — پس کلیک داخل خودِ پنل هم
+    // باید به‌عنوان «داخل» حساب شود، وگرنه هر کلیک روی چک‌باکس‌ها منو را می‌بندد
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (wrapRef.current?.contains(t) || panelRef.current?.contains(t)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  // موقعیت پنل با position:fixed محاسبه می‌شود — چون نوار ابزار در موبایل overflow-x:auto دارد
-  // و طبق مشخصات CSS همین باعث می‌شود overflow-y هم به auto تبدیل شود و پاپ‌آور absolute را ببرد.
-  // این صفحه دیتای async زیادی لود می‌کند که می‌تواند بعد از باز شدن منو layout را جابجا کند،
-  // پس موقعیت فقط لحظه کلیک محاسبه نمی‌شود؛ تا وقتی باز است با اسکرول/ریسایز هم به‌روز می‌شود.
+  // پنل با createPortal به document.body و position:fixed رندر می‌شود — چون نوار ابزار
+  // backdrop-filter دارد و طبق مشخصات CSS این هم مثل transform یک containing-block جدید
+  // برای فرزندهای fixed می‌سازد؛ بدون پورتال، پنل به‌جای viewport نسبت به همان نوار ابزار جابه‌جا می‌شد.
+  // موقعیت فقط لحظه باز شدن محاسبه نمی‌شود؛ چون این صفحه دیتای async زیادی لود می‌کند که می‌تواند
+  // layout را جابجا کند، تا وقتی باز است با اسکرول/ریسایز هم به‌روز می‌شود.
   useLayoutEffect(() => {
     if (!open) return
     const recompute = () => {
@@ -544,8 +551,8 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
         </button>
       </Field>
 
-      {open && pos && (
-        <div style={{
+      {open && pos && createPortal(
+        <div ref={panelRef} style={{
           position: 'fixed', top: pos.top, right: pos.right, zIndex: 1000, minWidth: 160,
           background: panel, border: `0.5px solid ${line}`, borderRadius: 12,
           padding: 8, backdropFilter: 'blur(12px)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
@@ -576,7 +583,8 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
               {!t.available && <span style={{ fontSize: 10 }}>(به‌زودی)</span>}
             </label>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
