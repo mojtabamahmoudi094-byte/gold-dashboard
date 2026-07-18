@@ -16,7 +16,10 @@ export async function callOpenRouter(
   maxTokens: number,
 ): Promise<LlmResult> {
   try {
-    const model = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash-lite'
+    // ۲۵.۷.۲۰۲۶: gemini-2.5-flash-lite رو بک‌اند گوگل با خطای «no longer available to new
+    // users» رد می‌شه (باگ/قطعی زودهنگام گوگل، قبل تاریخ رسمی deprecate اکتبر) — تا اطلاع
+    // ثانوی نسل بعدی (پایدار، پشتیبانی تا می ۲۰۲۷) پیش‌فرض است.
+    const model = process.env.OPENROUTER_MODEL || 'google/gemini-3.1-flash-lite'
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -57,7 +60,9 @@ export async function callGemini(
   maxTokens: number,
 ): Promise<LlmResult> {
   try {
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite'
+    // fallback مسیر مستقیم Gemini: 2.5-flash-lite رو بک‌اند گوگل الان خطای «no longer
+    // available» می‌ده (۲۵.۷.۲۰۲۶) — 2.5-flash کامل هنوز جواب می‌ده، فقط quota محدودتره
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
     const res = await fetch(url, {
       method: 'POST',
