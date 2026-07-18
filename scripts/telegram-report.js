@@ -133,7 +133,9 @@ const deltaOf = (prev, cur) => (prev == null || cur == null ? null : Number(cur)
 // اعداد خام market_watch → کارت/کپشن (یک‌بار محاسبه، هم برای عکس هم برای متن)
 // raw market_watch fields → card highlight + rows / caption facts (computed once, used by both the image and the text)
 // rows: همهٔ ردیف‌های امروز — آخری برای اعداد لحظه‌ای، یکی‌مانده‌به‌آخر برای «تغییر نسبت به گزارش قبلی»
-function computeFacts(rows) {
+// صف خرید/فروش و شمار نماد مثبت/منفی برای صندوق‌های طلا/نقره/زعفران بی‌معنی است (تک نماد) — فقط برای سهام نشون بده
+// buy/sell-queue counts and positive/negative symbol counts are meaningless for single-symbol gold/silver/saffron funds — stocks only
+function computeFacts(rows, includeQueueSym = true) {
   const empty = { highlight: null, rows: [], deltas: null }
   if (!rows || !rows.length) return empty
   const d = rows[rows.length - 1]
@@ -143,16 +145,16 @@ function computeFacts(rows) {
     const flow = Number(d.money_in) / 1e10 // میلیارد تومان
     out.highlight = { label: 'ورود / خروج پول حقیقی (میلیارد تومان)', value: `${flow >= 0 ? '+' : ''}${num(flow, 1)}`, tone: flow >= 0 ? 'up' : 'down' }
   }
-  if (d.buyq != null || d.sellq != null)
+  if (includeQueueSym && (d.buyq != null || d.sellq != null))
     out.rows.push({ label: 'صف خرید / فروش', value: `${num(d.buyq)} / ${num(d.sellq)}` })
-  if (d.sym_pos != null || d.sym_neg != null)
+  if (includeQueueSym && (d.sym_pos != null || d.sym_neg != null))
     out.rows.push({ label: 'نماد مثبت / منفی', value: `${num(d.sym_pos)} / ${num(d.sym_neg)}` })
   if (d.tval_total != null)
     out.rows.push({ label: 'ارزش کل معاملات', value: `${num(Number(d.tval_total) / 1e10)} میلیارد تومان` })
   if (d.ind_buy_pc != null || d.ind_sell_pc != null)
     out.rows.push({ label: 'سرانه خرید/فروش حقیقی', value: `${num(Number(d.ind_buy_pc) / 1e7, 1)} / ${num(Number(d.ind_sell_pc) / 1e7, 1)} م.ت` })
 
-  if (rows.length >= 2) {
+  if (includeQueueSym && rows.length >= 2) {
     const p = rows[rows.length - 2]
     out.deltas = {
       buyq: deltaOf(p.buyq, d.buyq),
@@ -194,7 +196,7 @@ async function buildCaption(cat, facts) {
 }
 
 // کارت گرافیکی چارت‌دار از رو سری زمانی امروز (نه اسکرین‌شات از سایت)
-function buildCardHtml(cat, series) {
+function buildCardHtml(cat, series, includeQueueSym = true) {
   const c = CATS[cat]
   return renderMarketCardHtml({
     emoji: c.emoji,
@@ -203,8 +205,8 @@ function buildCardHtml(cat, series) {
     times: series.times,
     flow: series.flow,
     tval: series.tval,
-    queue: series.queue,
-    sym: series.sym,
+    queue: includeQueueSym ? series.queue : null,
+    sym: includeQueueSym ? series.sym : null,
     pc: series.pc,
     footer: `${faTime()} — ${faDate()}`,
   })
@@ -276,9 +278,10 @@ async function main() {
         continue
       }
 
-      const facts = computeFacts(snap.rows)
+      const includeQueueSym = cat === 'stocks'
+      const facts = computeFacts(snap.rows, includeQueueSym)
       const series = computeSeries(snap.rows)
-      const buf = await screenshotCard(browser, buildCardHtml(cat, series))
+      const buf = await screenshotCard(browser, buildCardHtml(cat, series, includeQueueSym))
       await sendPhoto(buf, await buildCaption(cat, facts))
       console.log(`[report] ✅ sent ${cat}`)
       sent++
