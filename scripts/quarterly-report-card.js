@@ -26,6 +26,8 @@ const PANEL = '#161a22'
 const PANEL2 = '#1c212b'
 const BORDER = '#2a2f3a'
 const HILITE = 'rgba(202,166,106,0.12)'
+// رنگ هر سال مالی در نمودارهای فصلی — قدیم به جدید، سال جاری همیشه طلایی (هم‌راستا با پالت کارت)
+const YEAR_PALETTE = ['#2bbfa0', '#e0575c', '#3a5fc4', GOLD]
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const faNum = (v, dec = 0) => v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toLocaleString('fa-IR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
@@ -65,6 +67,43 @@ function toDiscreteQuarters(quarters) {
   return out
 }
 
+// تجمعی هر سال مالی → مقدار فصل مجزا، سطربندی‌شده بر اساس سال+فصل (نه زنجیرهٔ زمانی خطی).
+// فقط گام‌های واقعاً ۳ماهه معتبرند (months - prevMonths === 3)؛ اگر فصلی جا افتاده باشه (مثلاً از ۳
+// مستقیم به ۹)، اون فصل خالی می‌مونه نه اینکه چند فصل با هم به یک ستون فروخته بشه.
+function seasonalFromQuarters(quarters) {
+  const seasonNames = ['بهار', 'تابستان', 'پاییز', 'زمستان']
+  const byYear = new Map()
+  for (const q of quarters) {
+    const p = periodParts(q.period)
+    if (!p) continue
+    if (!byYear.has(p.y)) byYear.set(p.y, [])
+    byYear.get(p.y).push(q)
+  }
+  const metrics = ['net', 'gross', 'op']
+  const seasonal = { net: [{}, {}, {}, {}], gross: [{}, {}, {}, {}], op: [{}, {}, {}, {}] }
+
+  for (const [year, arr] of byYear) {
+    arr.sort((a, b) => a.months - b.months)
+    let prev = null
+    for (const q of arr) {
+      const seasonIdx = q.months / 3 - 1
+      if (Number.isInteger(seasonIdx) && seasonIdx >= 0 && seasonIdx <= 3) {
+        let vals = null
+        if (prev == null) {
+          if (q.months === 3) vals = { net: q.net, gross: q.gross, op: q.op }
+        } else if (q.months - prev.months === 3) {
+          const diff = (a, b) => (a != null && b != null) ? a - b : null
+          vals = { net: diff(q.net, prev.net), gross: diff(q.gross, prev.gross), op: diff(q.op, prev.op) }
+        }
+        if (vals) for (const m of metrics) if (vals[m] != null) seasonal[m][seasonIdx][year] = vals[m]
+      }
+      prev = q
+    }
+  }
+  const years = [...byYear.keys()].sort((a, b) => a - b).slice(-4)
+  return { seasonNames, years, seasonal }
+}
+
 // payload = محتوای reports-out/<نماد>.json (شامل quarters)
 // marketInfo (اختیاری): {pe, groupPe, mv (ریال), shares} از فید لحظه‌ای بازار
 function buildQuarterlyReportData(payload, marketInfo) {
@@ -91,13 +130,14 @@ function buildQuarterlyReportData(payload, marketInfo) {
   }
 
   const yoy = pctChange(latest.net, latest.net_ly)
+  const seasonal = seasonalFromQuarters(quarters)
 
   return {
     symbol: payload.symbol,
     period: latest.period,
     months: latest.months,
     audited: !!latest.audited,
-    epsChart, profitChart,
+    epsChart, profitChart, seasonal,
     stats: {
       net: latest.net, yoy, isRecord,
       eps: latest.eps, revenue: latest.revenue,
@@ -162,6 +202,55 @@ function multiLineChart({ width, height, labels, series, labelAllPoints }) {
   return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${grid}${paths}${axisLabels}</svg>`
 }
 
+// نمودار میله‌ای گروهی: محور افقی = فصل (بهار..زمستان)، هر گروه یه میله به‌ازای هر سالی که مقدار داره.
+// سال جاری بر اساس علامت مقدار رنگ می‌شه (سبز=سود، قرمز=زیان)؛ سال‌های قبل‌تر آبی (YEAR_PREV) — یه رنگ
+// کاملاً جدا تا «داده‌ی سال قبل» با نگاه اول از «سود/زیان امسال» تفکیک بشه، نه فقط با شفافیت.
+// عدد هر میله همیشه تو یه ردیف ثابتِ زیر محور می‌شینه (نه بالای میله/رو صفر) که تو خط چارت گم نشه.
+function seasonalBarChart({ width, height, seasonNames, years, values }) {
+  const padL = 10, padR = 10, padT = 22, padB = 54
+  const plotW = width - padL - padR
+  const plotH = height - padT - padB
+  const n = seasonNames.length
+  const allVals = []
+  for (let s = 0; s < n; s++) for (const y of years) { const v = values[s]?.[y]; if (v != null) allVals.push(v) }
+  const maxVal = Math.max(1, ...allVals, 0)
+  const minVal = Math.min(0, ...allVals)
+  const range = (maxVal - minVal) || 1
+  const groupW = plotW / n
+  const zeroY = padT + plotH - ((0 - minVal) / range) * plotH
+  const latestYear = years[years.length - 1]
+  const opacityForPrior = (idx, total) => total <= 1 ? 1 : 0.55 + (idx / (total - 1)) * 0.45
+
+  let grid = `<line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${width - padR}" y2="${zeroY.toFixed(1)}" stroke="${BORDER}" stroke-width="1"/>`
+
+  let bars = '', axisLabels = ''
+  for (let s = 0; s < n; s++) {
+    const presentYears = years.filter(y => values[s]?.[y] != null)
+    const priorYears = presentYears.filter(y => y !== latestYear)
+    const bw = presentYears.length ? Math.min(30, (groupW - 10) / presentYears.length) : 0
+    const totalW = bw * presentYears.length
+    let bx = padL + s * groupW + (groupW - totalW) / 2
+    presentYears.forEach((y) => {
+      const v = values[s][y]
+      const isLatest = y === latestYear
+      const barH = Math.max(Math.abs(v) / range * plotH, v === 0 ? 0 : 1.5)
+      const by = v >= 0 ? zeroY - barH : zeroY
+      const color = isLatest ? (v >= 0 ? UP : DOWN) : YEAR_PREV
+      const op = isLatest ? 1 : opacityForPrior(priorYears.indexOf(y), priorYears.length)
+      bars += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${(bw - 3).toFixed(1)}" height="${barH.toFixed(1)}" fill="${color}" fill-opacity="${op.toFixed(2)}" rx="3"/>`
+      bars += `<text x="${(bx + (bw - 3) / 2).toFixed(1)}" y="${(height - 40).toFixed(1)}" font-size="10.5" fill="${CREAM}" text-anchor="middle">${toman(v)}</text>`
+      // فقط وقتی چند سال کنار هم توی یه فصل نشستن سال زیر عدد می‌آد — تک‌سال یعنی تکراریه، شلوغی الکی
+      if (presentYears.length > 1) {
+        bars += `<text x="${(bx + (bw - 3) / 2).toFixed(1)}" y="${(height - 26).toFixed(1)}" font-size="9.5" fill="${MUTED}" text-anchor="middle">${y}</text>`
+      }
+      bx += bw
+    })
+    const gx = padL + s * groupW + groupW / 2
+    axisLabels += `<text x="${gx.toFixed(1)}" y="${height - 6}" font-size="12" fill="${CREAM}" text-anchor="middle">${seasonNames[s]}</text>`
+  }
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${grid}${bars}${axisLabels}</svg>`
+}
+
 function legend(items) {
   return `<div class="legend">${items.map(it => `<span class="legendItem"><span class="dot" style="background:${it.color}"></span>${esc(it.label)}</span>`).join('')}</div>`
 }
@@ -172,20 +261,17 @@ function statRow(label, value, tone) {
 
 function renderQuarterlyReportCardHtml(data, companyName) {
   const chart1 = multiLineChart({
-    width: 900, height: 250, labels: data.epsChart.labels,
+    width: 900, height: 215, labels: data.epsChart.labels,
     series: [
-      { values: data.epsChart.quarterly, color: GOLD },
+      { values: data.epsChart.quarterly, color: YEAR_PREV },
     ],
     labelAllPoints: true,
   })
-  const chart2 = multiLineChart({
-    width: 900, height: 250, labels: data.profitChart.labels,
-    series: [
-      { values: data.profitChart.gross, color: DOWN },
-      { values: data.profitChart.op, color: YEAR_PREV },
-      { values: data.profitChart.net, color: GOLD },
-    ],
-  })
+  const { seasonNames, years, seasonal } = data.seasonal
+  const seasonalChartOpts = { width: 276, height: 172, seasonNames, years }
+  const grossSeasonChart = seasonalBarChart({ ...seasonalChartOpts, values: seasonal.gross })
+  const opSeasonChart = seasonalBarChart({ ...seasonalChartOpts, values: seasonal.op })
+  const netSeasonChart = seasonalBarChart({ ...seasonalChartOpts, values: seasonal.net })
 
   const st = data.stats
   const statsHtml = [
@@ -217,11 +303,14 @@ function renderQuarterlyReportCardHtml(data, companyName) {
   .brand img { width: 40px; height: 40px; border-radius: 50%; }
   .body { display: flex; flex: 1; gap: 28px; z-index: 1; min-height: 0; }
   .left { flex: 0 0 920px; display: flex; flex-direction: column; gap: 18px; }
-  .panel { background: ${PANEL2}; border: 1px solid ${BORDER}; border-radius: 16px; padding: 14px 16px 4px; }
-  .panelTitle { color: ${CREAM}; font-size: 17px; font-weight: 600; margin-bottom: 4px; }
-  .legend { display: flex; gap: 16px; margin-bottom: 4px; flex-wrap: wrap; }
+  .panel { background: ${PANEL2}; border: 1px solid ${BORDER}; border-radius: 16px; padding: 16px 18px 10px; }
+  .panelTitle { color: ${CREAM}; font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  .legend { display: flex; gap: 16px; margin-bottom: 10px; flex-wrap: wrap; }
   .legendItem { color: ${MUTED}; font-size: 13px; display: flex; align-items: center; gap: 6px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .seasonalRow { display: flex; gap: 18px; }
+  .seasonalCol { flex: 1; min-width: 0; background: ${PANEL}; border-radius: 12px; padding: 6px 4px 0; }
+  .seasonalColTitle { color: ${CREAM}; font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 2px; }
   .right { flex: 1; background: ${PANEL2}; border: 1px solid ${BORDER}; border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
   .srow { display: flex; align-items: center; justify-content: space-between; padding: 16px 4px; border-top: 1px solid ${BORDER}; font-size: 22px; }
   .srow:first-child { border-top: none; }
@@ -247,9 +336,13 @@ function renderQuarterlyReportCardHtml(data, companyName) {
           ${chart1}
         </div>
         <div class="panel">
-          <div class="panelTitle">سود ناخالص/عملیاتی/خالص فصلی — میلیون ریال</div>
-          ${legend([{ color: DOWN, label: 'ناخالص' }, { color: YEAR_PREV, label: 'عملیاتی' }, { color: GOLD, label: 'خالص' }])}
-          ${chart2}
+          <div class="panelTitle">سود فصلی به تفکیک سال — میلیارد تومان</div>
+          ${legend([{ color: UP, label: 'سود (سال جاری)' }, { color: DOWN, label: 'زیان (سال جاری)' }, { color: YEAR_PREV, label: 'سال‌های قبل' }])}
+          <div class="seasonalRow">
+            <div class="seasonalCol"><div class="seasonalColTitle">ناخالص</div>${grossSeasonChart}</div>
+            <div class="seasonalCol"><div class="seasonalColTitle">عملیاتی</div>${opSeasonChart}</div>
+            <div class="seasonalCol"><div class="seasonalColTitle">خالص</div>${netSeasonChart}</div>
+          </div>
         </div>
       </div>
       <div class="right">${statsHtml}</div>
