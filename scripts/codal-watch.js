@@ -555,7 +555,10 @@ async function fromCodal(since) {
         title: l.Title,
         publish,
         url: l.Url ? `https://codal.ir${l.Url}` : null,
-        key: String(l.TracingNo ?? `${l.Symbol}|${l.Title}|${publish}`),
+        // کلید عمداً از symbol|title|publish ساخته می‌شود، نه TracingNo خام —
+        // چون فرمت/مقدار tracing no بین کدال و پشتیبان BrsApi یکی نیست و باعث
+        // پست دوباره‌ی همان اطلاعیه موقع سوییچ منبع می‌شد (باگ غمینو ۲۰۲۶-۰۷-۱۹).
+        key: `${l.Symbol}|${l.Title}|${publish}`,
       })
     }
     if (reachedCutoff) break
@@ -571,12 +574,16 @@ async function fromBrsApi(ds, de) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = await res.json()
   const list = Array.isArray(data) ? data : (data?.announcement ?? [])
-  return list.map(a => ({
-    symbol: a.l18,
-    title: a.title,
-    publish: pdt(a.date_publish ?? a.date_send),
-    key: String(a.tracing_no ?? `${a.l18}|${a.title}|${a.date_publish}`),
-  }))
+  return list.map(a => {
+    const publish = pdt(a.date_publish ?? a.date_send)
+    return {
+      symbol: a.l18,
+      title: a.title,
+      publish,
+      // همان الگوی کلید fromCodal — یکسان‌سازی بین دو منبع، نه tracing_no خام.
+      key: `${a.l18}|${a.title}|${publish}`,
+    }
+  })
 }
 
 async function fetchRecent() {
