@@ -219,6 +219,11 @@ async function main() {
     const buyValN = bNVol * pc, sellValN = sNVol * pc
     const buyPcI = bICount ? Math.round(buyVal / bICount) : 0
     const sellPcI = sICount ? Math.round(sellVal / sICount) : 0
+    // صف خرید/فروش: بهترین سفارش روی سقف/کف دامنه قیمت (همان منطق computeMarketWatch)
+    const pd1 = num(it.pd1), qd1 = num(it.qd1), tmax = num(it.tmax)
+    const po1 = num(it.po1), qo1 = num(it.qo1), tmin = num(it.tmin)
+    const buyQueueVol = (tmax && pd1 >= tmax && qd1 > 0) ? qd1 : 0
+    const sellQueueVol = (tmin && po1 <= tmin && qo1 > 0) ? qo1 : 0
     return {
       symbol: clean(it.l18), cat,
       tval: num(it.tval) ?? 0,
@@ -228,6 +233,8 @@ async function main() {
       money_in: Math.round(buyVal - sellVal),
       big_buy: (bICount && buyPcI >= BIG_MONEY_PORTFOLIO_RIAL) ? Math.round(buyVal) : 0,
       big_sell: (sICount && sellPcI >= BIG_MONEY_PORTFOLIO_RIAL) ? Math.round(sellVal) : 0,
+      buy_queue_vol: buyQueueVol, sell_queue_vol: sellQueueVol,
+      last_price: num(it.pl) ?? 0, last_price_pct: num(it.plp) ?? 0,
     }
   }
 
