@@ -19,7 +19,7 @@ const COMPANY_LINKS = [
   { label: 'درباره ما',   href: '/about' },
   { label: 'تماس با ما', href: '/contact' },
   { label: 'قوانین',      href: '/terms' },
-  { label: 'حریم خصوصی', href: '#' },
+  { label: 'حریم خصوصی', href: '/privacy' },
 ]
 
 export default function Footer() {
