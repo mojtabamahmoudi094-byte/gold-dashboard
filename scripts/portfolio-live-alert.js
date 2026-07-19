@@ -35,6 +35,7 @@ function loadEnv(file) {
 loadEnv('../.env.local')
 loadEnv('.env.sync')
 
+const SITE = (process.env.SITE_URL || 'https://bourssanj.ir').replace(/\/$/, '')
 const TOKEN = process.env.TELEGRAM_PORTFOLIO_BOT_TOKEN
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -121,15 +122,19 @@ async function checkBigTrades(bySymbol, holders) {
     const price = Math.round((cur.last_price || 0) / 10) // ریال → تومان
     const pct = cur.last_price_pct ?? 0
 
+    // ارزش نشان‌داده‌شده = سرانه خرید/فروش (buy_pc_i/sell_pc_i) — همان مقداری که آستانه ۲۰۰ میلیون تومان را رد کرده،
+    // یعنی اندازه‌ی تقریبی همین معامله‌ی درشت (نه مجموع کل خرید/فروش حقیقی امروز)
     if (cur.big_buy > 0 && !(prev?.big_buy > 0)) {
-      const shares = price > 0 ? Math.round((cur.big_buy / 10) / price) : 0
+      const value = Math.round((cur.buy_pc_i || 0) / 10)
+      const shares = price > 0 ? Math.round(value / price) : 0
       await notifyHolders(holders, symbol,
-        `🟢 <b>خرید درشت</b> ${symbol}\nقیمت: ${fa(price)} تومان (${fa(pct, 1)}٪)\nارزش: ${fa(Math.round(cur.big_buy / 10))} تومان\nحجم: ${fa(shares)} سهم`)
+        `🟢 <b>خرید درشت</b> ${symbol}\nقیمت: ${fa(price)} تومان (${fa(pct, 1)}٪)\nارزش: ${fa(value)} تومان\nحجم: ${fa(shares)} سهم`)
     }
     if (cur.big_sell > 0 && !(prev?.big_sell > 0)) {
-      const shares = price > 0 ? Math.round((cur.big_sell / 10) / price) : 0
+      const value = Math.round((cur.sell_pc_i || 0) / 10)
+      const shares = price > 0 ? Math.round(value / price) : 0
       await notifyHolders(holders, symbol,
-        `🔴 <b>فروش درشت</b> ${symbol}\nقیمت: ${fa(price)} تومان (${fa(pct, 1)}٪)\nارزش: ${fa(Math.round(cur.big_sell / 10))} تومان\nحجم: ${fa(shares)} سهم`)
+        `🔴 <b>فروش درشت</b> ${symbol}\nقیمت: ${fa(price)} تومان (${fa(pct, 1)}٪)\nارزش: ${fa(value)} تومان\nحجم: ${fa(shares)} سهم`)
     }
   }
 }
@@ -200,6 +205,13 @@ const VIP_FILTER_TITLES = {
   'pc-1-5': 'افزایش سرانه خرید روزانه به ۵ روزه', 'pc-3-10': 'افزایش سرانه خرید ۳ به ۱۰ روزه',
   'pc-5-20': 'افزایش سرانه خرید ۵ به ۲۰ روزه',
 }
+// هر فیلتر روی کدام صفحه VIP نمایش داده می‌شود — برای لینک مستقیم داخل پیام
+const VIP_FILTER_PAGES = {
+  'vol-float': 'useful-filters', 'val-mv': 'useful-filters', 'val-float': 'useful-filters',
+  'most-buyers': 'useful-filters', 'most-sellers': 'useful-filters',
+  'pc-1-5': 'useful-filters', 'pc-3-10': 'useful-filters', 'pc-5-20': 'useful-filters',
+  'near-buy-queue': 'queue-filters', 'near-sell-queue': 'queue-filters',
+}
 
 async function checkFilterEntries(holders) {
   const { data: rows, error } = await sb.from('symbol_filter_membership').select('symbol, filters')
@@ -212,8 +224,9 @@ async function checkFilterEntries(holders) {
 
     for (const id of newOnes) {
       const title = VIP_FILTER_TITLES[id] || id
+      const page = VIP_FILTER_PAGES[id] || 'filters'
       await notifyHolders(holders, row.symbol,
-        `🎯 <b>${row.symbol}</b> وارد فیلتر VIP شد\nفیلتر: ${title}`)
+        `🎯 <b>${row.symbol}</b> وارد فیلتر VIP شد\nفیلتر: ${title}\n${SITE}/vip/${page}`)
     }
 
     const changed = current.length !== seenSet.size || newOnes.length > 0
