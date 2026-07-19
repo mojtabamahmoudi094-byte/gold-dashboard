@@ -958,6 +958,14 @@ ${txs.map(tx => row([
           }}>
             🔔 هشدارها
           </Link>
+          <Link href="/portfolio/live-monitor" style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '10px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600,
+            background: 'rgba(217,180,91,0.08)', border: '1px solid rgba(217,180,91,0.3)',
+            color: t.brand, textDecoration: 'none', fontFamily: 'inherit',
+          }}>
+            📡 رصد لحظه‌ای پورتفو
+          </Link>
           <button
             type="button"
             onClick={() => setShowForm(!showForm)}

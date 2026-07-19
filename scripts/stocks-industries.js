@@ -201,6 +201,35 @@ async function main() {
   let commodityNames = new Set()
   const CAT_MAP = { 'طلا': 'gold', 'نقره': 'silver', 'زعفران': 'saffron' }
   const commoditySets = { gold: new Set(), silver: new Set(), saffron: new Set() }
+
+  // ── «رصد لحظه‌ای پورتفو»: فقط نمادهای داخل تراکنش‌های پورتفوی کاربران تاریخچه ۵دقیقه‌ای می‌گیرند ──
+  const { data: txRows, error: txErr } = await sb.from('portfolio_transactions').select('symbol')
+  if (txErr) console.error(`[stocks-industries] portfolio_transactions: ${txErr.message}`)
+  const watchSymbols = new Set((txRows ?? []).map(r => clean(r.symbol)))
+  const symbolWatchRows = []
+  const BIG_MONEY_PORTFOLIO_RIAL = 2_000_000_000 // آستانه «پول درشت» رصد پورتفو: ۲۰۰ میلیون تومان سرانه
+  function buildSymbolWatchRow(it, cat) {
+    const pc = num(it.pc) ?? 0
+    const bIVol = num(it.Buy_I_Volume) ?? 0, sIVol = num(it.Sell_I_Volume) ?? 0
+    const bICount = num(it.Buy_CountI) ?? 0, sICount = num(it.Sell_CountI) ?? 0
+    const bNVol = num(it.Buy_N_Volume) ?? 0, sNVol = num(it.Sell_N_Volume) ?? 0
+    const bNCount = num(it.Buy_CountN) ?? 0, sNCount = num(it.Sell_CountN) ?? 0
+    const buyVal = bIVol * pc, sellVal = sIVol * pc
+    const buyValN = bNVol * pc, sellValN = sNVol * pc
+    const buyPcI = bICount ? Math.round(buyVal / bICount) : 0
+    const sellPcI = sICount ? Math.round(sellVal / sICount) : 0
+    return {
+      symbol: clean(it.l18), cat,
+      tval: num(it.tval) ?? 0,
+      buy_pc_i: buyPcI, sell_pc_i: sellPcI,
+      buy_pc_n: bNCount ? Math.round(buyValN / bNCount) : 0,
+      sell_pc_n: sNCount ? Math.round(sellValN / sNCount) : 0,
+      money_in: Math.round(buyVal - sellVal),
+      big_buy: (bICount && buyPcI >= BIG_MONEY_PORTFOLIO_RIAL) ? Math.round(buyVal) : 0,
+      big_sell: (sICount && sellPcI >= BIG_MONEY_PORTFOLIO_RIAL) ? Math.round(sellVal) : 0,
+    }
+  }
+
   const { data: assets, error: aErr } = await sb.from('assets').select('name, category')
   if (aErr) {
     console.error(`[stocks-industries] assets: ${aErr.message}`)
@@ -343,6 +372,16 @@ async function main() {
       if (symLegalErr) console.error(`[stocks-industries] stock_legalflow_daily: ${symLegalErr.message}`)
       else console.log(`✅ stock_legalflow_daily بروز شد (${symLegalRows.length} نماد)`)
     }
+
+    // ── «رصد لحظه‌ای پورتفو»: تاریخچه ۵دقیقه‌ای فقط برای نمادهای پورتفوی کاربران ──
+    if (watchSymbols.size > 0) {
+      for (const it of watchItems) {
+        const sym = clean(it.l18)
+        if (!watchSymbols.has(sym)) continue
+        const cat = EQUITY_FUND_NAMES.has(sym) ? 'bourse-funds' : 'stocks'
+        symbolWatchRows.push(buildSymbolWatchRow(it, cat))
+      }
+    }
   }
 
   // ── رصد لحظه‌ای بازار: هر دسته یک اسنپ‌شات ۵ دقیقه‌ای در market_watch ──
@@ -356,8 +395,21 @@ async function main() {
   // صندوق‌های کالایی (طلا/نقره/زعفران) به‌عنوان cat جدا فقط در بازار ۱۲:۳۰–۱۸:۰۰ ثبت می‌شود
   if (fundsOpen) {
     for (const [cat, set] of Object.entries(commoditySets)) {
-      cats.push([cat, arr.filter(it => set.has(clean(it.l18)))])
+      const items = arr.filter(it => set.has(clean(it.l18)))
+      cats.push([cat, items])
+      if (watchSymbols.size > 0) {
+        for (const it of items) {
+          const sym = clean(it.l18)
+          if (watchSymbols.has(sym)) symbolWatchRows.push(buildSymbolWatchRow(it, cat))
+        }
+      }
     }
+  }
+
+  if (symbolWatchRows.length > 0) {
+    const { error: watchErr } = await sb.from('stock_watch_5m').insert(symbolWatchRows)
+    if (watchErr) console.error(`[stocks-industries] stock_watch_5m: ${watchErr.message}`)
+    else console.log(`✅ stock_watch_5m ثبت شد (${symbolWatchRows.length} نماد پورتفو)`)
   }
 
   // تفکیک ارزش معاملات بورس/فرابورس/آپشن/صندوق سهامی/درآمدثابت/کالایی — برای نمودار دایره‌ای «تفکیک ارزش معاملات» رصد لحظه‌ای
