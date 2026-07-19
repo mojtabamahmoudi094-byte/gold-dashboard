@@ -132,6 +132,7 @@ async function main() {
     mv: num(it.mv),                        // ارزش بازار (ریال)
     pe: num(it.pe),
     bi: num(it.Buy_I_Volume), si: num(it.Sell_I_Volume),   // حجم خرید/فروش حقیقی — برای badge خرید/فروش
+    bci: num(it.Buy_CountI), sci: num(it.Sell_CountI),     // تعداد کد خریدار/فروشنده حقیقی — برای سرانه (anomaly-watch «کد کلان»)
     bn: num(it.Buy_N_Volume), sn: num(it.Sell_N_Volume),   // حجم خرید/فروش حقوقی
     board: marketFromIsin(it.isin),                        // 'bourse' | 'fara-bourse' | 'other' — برای فیلتر «بازار» نقشه بازار
   })

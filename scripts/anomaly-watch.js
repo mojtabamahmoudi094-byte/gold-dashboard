@@ -16,6 +16,7 @@
  *   ANOMALY_PCP_THRESHOLD (پیش‌فرض ۴.۷ — درصد فاصله تا دامنه نوسان معمول)
  *   ANOMALY_TURNOVER_THRESHOLD (پیش‌فرض ۰.۰۵ — نسبت ارزش معاملات به ارزش بازار)
  *   ANOMALY_RELVOL_THRESHOLD (پیش‌فرض ۴ — نسبت ارزش معاملات امروز به میانگین ۲۰ روز خودِ نماد)
+ *   ANOMALY_PERCAP_THRESHOLD (پیش‌فرض ۱۰۰۰۰۰۰۰۰۰۰ ریال = ۱ میلیارد تومان — سرانه خرید/فروش هر کد حقیقی)
  *   ANOMALY_MAX_PER_RUN (پیش‌فرض ۴)
  *
  * وضعیت در anomaly-watch-state.json نگه داشته می‌شود تا هر نماد فقط یک‌بار در روز برای هر دلیل هشدار بگیرد.
@@ -24,6 +25,11 @@
  * از stock_candles.value (پرشده توسط candles-daily.js) میانگین ۲۰ روز اخیر هر نماد را می‌گیرد؛
  * اگر ارزش معاملات امروز چند برابر آن باشد، پرچم «حجم غیرعادی» می‌زند. صرفاً توصیف الگوی معاملاتی
  * است، ادعای تخلف/دستکاری نمی‌کند.
+ *
+ * چهارمین قاعده (P5): کد حقیقی کلان — اگر سرانه خرید یا فروش هر کد حقیقی یک نماد (ارزش ÷ تعداد کد،
+ * از Buy_I_Volume/Sell_I_Volume و Buy_CountI/Sell_CountI که stocks-industries.js در stock_industries
+ * ذخیره می‌کند) از آستانه (پیش‌فرض ۱ میلیارد تومان) بیشتر شود، یعنی به‌طور میانگین یک یا چند کد حقیقی
+ * معامله‌ای بزرگ زده‌اند — نشانهٔ ورود/خروج سرمایه‌گذار بزرگ، نه لزوماً تخلف.
  */
 
 'use strict'
@@ -63,6 +69,7 @@ function isMarketOpen() {
 const PCP_THRESHOLD = Number(process.env.ANOMALY_PCP_THRESHOLD || 4.7)
 const TURNOVER_THRESHOLD = Number(process.env.ANOMALY_TURNOVER_THRESHOLD || 0.05)
 const RELVOL_THRESHOLD = Number(process.env.ANOMALY_RELVOL_THRESHOLD || 4)
+const PERCAP_THRESHOLD = Number(process.env.ANOMALY_PERCAP_THRESHOLD || 1e10) // ریال — پیش‌فرض ۱ میلیارد تومان
 const MAX_PER_RUN = Number(process.env.ANOMALY_MAX_PER_RUN || 4)
 // نمادهای کم‌معامله (میانگین ارزش زیر این سقف) رد می‌شوند — نسبت حجم رو این‌ها بی‌معنی/پرنویز است
 const RELVOL_MIN_AVG_VALUE = 1_000_000_000 // ۱ میلیارد ریال ≈ ۱۰۰ میلیون تومان
@@ -150,6 +157,18 @@ async function fetchCandidates() {
       } else if (turnover != null && turnover >= TURNOVER_THRESHOLD) {
         out.push({ symbol: s.l18, name: s.l30, reasonTag: 'turnover', s, score: turnover * 20, turnover })
       }
+
+      // کد حقیقی کلان — سرانه خرید/فروش هر کد حقیقی بالای آستانه (مستقل از band/turnover، هم‌زمان هم می‌تواند رخ دهد)
+      if (s.pc != null) {
+        const perCapBuy = s.bci > 0 ? (s.bi * s.pc) / s.bci : null
+        const perCapSell = s.sci > 0 ? (s.si * s.pc) / s.sci : null
+        if (perCapBuy != null && perCapBuy >= PERCAP_THRESHOLD) {
+          out.push({ symbol: s.l18, name: s.l30, reasonTag: 'bigCodeBuy', s, turnover, perCap: perCapBuy, codeCount: s.bci, score: perCapBuy / 1e8 })
+        }
+        if (perCapSell != null && perCapSell >= PERCAP_THRESHOLD) {
+          out.push({ symbol: s.l18, name: s.l30, reasonTag: 'bigCodeSell', s, turnover, perCap: perCapSell, codeCount: s.sci, score: perCapSell / 1e8 })
+        }
+      }
     }
   }
 
@@ -169,8 +188,12 @@ function buildFacts(c) {
   if (s.tval != null) lines.push(`ارزش معاملات: ${toman(s.tval)} میلیارد تومان`)
   if (turnover != null) lines.push(`نسبت ارزش معاملات به ارزش بازار: ${faNum(turnover * 100, 1)}٪`)
   if (c.reasonTag === 'volSpike') lines.push(`ارزش معاملات نسبت به میانگین ۲۰ روز اخیر خودِ نماد: ${faNum(c.relVol, 1)} برابر`)
+  if (c.reasonTag === 'bigCodeBuy') lines.push(`سرانه خرید هر کد حقیقی: ${toman(c.perCap)} میلیارد تومان (${faNum(c.codeCount)} کد خریدار)`)
+  if (c.reasonTag === 'bigCodeSell') lines.push(`سرانه فروش هر کد حقیقی: ${toman(c.perCap)} میلیارد تومان (${faNum(c.codeCount)} کد فروشنده)`)
   if (c.reasonTag === 'band') lines.push('علت هشدار: نزدیک/برخورد به سقف یا کف دامنهٔ نوسان روزانه')
   else if (c.reasonTag === 'volSpike') lines.push('علت هشدار: حجم معاملات چند برابر میانگین ۲۰ روز اخیر همین نماد است')
+  else if (c.reasonTag === 'bigCodeBuy') lines.push('علت هشدار: میانگین ارزش خرید هر کد حقیقی از ۱ میلیارد تومان بیشتر شده — نشانهٔ ورود سرمایه‌گذار بزرگ')
+  else if (c.reasonTag === 'bigCodeSell') lines.push('علت هشدار: میانگین ارزش فروش هر کد حقیقی از ۱ میلیارد تومان بیشتر شده — نشانهٔ خروج سرمایه‌گذار بزرگ')
   else lines.push('علت هشدار: حجم معاملات نسبت به ارزش بازار غیرعادی است')
   return lines.join('\n')
 }
@@ -201,11 +224,15 @@ function buildCardHtml(c) {
     title: `${c.symbol}${c.name ? ` — ${c.name}` : ''}`,
     subtitle: c.reasonTag === 'band' ? 'نزدیک سقف/کف دامنهٔ نوسان'
       : c.reasonTag === 'volSpike' ? 'حجم معاملات چند برابر میانگین خودِ نماد'
+      : c.reasonTag === 'bigCodeBuy' ? 'سرانه خرید کد حقیقی کلان'
+      : c.reasonTag === 'bigCodeSell' ? 'سرانه فروش کد حقیقی کلان'
       : 'حجم معاملات غیرعادی',
     bigStat: { value: `${up ? '+' : ''}${faNum(s.pcp, 1)}٪`, label: `قیمت پایانی ${faNum(s.pc)} ریال`, tone: up ? 'up' : 'down' },
     rows: [
       s.tval != null ? { label: 'ارزش معاملات', value: `${toman(s.tval)} میلیارد تومان` } : null,
       c.reasonTag === 'volSpike' ? { label: 'نسبت به میانگین ۲۰ روز خودِ نماد', value: `${faNum(c.relVol, 1)}×` }
+        : (c.reasonTag === 'bigCodeBuy' || c.reasonTag === 'bigCodeSell')
+          ? { label: c.reasonTag === 'bigCodeBuy' ? 'سرانه خرید هر کد' : 'سرانه فروش هر کد', value: `${toman(c.perCap)} میلیارد تومان (${faNum(c.codeCount)} کد)` }
         : turnover != null ? { label: 'نسبت معاملات به ارزش بازار', value: `${faNum(turnover * 100, 1)}٪` } : null,
     ].filter(Boolean),
     footer: `${faTime()} — رصد لحظه‌ای بورس سنج`,
@@ -244,7 +271,7 @@ const saveState = (st) => fs.writeFileSync(STATE_FILE, JSON.stringify(st))
 
 async function main() {
   const today = tehranDay()
-  log(`▶ رصدگر نوسان غیرعادی — pcp≥${PCP_THRESHOLD}٪ | turnover≥${(TURNOVER_THRESHOLD * 100).toFixed(0)}٪${DRY ? ' (dry run)' : ''}`)
+  log(`▶ رصدگر نوسان غیرعادی — pcp≥${PCP_THRESHOLD}٪ | turnover≥${(TURNOVER_THRESHOLD * 100).toFixed(0)}٪ | سرانه کد≥${toman(PERCAP_THRESHOLD)}میلیارد‌ت${DRY ? ' (dry run)' : ''}`)
 
   if (!FORCE && !isMarketOpen()) {
     log('بازار سهام باز نیست — رد شد (--force برای دور زدن)')

@@ -349,23 +349,34 @@ export default function MoneyFlowPage() {
   const cMoneyInLive: Col = { label: 'ورود پول', key: 'moneyInI', fmt: (r) => fToman(r.moneyInI), num: (r) => r.moneyInI }
 
   // ── بزرگترین خرید/فروش حقیقی (مجموع کل، نه خالص) ────────────────────────────
-  const cPerCapSeller: Col = { label: 'سرانه فروش', key: 'perCapS', fmt: (r) => fToman(r.perCapS), num: (r) => r.perCapS ?? 0 }
+  // آستانهٔ «کد کلان» — هم‌ارز با ANOMALY_PERCAP_THRESHOLD در scripts/anomaly-watch.js (پیش‌فرض ۱ میلیارد تومان)
+  const BIG_CODE_THRESHOLD = 1e10 // ریال
   const cBuyCntM: Col = { label: 'تعداد خریدار', key: 'buyCountI', fmt: (r) => faN(r.buyCountI), num: (r) => r.buyCountI }
   const cSellCntM: Col = { label: 'تعداد فروشنده', key: 'sellCountI', fmt: (r) => faN(r.sellCountI), num: (r) => r.sellCountI }
+  const cPerCapBuyerFlag: Col = {
+    label: 'سرانه خریدار', key: 'perCapB',
+    fmt: (r) => `${fToman(r.perCapB)}${(r.perCapB ?? 0) >= BIG_CODE_THRESHOLD ? ' 🔥' : ''}`,
+    num: (r) => r.perCapB ?? 0,
+  }
+  const cPerCapSellerFlag: Col = {
+    label: 'سرانه فروش', key: 'perCapS',
+    fmt: (r) => `${fToman(r.perCapS)}${(r.perCapS ?? 0) >= BIG_CODE_THRESHOLD ? ' 🔥' : ''}`,
+    num: (r) => r.perCapS ?? 0,
+  }
   const cBuyIVal: Col = { label: 'مجموع کل خرید', key: 'buyIVal', fmt: (r) => fToman(r.buyIVal), num: (r) => r.buyIVal }
   const cSellIVal: Col = { label: 'مجموع کل فروش', key: 'sellIVal', fmt: (r) => fToman(r.sellIVal), num: (r) => r.sellIVal }
 
   const biggestBuyCard: Card | null = metrics ? {
     id: 'biggest-real-buy', title: 'بزرگترین خریدهای حقیقی', tone: 'green',
-    desc: 'مجموع کل ارزش خرید حقیقی امروز هر نماد (تعداد کد خریدار × سرانه خرید) — رتبه‌بندی بر مبنای بزرگی خرید، نه خالص ورود پول',
-    cols: [cSym, cPl, cBuyCntM, cPerCapBuyer, cBuyIVal],
+    desc: 'مجموع کل ارزش خرید حقیقی امروز هر نماد (تعداد کد خریدار × سرانه خرید) — رتبه‌بندی بر مبنای بزرگی خرید، نه خالص ورود پول. 🔥 یعنی سرانه هر کد خریدار بالای ۱ میلیارد تومان است (همان آستانه هشدار تلگرام)',
+    cols: [cSym, cPl, cBuyCntM, cPerCapBuyerFlag, cBuyIVal],
     rows: [...metrics].filter((r) => r.buyCountI > 0).sort((a, b) => b.buyIVal - a.buyIVal).slice(0, 30),
   } : null
 
   const biggestSellCard: Card | null = metrics ? {
     id: 'biggest-real-sell', title: 'بزرگترین فروش‌های حقیقی', tone: 'red',
-    desc: 'مجموع کل ارزش فروش حقیقی امروز هر نماد (تعداد کد فروشنده × سرانه فروش) — رتبه‌بندی بر مبنای بزرگی فروش، نه خالص خروج پول',
-    cols: [cSym, cPl, cSellCntM, cPerCapSeller, cSellIVal],
+    desc: 'مجموع کل ارزش فروش حقیقی امروز هر نماد (تعداد کد فروشنده × سرانه فروش) — رتبه‌بندی بر مبنای بزرگی فروش، نه خالص خروج پول. 🔥 یعنی سرانه هر کد فروشنده بالای ۱ میلیارد تومان است (همان آستانه هشدار تلگرام)',
+    cols: [cSym, cPl, cSellCntM, cPerCapSellerFlag, cSellIVal],
     rows: [...metrics].filter((r) => r.sellCountI > 0).sort((a, b) => b.sellIVal - a.sellIVal).slice(0, 30),
   } : null
 
