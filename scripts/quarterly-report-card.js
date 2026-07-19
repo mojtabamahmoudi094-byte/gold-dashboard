@@ -269,9 +269,13 @@ function renderQuarterlyReportCardHtml(data, companyName) {
   })
   const { seasonNames, years, seasonal } = data.seasonal
   const seasonalChartOpts = { width: 276, height: 172, seasonNames, years }
-  const grossSeasonChart = seasonalBarChart({ ...seasonalChartOpts, values: seasonal.gross })
-  const opSeasonChart = seasonalBarChart({ ...seasonalChartOpts, values: seasonal.op })
-  const netSeasonChart = seasonalBarChart({ ...seasonalChartOpts, values: seasonal.net })
+  // بانک/بیمه ردیف «سود ناخالص» تو صورت مالی میان‌دوره‌ای ندارن (COGS اصلاً مفهومی نداره براشون) —
+  // چارت خالی گیج‌کننده‌ست، پس به‌جاش پیام می‌ذاریم که این نماد این متغیر رو گزارش نمی‌کنه
+  const hasData = (values) => values.some(season => Object.keys(season).length > 0)
+  const emptyChartMsg = (label) => `<div class="seasonalEmpty" style="height:${seasonalChartOpts.height}px">این نماد «${esc(label)}» را در صورت‌های میاندوره‌ای گزارش نمی‌کند</div>`
+  const grossSeasonChart = hasData(seasonal.gross) ? seasonalBarChart({ ...seasonalChartOpts, values: seasonal.gross }) : emptyChartMsg('سود ناخالص')
+  const opSeasonChart = hasData(seasonal.op) ? seasonalBarChart({ ...seasonalChartOpts, values: seasonal.op }) : emptyChartMsg('سود عملیاتی')
+  const netSeasonChart = hasData(seasonal.net) ? seasonalBarChart({ ...seasonalChartOpts, values: seasonal.net }) : emptyChartMsg('سود خالص')
 
   const st = data.stats
   const statsHtml = [
@@ -311,6 +315,7 @@ function renderQuarterlyReportCardHtml(data, companyName) {
   .seasonalRow { display: flex; gap: 18px; }
   .seasonalCol { flex: 1; min-width: 0; background: ${PANEL}; border-radius: 12px; padding: 6px 4px 0; }
   .seasonalColTitle { color: ${CREAM}; font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 2px; }
+  .seasonalEmpty { display: flex; align-items: center; justify-content: center; text-align: center; color: ${MUTED}; font-size: 12px; padding: 0 10px; line-height: 1.7; }
   .right { flex: 1; background: ${PANEL2}; border: 1px solid ${BORDER}; border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
   .srow { display: flex; align-items: center; justify-content: space-between; padding: 16px 4px; border-top: 1px solid ${BORDER}; font-size: 22px; }
   .srow:first-child { border-top: none; }
