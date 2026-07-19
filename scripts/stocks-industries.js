@@ -211,8 +211,14 @@ async function main() {
     'legal-buy': 'بیشترین درصد حجم خرید حقوقی', 'tick-up': 'فیلتر الگوی تیک صعودی', 'tick-down': 'فیلتر الگوی تیک نزولی',
     'swing-reversal': 'فیلتر نوسان‌گیری', 'spread': 'بیشترین درصد اختلاف عرضه و تقاضا', 'golden': 'فیلتر طلایی بورس سنج',
     'most-buy-power': 'بیشترین قدرت خریدار حقیقی', 'most-sell-power': 'بیشترین قدرت فروشنده حقیقی',
+    'vol-float': 'بیشترین درصد حجم نسبت به شناوری', 'val-mv': 'بیشترین ارزش معاملات نسبت به مارکت شرکت',
+    'val-float': 'بیشترین ارزش معاملات نسبت به شناوری',
+    'most-buyers': 'بیشترین تعداد کد خریدار حقیقی', 'most-sellers': 'بیشترین تعداد کد فروشنده حقیقی',
+    'near-buy-queue': 'در آستانه صف خرید', 'near-sell-queue': 'در آستانه صف فروش',
+    'pc-1-5': 'افزایش سرانه خرید روزانه به ۵ روزه', 'pc-3-10': 'افزایش سرانه خرید ۳ به ۱۰ روزه',
+    'pc-5-20': 'افزایش سرانه خرید ۵ به ۲۰ روزه',
   }
-  function computeVipFilters(items, volMap) {
+  function computeVipFilters(items, volMap, floatMap) {
     const hasVol = volMap.size > 0
     const top = (rows, by, n = 30) => [...rows].sort((a, b) => by(b) - by(a)).slice(0, n)
     const hotVol = (r, k) => (hasVol && r.ratioM != null ? r.ratioM >= k : r.tval >= 1e10)
@@ -243,6 +249,8 @@ async function main() {
       const buyQueue = !!(tmax && pd1 != null && pd1 >= tmax && qd1 > 0)
       const sellQueue = !!(tmin && po1 != null && po1 <= tmin && qo1 > 0)
       const v = volMap.get(sym)
+      const fl = floatMap.get(sym)
+      const floatShares = fl?.ff != null && fl?.z != null ? fl.z * (fl.ff / 100) : null
       ms.push({
         sym, pl, plp: num(it.plp) ?? 0, pc, pcp: num(it.pcp) ?? 0, tvol, tval,
         bp, perCapB,
@@ -251,12 +259,17 @@ async function main() {
         dVal, oVal, spreadPct,
         ratioW: v?.w ? tvol / v.w : null,
         ratioM: v?.m ? tvol / v.m : null,
-        buyQueue, sellQueue,
+        buyQueue, sellQueue, tmax, tmin,
+        mv: num(it.mv) ?? 0, floatShares,
         buyCountI: bCI, sellCountI: sCI,
       })
     }
 
     const withPower = ms.filter(r => r.bp != null && r.bp > 0 && (r.buyCountI > 0 || r.sellCountI > 0))
+    const withFloat = ms.filter(r => r.floatShares != null && r.floatShares > 0)
+    const withCounts = ms.filter(r => r.buyCountI > 0 || r.sellCountI > 0)
+    const nearBuy = ms.filter(r => !r.buyQueue && r.tmax != null && r.pl >= 0.994 * r.tmax)
+    const nearSell = ms.filter(r => !r.sellQueue && r.tmin != null && r.pl <= 1.006 * r.tmin)
     const lists = {
       'smart-in': ms.filter(r => r.plp > 0 && (r.bp ?? 0) >= 2 && hotVol(r, 1.5)),
       'smart-out': ms.filter(r => r.plp < 0 && r.bp != null && r.bp > 0 && r.bp <= 0.5 && hotVol(r, 1.5)),
@@ -275,6 +288,13 @@ async function main() {
       'golden': ms.filter(r => r.plp > 0 && (r.bp ?? 0) >= 2 && (r.perCapB ?? 0) >= 3e8 && (r.sellNPct ?? 0) >= 30 && hotVol(r, 1.5)),
       'most-buy-power': top(withPower, r => r.bp ?? 0, 30),
       'most-sell-power': top(withPower, r => (r.bp && r.bp > 0 ? 1 / r.bp : 0), 30),
+      'vol-float': top(withFloat, r => r.tvol / r.floatShares, 30),
+      'val-mv': top(ms.filter(r => r.mv > 0), r => r.tval / r.mv, 30),
+      'val-float': top(withFloat, r => r.tval / (r.floatShares * r.pc), 30),
+      'most-buyers': top(withCounts, r => r.buyCountI, 30),
+      'most-sellers': top(withCounts, r => r.sellCountI, 30),
+      'near-buy-queue': top(nearBuy, r => -(((r.tmax - r.pl) / r.tmax) * 100), 30),
+      'near-sell-queue': top(nearSell, r => -(((r.pl - r.tmin) / r.tmin) * 100), 30),
     }
 
     const bySymbol = new Map()
@@ -282,6 +302,53 @@ async function main() {
       for (const r of rows) {
         if (!bySymbol.has(r.sym)) bySymbol.set(r.sym, [])
         bySymbol.get(r.sym).push(id)
+      }
+    }
+    return bySymbol
+  }
+
+  // ── افزایش سرانه خریدار (همان منطق app/vip/useful-filters/page.tsx) — تاریخچه ۳۰ روزه stock_per_capita_daily ──
+  async function computePerCapFilters(sb) {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const raw = []
+    for (let off = 0; off < 50_000; off += 1000) {
+      const { data, error } = await sb.from('stock_per_capita_daily')
+        .select('symbol, trade_date, per_capita_buy')
+        .gte('trade_date', cutoff)
+        .order('trade_date', { ascending: false }).order('symbol', { ascending: true })
+        .range(off, off + 999)
+      if (error || !data?.length) break
+      raw.push(...data)
+      if (data.length < 1000) break
+    }
+    const bySym = new Map()
+    for (const r of raw) {
+      if (r.per_capita_buy == null) continue
+      if (!bySym.has(r.symbol)) bySym.set(r.symbol, [])
+      bySym.get(r.symbol).push(r.per_capita_buy) // ترتیب نزولی تاریخ حفظ می‌شود
+    }
+    const avgN = (arr, n) => { const s = arr.slice(0, n); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : null }
+    const rows = []
+    for (const [sym, arr] of bySym) {
+      if (!arr.length) continue
+      rows.push({ sym, today: arr[0], avg3: avgN(arr, 3), avg5: avgN(arr, 5), avg10: avgN(arr, 10), avg20: avgN(arr, 20) })
+    }
+    const top30ByDiff = (shortKey, longKey) => rows
+      .map(r => (r[shortKey] != null && r[longKey] != null && r[longKey] > 0) ? { sym: r.sym, diff: (r[shortKey] - r[longKey]) / r[longKey] } : null)
+      .filter(x => x && x.diff > 0)
+      .sort((a, b) => b.diff - a.diff)
+      .slice(0, 30)
+
+    const bySymbol = new Map()
+    const lists = {
+      'pc-1-5': top30ByDiff('today', 'avg5'),
+      'pc-3-10': top30ByDiff('avg3', 'avg10'),
+      'pc-5-20': top30ByDiff('avg5', 'avg20'),
+    }
+    for (const [id, list] of Object.entries(lists)) {
+      for (const x of list) {
+        if (!bySymbol.has(x.sym)) bySymbol.set(x.sym, [])
+        bySymbol.get(x.sym).push(id)
       }
     }
     return bySymbol
@@ -476,7 +543,7 @@ async function main() {
       }
     }
 
-    // ── فیلترهای VIP: عضویت فعلی نمادهای پورتفو در ۱۷ فیلتر — برای هشدار «وارد فیلتر شد» ──
+    // ── فیلترهای VIP: عضویت فعلی نمادهای پورتفو در ۲۷ فیلتر (filters + useful-filters + queue-filters) ──
     if (watchSymbols.size > 0) {
       let volMap = new Map()
       try {
@@ -484,7 +551,19 @@ async function main() {
         for (const r of volRows ?? []) volMap.set(clean(r.symbol), { w: num(r.avg_vol_w), m: num(r.avg_vol_m) })
       } catch (e) { console.warn('[stocks-industries] stock_vol_avgs در دسترس نیست:', e.message) }
 
-      const filterMap = computeVipFilters(watchItems, volMap)
+      let floatMap = new Map()
+      try {
+        const { data: floatRows } = await sb.from('stock_float').select('symbol, free_float_pct, shares_outstanding')
+        for (const r of floatRows ?? []) floatMap.set(clean(r.symbol), { ff: num(r.free_float_pct), z: num(r.shares_outstanding) })
+      } catch (e) { console.warn('[stocks-industries] stock_float در دسترس نیست:', e.message) }
+
+      const filterMap = computeVipFilters(watchItems, volMap, floatMap)
+      const perCapMap = await computePerCapFilters(sb)
+      for (const [sym, ids] of perCapMap) {
+        if (!filterMap.has(sym)) filterMap.set(sym, [])
+        filterMap.get(sym).push(...ids)
+      }
+
       const filterRows = [...watchSymbols].map(sym => ({
         symbol: sym, filters: filterMap.get(sym) || [], updated_at: new Date().toISOString(),
       }))
