@@ -1,7 +1,7 @@
 // فراخوانی مدل تولید متن فارسی (JSON خروجی) — سه مسیر مشترک این تابع را صدا می‌زنند
 // (signal-narrative, annual-audit-narrative, quarterly-deep-narrative).
-// OpenRouter (کلید شارژ‌شده، سقف بالاتر از تیر رایگان Google) ترجیح دارد؛ اگر کلیدش
-// تنظیم نشده بود، به کلید مستقیم Gemini fallback می‌شود — سرویس هرگز کامل قطع نمی‌شود.
+// کلید مستقیم Gemini (رایگان، بدون billing) ترجیح دارد؛ فقط وقتی شکست بخورد (از جمله
+// سقف روزانه‌ی رایگان تمام شود) به OpenRouter (پولی، شارژ‌شده) fallback می‌شود.
 
 type JsonSchema = Record<string, unknown>
 
@@ -88,4 +88,28 @@ export async function callGemini(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'fetch failed' }
   }
+}
+
+// اول Gemini رایگان را امتحان می‌کند؛ اگر شکست بخورد (شامل تمام‌شدن سقف روزانهٔ رایگان،
+// معمولاً HTTP 429 / پیام حاوی quota یا RESOURCE_EXHAUSTED) و کلید OpenRouter موجود باشد،
+// به آن پولی fallback می‌کند. اگر کلید Gemini اصلاً تنظیم نشده بود، مستقیم سراغ OpenRouter می‌رود.
+export async function callNarrate(
+  geminiKey: string | undefined,
+  openrouterKey: string | undefined,
+  system: string,
+  user: string,
+  geminiSchema: JsonSchema,
+  openrouterSchema: JsonSchema,
+  schemaName: string,
+  maxTokens: number,
+): Promise<LlmResult> {
+  if (geminiKey) {
+    const viaGemini = await callGemini(geminiKey, system, user, geminiSchema, maxTokens)
+    if (viaGemini.ok) return viaGemini
+    if (!openrouterKey) return viaGemini
+    console.error(`[llmNarrate] Gemini شکست خورد (${viaGemini.error}) — fallback به OpenRouter پولی`)
+    return callOpenRouter(openrouterKey, system, user, openrouterSchema, schemaName, maxTokens)
+  }
+  if (openrouterKey) return callOpenRouter(openrouterKey, system, user, openrouterSchema, schemaName, maxTokens)
+  return { ok: false, error: 'GEMINI_API_KEY/OPENROUTER_API_KEY تنظیم نشده' }
 }

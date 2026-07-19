@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { callOpenRouter, callGemini } from '@/lib/llmNarrate'
+import { callNarrate } from '@/lib/llmNarrate'
 import { rateLimit } from '../../../lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
@@ -66,11 +66,7 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean).join('\n')
 
   try {
-    // OpenRouter (کلید شارژ‌شده، سقف بالاتر از رایگان Google) ترجیح دارد؛ اگر تنظیم نشده
-    // بود به کلید مستقیم Gemini fallback می‌شود — سرویس قطع نمی‌شود.
-    const raw = OPENROUTER_KEY
-      ? await callOpenRouter(OPENROUTER_KEY, SYSTEM, userPrompt, OPENROUTER_SCHEMA, 'signal_narrative', 400)
-      : await callGemini(GEMINI_KEY!, SYSTEM, userPrompt, GEMINI_SCHEMA, 400)
+    const raw = await callNarrate(GEMINI_KEY, OPENROUTER_KEY, SYSTEM, userPrompt, GEMINI_SCHEMA, OPENROUTER_SCHEMA, 'signal_narrative', 400)
     if (!raw.ok) return NextResponse.json({ ok: false, error: raw.error }, { status: 502 })
 
     let parsed: { headline?: string; text?: string }

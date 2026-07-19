@@ -51,6 +51,17 @@ const faTime = () =>
 const tehranDay = () =>
   new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' })
 
+// ضدتکرار | dedup guard: اگر cron روی یک دسته دوبار در بازهٔ کوتاه فایر بشه (schedule
+// همپوش یا catch-up)، پست دوم رو ساکت رد می‌کنیم — مثل الگوی anomaly-watch-state.json
+const STATE_FILE = path.join(__dirname, 'telegram-report-state.json')
+const MIN_INTERVAL_MS = 20 * 60 * 1000 // ۲۰ دقیقه
+const loadState = () => { try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) } catch { return {} } }
+const saveState = (st) => fs.writeFileSync(STATE_FILE, JSON.stringify(st))
+function recentlySent(state, cat, today) {
+  const last = state[cat]
+  return !!(last && last.day === today && Date.now() - last.ts < MIN_INTERVAL_MS)
+}
+
 const num = (v, dec = 0) =>
   v == null || Number.isNaN(Number(v))
     ? '—'
@@ -252,6 +263,7 @@ async function main() {
 
   const cats = JOBS[job]
   const today = tehranDay()
+  const state = loadState()
 
   const puppeteer = require('puppeteer')
   const browser = await puppeteer.launch({
@@ -263,6 +275,12 @@ async function main() {
   try {
     for (const cat of cats) {
       const c = CATS[cat]
+
+      if (recentlySent(state, cat, today)) {
+        console.log(`[report] skip ${cat}: کمتر از ۲۰ دقیقه از پست قبلی همین دسته گذشته (ضدتکرار)`)
+        continue
+      }
+
       const snap = await fetchDay(cat)
 
       // نگهبان تازگی داده | freshness guard
@@ -283,6 +301,8 @@ async function main() {
       const series = computeSeries(snap.rows)
       const buf = await screenshotCard(browser, buildCardHtml(cat, series, includeQueueSym))
       await sendPhoto(buf, await buildCaption(cat, facts))
+      state[cat] = { day: today, ts: Date.now() }
+      saveState(state)
       console.log(`[report] ✅ sent ${cat}`)
       sent++
       if (cats.length > 1) await sleep(1500) // فاصله بین ارسال‌ها | throttle

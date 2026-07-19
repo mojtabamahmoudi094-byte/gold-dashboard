@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { callOpenRouter, callGemini } from '@/lib/llmNarrate'
+import { callNarrate } from '@/lib/llmNarrate'
 import { rateLimit } from '../../../lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
@@ -80,9 +80,7 @@ export async function POST(req: NextRequest) {
   })
 
   try {
-    const raw = OPENROUTER_KEY
-      ? await callOpenRouter(OPENROUTER_KEY, SYSTEM, userPrompt, OPENROUTER_SCHEMA, 'annual_audit_narrative', 2000)
-      : await callGemini(GEMINI_KEY!, SYSTEM, userPrompt, GEMINI_SCHEMA, 2000)
+    const raw = await callNarrate(GEMINI_KEY, OPENROUTER_KEY, SYSTEM, userPrompt, GEMINI_SCHEMA, OPENROUTER_SCHEMA, 'annual_audit_narrative', 2000)
     if (!raw.ok) return NextResponse.json({ ok: false, error: raw.error }, { status: 502 })
 
     let parsed: { html?: string }
