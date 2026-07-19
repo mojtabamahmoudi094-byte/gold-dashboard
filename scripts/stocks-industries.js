@@ -202,6 +202,91 @@ async function main() {
   const CAT_MAP = { 'طلا': 'gold', 'نقره': 'silver', 'زعفران': 'saffron' }
   const commoditySets = { gold: new Set(), silver: new Set(), saffron: new Set() }
 
+  // ── فیلترهای VIP (همان منطق app/vip/filters/page.tsx + lib/vipFiltersShared.tsx) — برای هشدار «نماد پورتفو وارد فیلتر شد» ──
+  const VIP_FILTER_TITLES = {
+    'smart-in': 'ورود پول هوشمند', 'smart-out': 'خروج پول هوشمند',
+    'c2c-to-legal': 'کد به کد حقیقی به حقوقی', 'c2c-to-real': 'کد به کد حقوقی به حقیقی',
+    'heavy-buy': 'اردرهای حمایتی و سنگین خرید', 'heavy-sell': 'اردرهای ترس و سنگین فروش',
+    'susp-week': 'حجم مشکوک هفته', 'susp-month': 'حجم مشکوک ماه', 'susp-heavy': 'حجم خیلی مشکوک',
+    'legal-buy': 'بیشترین درصد حجم خرید حقوقی', 'tick-up': 'فیلتر الگوی تیک صعودی', 'tick-down': 'فیلتر الگوی تیک نزولی',
+    'swing-reversal': 'فیلتر نوسان‌گیری', 'spread': 'بیشترین درصد اختلاف عرضه و تقاضا', 'golden': 'فیلتر طلایی بورس سنج',
+    'most-buy-power': 'بیشترین قدرت خریدار حقیقی', 'most-sell-power': 'بیشترین قدرت فروشنده حقیقی',
+  }
+  function computeVipFilters(items, volMap) {
+    const hasVol = volMap.size > 0
+    const top = (rows, by, n = 30) => [...rows].sort((a, b) => by(b) - by(a)).slice(0, n)
+    const hotVol = (r, k) => (hasVol && r.ratioM != null ? r.ratioM >= k : r.tval >= 1e10)
+
+    const ms = []
+    for (const it of items) {
+      const sym = clean(it.l18)
+      const pl = num(it.pl) ?? 0, pc = num(it.pc) ?? 0
+      const tvol = num(it.tvol) ?? 0, tval = num(it.tval) ?? 0
+      if (!sym || !pl || !pc || tvol <= 0) continue
+      const bI = num(it.Buy_I_Volume) ?? 0, sI = num(it.Sell_I_Volume) ?? 0
+      const bN = num(it.Buy_N_Volume) ?? 0, sN = num(it.Sell_N_Volume) ?? 0
+      const bCI = num(it.Buy_CountI) ?? 0, sCI = num(it.Sell_CountI) ?? 0
+      const perCapB = bCI > 0 ? (bI * pc) / bCI : null
+      const perCapS = sCI > 0 ? (sI * pc) / sCI : null
+      const bp = (perCapB != null && perCapS != null && perCapS > 0) ? perCapB / perCapS : null
+      let dVal = 0, oVal = 0
+      for (let i = 1; i <= 5; i++) {
+        const qd = num(it['qd' + i]) ?? 0, pd = num(it['pd' + i]) ?? 0
+        const qo = num(it['qo' + i]) ?? 0, po = num(it['po' + i]) ?? 0
+        if (qd > 0 && pd > 0) dVal += qd * pd
+        if (qo > 0 && po > 0) oVal += qo * po
+      }
+      const pd1 = num(it.pd1), po1 = num(it.po1)
+      const spreadPct = (pd1 && po1 && pd1 > 0 && po1 > 0) ? ((po1 - pd1) / pd1) * 100 : null
+      const tmax = num(it.tmax), tmin = num(it.tmin)
+      const qd1 = num(it.qd1) ?? 0, qo1 = num(it.qo1) ?? 0
+      const buyQueue = !!(tmax && pd1 != null && pd1 >= tmax && qd1 > 0)
+      const sellQueue = !!(tmin && po1 != null && po1 <= tmin && qo1 > 0)
+      const v = volMap.get(sym)
+      ms.push({
+        sym, pl, plp: num(it.plp) ?? 0, pc, pcp: num(it.pcp) ?? 0, tvol, tval,
+        bp, perCapB,
+        buyNPct: tvol > 0 ? (bN / tvol) * 100 : null,
+        sellNPct: tvol > 0 ? (sN / tvol) * 100 : null,
+        dVal, oVal, spreadPct,
+        ratioW: v?.w ? tvol / v.w : null,
+        ratioM: v?.m ? tvol / v.m : null,
+        buyQueue, sellQueue,
+        buyCountI: bCI, sellCountI: sCI,
+      })
+    }
+
+    const withPower = ms.filter(r => r.bp != null && r.bp > 0 && (r.buyCountI > 0 || r.sellCountI > 0))
+    const lists = {
+      'smart-in': ms.filter(r => r.plp > 0 && (r.bp ?? 0) >= 2 && hotVol(r, 1.5)),
+      'smart-out': ms.filter(r => r.plp < 0 && r.bp != null && r.bp > 0 && r.bp <= 0.5 && hotVol(r, 1.5)),
+      'c2c-to-legal': ms.filter(r => (r.buyNPct ?? 0) >= 50 && (100 - (r.sellNPct ?? 0)) >= 50 && hotVol(r, 1.25)),
+      'c2c-to-real': ms.filter(r => (r.sellNPct ?? 0) >= 50 && (100 - (r.buyNPct ?? 0)) >= 50 && (r.bp ?? 0) >= 1 && r.pl >= r.pc && r.plp > 0 && hotVol(r, 1.25)),
+      'heavy-buy': ms.filter(r => r.dVal >= 3e10 && r.dVal >= 2 * r.oVal && !r.buyQueue),
+      'heavy-sell': ms.filter(r => r.oVal >= 3e10 && r.oVal >= 2 * r.dVal && !r.sellQueue),
+      'susp-week': hasVol ? ms.filter(r => (r.ratioW ?? 0) >= 3) : [],
+      'susp-month': hasVol ? ms.filter(r => (r.ratioM ?? 0) >= 2) : [],
+      'susp-heavy': hasVol ? ms.filter(r => (r.ratioM ?? 0) >= 5) : [],
+      'legal-buy': top(ms.filter(r => r.tval >= 1e9 && (r.buyNPct ?? 0) > 0), r => r.buyNPct ?? 0, 20),
+      'tick-up': ms.filter(r => r.pl > r.pc && r.plp > 0 && r.pcp > 0 && (r.bp ?? 0) > 1),
+      'tick-down': ms.filter(r => r.pl < r.pc && r.plp < 0 && r.pcp < 0 && r.bp != null && r.bp > 0 && r.bp < 1),
+      'swing-reversal': ms.filter(r => r.pcp < -3 && r.plp > -3),
+      'spread': top(ms.filter(r => r.tval >= 5e8 && r.spreadPct != null && r.spreadPct > 0), r => r.spreadPct ?? 0, 20),
+      'golden': ms.filter(r => r.plp > 0 && (r.bp ?? 0) >= 2 && (r.perCapB ?? 0) >= 3e8 && (r.sellNPct ?? 0) >= 30 && hotVol(r, 1.5)),
+      'most-buy-power': top(withPower, r => r.bp ?? 0, 30),
+      'most-sell-power': top(withPower, r => (r.bp && r.bp > 0 ? 1 / r.bp : 0), 30),
+    }
+
+    const bySymbol = new Map()
+    for (const [id, rows] of Object.entries(lists)) {
+      for (const r of rows) {
+        if (!bySymbol.has(r.sym)) bySymbol.set(r.sym, [])
+        bySymbol.get(r.sym).push(id)
+      }
+    }
+    return bySymbol
+  }
+
   // ── «رصد لحظه‌ای پورتفو»: فقط نمادهای داخل تراکنش‌های پورتفوی کاربران تاریخچه ۵دقیقه‌ای می‌گیرند ──
   const { data: txRows, error: txErr } = await sb.from('portfolio_transactions').select('symbol, name, asset_type')
   if (txErr) console.error(`[stocks-industries] portfolio_transactions: ${txErr.message}`)
@@ -389,6 +474,23 @@ async function main() {
         const cat = EQUITY_FUND_NAMES.has(sym) ? 'bourse-funds' : 'stocks'
         symbolWatchRows.push(buildSymbolWatchRow(it, cat))
       }
+    }
+
+    // ── فیلترهای VIP: عضویت فعلی نمادهای پورتفو در ۱۷ فیلتر — برای هشدار «وارد فیلتر شد» ──
+    if (watchSymbols.size > 0) {
+      let volMap = new Map()
+      try {
+        const { data: volRows } = await sb.from('stock_vol_avgs').select('symbol, avg_vol_w, avg_vol_m')
+        for (const r of volRows ?? []) volMap.set(clean(r.symbol), { w: num(r.avg_vol_w), m: num(r.avg_vol_m) })
+      } catch (e) { console.warn('[stocks-industries] stock_vol_avgs در دسترس نیست:', e.message) }
+
+      const filterMap = computeVipFilters(watchItems, volMap)
+      const filterRows = [...watchSymbols].map(sym => ({
+        symbol: sym, filters: filterMap.get(sym) || [], updated_at: new Date().toISOString(),
+      }))
+      const { error: filterErr } = await sb.from('symbol_filter_membership').upsert(filterRows, { onConflict: 'symbol' })
+      if (filterErr) console.error(`[stocks-industries] symbol_filter_membership: ${filterErr.message}`)
+      else console.log(`✅ symbol_filter_membership بروز شد (${filterRows.length} نماد پورتفو)`)
     }
   }
 

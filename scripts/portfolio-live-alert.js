@@ -184,11 +184,48 @@ async function checkQueueShrink(bySymbol, holders) {
   }
 }
 
+// همان عناوین فیلترهای VIP (scripts/stocks-industries.js → computeVipFilters)
+const VIP_FILTER_TITLES = {
+  'smart-in': 'ورود پول هوشمند', 'smart-out': 'خروج پول هوشمند',
+  'c2c-to-legal': 'کد به کد حقیقی به حقوقی', 'c2c-to-real': 'کد به کد حقوقی به حقیقی',
+  'heavy-buy': 'اردرهای حمایتی و سنگین خرید', 'heavy-sell': 'اردرهای ترس و سنگین فروش',
+  'susp-week': 'حجم مشکوک هفته', 'susp-month': 'حجم مشکوک ماه', 'susp-heavy': 'حجم خیلی مشکوک',
+  'legal-buy': 'بیشترین درصد حجم خرید حقوقی', 'tick-up': 'فیلتر الگوی تیک صعودی', 'tick-down': 'فیلتر الگوی تیک نزولی',
+  'swing-reversal': 'فیلتر نوسان‌گیری', 'spread': 'بیشترین درصد اختلاف عرضه و تقاضا', 'golden': 'فیلتر طلایی بورس سنج',
+  'most-buy-power': 'بیشترین قدرت خریدار حقیقی', 'most-sell-power': 'بیشترین قدرت فروشنده حقیقی',
+}
+
+async function checkFilterEntries(holders) {
+  const { data: rows, error } = await sb.from('symbol_filter_membership').select('symbol, filters')
+  if (error) { console.error('[portfolio-live-alert] symbol_filter_membership:', error.message); return }
+  for (const row of rows ?? []) {
+    const current = row.filters || []
+    const { data: seen } = await sb.from('symbol_filter_seen').select('filters').eq('symbol', row.symbol).maybeSingle()
+    const seenSet = new Set(seen?.filters || [])
+    const newOnes = current.filter((id) => !seenSet.has(id))
+
+    for (const id of newOnes) {
+      const title = VIP_FILTER_TITLES[id] || id
+      await notifyHolders(holders, row.symbol,
+        `🎯 <b>${row.symbol}</b> وارد فیلتر VIP شد\nفیلتر: ${title}`)
+    }
+
+    const changed = current.length !== seenSet.size || newOnes.length > 0
+    if (changed) {
+      await sb.from('symbol_filter_seen').upsert({ symbol: row.symbol, filters: current, updated_at: new Date().toISOString() })
+    }
+  }
+}
+
 async function main() {
   const [bySymbol, holders] = await Promise.all([loadRecentTicks(), loadHolders()])
-  if (bySymbol.size === 0) { console.log('[portfolio-live-alert] تیک تازه‌ای در ۲۰ دقیقه اخیر نیست'); return }
-  await checkBigTrades(bySymbol, holders)
-  await checkQueueShrink(bySymbol, holders)
+  if (bySymbol.size > 0) {
+    await checkBigTrades(bySymbol, holders)
+    await checkQueueShrink(bySymbol, holders)
+  } else {
+    console.log('[portfolio-live-alert] تیک تازه‌ای در ۲۰ دقیقه اخیر نیست')
+  }
+  await checkFilterEntries(holders)
 }
 
 main().catch((e) => { console.error('[portfolio-live-alert] fatal:', e); process.exit(1) })
