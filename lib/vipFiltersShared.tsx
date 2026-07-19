@@ -59,6 +59,8 @@ export type M = {
   bp: number | null          // قدرت خرید حقیقی
   perCapB: number | null     // سرانه خرید حقیقی (ریال)
   perCapS: number | null
+  buyIVal: number            // مجموع کل ارزش خرید حقیقی امروز (ریال)
+  sellIVal: number           // مجموع کل ارزش فروش حقیقی امروز (ریال)
   buyNPct: number | null     // سهم حقوقی از خرید (٪ حجم)
   sellNPct: number | null
   buyNVol: number | null
@@ -133,6 +135,7 @@ export function buildMetrics(
       pl, plp: num(it.plp) ?? 0, pc, pcp: num(it.pcp) ?? 0,
       tvol, tval,
       bp, perCapB, perCapS,
+      buyIVal: bI * pc, sellIVal: sI * pc,
       buyNPct: tvol > 0 ? (bN / tvol) * 100 : null,
       sellNPct: tvol > 0 ? (sN / tvol) * 100 : null,
       buyNVol: bN,

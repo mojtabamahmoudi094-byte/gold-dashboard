@@ -214,6 +214,7 @@ async function main() {
     'vol-float': 'بیشترین درصد حجم نسبت به شناوری', 'val-mv': 'بیشترین ارزش معاملات نسبت به مارکت شرکت',
     'val-float': 'بیشترین ارزش معاملات نسبت به شناوری',
     'most-buyers': 'بیشترین تعداد کد خریدار حقیقی', 'most-sellers': 'بیشترین تعداد کد فروشنده حقیقی',
+    'biggest-real-buy': 'بزرگترین خریدهای حقیقی', 'biggest-real-sell': 'بزرگترین فروش‌های حقیقی',
     'near-buy-queue': 'در آستانه صف خرید', 'near-sell-queue': 'در آستانه صف فروش',
     'pc-1-5': 'افزایش سرانه خرید روزانه به ۵ روزه', 'pc-3-10': 'افزایش سرانه خرید ۳ به ۱۰ روزه',
     'pc-5-20': 'افزایش سرانه خرید ۵ به ۲۰ روزه',
@@ -253,7 +254,8 @@ async function main() {
       const floatShares = fl?.ff != null && fl?.z != null ? fl.z * (fl.ff / 100) : null
       ms.push({
         sym, pl, plp: num(it.plp) ?? 0, pc, pcp: num(it.pcp) ?? 0, tvol, tval,
-        bp, perCapB,
+        bp, perCapB, perCapS,
+        buyIVal: bI * pc, sellIVal: sI * pc,
         buyNPct: tvol > 0 ? (bN / tvol) * 100 : null,
         sellNPct: tvol > 0 ? (sN / tvol) * 100 : null,
         dVal, oVal, spreadPct,
@@ -293,6 +295,8 @@ async function main() {
       'val-float': top(withFloat, r => r.tval / (r.floatShares * r.pc), 30),
       'most-buyers': top(withCounts, r => r.buyCountI, 30),
       'most-sellers': top(withCounts, r => r.sellCountI, 30),
+      'biggest-real-buy': top(ms.filter(r => r.buyCountI > 0), r => r.buyIVal, 30),
+      'biggest-real-sell': top(ms.filter(r => r.sellCountI > 0), r => r.sellIVal, 30),
       'near-buy-queue': top(nearBuy, r => -(((r.tmax - r.pl) / r.tmax) * 100), 30),
       'near-sell-queue': top(nearSell, r => -(((r.pl - r.tmin) / r.tmin) * 100), 30),
     }

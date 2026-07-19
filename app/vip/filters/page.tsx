@@ -29,6 +29,9 @@ import { shouldUseDark } from '../../../lib/theme'
 const cBp: Col = { label: 'قدرت خرید', key: 'bp', fmt: (r) => fX(r.bp), num: (r) => r.bp ?? 0 }
 const cVal: Col = { label: 'ارزش', key: 'tval', fmt: (r) => fToman(r.tval), num: (r) => r.tval }
 const cPerCap: Col = { label: 'سرانه خرید', key: 'perCapB', fmt: (r) => fToman(r.perCapB), num: (r) => r.perCapB ?? 0 }
+const cPerCapS: Col = { label: 'سرانه فروش', key: 'perCapS', fmt: (r) => fToman(r.perCapS), num: (r) => r.perCapS ?? 0 }
+const cBuyIVal: Col = { label: 'مجموع کل خرید حقیقی', key: 'buyIVal', fmt: (r) => fToman(r.buyIVal), num: (r) => r.buyIVal }
+const cSellIVal: Col = { label: 'مجموع کل فروش حقیقی', key: 'sellIVal', fmt: (r) => fToman(r.sellIVal), num: (r) => r.sellIVal }
 const cSellN: Col = { label: 'فروش حقوقی', key: 'sellNPct', fmt: (r) => fPct(r.sellNPct, 0), num: (r) => r.sellNPct ?? 0 }
 const cSellPower: Col = {
   label: 'قدرت فروش', key: 'bp',
@@ -79,6 +82,16 @@ function buildCards(ms: M[], hasVol: boolean): Card[] {
       id: 'smart-out', title: 'خروج پول هوشمند', tone: 'red',
       desc: 'قدرت فروشنده حقیقی ≥۲ برابر خریدار + حجم بالا + آخرین قیمت منفی',
       cols: [cSym, cPl, cBp, cVol, cVal], rows: top(smartOut, (r) => (r.bp ? 1 / r.bp : 0)),
+    },
+    {
+      id: 'biggest-real-buy', title: 'بزرگترین خریدهای حقیقی', tone: 'green',
+      desc: 'مجموع کل ارزش خرید حقیقی امروز (تعداد کد خریدار × سرانه خرید) — بدون شرط حجمی، صرفاً بزرگی خرید',
+      cols: [cSym, cPl, cBuyCnt, cPerCap, cBuyIVal], rows: top(ms.filter((r) => r.buyCountI > 0), (r) => r.buyIVal),
+    },
+    {
+      id: 'biggest-real-sell', title: 'بزرگترین فروش‌های حقیقی', tone: 'red',
+      desc: 'مجموع کل ارزش فروش حقیقی امروز (تعداد کد فروشنده × سرانه فروش) — بدون شرط حجمی، صرفاً بزرگی فروش',
+      cols: [cSym, cPl, cSellCnt, cPerCapS, cSellIVal], rows: top(ms.filter((r) => r.sellCountI > 0), (r) => r.sellIVal),
     },
     {
       id: 'c2c-to-legal', title: 'کد به کد حقیقی به حقوقی', tone: 'red',
@@ -271,7 +284,7 @@ export default function VipFiltersPage() {
         </div>
 
         <p style={{ fontSize: 12.5, color: cream, margin: '0 0 20px', lineHeight: 2 }}>
-          ۱۷ فیلتر لحظه‌ای روی کل سهام بازار — پول هوشمند، کد به کد، حجم مشکوک، اردرهای سنگین، قدرت خریدار/فروشنده، الگوی تیک و فیلتر طلایی.
+          ۱۹ فیلتر لحظه‌ای روی کل سهام بازار — پول هوشمند، بزرگترین خرید/فروش حقیقی، کد به کد، حجم مشکوک، اردرهای سنگین، قدرت خریدار/فروشنده، الگوی تیک و فیلتر طلایی.
           داده‌ها در ساعت بازار (۹:۰۰–۱۲:۳۰) هر ۲ دقیقه به‌روز می‌شود. این فیلترها صرفاً ابزار رصد هستند و توصیه خرید یا فروش نیستند.
         </p>
 
