@@ -43,6 +43,7 @@ type Row = {
   platform_breakout?: boolean
   year_line_pullback?: boolean
   turtle_breakout_20d?: boolean
+  below_avg_cost?: boolean
 }
 
 // فیلترها با هم AND می‌شوند — چند چیپ فعال یعنی نمادهایی که همه شرط‌ها را دارند
@@ -75,6 +76,7 @@ const FILTERS: { key: string; label: string; tone?: 'pos' | 'neg' }[] = [
   { key: 'platform_breakout', label: 'شکست پلتفرم', tone: 'pos' },
   { key: 'year_line_pullback', label: 'بازگشت به خط سالانه', tone: 'pos' },
   { key: 'turtle_breakout_20d', label: 'شکست لاک‌پشتی ۲۰روزه', tone: 'pos' },
+  { key: 'below_avg_cost', label: 'زیر میانگین بهای تمام‌شده (چیپ)', tone: 'pos' },
 ]
 
 // استراتژی‌های آماده — هر کدوم چند فیلتر بالا رو با هم فعال می‌کنه (AND)
@@ -170,6 +172,23 @@ export default function ScreenerPage() {
         all.push(...(data as Row[]))
         if (data.length < 1000) break
       }
+
+      // میانگین بهای تمام‌شده از توزیع چیپ (یک ردیف به‌ازای هر نماد) — برای فیلتر «زیر میانگین بهای تمام‌شده»
+      const chipAvgCost: Record<string, number> = {}
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from('stock_chip_distribution')
+          .select('symbol, avg_cost')
+          .range(from, from + 999)
+        if (error || !data) break
+        for (const c of data as { symbol: string; avg_cost: number }[]) chipAvgCost[c.symbol] = c.avg_cost
+        if (data.length < 1000) break
+      }
+      for (const r of all) {
+        const avgCost = chipAvgCost[r.symbol]
+        if (avgCost != null) r.below_avg_cost = r.close < avgCost
+      }
+
       setRows(all)
     }
     load()
