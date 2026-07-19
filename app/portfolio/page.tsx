@@ -9,6 +9,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+import persian from 'react-date-object/calendars/persian'
+import persian_fa from 'react-date-object/locales/persian_fa'
+import DateObject from 'react-date-object'
 import {
   PieChart, Pie, Cell, Sector, Tooltip as ReTooltip, ResponsiveContainer,
   AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
@@ -17,6 +21,18 @@ import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { safe, fmtNum, fmtPct, todayShamsi } from '../../lib/format'
+
+const DatePicker = dynamic(() => import('react-multi-date-picker'), { ssr: false })
+
+// رشته تاریخ شمسی «YYYY/MM/DD» را برای DatePicker به DateObject تبدیل می‌کند
+const shamsiToDateObject = (s: string): DateObject | null => {
+  if (!s) return null
+  try { return new DateObject({ date: s, format: 'YYYY/MM/DD', calendar: persian, locale: persian_fa }) } catch { return null }
+}
+const dateObjectToShamsi = (d: any): string => {
+  if (!d) return ''
+  try { return d.format('YYYY/MM/DD') } catch { return '' }
+}
 
 type AssetType = 'stock' | 'fund' | 'physical'
 
@@ -161,6 +177,16 @@ export default function PortfolioPage() {
   const [qtAutoFee, setQtAutoFee] = useState(true)
   const [qtSaving, setQtSaving] = useState(false)
   const [qtMsg, setQtMsg] = useState<string | null>(null)
+
+  // ویرایش یک تراکنش ثبت‌شده (مثلاً وقتی واحد ریال/تومان اشتباه وارد شده)
+  const [editTx, setEditTx] = useState<Tx | null>(null)
+  const [editSide, setEditSide] = useState<'buy' | 'sell'>('buy')
+  const [editQty, setEditQty] = useState('')
+  const [editPrice, setEditPrice] = useState('')
+  const [editCommission, setEditCommission] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editMsg, setEditMsg] = useState<string | null>(null)
 
   // آپلود اکسل کارگزاری — پیش‌نمایش + تایید قبل از افزودن به پورتفو
   const [showImport, setShowImport] = useState(false)
@@ -694,6 +720,34 @@ export default function PortfolioPage() {
     loadTxs()
   }
 
+  const openEditTx = (tx: Tx) => {
+    setEditTx(tx)
+    setEditSide(tx.side)
+    setEditQty(String(tx.quantity))
+    setEditPrice(String(toToman(tx.price)))
+    setEditCommission(String(toToman(tx.commission)))
+    setEditDate(tx.trade_date)
+    setEditMsg(null)
+  }
+
+  const submitEditTx = async () => {
+    if (!editTx) return
+    setEditMsg(null)
+    if (safe(editQty) <= 0 || safe(editPrice) <= 0) { setEditMsg('تعداد و قیمت باید بزرگ‌تر از صفر باشد'); return }
+    setEditSaving(true)
+    const { error } = await supabase.from('portfolio_transactions').update({
+      side: editSide,
+      quantity: safe(editQty),
+      price: tomanToRial(editPrice),
+      commission: tomanToRial(editCommission),
+      trade_date: editDate || todayShamsi(),
+    }).eq('id', editTx.id)
+    setEditSaving(false)
+    if (error) { setEditMsg('خطا در ثبت: ' + error.message); return }
+    setEditTx(null)
+    loadTxs()
+  }
+
   const pickInstrument = (i: Instrument) => {
     setPicked(i)
     setQuery(i.type === 'stock' ? i.symbol : i.name)
@@ -1136,7 +1190,13 @@ ${txs.map(tx => row([
 
             <div>
               <span style={label}>تاریخ (شمسی)</span>
-              <input style={input} value={date} onChange={e => setDate(e.target.value)} placeholder="1405/04/15" />
+              <DatePicker
+                calendar={persian}
+                locale={persian_fa}
+                value={shamsiToDateObject(date)}
+                onChange={(v: any) => setDate(dateObjectToShamsi(v))}
+                render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" />}
+              />
             </div>
 
             <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 2' }}>
@@ -1684,7 +1744,12 @@ ${txs.map(tx => row([
                     <td style={td}>{fmtToman(tx.price)}</td>
                     <td style={{ ...td, color: t.muted }}>{fmtToman(tx.commission)}</td>
                     <td style={td}>{fmtToman(total)}</td>
-                    <td style={td}>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      <button type="button" onClick={() => openEditTx(tx)} title="ویرایش" style={{
+                        padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginLeft: 6,
+                        background: 'rgba(217,180,91,0.08)', border: `1px solid ${t.borderStrong}`,
+                        color: t.brand, fontFamily: 'inherit',
+                      }}>ویرایش</button>
                       <button type="button" onClick={() => removeTx(tx.id)} title="حذف" style={{
                         padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                         background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)',
@@ -1728,7 +1793,13 @@ ${txs.map(tx => row([
               </div>
               <div>
                 <span style={label}>تاریخ (شمسی)</span>
-                <input style={input} value={qtDate} onChange={e => setQtDate(e.target.value)} placeholder="1405/04/15" />
+                <DatePicker
+                  calendar={persian}
+                  locale={persian_fa}
+                  value={shamsiToDateObject(qtDate)}
+                  onChange={(v: any) => setQtDate(dateObjectToShamsi(v))}
+                  render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" />}
+                />
               </div>
               <div>
                 <span style={label}>
@@ -1751,6 +1822,77 @@ ${txs.map(tx => row([
                 {qtSaving ? 'در حال ثبت…' : quickTx.side === 'sell' ? 'ثبت فروش' : 'ثبت خرید'}
               </button>
               <button type="button" onClick={() => setQuickTx(null)} style={{
+                padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.muted, fontFamily: 'inherit',
+              }}>انصراف</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* مودال ویرایش تراکنش ثبت‌شده */}
+      {editTx && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onClick={() => setEditTx(null)}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 16px' }}>
+              ✏️ ویرایش تراکنش {editTx.asset_type === 'stock' ? editTx.symbol : editTx.name}
+            </h3>
+            <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
+              <div>
+                <span style={label}>نوع</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['buy', 'sell'] as const).map(s => (
+                    <button key={s} type="button" onClick={() => setEditSide(s)} style={{
+                      flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      background: editSide === s ? (s === 'buy' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)') : 'transparent',
+                      color: editSide === s ? (s === 'buy' ? t.green : t.red) : t.muted,
+                      border: `1px solid ${editSide === s ? (s === 'buy' ? t.green : t.red) : t.borderStrong}`,
+                    }}>
+                      {s === 'buy' ? 'خرید' : 'فروش'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span style={label}>تعداد</span>
+                <input style={input} inputMode="numeric" value={editQty} onChange={e => setEditQty(e.target.value.replace(/[^\d.]/g, ''))} />
+              </div>
+              <div>
+                <span style={label}>قیمت واحد (تومان)</span>
+                <input style={input} inputMode="numeric" value={editPrice} onChange={e => setEditPrice(e.target.value.replace(/[^\d.]/g, ''))} />
+              </div>
+              <div>
+                <span style={label}>تاریخ (شمسی)</span>
+                <DatePicker
+                  calendar={persian}
+                  locale={persian_fa}
+                  value={shamsiToDateObject(editDate)}
+                  onChange={(v: any) => setEditDate(dateObjectToShamsi(v))}
+                  render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" />}
+                />
+              </div>
+              <div>
+                <span style={label}>کارمزد (تومان)</span>
+                <input style={input} inputMode="numeric" value={editCommission} onChange={e => setEditCommission(e.target.value.replace(/[^\d.]/g, ''))} />
+              </div>
+            </div>
+            {editMsg && <p style={{ fontSize: 12, color: t.red, margin: '0 0 12px' }}>{editMsg}</p>}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={submitEditTx} disabled={editSaving} style={{
+                flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`,
+                color: '#fff', border: 'none', fontFamily: 'inherit', opacity: editSaving ? 0.6 : 1,
+              }}>
+                {editSaving ? 'در حال ذخیره…' : 'ذخیره تغییرات'}
+              </button>
+              <button type="button" onClick={() => setEditTx(null)} style={{
                 padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.muted, fontFamily: 'inherit',
               }}>انصراف</button>
