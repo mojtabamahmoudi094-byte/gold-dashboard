@@ -98,7 +98,8 @@ async function tg(method, params) {
 const BTN_PORTFOLIO = '📊 پورتفوی من'
 const BTN_OPTIMIZE = '⚖️ بهینه‌سازی پرتفوی'
 const BTN_CONNECT = '🔗 اتصال حساب'
-const KEYBOARD = { keyboard: [[BTN_PORTFOLIO], [BTN_OPTIMIZE], [BTN_CONNECT]], resize_keyboard: true }
+const BTN_HELP = '❓ آموزش اتصال'
+const KEYBOARD = { keyboard: [[BTN_PORTFOLIO], [BTN_OPTIMIZE], [BTN_CONNECT, BTN_HELP]], resize_keyboard: true }
 
 const sendMessage = (chatId, text) =>
   tg('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', reply_markup: KEYBOARD })
@@ -125,7 +126,8 @@ async function handleStart(chatId, from, code) {
     awaitingCode.add(chatId)
     await sendMessage(chatId,
       `به ربات پورتفوی بورس سنج خوش آمدید${from?.first_name ? ' ' + from.first_name : ''} 👋\n` +
-      'برای اتصال، از داشبورد بورس سنج (بخش پورتفو) کد اتصال بگیرید و همین‌جا بفرستید.'
+      'برای اتصال، از داشبورد بورس سنج (بخش پورتفو) کد اتصال بگیرید و همین‌جا بفرستید.\n' +
+      `راهنمای کامل: «${BTN_HELP}»`
     )
     return
   }
@@ -160,6 +162,18 @@ async function handleStart(chatId, from, code) {
   }, { onConflict: 'user_id' })
 
   await sendMessage(chatId, `اتصال با موفقیت انجام شد ✅\nبرای دیدن پورتفو، «${BTN_PORTFOLIO}» را بزنید.`)
+}
+
+async function handleHelp(chatId) {
+  await sendMessage(chatId,
+    '📚 <b>آموزش اتصال پورتفو به تلگرام</b>\n\n' +
+    `۱. وارد سایت ${SITE} شوید و به بخش «پورتفو» بروید.\n` +
+    '۲. روی «اتصال به تلگرام» بزنید و دکمه «دریافت کد» را بزنید — یک کد ۶ رقمی (اعتبار ۱۰ دقیقه) نشان داده می‌شود.\n' +
+    `۳. همین‌جا در تلگرام ربات را باز نگه دارید (اگر تازه باز کردید، روی «${BTN_CONNECT}» بزنید).\n` +
+    '۴. کد ۶ رقمی را همین‌جا برای بات بفرستید (فقط عدد، بدون فاصله).\n' +
+    '۵. پیام «اتصال با موفقیت انجام شد ✅» را دیدید یعنی تمام — از این به بعد با «' + BTN_PORTFOLIO + '» پورتفوی خودتان را می‌بینید.\n\n' +
+    '⚠️ کد فقط ۱۰ دقیقه اعتبار دارد و فقط یک‌بار قابل استفاده است. اگر منقضی شد از داشبورد یک کد تازه بگیرید.'
+  )
 }
 
 // پیام تلگرام حداکثر ۴۰۹۶ کاراکتر می‌پذیرد — هدر+ردیف‌ها را به چند پیام تقسیم می‌کند
@@ -311,10 +325,12 @@ async function handleUpdate(update) {
     await handleOptimize(chatId)
   } else if (text === BTN_CONNECT) {
     await handleStart(chatId, msg.from, null)
+  } else if (text.startsWith('/help') || text === BTN_HELP) {
+    await handleHelp(chatId)
   } else if (/^\d{4,8}$/.test(text) && awaitingCode.has(chatId)) {
     await handleStart(chatId, msg.from, text)
   } else {
-    await sendMessage(chatId, `از دکمه‌های پایین صفحه استفاده کنید: «${BTN_PORTFOLIO}»، «${BTN_OPTIMIZE}» یا «${BTN_CONNECT}»`)
+    await sendMessage(chatId, `از دکمه‌های پایین صفحه استفاده کنید: «${BTN_PORTFOLIO}»، «${BTN_OPTIMIZE}»، «${BTN_CONNECT}» یا «${BTN_HELP}»`)
   }
 }
 

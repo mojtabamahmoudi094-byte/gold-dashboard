@@ -70,6 +70,37 @@ const isInteresting = (title) => {
   return isMonthlyTitle(t) || isQuarterlyTitle(t)
 }
 
+// اصلاحیه = عنوان صریحاً «اصلاحیه» دارد (کدال برای هر تصحیح گزارش قبلی همین کلمه را می‌گذارد)
+const isAmendmentTitle = (t) => /اصلاحیه/.test(norm(t))
+
+// اعداد کلیدی برای مقایسهٔ نسخهٔ قبل/بعدِ اصلاحیه — فقط همان‌هایی که در متن پیام/کارت ظاهر می‌شوند
+function monthMetrics(m) {
+  if (!m) return null
+  if (m.kind === 'portfolio') return { totalMv: m.totalMv, gain: m.gain }
+  if (m.kind === 'bank') return { month: m.month, expense_m: m.expense_m }
+  return { month: m.month, cum: m.cum }
+}
+function quarterMetrics(q) {
+  if (!q) return null
+  return { revenue: q.revenue, net: q.net, eps: q.eps, gross: q.gross, op: q.op }
+}
+
+// تغییر بزرگ‌تر از ۱٪ در هر یک از اعداد کلیدی = اصلاحیهٔ واقعی؛ نبود نسخهٔ قبلی برای مقایسه هم محافظه‌کارانه «بزرگ» فرض می‌شود
+const AMENDMENT_SIG_THRESHOLD = 0.01
+function isSignificantChange(prevM, curM) {
+  if (!prevM || !curM) return true
+  const keys = new Set([...Object.keys(prevM), ...Object.keys(curM)])
+  for (const k of keys) {
+    const a = prevM[k], b = curM[k]
+    if (a == null && b == null) continue
+    if (a == null || b == null) return true
+    if (a === 0 && b === 0) continue
+    const denom = Math.max(Math.abs(a), Math.abs(b), 1)
+    if (Math.abs(a - b) / denom > AMENDMENT_SIG_THRESHOLD) return true
+  }
+  return false
+}
+
 // آیا این اطلاعیه واقعاً در payload نشسته؟ رکورد همان دوره باید publish ≥ انتشار اطلاعیه داشته باشد.
 // اگر نه (اکسل نسخهٔ جدید هنوز روی کدال نیامده و پارسر به نسخهٔ قدیمی برگشته)، false برمی‌گردد
 // تا اطلاعیه seen نشود و اجرای بعدی دوباره تلاش کند — وگرنه نسخهٔ حسابرسی‌شده/اصلاحیه برای همیشه
@@ -163,8 +194,8 @@ function verdict(yoy, isRecord) {
   return { head: null, tail: 'گزارش ضعیف' }
 }
 
-function summarizeMonth(symbol, months, m) {
-  const tag = `#گزارش_عملکرد_${monthName(m.period)}_${periodParts(m.period)?.y ?? ''}`
+function summarizeMonth(symbol, months, m, opts = {}) {
+  const tag = `#گزارش_عملکرد_${monthName(m.period)}_${periodParts(m.period)?.y ?? ''}${opts.amendment ? '_اصلاحیه' : ''}`
   const lines = []
 
   if (m.kind === 'portfolio') {
@@ -215,8 +246,8 @@ function summarizeMonth(symbol, months, m) {
   return { tag, body: lines.join('\n') }
 }
 
-function summarizeQuarter(symbol, q) {
-  const tag = `#صورت_مالی_${faNumFmt(q.months)}ماهه_${periodParts(q.period)?.y ?? ''}${q.audited ? '_حسابرسی‌شده' : ''}`
+function summarizeQuarter(symbol, q, opts = {}) {
+  const tag = `#صورت_مالی_${faNumFmt(q.months)}ماهه_${periodParts(q.period)?.y ?? ''}${q.audited ? '_حسابرسی‌شده' : ''}${opts.amendment ? '_اصلاحیه' : ''}`
   const lines = []
   if (q.revenue != null) lines.push(`✅ درآمد عملیاتی: ${toman(q.revenue)} میلیارد تومان`)
   const pct = pctChange(q.net, q.net_ly)
@@ -251,8 +282,8 @@ function buildKeyPoints(symbol, payload, freshTitles, opts = {}) {
   const hasMonthly   = freshTitles.some(isMonthlyTitle) && !opts.skipMonthly
   const hasQuarterly = freshTitles.some(isQuarterlyTitle) && !opts.skipQuarterly
   const parts = []
-  if (hasMonthly && payload.months.length) parts.push(summarizeMonth(symbol, payload.months, payload.months[payload.months.length - 1]))
-  if (hasQuarterly && payload.quarters.length) parts.push(summarizeQuarter(symbol, payload.quarters[payload.quarters.length - 1]))
+  if (hasMonthly && payload.months.length) parts.push(summarizeMonth(symbol, payload.months, payload.months[payload.months.length - 1], { amendment: opts.monthlyAmendment }))
+  if (hasQuarterly && payload.quarters.length) parts.push(summarizeQuarter(symbol, payload.quarters[payload.quarters.length - 1], { amendment: opts.quarterlyAmendment }))
   if (!parts.length) return null
 
   const hashtags = [`#${symbol.replace(/\s+/g, '_')}`, ...parts.map(p => p.tag)].join('\n')
@@ -440,10 +471,10 @@ async function getBrowser() {
 async function closeBrowser() { if (_browser) { await _browser.close(); _browser = null } }
 
 // گزارش فعالیت ماهانهٔ تولیدی → کارت عکسی (نمودار+جدول)، نه متن خام
-async function sendMonthlyPhoto(symbol, payload, monthEntry) {
+async function sendMonthlyPhoto(symbol, payload, monthEntry, opts = {}) {
   const data = buildMonthlyReportData(payload)
   if (!data) return false
-  const summary = summarizeMonth(symbol, payload.months, monthEntry)
+  const summary = summarizeMonth(symbol, payload.months, monthEntry, opts)
   const narrated = await narrate(symbol, summary.body)
   const caption = capCaption([
     `#${symbol.replace(/\s+/g, '_')}`,
@@ -461,11 +492,11 @@ async function sendMonthlyPhoto(symbol, payload, monthEntry) {
 }
 
 // صورت مالی میاندوره‌ای/سالانه → کارت عکسی (روند سود+آمار)، نه متن خام
-async function sendQuarterlyPhoto(symbol, payload, quarterEntry) {
+async function sendQuarterlyPhoto(symbol, payload, quarterEntry, opts = {}) {
   const info = stockInfo(symbol)
   const data = buildQuarterlyReportData(payload, info)
   if (!data) return false
-  const summary = summarizeQuarter(symbol, quarterEntry)
+  const summary = summarizeQuarter(symbol, quarterEntry, opts)
   const narrated = await narrate(symbol, summary.body)
   const caption = capCaption([
     `#${symbol.replace(/\s+/g, '_')}`,
@@ -698,11 +729,15 @@ async function main() {
   const pendingKeys = new Set()   // اطلاعیه‌هایی که هنوز ingest نشده‌اند — seen نمی‌شوند تا retry شوند
   for (const s of symbols) {
     try {
+      // اسنپ‌شات نسخهٔ قبلِ payload — قبل از overwrite شدن توسط buildSymbol، تا اصلاحیه با «قبل از خودش» مقایسه شود
+      const outFile = path.join(OUT_DIR, `${s.replace(/\s+/g, '-')}.json`)
+      let prevPayload = null
+      try { prevPayload = JSON.parse(fs.readFileSync(outFile, 'utf8')) } catch {}
+
       const status = await buildSymbol(s, { force: true })
       if (status === 'ok') {
         built.add(s)
         try {
-          const outFile = path.join(OUT_DIR, `${s.replace(/\s+/g, '-')}.json`)
           const payload = JSON.parse(fs.readFileSync(outFile, 'utf8'))
           const mine = fresh.filter(a => a.symbol === s)
           const pending = mine.filter(a => !isIngested(a, payload))
@@ -710,8 +745,33 @@ async function main() {
             pendingKeys.add(a.key)
             log(`⏳ ${s}: «${norm(a.title)}» هنوز ingest نشده (اکسل نیامده؟) — اجرای بعدی دوباره تلاش می‌شود`)
           }
-          // کارت/متن فقط برای اطلاعیه‌هایی که واقعاً در داده نشسته‌اند — نه کارتِ کهنه از دادهٔ قدیمی
-          const freshTitles = mine.filter(a => !pendingKeys.has(a.key)).map(a => norm(a.title))
+
+          // اصلاحیه‌هایی که در اعداد کلیدی تغییر معناداری ایجاد نکرده‌اند پست نمی‌شوند (seen می‌مانند، چون واقعاً ingest شده‌اند)؛
+          // اصلاحیهٔ با تغییر بزرگ پست می‌شود ولی با هشتگ #اصلاحیه علامت‌گذاری می‌شود
+          const minorAmendmentKeys = new Set()
+          let monthlyAmendment = false
+          let quarterlyAmendment = false
+          for (const a of mine) {
+            if (pendingKeys.has(a.key)) continue
+            const t = norm(a.title)
+            if (!isAmendmentTitle(t)) continue
+            const period = faDate(t)
+            if (isMonthlyTitle(t)) {
+              const curM = payload.months.find(x => x.period === period)
+              const prevM = prevPayload?.months?.find(x => x.period === period)
+              if (isSignificantChange(monthMetrics(prevM), monthMetrics(curM))) monthlyAmendment = true
+              else minorAmendmentKeys.add(a.key)
+            } else if (isQuarterlyTitle(t)) {
+              const curQ = payload.quarters.find(x => x.period === period)
+              const prevQ = prevPayload?.quarters?.find(x => x.period === period)
+              if (isSignificantChange(quarterMetrics(prevQ), quarterMetrics(curQ))) quarterlyAmendment = true
+              else minorAmendmentKeys.add(a.key)
+            }
+          }
+          for (const a of mine) if (minorAmendmentKeys.has(a.key)) log(`ℹ️ ${s}: اصلاحیهٔ «${norm(a.title)}» بدون تغییر معنادار در اعداد — پست تلگرام نشد`)
+
+          // کارت/متن فقط برای اطلاعیه‌هایی که واقعاً در داده نشسته‌اند و اصلاحیهٔ بی‌اثر نیستند
+          const freshTitles = mine.filter(a => !pendingKeys.has(a.key) && !minorAmendmentKeys.has(a.key)).map(a => norm(a.title))
           if (freshTitles.length) {
             // ماهانهٔ تولیدی (فرم «نام محصول») و صورت مالی فصلی/سالانه → کارت عکسی؛ بقیهٔ فرم‌های ماهانه (بانک/خدماتی/پرتفوی) → متن قبلی
             const hasMonthly = freshTitles.some(isMonthlyTitle)
@@ -719,7 +779,7 @@ async function main() {
             const monthlyIsProduction = !!latestMonth && latestMonth.kind === 'production'
             let monthlyPhotoSent = false
             if (monthlyIsProduction) {
-              try { monthlyPhotoSent = await sendMonthlyPhoto(s, payload, latestMonth) }
+              try { monthlyPhotoSent = await sendMonthlyPhoto(s, payload, latestMonth, { amendment: monthlyAmendment }) }
               catch (e) { log(`⚠️ ${s}: کارت عکسی ماهانه شکست خورد، ادامه با متن — ${e.message}`) }
             }
 
@@ -727,7 +787,7 @@ async function main() {
             const latestQuarter = hasQuarterly && payload.quarters.length ? payload.quarters[payload.quarters.length - 1] : null
             let quarterlyPhotoSent = false
             if (latestQuarter) {
-              try { quarterlyPhotoSent = await sendQuarterlyPhoto(s, payload, latestQuarter) }
+              try { quarterlyPhotoSent = await sendQuarterlyPhoto(s, payload, latestQuarter, { amendment: quarterlyAmendment }) }
               catch (e) { log(`⚠️ ${s}: کارت عکسی فصلی شکست خورد، ادامه با متن — ${e.message}`) }
             }
 
@@ -758,7 +818,7 @@ async function main() {
             }
 
             // اگه عکس واقعاً نرفت (خطا/عدم داده)، متن قدیمی جایگزینش می‌شه — گزارش نباید کامل از دست بره
-            const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent, skipQuarterly: quarterlyPhotoSent })
+            const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent, skipQuarterly: quarterlyPhotoSent, monthlyAmendment, quarterlyAmendment })
             if (kp) {
               const narrated = await narrate(s, kp.facts)
               await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text)

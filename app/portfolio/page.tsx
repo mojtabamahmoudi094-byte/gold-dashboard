@@ -1005,9 +1005,12 @@ ${txs.map(tx => row([
             </div>
           ) : (
             <div>
-              <p style={{ fontSize: 12.5, color: t.muted, margin: '0 0 12px', lineHeight: 2 }}>
-                یک کد یک‌بارمصرف بگیرید، در تلگرام بات بورس سنج را باز کنید، دکمه «🔗 اتصال حساب» را بزنید و کد را بفرستید.
-              </p>
+              <ol style={{ fontSize: 12.5, color: t.muted, margin: '0 0 14px', lineHeight: 2, paddingRight: 18 }}>
+                <li>روی «دریافت کد اتصال» بزنید تا یک کد ۶ رقمی بگیرید.</li>
+                <li>روی دکمه «باز کردن بات در تلگرام» بزنید (یا در تلگرام <b>@bsportfo_bot</b> را سرچ کنید).</li>
+                <li>در تلگرام دکمه «شروع / Start» را بزنید، سپس کد ۶ رقمی را برای بات بفرستید.</li>
+                <li>پیام «اتصال با موفقیت انجام شد ✅» را که دیدید، تمام است — از این پس با دکمه «📊 پورتفوی من» در تلگرام خلاصه پورتفوی خودتان را می‌بینید.</li>
+              </ol>
               {tgCode && (
                 <div>
                   <div style={{
@@ -1018,12 +1021,27 @@ ${txs.map(tx => row([
                   <p style={{ fontSize: 11.5, color: t.muted, margin: '0 0 12px' }}>این کد تا ۱۰ دقیقه معتبر است.</p>
                 </div>
               )}
-              <button type="button" onClick={requestTelegramCode} disabled={tgLoading} style={{
-                padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff', border: 'none',
-                fontFamily: 'inherit', opacity: tgLoading ? 0.6 : 1,
-              }}>{tgLoading ? 'در حال دریافت…' : tgCode ? 'دریافت کد جدید' : 'دریافت کد اتصال'}</button>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button type="button" onClick={requestTelegramCode} disabled={tgLoading} style={{
+                  padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, color: '#fff', border: 'none',
+                  fontFamily: 'inherit', opacity: tgLoading ? 0.6 : 1,
+                }}>{tgLoading ? 'در حال دریافت…' : tgCode ? 'دریافت کد جدید' : 'دریافت کد اتصال'}</button>
+                <a
+                  href={tgCode ? `https://t.me/bsportfo_bot?start=${tgCode}` : 'https://t.me/bsportfo_bot'}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center',
+                    padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, textDecoration: 'none',
+                    background: 'rgba(41,182,246,0.1)', border: '1px solid rgba(41,182,246,0.35)',
+                    color: '#29B6F6', fontFamily: 'inherit',
+                  }}
+                >💬 باز کردن بات در تلگرام</a>
+              </div>
               {tgMsg && <p style={{ fontSize: 12, color: t.red, margin: '10px 0 0' }}>{tgMsg}</p>}
+              <p style={{ fontSize: 11.5, color: t.muted, margin: '12px 0 0' }}>
+                آدرس بات: <a href="https://t.me/bsportfo_bot" target="_blank" rel="noopener noreferrer" style={{ color: t.brand }}>t.me/bsportfo_bot</a> — داخل خود بات هم با زدن دکمه «❓ آموزش اتصال» راهنمای کامل را می‌بینید.
+              </p>
             </div>
           )}
         </div>
