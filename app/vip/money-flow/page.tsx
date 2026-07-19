@@ -348,6 +348,27 @@ export default function MoneyFlowPage() {
   const cTvalSym: Col = { label: 'ارزش معاملات', key: 'tval', fmt: (r) => fToman(r.tval), num: (r) => r.tval }
   const cMoneyInLive: Col = { label: 'ورود پول', key: 'moneyInI', fmt: (r) => fToman(r.moneyInI), num: (r) => r.moneyInI }
 
+  // ── بزرگترین خرید/فروش حقیقی (مجموع کل، نه خالص) ────────────────────────────
+  const cPerCapSeller: Col = { label: 'سرانه فروش', key: 'perCapS', fmt: (r) => fToman(r.perCapS), num: (r) => r.perCapS ?? 0 }
+  const cBuyCntM: Col = { label: 'تعداد خریدار', key: 'buyCountI', fmt: (r) => faN(r.buyCountI), num: (r) => r.buyCountI }
+  const cSellCntM: Col = { label: 'تعداد فروشنده', key: 'sellCountI', fmt: (r) => faN(r.sellCountI), num: (r) => r.sellCountI }
+  const cBuyIVal: Col = { label: 'مجموع کل خرید', key: 'buyIVal', fmt: (r) => fToman(r.buyIVal), num: (r) => r.buyIVal }
+  const cSellIVal: Col = { label: 'مجموع کل فروش', key: 'sellIVal', fmt: (r) => fToman(r.sellIVal), num: (r) => r.sellIVal }
+
+  const biggestBuyCard: Card | null = metrics ? {
+    id: 'biggest-real-buy', title: 'بزرگترین خریدهای حقیقی', tone: 'green',
+    desc: 'مجموع کل ارزش خرید حقیقی امروز هر نماد (تعداد کد خریدار × سرانه خرید) — رتبه‌بندی بر مبنای بزرگی خرید، نه خالص ورود پول',
+    cols: [cSym, cPl, cBuyCntM, cPerCapBuyer, cBuyIVal],
+    rows: [...metrics].filter((r) => r.buyCountI > 0).sort((a, b) => b.buyIVal - a.buyIVal).slice(0, 30),
+  } : null
+
+  const biggestSellCard: Card | null = metrics ? {
+    id: 'biggest-real-sell', title: 'بزرگترین فروش‌های حقیقی', tone: 'red',
+    desc: 'مجموع کل ارزش فروش حقیقی امروز هر نماد (تعداد کد فروشنده × سرانه فروش) — رتبه‌بندی بر مبنای بزرگی فروش، نه خالص خروج پول',
+    cols: [cSym, cPl, cSellCntM, cPerCapSeller, cSellIVal],
+    rows: [...metrics].filter((r) => r.sellCountI > 0).sort((a, b) => b.sellIVal - a.sellIVal).slice(0, 30),
+  } : null
+
   const cMoneyInWindow = (map: Map<string, number>): Col => ({
     label: 'ورود پول', key: 'sym',
     fmt: (r) => fTomanT(map.get(r.sym) ?? 0),
@@ -549,6 +570,24 @@ export default function MoneyFlowPage() {
           )}
           {card22 ? <Table card={card22} isDark={isDark} /> : (
             <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت تاریخچه…</div>
+          )}
+        </div>
+
+        <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, margin: '32px 0 6px', color: text }}>
+          بزرگترین خرید و فروش حقیقی
+        </h2>
+        <p style={{ fontSize: 12.5, color: cream, margin: '0 0 16px', lineHeight: 2 }}>
+          مجموع کل ارزش خرید/فروش حقیقی امروز هر نماد (تعداد کد × سرانه) — بر خلاف بخش‌های زیر که خالص ورود/خروج (خرید منهای فروش) را نشان می‌دهند، این جدول‌ها فقط بزرگی یک‌طرفه معامله را رتبه‌بندی می‌کنند.
+        </p>
+        <div style={{
+          display: 'grid', gap: 16, marginBottom: 12,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+        }}>
+          {biggestBuyCard ? <FilterTable card={biggestBuyCard} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
+          )}
+          {biggestSellCard ? <FilterTable card={biggestSellCard} isDark={isDark} /> : (
+            <div style={{ padding: 40, textAlign: 'center', color: cream, fontSize: 13 }}>در حال دریافت اطلاعات بازار…</div>
           )}
         </div>
 
