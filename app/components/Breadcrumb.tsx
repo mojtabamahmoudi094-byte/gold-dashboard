@@ -48,14 +48,14 @@ export default function Breadcrumb() {
         fontSize: 12, direction: 'rtl', borderBottom: `0.5px solid ${border}`,
       }}
     >
-      <Link href="/" style={{ color: muted, textDecoration: 'none' }}>خانه</Link>
+      <Link href="/" style={{ color: muted, textDecoration: 'none', padding: '6px 2px', display: 'inline-block' }}>خانه</Link>
       {crumbs.map((c, i) => (
         <span key={c.path} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ color: muted }}>‹</span>
           {i === crumbs.length - 1 ? (
-            <span style={{ color: text, fontWeight: 600 }}>{c.label}</span>
+            <span style={{ color: text, fontWeight: 600, padding: '6px 2px', display: 'inline-block' }}>{c.label}</span>
           ) : (
-            <Link href={c.path} style={{ color: muted, textDecoration: 'none' }}>{c.label}</Link>
+            <Link href={c.path} style={{ color: muted, textDecoration: 'none', padding: '6px 2px', display: 'inline-block' }}>{c.label}</Link>
           )}
         </span>
       ))}

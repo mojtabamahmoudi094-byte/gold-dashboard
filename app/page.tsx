@@ -392,7 +392,7 @@ export default function HomePage() {
               return (
                 <Link key={i} href={item.slug ? `/fund/${item.slug}` : '/funds'} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
-                  padding: '0 24px', fontSize: 11.5, fontFamily: 'system-ui, sans-serif',
+                  padding: '0 24px', fontSize: 12.5, fontFamily: 'system-ui, sans-serif',
                   borderLeft: `1px solid ${divider}`,
                   textDecoration: 'none', lineHeight: '36px', cursor: 'pointer',
                 }}>
@@ -665,7 +665,7 @@ export default function HomePage() {
                 onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
                 <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.l18}</span>
-                <span style={{ fontSize: 11.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
+                <span style={{ fontSize: 12.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
                 <span style={{ marginInlineStart: 'auto', flexShrink: 0, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontWeight: 700, fontSize: 13, fontFamily: 'system-ui, sans-serif' }}>{s.pl.toLocaleString('fa-IR')}</span>
                   <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: t.green }}>▲ {s.plp.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪</span>
@@ -694,7 +694,7 @@ export default function HomePage() {
                   onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
                   <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.l18}</span>
-                  <span style={{ fontSize: 11.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
+                  <span style={{ fontSize: 12.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
                   <span style={{ marginInlineStart: 'auto', flexShrink: 0, textAlign: 'left' }}>
                     <span style={{ display: 'block', fontWeight: 700, fontSize: 13, fontFamily: 'system-ui, sans-serif' }}>{fmtRial(s.tval)}</span>
                     <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: pos ? t.green : t.red }}>{pos ? '▲' : '▼'} {Math.abs(s.plp).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪</span>
@@ -765,7 +765,7 @@ export default function HomePage() {
               <div key={s.n} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
                 <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.sym || s.n}</span>
-                {s.sym && <span style={{ fontSize: 11.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.n}</span>}
+                {s.sym && <span style={{ fontSize: 12.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.n}</span>}
                 <span style={{ marginInlineStart: 'auto', flexShrink: 0, fontWeight: 700, fontSize: 13, color: t.green, fontFamily: 'system-ui, sans-serif' }}>+{fmtBt(s.net)}</span>
               </div>
             ))}

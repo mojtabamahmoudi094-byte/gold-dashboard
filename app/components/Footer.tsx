@@ -58,9 +58,9 @@ export default function Footer() {
         {/* محصول */}
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: '#eef1f8' }}>محصول</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
             {PRODUCT_LINKS.map(l => (
-              <Link key={l.label} href={l.href} style={{ color: LINK_C, textDecoration: 'none', transition: 'color 0.18s' }}
+              <Link key={l.label} href={l.href} style={{ color: LINK_C, textDecoration: 'none', transition: 'color 0.18s', padding: '6px 0', display: 'inline-block' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
                 onMouseLeave={e => (e.currentTarget.style.color = LINK_C)}>
                 {l.label}
@@ -72,9 +72,9 @@ export default function Footer() {
         {/* شرکت */}
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: '#eef1f8' }}>شرکت</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
             {COMPANY_LINKS.map(l => (
-              <Link key={l.label} href={l.href} style={{ color: LINK_C, textDecoration: 'none', transition: 'color 0.18s' }}
+              <Link key={l.label} href={l.href} style={{ color: LINK_C, textDecoration: 'none', transition: 'color 0.18s', padding: '6px 0', display: 'inline-block' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
                 onMouseLeave={e => (e.currentTarget.style.color = LINK_C)}>
                 {l.label}
