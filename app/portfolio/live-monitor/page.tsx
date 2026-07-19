@@ -119,11 +119,13 @@ export default function PortfolioLiveMonitorPage() {
     let stop = false
     supabase
       .from('portfolio_transactions')
-      .select('symbol, asset_type')
+      .select('symbol, name, asset_type')
       .in('asset_type', ['stock', 'fund'])
       .then(({ data }) => {
         if (stop) return
-        const uniq = Array.from(new Set((data ?? []).map((r: any) => r.symbol as string)))
+        // صندوق‌ها گاهی با کد ISIN وارد شده‌اند (symbol) نه با تیکر بورسی؛ name همیشه همان تیکر واقعی است
+        const uniq = Array.from(new Set((data ?? []).map((r: any) =>
+          (r.asset_type === 'fund' ? (r.name || r.symbol) : r.symbol) as string)))
         setSymbols(uniq)
         setSelected(prev => prev ?? uniq[0] ?? null)
       })

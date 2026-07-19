@@ -203,9 +203,10 @@ async function main() {
   const commoditySets = { gold: new Set(), silver: new Set(), saffron: new Set() }
 
   // ── «رصد لحظه‌ای پورتفو»: فقط نمادهای داخل تراکنش‌های پورتفوی کاربران تاریخچه ۵دقیقه‌ای می‌گیرند ──
-  const { data: txRows, error: txErr } = await sb.from('portfolio_transactions').select('symbol')
+  const { data: txRows, error: txErr } = await sb.from('portfolio_transactions').select('symbol, name, asset_type')
   if (txErr) console.error(`[stocks-industries] portfolio_transactions: ${txErr.message}`)
-  const watchSymbols = new Set((txRows ?? []).map(r => clean(r.symbol)))
+  // صندوق‌ها گاهی با کد ISIN وارد شده‌اند (symbol) نه با تیکر بورسی؛ name همیشه همان تیکر واقعی است
+  const watchSymbols = new Set((txRows ?? []).map(r => clean(r.asset_type === 'fund' ? (r.name || r.symbol) : r.symbol)))
   const symbolWatchRows = []
   const BIG_MONEY_PORTFOLIO_RIAL = 2_000_000_000 // آستانه «پول درشت» رصد پورتفو: ۲۰۰ میلیون تومان سرانه
   function buildSymbolWatchRow(it, cat) {
