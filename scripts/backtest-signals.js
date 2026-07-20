@@ -8,6 +8,9 @@
  * signal_backtest_stats تجمیع می‌کند (نرخ برد، میانگین/میانه بازده).
  * cron هفتگی روی سرور ایرانی، پنجشنبه (بازار تعطیل).
  * فقط با سوپابیس کار می‌کند — درخواستی به BrsApi/tsetmc نمی‌زند.
+ * فهرست نمادها از آخرین روز معاملاتی گرفته می‌شود، سپس هر نماد جدا (با
+ * CONCURRENCY=8) fetch می‌شود — نه یک کوئری سراسری روی ۵۹۰هزار+ ردیف، چون
+ * OFFSET عمیق روی جدول بزرگ به statement timeout سوپابیس می‌خورد.
  *
  *   node backtest-signals.js --probe            → ۵ سیگنال پرتکرار، بدون نوشتن
  *   node backtest-signals.js --probe --limit=30  → فقط ۳۰ نماد اول (تست سریع)
@@ -197,36 +200,62 @@ function median(arr) {
 
 // ───────────────────── main ─────────────────────
 
-async function main() {
-  initClient()
-  console.log('[backtest] خواندن کل تاریخچه stock_candles…')
-  const bySymbol = new Map()
-  const PAGE = 1000
+const CANDLE_COLS = 'symbol, trade_date, trade_date_shamsi, open, high, low, close, volume, adj_close'
+const PAGE = 1000
+const CONCURRENCY = 8
+
+// یک نماد کمتر از هزار ردیف در سه سال دارد، پس تقریباً همیشه یک صفحه است — offset
+// کوچک می‌ماند و به مشکل کندشدن OFFSET عمیق پستگرس روی جدول بزرگ برنمی‌خوریم
+async function fetchSymbolCandles(symbol) {
+  const rows = []
   let from = 0
   for (;;) {
     const { data, error } = await sb
       .from('stock_candles')
-      .select('symbol, trade_date, trade_date_shamsi, open, high, low, close, volume, adj_close')
-      .order('symbol', { ascending: true })
+      .select(CANDLE_COLS)
+      .eq('symbol', symbol)
       .order('trade_date', { ascending: true })
       .range(from, from + PAGE - 1)
-    if (error) { console.error('[backtest] خطا در خواندن کندل‌ها:', error.message); process.exit(1) }
-    for (const r of data ?? []) {
-      const arr = bySymbol.get(r.symbol)
-      if (arr) arr.push(r)
-      else bySymbol.set(r.symbol, [r])
-    }
-    if (from % 100000 === 0 && from > 0) console.log(`[backtest] …${from} ردیف`)
+    if (error) throw new Error(error.message)
+    rows.push(...(data ?? []))
     if (!data || data.length < PAGE) break
     from += PAGE
   }
-  console.log(`[backtest] ${bySymbol.size} نماد خوانده شد`)
+  return rows
+}
 
-  const symbols = [...bySymbol.entries()].slice(0, LIMIT)
+async function fetchSymbolList() {
+  const { data: latest, error: e1 } = await sb
+    .from('stock_candles').select('trade_date').order('trade_date', { ascending: false }).limit(1)
+  if (e1) throw new Error(e1.message)
+  const latestDate = latest?.[0]?.trade_date
+  if (!latestDate) return []
+  const { data, error: e2 } = await sb
+    .from('stock_candles').select('symbol').eq('trade_date', latestDate)
+  if (e2) throw new Error(e2.message)
+  return [...new Set((data ?? []).map(r => r.symbol))]
+}
+
+async function main() {
+  initClient()
+  console.log('[backtest] گرفتن فهرست نمادها (آخرین روز معاملاتی)…')
+  const allSymbols = await fetchSymbolList()
+  const symbols = allSymbols.slice(0, LIMIT)
+  console.log(`[backtest] ${allSymbols.length} نماد یافت شد — ${symbols.length} نماد پردازش می‌شود`)
+
   const acc = new Map()
   const t0 = Date.now()
-  for (const [symbol, rows] of symbols) {
-    try { backtestSymbol(rows, acc) } catch (e) { console.warn(`[backtest] ${symbol} ناموفق: ${e.message}`) }
+  let done = 0
+  for (let i = 0; i < symbols.length; i += CONCURRENCY) {
+    const batch = symbols.slice(i, i + CONCURRENCY)
+    await Promise.all(batch.map(async symbol => {
+      try {
+        const rows = await fetchSymbolCandles(symbol)
+        backtestSymbol(rows, acc)
+      } catch (e) { console.warn(`[backtest] ${symbol} ناموفق: ${e.message}`) }
+    }))
+    done += batch.length
+    if (done % 80 === 0 || done === symbols.length) console.log(`[backtest] …${done}/${symbols.length} نماد`)
   }
   console.log(`[backtest] ${symbols.length} نماد پردازش شد در ${((Date.now() - t0) / 1000).toFixed(1)} ثانیه — ${acc.size} ترکیب سیگنال/افق`)
 
