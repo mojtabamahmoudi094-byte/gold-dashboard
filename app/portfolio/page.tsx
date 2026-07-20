@@ -1414,7 +1414,7 @@ ${txs.map(tx => row([
         </p>
       )}
 
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: isMobile || pieData.length === 0 ? '1fr' : '2fr 1fr', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: '1fr', alignItems: 'start' }}>
         {/* جدول دارایی‌ها */}
         <div style={{ ...card, overflowX: 'auto' }}>
           <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 12px' }}>دارایی‌های فعال</h2>
