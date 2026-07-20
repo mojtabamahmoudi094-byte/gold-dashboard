@@ -152,6 +152,7 @@ export default function PortfolioPage() {
   const [txs, setTxs] = useState<Tx[]>([])
   const [historyFilter, setHistoryFilter] = useState<string | null>(null)
   const historyRef = useRef<HTMLDivElement>(null)
+  const [txPickerSymbol, setTxPickerSymbol] = useState<string | null>(null)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [dbMissing, setDbMissing] = useState(false)
@@ -737,6 +738,13 @@ export default function PortfolioPage() {
     if (!window.confirm('این تراکنش حذف شود؟')) return
     await supabase.from('portfolio_transactions').delete().eq('id', id)
     loadTxs()
+  }
+
+  const openEditForSymbol = (symbol: string) => {
+    const matches = txs.filter(tx => tx.symbol === symbol)
+    if (matches.length === 0) return
+    if (matches.length === 1) { openEditTx(matches[0]); return }
+    setTxPickerSymbol(symbol)
   }
 
   const openEditTx = (tx: Tx) => {
@@ -1489,10 +1497,7 @@ ${txs.map(tx => row([
                           padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                           background: 'rgba(16,185,129,0.08)', border: `1px solid ${t.green}`, color: t.green, fontFamily: 'inherit',
                         }}>خرید مجدد</button>
-                        <button type="button" onClick={() => {
-                          setHistoryFilter(h.symbol)
-                          historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                        }} title="ویرایش تراکنش‌های این ردیف" style={{
+                        <button type="button" onClick={() => openEditForSymbol(h.symbol)} title="ویرایش تراکنش‌های این ردیف" style={{
                           padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                           background: 'rgba(217,180,91,0.08)', border: `1px solid ${t.borderStrong}`, color: t.brand, fontFamily: 'inherit',
                         }}>ویرایش</button>
@@ -1896,6 +1901,42 @@ ${txs.map(tx => row([
                 background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.muted, fontFamily: 'inherit',
               }}>انصراف</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* مودال انتخاب تراکنش برای ویرایش — وقتی چند تراکنش برای یک نماد ثبت شده */}
+      {txPickerSymbol && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onClick={() => setTxPickerSymbol(null)}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 14px' }}>
+              کدام تراکنش {txPickerSymbol} ویرایش شود؟
+            </h3>
+            <div style={{ display: 'grid', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+              {[...txs].filter(tx => tx.symbol === txPickerSymbol).reverse().map(tx => (
+                <button key={tx.id} type="button" onClick={() => { setTxPickerSymbol(null); openEditTx(tx) }} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
+                  padding: '9px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                  background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.text,
+                }}>
+                  <span style={{ color: tx.side === 'buy' ? t.green : t.red, fontWeight: 600 }}>
+                    {tx.side === 'buy' ? 'خرید' : 'فروش'}
+                  </span>
+                  <span>{fmtNum(tx.quantity)} × {fmtToman(tx.price)}</span>
+                  <span style={{ color: t.muted, fontSize: 11 }}>{tx.trade_date}</span>
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setTxPickerSymbol(null)} style={{
+              marginTop: 14, width: '100%', padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.muted, fontFamily: 'inherit',
+            }}>انصراف</button>
           </div>
         </div>
       )}
