@@ -517,14 +517,30 @@ type ScaleMode = 'normal' | 'percentage' | 'logarithm'
 
 type SymItem = { l18: string; pcp: number | null }
 
+type AdjMode = 'raw' | 'adj' | 'capital' | 'dividend' | 'additive'
+const ADJ_MODE_KEYS = ['raw', 'adj', 'capital', 'dividend', 'additive'] as const
+const ADJ_MODE_LABELS: Record<AdjMode, string> = {
+  raw: 'بدون تعدیل',
+  adj: 'نسبی — افزایش سرمایه + سود نقدی',
+  capital: 'نسبی — فقط افزایش سرمایه',
+  dividend: 'نسبی — فقط سود نقدی',
+  additive: 'جمعی — افزایش سرمایه + سود نقدی',
+}
+
 type Props = {
   symbol: string
   candles: Candle[]
   isDark: boolean
   symbols?: SymItem[]
   livePrice?: { pl: number; plp: number } | null
-  /** سری تعدیل‌شده (adj_* از stock_candles) — undefined یعنی هنوز داده‌ای نیست */
+  /** سری تعدیل‌شده نسبی ترکیبی (adj_* از stock_candles) — undefined یعنی هنوز داده‌ای نیست */
   candlesAdj?: Candle[]
+  /** تعدیل نسبی فقط افزایش سرمایه (coef_capital) */
+  candlesAdjCapital?: Candle[]
+  /** تعدیل نسبی فقط سود نقدی (coef_dividend) */
+  candlesAdjDividend?: Candle[]
+  /** تعدیل جمعی/نقطه‌ای ترکیبی (offset_combined) */
+  candlesAdjAdditive?: Candle[]
 }
 
 const readAuto = (symbol: string): AutoSaveData | null => {
@@ -536,7 +552,7 @@ const readAuto = (symbol: string): AutoSaveData | null => {
 
 const toSlug = (s: string) => encodeURIComponent(s.replace(/\s+/g, '-'))
 
-export default function KlineChart({ symbol, candles, isDark, symbols = [], livePrice = null, candlesAdj }: Props) {
+export default function KlineChart({ symbol, candles, isDark, symbols = [], livePrice = null, candlesAdj, candlesAdjCapital, candlesAdjDividend, candlesAdjAdditive }: Props) {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -579,8 +595,11 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
   const [priceSrc, setPriceSrc] = useState<'close' | 'last'>(() => {
     try { return localStorage.getItem('ta-price-src') === 'last' ? 'last' : 'close' } catch { return 'close' }
   })
-  const [adjMode, setAdjMode] = useState<'raw' | 'adj'>(() => {
-    try { return localStorage.getItem('ta-adj') === 'adj' ? 'adj' : 'raw' } catch { return 'raw' }
+  const [adjMode, setAdjMode] = useState<AdjMode>(() => {
+    try {
+      const v = localStorage.getItem('ta-adj')
+      return (ADJ_MODE_KEYS as readonly string[]).includes(v ?? '') ? (v as AdjMode) : 'raw'
+    } catch { return 'raw' }
   })
   const [scaleMode, setScaleMode] = useState<ScaleMode>('normal')
   const [settings, setSettings] = useState<ChartSettings>(() => {
@@ -654,9 +673,13 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
     return () => clearInterval(t)
   }, [])
 
-  // ── تعدیل: سری adj اگر انتخاب شده و موجود است؛ وگرنه خام
-  const hasAdj = Boolean(candlesAdj && candlesAdj.length > 0)
-  const baseCandles = adjMode === 'adj' && hasAdj ? (candlesAdj as Candle[]) : candles
+  // ── تعدیل: سری روش انتخاب‌شده اگر موجود است؛ وگرنه خام
+  const adjSeries: Record<Exclude<AdjMode, 'raw'>, Candle[] | undefined> = {
+    adj: candlesAdj, capital: candlesAdjCapital, dividend: candlesAdjDividend, additive: candlesAdjAdditive,
+  }
+  const hasMode = (m: AdjMode) => m === 'raw' || Boolean(adjSeries[m] && (adjSeries[m] as Candle[]).length > 0)
+  const hasAdj = hasMode(adjMode)
+  const baseCandles = adjMode !== 'raw' && hasAdj ? (adjSeries[adjMode] as Candle[]) : candles
 
   // ── منبع قیمت «آخرین» — کندل امروز با آخرین معامله لحظه‌ای جایگزین می‌شود
   const livePl = livePrice?.pl ?? null
@@ -1380,32 +1403,33 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
 
         {/* تعدیل قیمت */}
         <div style={{ position: 'relative' }}>
-          {menuBtn('adj', adjMode === 'adj' && hasAdj ? 'تعدیل‌شده' : 'بدون تعدیل', adjMode === 'adj' && hasAdj)}
+          {menuBtn('adj', adjMode === 'raw' ? 'بدون تعدیل' : ADJ_MODE_LABELS[adjMode], adjMode !== 'raw' && hasAdj)}
           {openMenu === 'adj' && (
-            <div style={{ ...menuBox, minWidth: 230 }}>
-              {([
-                { key: 'raw', label: 'بدون تعدیل' },
-                { key: 'adj', label: 'تعدیل‌شده (افزایش سرمایه/سود)' },
-              ] as const).map(o => (
-                <button key={o.key}
-                  onClick={() => {
-                    if (o.key === 'adj' && !hasAdj) {
-                      notify('داده تعدیل‌شده برای این نماد هنوز آماده نیست')
+            <div style={{ ...menuBox, minWidth: 260 }}>
+              {ADJ_MODE_KEYS.map(key => {
+                const avail = hasMode(key)
+                return (
+                  <button key={key}
+                    onClick={() => {
+                      if (key !== 'raw' && !avail) {
+                        notify('این روش تعدیل برای این نماد هنوز آماده نیست')
+                        setOpenMenu(null)
+                        return
+                      }
+                      setAdjMode(key)
+                      try { localStorage.setItem('ta-adj', key) } catch { /* — */ }
                       setOpenMenu(null)
-                      return
-                    }
-                    setAdjMode(o.key)
-                    try { localStorage.setItem('ta-adj', o.key) } catch { /* — */ }
-                    setOpenMenu(null)
-                  }}
-                  style={{ ...menuItem(adjMode === o.key), ...(o.key === 'adj' && !hasAdj ? { opacity: 0.45 } : {}) }}
-                  onMouseEnter={hoverBg} onMouseLeave={leaveBg}>
-                  <span>{o.label}</span>
-                  {adjMode === o.key && (o.key !== 'adj' || hasAdj) && <Check />}
-                </button>
-              ))}
+                    }}
+                    style={{ ...menuItem(adjMode === key), ...(key !== 'raw' && !avail ? { opacity: 0.45 } : {}) }}
+                    onMouseEnter={hoverBg} onMouseLeave={leaveBg}>
+                    <span>{ADJ_MODE_LABELS[key]}</span>
+                    {adjMode === key && (key === 'raw' || avail) && <Check />}
+                  </button>
+                )
+              })}
               <div style={{ fontSize: 10.5, color: muted, padding: '4px 11px 8px', lineHeight: 1.8 }}>
-                تعدیل بابت افزایش سرمایه و سود نقدی — منبع tsetmc، هر شب به‌روز می‌شود.
+                نسبی = ضرب در ضریب (روش رایج نمودار)، جمعی = کم‌کردن مبلغ ثابت (روش نرم‌افزارهای معاملاتی مثل MetaStock).
+                منبع tsetmc، هر شب به‌روز می‌شود.
               </div>
             </div>
           )}

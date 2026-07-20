@@ -31,6 +31,9 @@ type Row = {
   adj_high: number | null
   adj_low: number | null
   adj_close: number | null
+  coef_capital: number | null
+  coef_dividend: number | null
+  offset_combined: number | null
 }
 type SymRow = {
   l18: string; pcp: number | null; pl?: number | null; plp?: number | null; pc?: number | null
@@ -62,24 +65,43 @@ export default function TechnicalSymbolPage() {
     if (!symbol) return
     setRows(null)
     setFailed(false)
+    const baseCols = 'trade_date, trade_date_shamsi, open, high, low, close, volume'
+    const adjCols = 'adj_open, adj_high, adj_low, adj_close'
+    const methodCols = 'coef_capital, coef_dividend, offset_combined'
     supabase
       .from('stock_candles')
-      .select('trade_date, trade_date_shamsi, open, high, low, close, volume, adj_open, adj_high, adj_low, adj_close')
+      .select(`${baseCols}, ${adjCols}, ${methodCols}`)
       .eq('symbol', symbol)
       .order('trade_date', { ascending: true })
       .then(({ data, error }) => {
         if (!error && data) { setRows(data as Row[]); return }
-        // ستون‌های adj هنوز ساخته نشده (migration اجرا نشده) — بدون تعدیل ادامه بده
+        // ستون‌های روش‌های جدید هنوز ساخته نشده (migration اجرا نشده) — با adj قدیمی ادامه بده
         supabase
           .from('stock_candles')
-          .select('trade_date, trade_date_shamsi, open, high, low, close, volume')
+          .select(`${baseCols}, ${adjCols}`)
           .eq('symbol', symbol)
           .order('trade_date', { ascending: true })
           .then(({ data: d2, error: e2 }) => {
-            if (e2 || !d2) setFailed(true)
-            else setRows((d2 as Omit<Row, 'adj_open' | 'adj_high' | 'adj_low' | 'adj_close'>[]).map(r => ({
-              ...r, adj_open: null, adj_high: null, adj_low: null, adj_close: null,
-            })))
+            if (!e2 && d2) {
+              setRows((d2 as Omit<Row, 'coef_capital' | 'coef_dividend' | 'offset_combined'>[]).map(r => ({
+                ...r, coef_capital: null, coef_dividend: null, offset_combined: null,
+              })))
+              return
+            }
+            // ستون‌های adj هم هنوز نیستند — بدون هیچ تعدیلی ادامه بده
+            supabase
+              .from('stock_candles')
+              .select(baseCols)
+              .eq('symbol', symbol)
+              .order('trade_date', { ascending: true })
+              .then(({ data: d3, error: e3 }) => {
+                if (e3 || !d3) setFailed(true)
+                else setRows((d3 as Omit<Row, 'adj_open' | 'adj_high' | 'adj_low' | 'adj_close' | 'coef_capital' | 'coef_dividend' | 'offset_combined'>[]).map(r => ({
+                  ...r,
+                  adj_open: null, adj_high: null, adj_low: null, adj_close: null,
+                  coef_capital: null, coef_dividend: null, offset_combined: null,
+                })))
+              })
           })
       })
   }, [symbol])
@@ -148,6 +170,63 @@ export default function TechnicalSymbolPage() {
           high: r.adj_high ?? r.high ?? c,
           low: r.adj_low ?? r.low ?? c,
           close: c,
+          volume: r.volume ?? 0,
+        }
+      })
+  }, [rows])
+
+  // تعدیل فقط افزایش سرمایه (نسبی: raw × coef_capital)
+  const candlesAdjCapital: Candle[] | undefined = useMemo(() => {
+    if (!rows || !rows.some(r => r.coef_capital != null && r.coef_capital !== 1)) return undefined
+    return rows
+      .filter(r => r.close != null && r.close > 0)
+      .map(r => {
+        const coef = r.coef_capital ?? 1
+        return {
+          time: r.trade_date,
+          shamsi: r.trade_date_shamsi,
+          open: (r.open ?? r.close) * coef,
+          high: (r.high ?? r.close) * coef,
+          low: (r.low ?? r.close) * coef,
+          close: r.close * coef,
+          volume: r.volume ?? 0,
+        }
+      })
+  }, [rows])
+
+  // تعدیل فقط سود نقدی (نسبی: raw × coef_dividend)
+  const candlesAdjDividend: Candle[] | undefined = useMemo(() => {
+    if (!rows || !rows.some(r => r.coef_dividend != null && r.coef_dividend !== 1)) return undefined
+    return rows
+      .filter(r => r.close != null && r.close > 0)
+      .map(r => {
+        const coef = r.coef_dividend ?? 1
+        return {
+          time: r.trade_date,
+          shamsi: r.trade_date_shamsi,
+          open: (r.open ?? r.close) * coef,
+          high: (r.high ?? r.close) * coef,
+          low: (r.low ?? r.close) * coef,
+          close: r.close * coef,
+          volume: r.volume ?? 0,
+        }
+      })
+  }, [rows])
+
+  // تعدیل جمعی/نقطه‌ای ترکیبی (raw − offset_combined)
+  const candlesAdjAdditive: Candle[] | undefined = useMemo(() => {
+    if (!rows || !rows.some(r => r.offset_combined != null && r.offset_combined !== 0)) return undefined
+    return rows
+      .filter(r => r.close != null && r.close > 0)
+      .map(r => {
+        const off = r.offset_combined ?? 0
+        return {
+          time: r.trade_date,
+          shamsi: r.trade_date_shamsi,
+          open: (r.open ?? r.close) - off,
+          high: (r.high ?? r.close) - off,
+          low: (r.low ?? r.close) - off,
+          close: r.close - off,
           volume: r.volume ?? 0,
         }
       })
@@ -385,6 +464,9 @@ export default function TechnicalSymbolPage() {
                 symbol={symbol}
                 candles={candles}
                 candlesAdj={candlesAdj}
+                candlesAdjCapital={candlesAdjCapital}
+                candlesAdjDividend={candlesAdjDividend}
+                candlesAdjAdditive={candlesAdjAdditive}
                 isDark={isDark}
                 symbols={symbols}
                 livePrice={showLive && liveRow?.pl != null ? { pl: liveRow.pl, plp: liveRow.plp ?? 0 } : null}
