@@ -11,6 +11,16 @@ import AuthGate from '../../components/AuthGate'
 
 const CATS = [
   {
+    href: '/monitor/stocks', ready: true,
+    title: 'سهام', desc: 'ارزش معاملات خرد، صف‌ها، سرانه‌ها و ورود پول حقیقی — ۹:۰۰ تا ۱۲:۳۰',
+    color: '#d9b45b',
+  },
+  {
+    href: '/monitor/bourse-funds', ready: true,
+    title: 'صندوق‌های بورسی', desc: 'رصد لحظه‌ای صندوق‌های اهرمی، بخشی و سهامی — ۹:۰۰ تا ۱۲:۳۰',
+    color: '#f4d795',
+  },
+  {
     href: '/monitor/gold', ready: true,
     title: 'صندوق‌های طلا', desc: 'رصد لحظه‌ای صندوق‌های مبتنی بر طلا — ۱۲:۰۰ تا ۱۸:۰۰',
     color: 'oklch(0.82 0.15 70)',
