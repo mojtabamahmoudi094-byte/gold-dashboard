@@ -14,10 +14,9 @@ import { supabase } from '../../../lib/supabase'
 import { darkTheme, lightTheme, shouldUseDark } from '../../../lib/theme'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { rsi } from '../../../lib/indicators'
-import { findTradingGaps, detectDilutionEvents, applyDilution, type DilutionEvent, type QuarterCapital } from '../../../lib/dilutionAdjust'
 
-type CandleRow = { trade_date: string; trade_date_shamsi: string; close: number; adj_close: number | null }
-type SymSeries = { symbol: string; rows: CandleRow[]; color: string; dilutionEvents: DilutionEvent[] }
+type CandleRow = { trade_date: string; trade_date_shamsi: string; close: number; adj_close: number | null; offset_combined: number | null }
+type SymSeries = { symbol: string; rows: CandleRow[]; color: string }
 
 const COLORS = ['#00C8FF', '#F59E0B', '#00E5A0', '#EF476F']
 const RANGES = [
@@ -29,13 +28,14 @@ const RANGES = [
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
 
-// قیمت تعدیل‌شده (افزایش سرمایه/سود نقدی) — همان روش app/technical/[symbol]/page.tsx؛ بدون این، بازده نمادی که
-// افزایش سرمایه داده (افت مصنوعی قیمت) در چارت به‌شدت منفی و نادرست نمایش داده می‌شود
-const effClose = (r: CandleRow) => (r.adj_close != null && r.adj_close > 0) ? r.adj_close : r.close
-
-// بعد از تعدیل tsetmc (بالا)، یک لایه دوم برای رویدادهایی که tsetmc تعدیل نمی‌کند (افزایش سرمایه آورده نقدی/حق‌تقدم) —
-// از جهش سرمایه فصلی کدال + شکاف معاملاتی واقعی نماد ساخته می‌شود، نه حدس
-const finalPrice = (r: CandleRow, events: DilutionEvent[]) => applyDilution(r.trade_date_shamsi, effClose(r), events)
+// قیمت تعدیل‌شده جمعی — ترکیب افزایش سرمایه + سود نقدی (offset_combined از پایپ‌لاین candles-adjusted.js، بر پایه
+// سرمایه فصلی واقعی کدال)؛ بدون این، بازده نمادی که افزایش سرمایه داده (افت مصنوعی قیمت) به‌شدت منفی و نادرست می‌شود.
+// اگر offset_combined هنوز محاسبه نشده، به adj_close نسبی (tsetmc) و در نهایت close خام برمی‌گردیم.
+const finalPrice = (r: CandleRow) => {
+  if (r.offset_combined != null) return r.close - r.offset_combined
+  if (r.adj_close != null && r.adj_close > 0) return r.adj_close
+  return r.close
+}
 
 export default function CompareStocksPage() {
   const isMobile = useIsMobile()
@@ -71,33 +71,23 @@ export default function CompareStocksPage() {
     Promise.all(missing.map(async (symbol, i) => {
       let { data, error } = await supabase
         .from('stock_candles')
-        .select('trade_date, trade_date_shamsi, close, adj_close')
+        .select('trade_date, trade_date_shamsi, close, adj_close, offset_combined')
         .eq('symbol', symbol)
         .order('trade_date', { ascending: false })
         .limit(280)
       if (error) {
-        // ستون adj_close هنوز ساخته نشده (migration اجرا نشده) — بدون تعدیل ادامه بده
+        // ستون‌های offset_combined/adj_close هنوز ساخته نشده (migration اجرا نشده) — بدون تعدیل ادامه بده
         const fallback = await supabase
           .from('stock_candles')
           .select('trade_date, trade_date_shamsi, close')
           .eq('symbol', symbol)
           .order('trade_date', { ascending: false })
           .limit(280)
-        data = (fallback.data ?? []).map(r => ({ ...r, adj_close: null })) as any
+        data = (fallback.data ?? []).map(r => ({ ...r, adj_close: null, offset_combined: null })) as any
       }
       const rows = ((data ?? []) as CandleRow[]).slice().reverse()
 
-      let dilutionEvents: DilutionEvent[] = []
-      try {
-        const repRes = await fetch(`/api/stock-reports/${encodeURIComponent(symbol.replace(/\s+/g, '-'))}`)
-        if (repRes.ok) {
-          const rep = await repRes.json()
-          const quarters: QuarterCapital[] = (rep?.quarters ?? []).map((q: any) => ({ period: q.period, capital: q.capital }))
-          dilutionEvents = detectDilutionEvents(findTradingGaps(rows), quarters)
-        }
-      } catch { /* گزارش کدال نبود — بدون تعدیل رقیق‌شدگی ادامه بده */ }
-
-      return { symbol, rows, dilutionEvents, color: COLORS[(Object.keys(series).length + i) % COLORS.length] } as SymSeries
+      return { symbol, rows, color: COLORS[(Object.keys(series).length + i) % COLORS.length] } as SymSeries
     })).then(results => {
       if (cancelled) return
       setSeries(prev => {
@@ -124,18 +114,18 @@ export default function CompareStocksPage() {
   const chartData = useMemo(() => {
     const active = selected.filter(s => series[s]?.rows?.length)
     if (active.length === 0) return []
-    const sliced = active.map(s => ({ symbol: s, rows: series[s].rows.slice(-rangeDays), events: series[s].dilutionEvents }))
+    const sliced = active.map(s => ({ symbol: s, rows: series[s].rows.slice(-rangeDays) }))
     const dateSet = new Set<string>()
     sliced.forEach(s => s.rows.forEach(r => dateSet.add(r.trade_date_shamsi)))
     const dates = [...dateSet].sort()
     const baseline: Record<string, number | null> = {}
-    sliced.forEach(s => { baseline[s.symbol] = s.rows[0] ? finalPrice(s.rows[0], s.events) : null })
+    sliced.forEach(s => { baseline[s.symbol] = s.rows[0] ? finalPrice(s.rows[0]) : null })
     return dates.map(date => {
       const point: Record<string, number | string | null> = { date }
       for (const s of sliced) {
         const row = s.rows.find(r => r.trade_date_shamsi === date)
         const base = baseline[s.symbol]
-        point[s.symbol] = row && base ? Math.round(((finalPrice(row, s.events) - base) / base) * 1000) / 10 : null
+        point[s.symbol] = row && base ? Math.round(((finalPrice(row) - base) / base) * 1000) / 10 : null
       }
       return point
     })
@@ -146,7 +136,7 @@ export default function CompareStocksPage() {
     if (!s || s.rows.length < 15) return { symbol: sym, close: null, changePct: null, rsiVal: null, color: s?.color ?? COLORS[0], dilutionAdjusted: false }
     // بازه نمایش (چند ماه انتخاب‌شده) — تغییر روزانه/RSI را هم روی همان بازه بگیریم، نه کل ۲۸۰ روز
     const rangeRows = s.rows.slice(-rangeDays)
-    const finalCloses = rangeRows.map(r => finalPrice(r, s.dilutionEvents))
+    const finalCloses = rangeRows.map(r => finalPrice(r))
     const rsiSeries = rsi(finalCloses, 14)
     const lastRow = rangeRows[rangeRows.length - 1]
     const prevFinal = finalCloses[finalCloses.length - 2]
@@ -155,7 +145,7 @@ export default function CompareStocksPage() {
       symbol: sym, close: lastRow?.close ?? null,
       changePct: prevFinal ? ((lastFinal - prevFinal) / prevFinal) * 100 : null,
       rsiVal: rsiSeries[rsiSeries.length - 1], color: s.color,
-      dilutionAdjusted: s.dilutionEvents.some(ev => rangeRows.some(r => r.trade_date_shamsi < ev.atDateShamsi)),
+      dilutionAdjusted: rangeRows.some(r => r.offset_combined != null && r.offset_combined !== 0),
     }
   }), [selected, series, rangeDays])
 
@@ -261,7 +251,7 @@ export default function CompareStocksPage() {
                           {s.symbol}
                         </Link>
                         {s.dilutionAdjusted && (
-                          <span title="بازده این نماد بابت افزایش سرمایه (رقیق‌شدگی) تعدیل شده — بر اساس سرمایه فصلی کدال"
+                          <span title="بازده این نماد بابت افزایش سرمایه + سود نقدی تعدیل شده — بر اساس سرمایه فصلی کدال"
                             style={{ marginInlineStart: 6, fontSize: 10, color: muted, cursor: 'help' }}>
                             *تعدیل‌شده
                           </span>
