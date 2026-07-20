@@ -9,6 +9,7 @@ import { Skeleton, SkeletonBlock, SkeletonRows } from '../../components/ui/Skele
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
+import { FUND_WEIGHTS, SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { type ChartModalPoint } from '../../../components/ChartModal'
 
 const ChartModal = dynamic(() => import('../../../components/ChartModal'), { ssr: false })
@@ -59,6 +60,48 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   const [snapshotRows, setSnapshotRows] = useState<FundSnapshotRow[] | null>(null)
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [modalMetric, setModalMetric] = useState<{ key: keyof FundSnapshotRow; label: string; color: string; unit?: string } | null>(null)
+
+  // حباب صندوق (اسمی/ذاتی/واقعی) — همان منطق /analysis/gold و /analysis/silver، برای این یک صندوق
+  const [goldWeights, setGoldWeights] = useState(FUND_WEIGHTS)
+  const [silverWeights, setSilverWeights] = useState(SILVER_FUND_WEIGHTS)
+  const [bubbleRaw, setBubbleRaw] = useState<{ nav: number | null; marketBubbles: { bullion: number | null; coin: number | null } | null; silverBubble: number | null } | null>(null)
+
+  useEffect(() => {
+    if (asset?.category === 'طلا') {
+      fetch('/fund-weights/gold.json').then(r => r.ok ? r.json() : null)
+        .then(j => { if (j?.weights) setGoldWeights(w => ({ ...w, ...j.weights })) }).catch(() => {})
+    } else if (asset?.category === 'نقره') {
+      fetch('/fund-weights/silver.json').then(r => r.ok ? r.json() : null)
+        .then(j => { if (j?.weights) setSilverWeights(w => ({ ...w, ...j.weights })) }).catch(() => {})
+    }
+  }, [asset?.category])
+
+  useEffect(() => {
+    if (!asset || (asset.category !== 'طلا' && asset.category !== 'نقره')) { setBubbleRaw(null); return }
+    Promise.all([
+      fetch('/api/gold-analysis', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+      fetch('/api/gold-nav').then(r => r.json()).catch(() => null),
+    ]).then(([gd, nd]) => {
+      const nav = nd?.navs?.[asset.name] ?? null
+      const ime = gd?.ime
+      if (asset.category === 'طلا') {
+        const fairBullionK = ime?.fairBullion != null ? ime.fairBullion / 1000 : null
+        const tabloBullionK = ime?.goldBarT != null ? ime.goldBarT * 10 : null
+        setBubbleRaw({
+          nav,
+          marketBubbles: {
+            bullion: fairBullionK != null && tabloBullionK != null ? ((tabloBullionK - fairBullionK) / fairBullionK) * 100 : null,
+            coin: ime?.fairCoinCert != null && ime?.goldCoinT != null ? ((ime.goldCoinT - ime.fairCoinCert) / ime.fairCoinCert) * 100 : null,
+          },
+          silverBubble: null,
+        })
+      } else {
+        const silverBubble = ime?.silverBarT != null && ime?.fairSilverGram
+          ? ((ime.silverBarT - ime.fairSilverGram) / ime.fairSilverGram) * 100 : null
+        setBubbleRaw({ nav, marketBubbles: null, silverBubble })
+      }
+    }).catch(() => {})
+  }, [asset?.name, asset?.category])
 
   const openFundMetric = (key: keyof FundSnapshotRow, label: string, color: string, unit?: string) => {
     setModalMetric({ key, label, color, unit })
@@ -183,6 +226,38 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   // قدرت خریدار
   const buyPower = sellAvg > 0 ? (buyAvg / sellAvg).toFixed(2) : '—'
 
+  // حباب اسمی/ذاتی/واقعی — فقط طلا/نقره (وزن ترکیب دارایی فقط برای این دو دسته موجود است)
+  let bubbleAsmi: number | null = null
+  let bubbleZati: number | null = null
+  let bubbleVaqei: number | null = null
+  let compositionBars: { label: string; pct: number; color: string }[] = []
+  if (bubbleRaw) {
+    if (bubbleRaw.nav) bubbleAsmi = ((safe(record.price_close) - bubbleRaw.nav) / bubbleRaw.nav) * 100
+    if (asset.category === 'طلا' && bubbleRaw.marketBubbles) {
+      const w = goldWeights[asset.name]
+      if (w && bubbleRaw.marketBubbles.bullion != null && bubbleRaw.marketBubbles.coin != null) {
+        bubbleZati = (w.coin / 100) * bubbleRaw.marketBubbles.coin + (w.bar / 100) * bubbleRaw.marketBubbles.bullion
+        compositionBars = [
+          { label: 'سکه', pct: w.coin, color: '#FACC15' },
+          { label: 'شمش', pct: w.bar, color: '#F59E0B' },
+          { label: 'نقد/سایر', pct: w.liq, color: '#94A3B8' },
+        ]
+      }
+    } else if (asset.category === 'نقره' && bubbleRaw.silverBubble != null) {
+      const w = silverWeights[asset.name]
+      if (w) {
+        bubbleZati = (w.silver / 100) * bubbleRaw.silverBubble
+        compositionBars = [
+          { label: 'گواهی نقره', pct: w.silver, color: '#C0C8D8' },
+          { label: 'سایر دارایی‌ها', pct: w.other, color: '#94A3B8' },
+        ]
+      }
+    }
+    if (bubbleAsmi != null && bubbleZati != null) bubbleVaqei = bubbleAsmi + bubbleZati
+  }
+  const pctFmt = (v: number | null) => v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪`
+  const pctColor = (v: number | null) => v == null ? undefined : v >= 0 ? '#FF4D6A' : '#00E5A0'
+
   return (
     <main style={{
       minHeight: '100vh', background: t.bg, color: t.text,
@@ -282,6 +357,43 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
             color={Number(buyPower) > 1 ? '#00E5A0' : Number(buyPower) < 1 ? '#FF4D6A' : t.textBright}
             tooltip="نسبت سرانه خریدار به سرانه فروشنده. بالای ۱ یعنی خریداران قوی‌ترند" />
         </div>
+
+        {/* حباب صندوق — فقط طلا/نقره (وزن ترکیب دارایی فقط برای این دو دسته موجود است) */}
+        {(bubbleAsmi != null || bubbleZati != null) && (
+          <div style={{
+            background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 14,
+            padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.textBright, marginBottom: 12 }}>حباب صندوق</div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 10, marginBottom: compositionBars.length > 0 ? 16 : 0 }}>
+              <MetricCard t={t} label="حباب اسمی" value={pctFmt(bubbleAsmi)} color={pctColor(bubbleAsmi)}
+                tooltip="(قیمت پایانی − NAV ابطال) ÷ NAV" />
+              <MetricCard t={t} label="حباب ذاتی" value={pctFmt(bubbleZati)} color={pctColor(bubbleZati)}
+                tooltip={asset.category === 'طلا' ? 'سهم سکه × حباب سکه بورس کالا + سهم شمش × حباب شمش بورس کالا' : 'سهم گواهی نقره × حباب شمش نقره بورس کالا'} />
+              <MetricCard t={t} label="حباب واقعی" value={pctFmt(bubbleVaqei)} color={pctColor(bubbleVaqei)}
+                tooltip="حباب اسمی + حباب ذاتی" />
+            </div>
+            {compositionBars.length > 0 && (
+              <>
+                <div style={{ fontSize: 10.5, color: t.muted, marginBottom: 8 }}>ترکیب دارایی صندوق</div>
+                <div style={{ display: 'flex', width: '100%', height: 10, borderRadius: 6, overflow: 'hidden' }}>
+                  {compositionBars.map(b => (
+                    <div key={b.label} title={`${b.label}: ${b.pct.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪`}
+                      style={{ width: `${b.pct}%`, background: b.color }} />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8 }}>
+                  {compositionBars.map(b => (
+                    <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: t.muted }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: b.color }} />
+                      {b.label} {b.pct.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <ChartModal
           open={!!modalMetric}
