@@ -7,7 +7,7 @@
  * قیمت لحظه‌ای سهام از /stocks/industries.json و صندوق‌ها از /api/funds می‌آید.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import persian from 'react-date-object/calendars/persian'
@@ -150,6 +150,8 @@ export default function PortfolioPage() {
   // در آپلود اکسل کارگزاری استفاده می‌شود؛ instruments بالا فقط نمادهای «زنده‌ی امروز» را دارد
   const [symbolMaster, setSymbolMaster] = useState<{ symbol: string; name: string }[]>([])
   const [txs, setTxs] = useState<Tx[]>([])
+  const [historyFilter, setHistoryFilter] = useState<string | null>(null)
+  const historyRef = useRef<HTMLDivElement>(null)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [dbMissing, setDbMissing] = useState(false)
@@ -1487,6 +1489,13 @@ ${txs.map(tx => row([
                           padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                           background: 'rgba(16,185,129,0.08)', border: `1px solid ${t.green}`, color: t.green, fontFamily: 'inherit',
                         }}>خرید مجدد</button>
+                        <button type="button" onClick={() => {
+                          setHistoryFilter(h.symbol)
+                          historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }} title="ویرایش تراکنش‌های این ردیف" style={{
+                          padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                          background: 'rgba(217,180,91,0.08)', border: `1px solid ${t.borderStrong}`, color: t.brand, fontFamily: 'inherit',
+                        }}>ویرایش</button>
                       </div>
                     </td>
                   </tr>
@@ -1764,8 +1773,19 @@ ${txs.map(tx => row([
 
       {/* تاریخچه تراکنش‌ها */}
       {txs.length > 0 && (
-        <div style={{ ...card, marginTop: 16, overflowX: 'auto' }}>
-          <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 12px' }}>تاریخچه تراکنش‌ها</h2>
+        <div ref={historyRef} style={{ ...card, marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: 0 }}>تاریخچه تراکنش‌ها</h2>
+            {historyFilter && (
+              <>
+                <span style={{ fontSize: 11.5, color: t.muted }}>فیلتر: {historyFilter}</span>
+                <button type="button" onClick={() => setHistoryFilter(null)} style={{
+                  padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                  background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.muted, fontFamily: 'inherit',
+                }}>پاک کردن فیلتر</button>
+              </>
+            )}
+          </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -1780,7 +1800,7 @@ ${txs.map(tx => row([
               </tr>
             </thead>
             <tbody>
-              {[...txs].reverse().map(tx => {
+              {[...txs].reverse().filter(tx => !historyFilter || tx.symbol === historyFilter).map(tx => {
                 const gross = safe(tx.quantity) * safe(tx.price)
                 const total = tx.side === 'buy' ? gross + safe(tx.commission) : gross - safe(tx.commission)
                 return (
