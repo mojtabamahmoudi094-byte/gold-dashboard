@@ -151,6 +151,7 @@ export default function PortfolioPage() {
   const [symbolMaster, setSymbolMaster] = useState<{ symbol: string; name: string }[]>([])
   const [txs, setTxs] = useState<Tx[]>([])
   const [historyFilter, setHistoryFilter] = useState<string | null>(null)
+  const [historyPage, setHistoryPage] = useState(1)
   const historyRef = useRef<HTMLDivElement>(null)
   const [txPickerSymbol, setTxPickerSymbol] = useState<string | null>(null)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
@@ -465,6 +466,9 @@ export default function PortfolioPage() {
 
   const active = holdings.filter(h => h.qty > 0)
   const closed = holdings.filter(h => h.qty <= 0 && h.realized !== 0)
+  const HISTORY_PAGE_SIZE = 10
+  const filteredTxs = [...txs].reverse().filter(tx => !historyFilter || tx.symbol === historyFilter)
+  const historyPageCount = Math.max(1, Math.ceil(filteredTxs.length / HISTORY_PAGE_SIZE))
 
   // «بهای تمام‌شده» همیشه روی همه‌ی دارایی‌های فعال است؛ «ارزش روز» و «سود/زیان باز» فقط
   // روی نمادهایی که قیمت روز دارند — قبلاً یک نماد بی‌قیمت (مثلاً صندوق‌ غیرطلا بدون فید زنده،
@@ -1508,29 +1512,30 @@ ${txs.map(tx => row([
               </tbody>
             </table>
           )}
-
-          {closed.length > 0 && (
-            <>
-              <h2 style={{ fontSize: 13.5, fontWeight: 700, margin: '22px 0 10px', color: t.muted }}>موقعیت‌های بسته‌شده</h2>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={th}>نماد</th>
-                    <th style={th}>سود/زیان محقق‌شده</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {closed.map(h => (
-                    <tr key={h.symbol}>
-                      <td style={td}>{h.symbol}</td>
-                      <td style={{ ...td, color: pnlColor(h.realized), fontWeight: 600 }}>{fmtToman(h.realized)} تومان</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
         </div>
+
+        {/* موقعیت‌های بسته‌شده */}
+        {closed.length > 0 && (
+          <div style={{ ...card, overflowX: 'auto' }}>
+            <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: '0 0 12px' }}>موقعیت‌های بسته‌شده</h2>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={th}>نماد</th>
+                  <th style={th}>سود/زیان محقق‌شده</th>
+                </tr>
+              </thead>
+              <tbody>
+                {closed.map(h => (
+                  <tr key={h.symbol}>
+                    <td style={td}>{h.symbol}</td>
+                    <td style={{ ...td, color: pnlColor(h.realized), fontWeight: 600 }}>{fmtToman(h.realized)} تومان</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* نمودار ترکیب دارایی */}
         {pieData.length > 0 && (
@@ -1784,7 +1789,7 @@ ${txs.map(tx => row([
             {historyFilter && (
               <>
                 <span style={{ fontSize: 11.5, color: t.muted }}>فیلتر: {historyFilter}</span>
-                <button type="button" onClick={() => setHistoryFilter(null)} style={{
+                <button type="button" onClick={() => { setHistoryFilter(null); setHistoryPage(1) }} style={{
                   padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                   background: 'transparent', border: `1px solid ${t.borderStrong}`, color: t.muted, fontFamily: 'inherit',
                 }}>پاک کردن فیلتر</button>
@@ -1805,7 +1810,7 @@ ${txs.map(tx => row([
               </tr>
             </thead>
             <tbody>
-              {[...txs].reverse().filter(tx => !historyFilter || tx.symbol === historyFilter).map(tx => {
+              {filteredTxs.slice((Math.min(historyPage, historyPageCount) - 1) * HISTORY_PAGE_SIZE, Math.min(historyPage, historyPageCount) * HISTORY_PAGE_SIZE).map((tx: Tx) => {
                 const gross = safe(tx.quantity) * safe(tx.price)
                 const total = tx.side === 'buy' ? gross + safe(tx.commission) : gross - safe(tx.commission)
                 return (
@@ -1836,6 +1841,21 @@ ${txs.map(tx => row([
               })}
             </tbody>
           </table>
+          {historyPageCount > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 }}>
+              <button type="button" disabled={historyPage <= 1} onClick={() => setHistoryPage(p => Math.max(1, p - 1))} style={{
+                padding: '5px 12px', borderRadius: 6, fontSize: 11.5, cursor: historyPage <= 1 ? 'default' : 'pointer',
+                background: 'transparent', border: `1px solid ${t.borderStrong}`, color: historyPage <= 1 ? t.muted : t.brand, fontFamily: 'inherit',
+                opacity: historyPage <= 1 ? 0.5 : 1,
+              }}>قبلی</button>
+              <span style={{ fontSize: 11.5, color: t.muted }}>صفحه {Math.min(historyPage, historyPageCount)} از {historyPageCount}</span>
+              <button type="button" disabled={historyPage >= historyPageCount} onClick={() => setHistoryPage(p => Math.min(historyPageCount, p + 1))} style={{
+                padding: '5px 12px', borderRadius: 6, fontSize: 11.5, cursor: historyPage >= historyPageCount ? 'default' : 'pointer',
+                background: 'transparent', border: `1px solid ${t.borderStrong}`, color: historyPage >= historyPageCount ? t.muted : t.brand, fontFamily: 'inherit',
+                opacity: historyPage >= historyPageCount ? 0.5 : 1,
+              }}>بعدی</button>
+            </div>
+          )}
         </div>
       )}
 
