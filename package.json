@@ -16,6 +16,7 @@
     "next": "16.2.9",
     "papaparse": "^5.5.4",
     "posthog-js": "^1.404.1",
+    "puppeteer": "^25.3.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-multi-date-picker": "^4.5.2",
