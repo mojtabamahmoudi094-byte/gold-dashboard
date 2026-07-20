@@ -470,9 +470,9 @@ export default function PortfolioPage() {
     let cost = 0, pricedCost = 0, value = 0, realized = 0, unpricedCount = 0
     for (const h of holdings) realized += h.realized
     for (const h of active) {
-      cost += h.totalCost
+      if (h.type !== 'cash') cost += h.totalCost
       if (h.value == null) { unpricedCount++; continue }
-      pricedCost += h.totalCost
+      if (h.type !== 'cash') pricedCost += h.totalCost
       value += h.value
     }
     const unrealized = value - pricedCost
@@ -1437,33 +1437,46 @@ ${txs.map(tx => row([
                         {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.type === 'cash' ? 'پول نقد' : h.name}
                       </div>
                     </td>
-                    <td style={td}>{fmtNum(h.qty)}</td>
-                    <td style={td}>{fmtToman(h.avgCost)}</td>
-                    <td style={{ ...td, color: t.muted }}>{fmtToman(h.breakEven)}</td>
-                    <td style={td}>
-                      {(priceMap.get(h.symbol)?.price ?? 0) <= 0 ? (
-                        // قیمت آنلاین در دسترس نیست — ورودی قیمت دستی (در مرورگر ذخیره می‌شود)
-                        <input
-                          style={{ ...input, width: 110, padding: '5px 8px', fontSize: 11.5 }}
-                          inputMode="numeric"
-                          defaultValue={manualPrices[h.symbol] ? toToman(manualPrices[h.symbol]) : ''}
-                          placeholder="قیمت دستی…"
-                          title="قیمت روز را دستی وارد کنید (تومان)"
-                          onBlur={e => setManualPrice(h.symbol, tomanToRial(e.target.value.replace(/[^\d.]/g, '')))}
-                        />
-                      ) : (
-                        <>
-                          {h.price != null ? fmtToman(h.price) : '—'}
-                          {h.changePct != null && (
-                            <span style={{ fontSize: 10.5, marginRight: 9, color: pnlColor(h.changePct) }}>({fmtPct(h.changePct, 1)})</span>
+                    {h.type === 'cash' ? (
+                      <>
+                        <td style={{ ...td, color: t.muted }}>—</td>
+                        <td style={{ ...td, color: t.muted }}>—</td>
+                        <td style={{ ...td, color: t.muted }}>—</td>
+                        <td style={{ ...td, color: t.muted }}>—</td>
+                        <td style={td}>{h.value != null ? fmtToman(h.value) : '—'}</td>
+                        <td style={{ ...td, color: t.muted }}>—</td>
+                      </>
+                    ) : (
+                      <>
+                        <td style={td}>{fmtNum(h.qty)}</td>
+                        <td style={td}>{fmtToman(h.avgCost)}</td>
+                        <td style={{ ...td, color: t.muted }}>{fmtToman(h.breakEven)}</td>
+                        <td style={td}>
+                          {(priceMap.get(h.symbol)?.price ?? 0) <= 0 ? (
+                            // قیمت آنلاین در دسترس نیست — ورودی قیمت دستی (در مرورگر ذخیره می‌شود)
+                            <input
+                              style={{ ...input, width: 110, padding: '5px 8px', fontSize: 11.5 }}
+                              inputMode="numeric"
+                              defaultValue={manualPrices[h.symbol] ? toToman(manualPrices[h.symbol]) : ''}
+                              placeholder="قیمت دستی…"
+                              title="قیمت روز را دستی وارد کنید (تومان)"
+                              onBlur={e => setManualPrice(h.symbol, tomanToRial(e.target.value.replace(/[^\d.]/g, '')))}
+                            />
+                          ) : (
+                            <>
+                              {h.price != null ? fmtToman(h.price) : '—'}
+                              {h.changePct != null && (
+                                <span style={{ fontSize: 10.5, marginRight: 9, color: pnlColor(h.changePct) }}>({fmtPct(h.changePct, 1)})</span>
+                              )}
+                            </>
                           )}
-                        </>
-                      )}
-                    </td>
-                    <td style={td}>{h.value != null ? fmtToman(h.value) : '—'}</td>
-                    <td style={{ ...td, color: pnlColor(h.unrealized), fontWeight: 600 }}>
-                      {h.unrealized != null ? <>{fmtToman(h.unrealized)}<span style={{ fontSize: 10.5, marginRight: 9, opacity: 0.85 }}>({fmtPct(h.unrealizedPct, 1)})</span></> : '—'}
-                    </td>
+                        </td>
+                        <td style={td}>{h.value != null ? fmtToman(h.value) : '—'}</td>
+                        <td style={{ ...td, color: pnlColor(h.unrealized), fontWeight: 600 }}>
+                          {h.unrealized != null ? <>{fmtToman(h.unrealized)}<span style={{ fontSize: 10.5, marginRight: 9, opacity: 0.85 }}>({fmtPct(h.unrealizedPct, 1)})</span></> : '—'}
+                        </td>
+                      </>
+                    )}
                     <td style={td}>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button type="button" onClick={() => openQuickTx(h, 'sell')} style={{
