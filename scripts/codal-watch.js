@@ -834,16 +834,18 @@ async function main() {
         } catch (e) { log(`⚠️ ${s}: ساخت/ارسال خلاصه تلگرام شکست خورد — ${e.message}`) }
       } else { fail++; log(`⚠️ ${s}: ${status}`) }
     } catch (e) { fail++; log(`❌ ${s}: ${e.message}`) }
+
+    // seen فوری بعد از همین نماد، نه فقط یک‌جا در انتها — با ۵۰+ نماد در یک اجرا (کارت/اسکرین‌شات/Gemini
+    // هر کدام تا ۹۰ ثانیه) کل اجرا گاهی نیم‌ساعت طول می‌کشد و قبل رسیدن به انتها کرش/کیل می‌شود؛ چون seen
+    // فقط در پایان ذخیره می‌شد، هر اطلاعیه‌ای که واقعاً پست شده بود اما اجرا ناتمام می‌ماند، اجرای بعدی
+    // دوباره «تازه» دیده و دوباره پست می‌شد (باگ ارسال چندباره ۲۰۲۶-۰۷-۲۰: وفتخار/بزاگرس/درازک/وصندوق).
+    for (const a of fresh) if (a.symbol === s && built.has(s) && !pendingKeys.has(a.key)) seen.add(a.key)
+    st.seen = [...seen].slice(-SEEN_CAP)
+    st.lastRun = new Date().toISOString()
+    saveState(st)
+
     await sleep(4000)
   }
-
-  // فقط اطلاعیه‌های نمادهایی که موفق ساخته شدند seen می‌شوند؛
-  // ناموفق‌ها (throttle کدال، اکسل خراب) و pendingها (نسخهٔ جدیدتر که هنوز ingest نشده)
-  // اجرای بعدی دوباره تلاش می‌شوند
-  for (const a of fresh) if (built.has(a.symbol) && !pendingKeys.has(a.key)) seen.add(a.key)
-  st.seen = [...seen].slice(-SEEN_CAP)
-  st.lastRun = new Date().toISOString()
-  saveState(st)
 
   await closeBrowser()
   log(`✔ تمام شد. ✅${built.size} به‌روز | ⛔${fail} ناموفق`)
