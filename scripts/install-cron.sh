@@ -84,9 +84,6 @@ MAILTO=""
 30-55/5 5 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh hot-money $NODE_BIN $SCRIPT_DIR/hot-money.js >> /var/log/hot-money.log 2>&1
 */5 6-8 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh hot-money $NODE_BIN $SCRIPT_DIR/hot-money.js >> /var/log/hot-money.log 2>&1
 0 9 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh hot-money $NODE_BIN $SCRIPT_DIR/hot-money.js >> /var/log/hot-money.log 2>&1
-
-# اسنپ‌شات قیمت نمادهای سیگنال‌دار سهام (برای نتیجه‌ی N روزه در بخش سیگنال‌ها) — یک‌بار روزانه، ۱۲:۴۵ تهران = ۰۹:۱۵ UTC (بعد بسته شدن بازار)
-15 9 * * 6,0-3 root $SCRIPT_DIR/run-with-alert.sh snapshot-stock-signal-prices $NODE_BIN $SCRIPT_DIR/snapshot-stock-signal-prices.js >> /var/log/snapshot-stock-signal-prices.log 2>&1
 EOF
 
 chmod +x "$SCRIPT_DIR/run-with-alert.sh"

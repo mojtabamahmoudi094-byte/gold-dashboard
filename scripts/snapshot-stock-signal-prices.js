@@ -9,8 +9,8 @@
  * راه‌اندازی:
  *   1. اجرای scripts/sql/stock-signal-prices.sql در Supabase SQL Editor (یک‌بار)
  *   2. متغیرهای محیطی را در .env.sync تنظیم کنید
- *   3. کرون با scripts/install-cron.sh نصب می‌شود (۱۲:۴۵ تهران = ۰۹:۱۵ UTC، بعد بسته‌شدن بازار)
- *      — دستی به crontab اضافه نکنید، چون هر اجرای دوباره‌ی install-cron.sh آن را حذف می‌کند
+ *   3. کرون با scripts/install-snapshots-cron.sh نصب می‌شود (۱۲:۴۰ تهران = ۰۹:۱۰ UTC، بعد بسته‌شدن بازار)
+ *      — دستی به crontab اضافه نکنید، چون هر اجرای دوباره‌ی اسکریپت نصب آن را بازنویسی می‌کند
  *
  * متغیرهای لازم (.env.sync):
  *   SITE_URL                    (پیش‌فرض https://bourssanj.ir)
