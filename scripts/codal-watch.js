@@ -705,9 +705,45 @@ async function runRaw() {
   log(`✔ خام تمام شد. ${fresh.length} اطلاعیه فوروارد شد.`)
 }
 
+// قفل اجرای هم‌زمان — با ۵۰+ نماد در یک روز شلوغ، یک اجرا گاهی از ۳۰ دقیقه (فاصلهٔ cron) بیشتر
+// طول می‌کشد (یا OOM سرور ۱GB رمی chrome-headless را کشت و پروسه معلق ماند)؛ بدون قفل، اجرای
+// بعدی هم‌زمان شروع می‌شد و همان اطلاعیه‌ها را دوباره پست می‌کرد (باگ ارسال چندباره ۲۰۲۶-۰۷-۲۰).
+const LOCK_FILE = path.join(__dirname, 'codal-watch.lock')
+function acquireLock() {
+  if (fs.existsSync(LOCK_FILE)) {
+    const pid = Number(fs.readFileSync(LOCK_FILE, 'utf8').trim())
+    let alive = false
+    try { process.kill(pid, 0); alive = true } catch {}
+    if (alive) return false
+    log(`⚠️ لاک قدیمی از pid=${pid} (دیگر زنده نیست، احتمالاً OOM/کرش) — آزاد شد`)
+  }
+  fs.writeFileSync(LOCK_FILE, String(process.pid))
+  return true
+}
+function releaseLock() {
+  try { if (Number(fs.readFileSync(LOCK_FILE, 'utf8').trim()) === process.pid) fs.unlinkSync(LOCK_FILE) } catch {}
+}
+
+// واچ‌داگ سخت — سرور فقط ~۹۶۰MB رم دارد و puppeteer زیر فشار حافظه گاهی برای همیشه گیر می‌کند
+// (نه واقعاً بی‌نهایت‌حلقه، فقط thrashing بدون swap). یه اجرای گیرکرده که کل کرون بعدی رو هم
+// اشغال کنه، بدتر از یه اجرای ناموفقه — پس بعد از ۲۰ دقیقه (کمتر از فاصلهٔ ۳۰دقیقه‌ای cron)
+// خودش رو با process.exit می‌کشه؛ یعنی هیچ‌وقت وارد بازهٔ اجرای بعدی نمی‌شه.
+const WATCHDOG_MS = 20 * 60 * 1000
+
 async function main() {
   if (RAW) return runRaw()
 
+  if (!acquireLock()) { log('⏭️ اجرای قبلی هنوز در حال اجراست — رد شد (بدون قفل دوباره‌پست می‌کرد)'); return }
+  const watchdog = setTimeout(() => {
+    log(`⏰ واچ‌داگ: اجرا بیش از ${WATCHDOG_MS / 60000} دقیقه طول کشید — کشته شد تا با اجرای بعدی تداخل نکند`)
+    releaseLock()
+    process.exit(1)
+  }, WATCHDOG_MS)
+  watchdog.unref()
+  try { return await run() } finally { clearTimeout(watchdog); releaseLock() }
+}
+
+async function run() {
   log(`▶ دیده‌بان کدال — بازهٔ ${HOURS} ساعت${DRY ? ' (dry run)' : ''}`)
   if (!sbClient()) log('⚠️ SUPABASE_URL/SUPABASE_KEY تنظیم نشده — خروجی فقط روی فایل می‌رود، سایت به‌روز نمی‌شود')
 

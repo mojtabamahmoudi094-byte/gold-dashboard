@@ -360,11 +360,15 @@ function renderQuarterlyReportCardHtml(data, companyName) {
 
 async function screenshotQuarterlyReportCard(browser, html) {
   const page = await browser.newPage()
-  await page.setViewport({ width: 1600, height: 900, deviceScaleFactor: 2 })
-  await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-  const buf = await page.screenshot({ type: 'jpeg', quality: 90 })
-  await page.close()
-  return buf
+  try {
+    await page.setViewport({ width: 1600, height: 900, deviceScaleFactor: 2 })
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    return await page.screenshot({ type: 'jpeg', quality: 90, timeout: 30_000 })
+  } finally {
+    // بدون finally، تایم‌اوت/خطا صفحه رو باز نگه می‌داشت — تو اجراهای پرنماد (۵۰+ نماد)
+    // چند صفحهٔ باز مونده حافظهٔ کم سرور رو تصاعدی مصرف می‌کرد و اجرا رو کند/گیر می‌داد
+    await page.close().catch(() => {})
+  }
 }
 
 module.exports = { buildQuarterlyReportData, renderQuarterlyReportCardHtml, screenshotQuarterlyReportCard }
