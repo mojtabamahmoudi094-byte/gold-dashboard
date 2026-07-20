@@ -730,8 +730,11 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
         callback(arr, { backward: false, forward: false })
       },
     })
-    // با دیتاست‌های بزرگ (مثل ۱۰ سال آتی پیوسته) نمای پیش‌فرض روی قدیمی‌ترین کندل می‌ماند — همیشه به امروز اسکرول کن
-    chart.scrollToRealTime()
+    // با دیتاست‌های بزرگ (مثل ۱۰ سال آتی پیوسته) نمای پیش‌فرض روی قدیمی‌ترین کندل می‌ماند.
+    // klinecharts اندازهٔ واقعی کانتینر (و بنابراین barSpace) را با ResizeObserver داخلی خودش
+    // در یک requestAnimationFrame جدا محاسبه می‌کند — قبل از آن scrollToRealTime روی مقدار
+    // پیش‌فرض/نادرست کار می‌کند. دو rAF پشت‌سرهم صبر می‌کند تا آن چرخه حتماً تمام شود.
+    requestAnimationFrame(() => requestAnimationFrame(() => chart.scrollToRealTime()))
 
     if (scaleMode !== 'normal') {
       chart.overrideYAxis({ name: scaleMode, paneId: 'candle_pane' })
