@@ -13,11 +13,16 @@ const GLOBAL_FUTURES_SYMBOLS = {
   'SI=F': 'نقره (کامکس)',
   'CL=F': 'نفت خام WTI',
   'BZ=F': 'نفت خام برنت',
-  'HG=F': 'مس',
+  'HG=F': 'مس (دلار/تن)',
   'NG=F': 'گاز طبیعی',
 }
 
 const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+
+// Yahoo مس (HG=F) را بر حسب دلار/پوند می‌دهد (کانونشن کامکس)؛ BrsApi Market/Commodity.php
+// و کانونشن رایج ایران دلار/تن است (LME). ۱ تن = ۲۲۰۴.۶۲۲۶۲ پوند — راستی‌آزمایی شد ۲۰۲۶-۰۷-۲۰
+// (Yahoo 6.33 × 2204.6 ≈ 13962 در برابر BrsApi 13966، تطابق کامل).
+const UNIT_MULTIPLIER = { 'HG=F': 2204.6226218 }
 
 /**
  * کندل روزانه یک نماد آتی پیوسته از Yahoo Finance chart API (رایگان، بدون کلید).
@@ -31,6 +36,7 @@ async function fetchYahooCandles(symbol, range, { gregorianToShamsi } = {}) {
   if (!result) throw new Error(data?.chart?.error?.description ?? 'پاسخ Yahoo Finance خالی/نامعتبر است')
   const ts = result.timestamp ?? []
   const q = result.indicators?.quote?.[0] ?? {}
+  const mul = UNIT_MULTIPLIER[symbol] ?? 1
   const out = []
   for (let i = 0; i < ts.length; i++) {
     const close = q.close?.[i]
@@ -39,10 +45,10 @@ async function fetchYahooCandles(symbol, range, { gregorianToShamsi } = {}) {
     out.push({
       trade_date: gregorian,
       trade_date_shamsi: gregorianToShamsi ? gregorianToShamsi(gregorian) : null,
-      open: q.open?.[i] ?? null,
-      high: q.high?.[i] ?? null,
-      low: q.low?.[i] ?? null,
-      close,
+      open: q.open?.[i] != null ? q.open[i] * mul : null,
+      high: q.high?.[i] != null ? q.high[i] * mul : null,
+      low: q.low?.[i] != null ? q.low[i] * mul : null,
+      close: close * mul,
       volume: q.volume?.[i] ?? null,
     })
   }

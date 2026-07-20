@@ -18,7 +18,7 @@ const GLOBAL_FUTURES: { symbol: string; label: string }[] = [
   { symbol: 'SI=F', label: 'نقره (کامکس)' },
   { symbol: 'CL=F', label: 'نفت خام WTI' },
   { symbol: 'BZ=F', label: 'نفت خام برنت' },
-  { symbol: 'HG=F', label: 'مس' },
+  { symbol: 'HG=F', label: 'مس (دلار/تن)' },
   { symbol: 'NG=F', label: 'گاز طبیعی' },
 ]
 
