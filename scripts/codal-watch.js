@@ -397,6 +397,20 @@ async function buildDeepQuarterlyText(symbol, q) {
   return null
 }
 
+// ادعای ارسال از دیتابیس — تنها منبع حقیقت مشترک بین همهٔ پروسه‌ها (زامبی/overlap/کرش/باگ‌های
+// کشف‌نشده). فایل JSON محلی (seen) فقط تو حافظهٔ همون پروسه‌ست و با کرش گم می‌شه؛ این جدول نه.
+// درست قبل از هر ارسال واقعی صدا زده می‌شه — اگه کلید از قبل claim شده، اصلاً ارسال انجام نمی‌شه.
+async function claimSend(key) {
+  const sb = sbClient()
+  if (!sb) return true // بدون SUPABASE_KEY (لوکال) گارد غیرفعاله، رفتار قبلی حفظ می‌شه
+  const { error } = await sb.from('codal_watch_sent').insert({ key })
+  if (!error) return true
+  if (error.code === '23505') { log(`⏭️ قبلاً واقعاً به تلگرام پست شده (DB claim) — رد شد: ${key}`); return false }
+  // fail-closed: اگه نشد چک کنیم، فرض می‌کنیم شاید قبلاً پست شده — دوباره‌ارسال بدتر از یه‌بار جاافتادنه
+  log(`⚠️ claimSend خطا داد (${error.message}) — برای امنیت رد شد: ${key}`)
+  return false
+}
+
 async function sendTelegram(text, opts = {}) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — اعلان ارسال نشد'); return }
   const parseModeField = opts.html ? { parse_mode: 'HTML' } : {}
@@ -472,6 +486,7 @@ async function closeBrowser() { if (_browser) { await _browser.close(); _browser
 
 // گزارش فعالیت ماهانهٔ تولیدی → کارت عکسی (نمودار+جدول)، نه متن خام
 async function sendMonthlyPhoto(symbol, payload, monthEntry, opts = {}) {
+  if (!(await claimSend(`monthly|${symbol}|${monthEntry.period}|${opts.amendment ? 'amend' : 'orig'}`))) return false
   const data = buildMonthlyReportData(payload)
   if (!data) return false
   const summary = summarizeMonth(symbol, payload.months, monthEntry, opts)
@@ -493,6 +508,7 @@ async function sendMonthlyPhoto(symbol, payload, monthEntry, opts = {}) {
 
 // صورت مالی میاندوره‌ای/سالانه → کارت عکسی (روند سود+آمار)، نه متن خام
 async function sendQuarterlyPhoto(symbol, payload, quarterEntry, opts = {}) {
+  if (!(await claimSend(`quarterly|${symbol}|${quarterEntry.period}|${opts.amendment ? 'amend' : 'orig'}`))) return false
   const info = stockInfo(symbol)
   const data = buildQuarterlyReportData(payload, info)
   if (!data) return false
@@ -846,7 +862,9 @@ async function run() {
                   const extracted = await fetchAuditLetter(letterAnnouncement.url, browser)
                   if (extracted) {
                     const deepText = await buildDeepAnalysisText(s, latestQuarter, extracted)
-                    if (deepText) await sendTelegram(deepPostFooter(s, deepText), { html: true })
+                    if (deepText && (await claimSend(`deep-audited|${s}|${latestQuarter.period}`))) {
+                      await sendTelegram(deepPostFooter(s, deepText), { html: true })
+                    }
                   } else {
                     log(`ℹ️ ${s}: نامهٔ حسابرسی قابل استخراج نبود — پست تحلیل عمیق رد شد`)
                   }
@@ -856,13 +874,15 @@ async function run() {
               // میاندوره‌ای معمولی — بدون نامهٔ حسابرس، مستقیم از اعداد پارس‌شده
               try {
                 const deepText = await buildDeepQuarterlyText(s, latestQuarter)
-                if (deepText) await sendTelegram(deepPostFooter(s, deepText), { html: true })
+                if (deepText && (await claimSend(`deep-quarterly|${s}|${latestQuarter.period}`))) {
+                  await sendTelegram(deepPostFooter(s, deepText), { html: true })
+                }
               } catch (e) { log(`⚠️ ${s}: پست تحلیل عمیق میاندوره‌ای شکست خورد (نادیده گرفته شد) — ${e.message}`) }
             }
 
             // اگه عکس واقعاً نرفت (خطا/عدم داده)، متن قدیمی جایگزینش می‌شه — گزارش نباید کامل از دست بره
             const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent, skipQuarterly: quarterlyPhotoSent, monthlyAmendment, quarterlyAmendment })
-            if (kp) {
+            if (kp && (await claimSend(`summary|${s}|${[...freshTitles].sort().join('~')}`))) {
               const narrated = await narrate(s, kp.facts)
               await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text)
             }
