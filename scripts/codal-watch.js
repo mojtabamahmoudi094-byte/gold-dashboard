@@ -37,6 +37,8 @@ const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 // مقصد پست‌های عمومی، کانال است — نه چت شخصی/ادمین که TELEGRAM_CHAT_ID برای هشدار خطا استفاده می‌شود
 const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID
+// مقصد هشدارهای عملیاتی (صف پرحجم و…) — چت خام ادمین، نه کانال عمومی
+const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID
 const SITE = process.env.SITE_URL || 'https://bourssanj.ir'
 const DRY = process.argv.includes('--dry')
 const RAW = process.argv.includes('--raw')
@@ -412,14 +414,15 @@ async function claimSend(key) {
 }
 
 async function sendTelegram(text, opts = {}) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — اعلان ارسال نشد'); return }
+  const chatId = opts.chatId || TELEGRAM_CHAT_ID
+  if (!TELEGRAM_BOT_TOKEN || !chatId) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — اعلان ارسال نشد'); return }
   const parseModeField = opts.html ? { parse_mode: 'HTML' } : {}
   // مستقیم — از داخل ایران معمولاً فیلتر است، ولی اگر باز بود سریع‌ترین راه است
   try {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, ...parseModeField }),
+      body: JSON.stringify({ chat_id: chatId, text, ...parseModeField }),
       signal: AbortSignal.timeout(20_000),
     })
     const data = await res.json()
@@ -432,12 +435,19 @@ async function sendTelegram(text, opts = {}) {
     const res = await fetch(`${SITE}/api/telegram-relay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: TELEGRAM_CHAT_ID, text, ...parseModeField }),
+      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: chatId, text, ...parseModeField }),
       signal: AbortSignal.timeout(90_000), // کلد-استارت Render
     })
     const data = await res.json()
     if (!data.ok) log(`⚠️ رله تلگرام هم ناموفق: ${data.error || res.status}`)
   } catch (e) { log(`⚠️ رله تلگرام هم خطا داد: ${e.message}`) }
+}
+
+// هشدار عملیاتی به ادمین (نه کانال عمومی) — صف پرحجم زیر بار سنگین، تا قبل از اینکه کاربر
+// خودش متوجه جاماندن گزارش بشه، خبردار بشیم. شکستش نباید اجرای اصلی رو متوقف کنه.
+async function sendAdminAlert(text) {
+  if (!ADMIN_CHAT_ID) return
+  try { await sendTelegram(text, { chatId: ADMIN_CHAT_ID }) } catch {}
 }
 
 // تلگرام کپشن عکس را حداکثر ۱۰۲۴ کاراکتر می‌پذیرد (نه ۴۰۹۶ مثل پیام متنی معمولی)
@@ -548,6 +558,25 @@ const jDate = (d = new Date()) => jNow(d).slice(0, 10).replace(/\//g, '-')
 
 // ═══ منبع اصلی: API عمومی کدال (بدون auth، صفحه‌بندی دارد) ═══
 // نزولی بر اساس زمان انتشار؛ تا رسیدن به cutoff صفحه می‌زنیم.
+// اجرای موازی محدود — سرور ~۹۶۰MB رم دارد، پس همه‌چیز را با هم شروع نمی‌کنیم؛ فقط N نماد هم‌زمان.
+// پیش‌تر این حلقه کاملاً سریال بود (هر نماد fetch+puppeteer+چند کال Gemini، ۱۰ تا ۹۰ ثانیه)، پس
+// در فصل گزارش‌دهی با ۳۰-۵۰+ نماد هم‌زمان از سقف واچ‌داگ ۲۰دقیقه‌ای رد می‌شد و نمادهای باقی‌مانده
+// به اجرای بعدی می‌افتاد — چون قفل overlap اجازهٔ هم‌پوشانی نمی‌داد، صف زیر بار پیوسته انباشته می‌شد.
+async function runPool(items, limit, worker) {
+  let i = 0
+  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) {
+      const idx = i++
+      await worker(items[idx], idx)
+    }
+  })
+  await Promise.all(lanes)
+}
+const CONCURRENCY = Math.max(1, Number(process.env.CODAL_WATCH_CONCURRENCY) || 2)
+// اگه صف یک اجرا از این تعداد نماد بیشتر شد، به ادمین هشدار بده — نشونهٔ اینه که ورودی گزارش
+// از ظرفیت پردازش جلو زده و ریسک جاماندن/تأخیر چندساعته هست
+const BACKLOG_ALERT_THRESHOLD = Math.max(1, Number(process.env.CODAL_WATCH_BACKLOG_ALERT) || 15)
+
 const MAX_PAGES = 40 // ۸۰۰ اطلاعیه — بیش از هر روز شلوغ کدال
 async function fromCodal(since) {
   const out = []
@@ -783,10 +812,15 @@ async function run() {
 
   if (DRY) { log('dry run — چیزی ساخته نشد'); return }
 
+  if (symbols.length > BACKLOG_ALERT_THRESHOLD) {
+    log(`⚠️ صف بزرگ: ${symbols.length} نماد در این اجرا (آستانهٔ هشدار ${BACKLOG_ALERT_THRESHOLD})`)
+    sendAdminAlert(`⚠️ کدال-واچ: ${symbols.length} نماد هم‌زمان در صف این اجرا — بیش از آستانهٔ ${BACKLOG_ALERT_THRESHOLD}. ریسک جاماندن گزارش زیر بار سنگین.`)
+  }
+
   let fail = 0
   const built = new Set()
   const pendingKeys = new Set()   // اطلاعیه‌هایی که هنوز ingest نشده‌اند — seen نمی‌شوند تا retry شوند
-  for (const s of symbols) {
+  async function processSymbol(s) {
     try {
       // اسنپ‌شات نسخهٔ قبلِ payload — قبل از overwrite شدن توسط buildSymbol، تا اصلاحیه با «قبل از خودش» مقایسه شود
       const outFile = path.join(OUT_DIR, `${s.replace(/\s+/g, '-')}.json`)
@@ -899,9 +933,9 @@ async function run() {
     st.seen = [...seen].slice(-SEEN_CAP)
     st.lastRun = new Date().toISOString()
     saveState(st)
-
-    await sleep(4000)
   }
+
+  await runPool(symbols, CONCURRENCY, processSymbol)
 
   await closeBrowser()
   log(`✔ تمام شد. ✅${built.size} به‌روز | ⛔${fail} ناموفق`)
