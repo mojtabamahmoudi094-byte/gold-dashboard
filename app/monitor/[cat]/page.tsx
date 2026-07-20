@@ -134,19 +134,6 @@ type ChartDef = {
 
 const DEFS: ChartDef[] = [
   {
-    id: 'excitement', title: 'نمودار هیجان بازار', refZero: true,
-    series: [{ key: 'excitement', name: 'هیجان', color: C.purple, kind: 'area' }],
-    sub: l => [{ txt: `هیجان ${fa(l.excitement)} واحد`, color: C.purple }],
-  },
-  {
-    id: 'movement', title: 'نمودار تحرک قیمتی',
-    series: [
-      { key: 'mov_pos', name: 'تحرک مثبت', color: C.green, kind: 'line' },
-      { key: 'mov_neg', name: 'تحرک منفی', color: C.red, kind: 'line' },
-    ],
-    sub: l => [{ txt: `مثبت ${fa(l.mov_pos)}`, color: C.green }, { txt: ' | ' }, { txt: `منفی ${fa(l.mov_neg)}`, color: C.red }],
-  },
-  {
     id: 'tval', title: 'ارزش معاملات خرد لحظه‌ای', unit: ' میلیارد تومان',
     series: [
       { key: 'tval5m', name: 'معاملات ۵ دقیقه', color: C.orange, kind: 'bar' },
@@ -169,14 +156,6 @@ const DEFS: ChartDef[] = [
       { key: 'sym_neg', name: 'منفی', color: C.red, kind: 'line' },
     ],
     sub: l => [{ txt: `مثبت ${fa(l.sym_pos)}`, color: C.green }, { txt: ' | ' }, { txt: `منفی ${fa(l.sym_neg)}`, color: C.red }],
-  },
-  {
-    id: 'queues', title: 'تعداد صف‌های خرید و فروش',
-    series: [
-      { key: 'buyq', name: 'صف خرید', color: C.green, kind: 'line' },
-      { key: 'sellq', name: 'صف فروش', color: C.red, kind: 'line' },
-    ],
-    sub: l => [{ txt: `خرید ${fa(l.buyq)}`, color: C.green }, { txt: ' | ' }, { txt: `فروش ${fa(l.sellq)}`, color: C.red }],
   },
   {
     id: 'ind', title: 'سرانه خرید و فروش حقیقی', unit: ' میلیون تومان', dec: 1,
