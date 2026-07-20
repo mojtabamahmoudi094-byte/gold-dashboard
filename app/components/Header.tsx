@@ -34,6 +34,7 @@ export const NAV: NavItem[] = [
     { label: 'تحلیل بازارها', href: '/analysis' },
     { label: 'تحلیل تکنیکال', href: '/technical' },
     { label: 'دیده‌بان تکنیکال', href: '/technical/screener' },
+    { label: 'قراردادهای آتی', href: '/futures' },
     { label: 'رادار پول هوشمند', href: '/funds/radar' },
     { label: 'ماشین‌حساب ارزش‌گذاری', href: '/valuation' },
   ] },
