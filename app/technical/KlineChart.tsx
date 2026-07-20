@@ -731,10 +731,20 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
       },
     })
     // با دیتاست‌های بزرگ (مثل ۱۰ سال آتی پیوسته) نمای پیش‌فرض روی قدیمی‌ترین کندل می‌ماند.
-    // klinecharts اندازهٔ واقعی کانتینر (و بنابراین barSpace) را با ResizeObserver داخلی خودش
-    // در یک requestAnimationFrame جدا محاسبه می‌کند — قبل از آن scrollToRealTime روی مقدار
-    // پیش‌فرض/نادرست کار می‌کند. دو rAF پشت‌سرهم صبر می‌کند تا آن چرخه حتماً تمام شود.
-    requestAnimationFrame(() => requestAnimationFrame(() => chart.scrollToRealTime()))
+    // DEBUG TEMP
+    // eslint-disable-next-line no-console
+    console.log('[dbg] dataFullRef.length', dataFullRef.current.length, 'visibleRange before', chart.getVisibleRange?.())
+    requestAnimationFrame(() => {
+      // eslint-disable-next-line no-console
+      console.log('[dbg] rAF1 visibleRange', chart.getVisibleRange?.(), 'barSpace', (chart as unknown as { getBarSpace?: () => unknown }).getBarSpace?.())
+      requestAnimationFrame(() => {
+        // eslint-disable-next-line no-console
+        console.log('[dbg] rAF2 before scroll visibleRange', chart.getVisibleRange?.())
+        chart.scrollToRealTime()
+        // eslint-disable-next-line no-console
+        console.log('[dbg] rAF2 after scroll visibleRange', chart.getVisibleRange?.())
+      })
+    })
 
     if (scaleMode !== 'normal') {
       chart.overrideYAxis({ name: scaleMode, paneId: 'candle_pane' })
