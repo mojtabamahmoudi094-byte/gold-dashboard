@@ -19,9 +19,12 @@ export type RHolding = {
 // فرم‌های گزارش ماهانه کدال: تولیدی (محصولات)، پرتفوی (شرکت سرمایه‌گذاری)،
 // بانک (درآمد + هزینه محقق‌شده)، خدماتی (فقط درآمد — مخابرات، پیمانکاری، انبوه‌سازی، بورس‌ها)
 export type MonthKind = 'production' | 'portfolio' | 'bank' | 'service'
+// خلاصه ۳خطی AI (مثبت/منفی + تأثیر EPS + یعنی‌چی) — روی هر دوره در scripts/codal-watch.js نشسته
+export type AiVerdict = { verdict: string; epsImpact: string; meaning: string }
 export type RMonth = {
   period: string; publish: string | null
   kind?: MonthKind
+  verdict?: AiVerdict
   // تولیدی، بانک و خدماتی
   month?: number | null; cum?: number | null; lastYearCum?: number | null
   products?: RProduct[]
@@ -32,6 +35,7 @@ export type RMonth = {
 }
 export type RQuarter = {
   period: string; months: number; audited: boolean; consolidated: boolean; publish: string | null
+  verdict?: AiVerdict
   revenue: number | null; revenue_ly: number | null
   cogs: number | null; gross: number | null; gross_ly: number | null
   sga: number | null; op: number | null; fin_cost: number | null

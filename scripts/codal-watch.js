@@ -27,7 +27,7 @@
 const path = require('path')
 const fs   = require('fs')
 
-const { buildSymbol, sbClient, OUT_DIR, faDate } = require('./codal-company-reports.js')
+const { buildSymbol, sbClient, OUT_DIR, faDate, upsertReport } = require('./codal-company-reports.js')
 const { fetchAuditLetter } = require('./codal-letter-extract.js')
 const { buildMonthlyReportData, renderMonthlyReportCardHtml, screenshotMonthlyReportCard } = require('./monthly-report-card.js')
 const { buildQuarterlyReportData, renderQuarterlyReportCardHtml, screenshotQuarterlyReportCard } = require('./quarterly-report-card.js')
@@ -317,6 +317,39 @@ async function narrate(symbol, facts) {
   return null
 }
 
+// خلاصه‌ساز ۳خطی سایت (مثبت/منفی + تأثیر EPS + یعنی‌چی) — جدا از narrate() تلگرام،
+// چون فرمت/مقصدش فرق دارد (کارت سایت، نه کپشن پست). شکست بی‌صدا: verdict فقط یک بونوسه.
+async function codalVerdict(symbol, kind, periodLabel, facts) {
+  try {
+    const res = await fetch(`${SITE}/api/codal-verdict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, kind, periodLabel, facts }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    const data = await res.json()
+    if (data.ok) return { verdict: data.verdict, epsImpact: data.epsImpact, meaning: data.meaning }
+  } catch (e) { log(`⚠️ ${symbol}: خلاصه ۳خطی شکست خورد — ${e.message}`) }
+  return null
+}
+
+// خلاصه ۳خطی را روی entry (ماهانه/فصلی) داخل payload می‌نشاند و دوباره در stock_reports
+// upsert می‌کند تا سایت (که همان payload را از /api/stock-reports می‌خواند) بدون rebuild ببیندش.
+async function attachVerdict(symbol, payload, entry, kind, periodLabel, facts) {
+  const v = await codalVerdict(symbol, kind, periodLabel, facts)
+  if (!v) return
+  entry.verdict = v
+  try {
+    await upsertReport({
+      symbol,
+      data: payload,
+      months: payload.months.length,
+      quarters: payload.quarters.length,
+      updated: new Date().toISOString(),
+    })
+  } catch (e) { log(`⚠️ ${symbol}: ذخیرهٔ خلاصه ۳خطی در stock_reports شکست خورد — ${e.message}`) }
+}
+
 // تلگرام روی تگ ناقص/غیرمجاز کل پیام را با خطای ۴۰۰ رد می‌کند، بدون partial-send —
 // فقط تگ‌های مجاز HTML تلگرام باقی می‌مانند، بقیه حذف می‌شوند (متن داخلشان می‌ماند)
 function sanitizeTelegramHtml(html) {
@@ -501,6 +534,7 @@ async function sendMonthlyPhoto(symbol, payload, monthEntry, opts = {}) {
   if (!data) return false
   const summary = summarizeMonth(symbol, payload.months, monthEntry, opts)
   const narrated = await narrate(symbol, summary.body)
+  await attachVerdict(symbol, payload, monthEntry, 'monthly', monthEntry.period, summary.body)
   const caption = capCaption([
     `#${symbol.replace(/\s+/g, '_')}`,
     summary.tag,
@@ -524,6 +558,7 @@ async function sendQuarterlyPhoto(symbol, payload, quarterEntry, opts = {}) {
   if (!data) return false
   const summary = summarizeQuarter(symbol, quarterEntry, opts)
   const narrated = await narrate(symbol, summary.body)
+  await attachVerdict(symbol, payload, quarterEntry, 'quarterly', quarterEntry.period, summary.body)
   const caption = capCaption([
     `#${symbol.replace(/\s+/g, '_')}`,
     summary.tag,

@@ -474,6 +474,26 @@ function ShareholdersSection({ symbol, t }: { symbol: string; t: Theme }) {
   )
 }
 
+// خلاصه ۳خطی AI روی آخرین گزارش کدال — مثبت/منفی + تأثیر EPS + یعنی‌چی برای سهام‌دار.
+// جدا از «تحلیل هوشمند» قاعده‌محور بالای صفحه (buildInsights)؛ این یکی مولد Gemini است،
+// در scripts/codal-watch.js موقع کارت‌سازی تلگرام محاسبه و در stock_reports ذخیره می‌شود.
+function AiVerdictBox({ verdict, t }: { verdict: { verdict: string; epsImpact: string; meaning: string }; t: Theme }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 7, padding: '12px 14px', borderRadius: 12,
+      marginBottom: 16, background: `${AI_ACCENT}0e`, border: `0.5px solid ${AI_ACCENT}35`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 6, height: 6, borderRadius: 3, background: AI_ACCENT, flexShrink: 0 }} />
+        <span style={{ fontSize: 11, fontWeight: 700, color: AI_ACCENT }}>خلاصه هوش مصنوعی</span>
+      </div>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: t.text, lineHeight: 1.8 }}>{verdict.verdict}</div>
+      <div style={{ fontSize: 12, color: t.text, lineHeight: 1.8 }}>{verdict.epsImpact}</div>
+      <div style={{ fontSize: 11.5, color: t.muted, lineHeight: 1.8 }}>{verdict.meaning}</div>
+    </div>
+  )
+}
+
 function SectionCard({ title, badge, accent, t, children }: {
   title: string; badge?: string; accent: string; t: Theme; children: React.ReactNode
 }) {
@@ -737,6 +757,7 @@ function MonthlySection({ months, t, isMobile }: { months: RMonth[]; t: Theme; i
 
   return (
     <SectionCard title="گزارش فعالیت ماهانه" badge={`${months.length.toLocaleString('fa-IR')} ماه`} accent={M_ACCENT} t={t}>
+      {last.verdict && <AiVerdictBox verdict={last.verdict} t={t} />}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
         <Chip t={t} label={`${noun} ${monthLabel(last.period)}`} value={mrial(last.month)} color={M_ACCENT} />
         <Chip t={t} label="نسبت به ماه قبل" value={gPct(mom)} color={mom === null ? undefined : mom >= 0 ? GREEN : RED} />
@@ -864,6 +885,7 @@ function QuarterlyFinSection({ quarters, t, isMobile }: { quarters: RQuarter[]; 
       <div style={{ fontSize: 11, color: t.muted, marginBottom: 12 }}>
         آخرین گزارش: {durLabel(last)} {last.audited ? '(حسابرسی شده)' : '(حسابرسی نشده)'}
       </div>
+      {last.verdict && <AiVerdictBox verdict={last.verdict} t={t} />}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
         <Chip t={t} label="درآمد عملیاتی دوره" value={mrial(last.revenue)} color={Q_ACCENT} />
