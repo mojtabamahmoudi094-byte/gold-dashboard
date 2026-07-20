@@ -150,14 +150,6 @@ const DEFS: ChartDef[] = [
     sub: l => [{ txt: `آخرین ${fa(l.avg_plp, 2)}٪`, color: C.orange }, { txt: ' | ' }, { txt: `پایانی ${fa(l.avg_pcp, 2)}٪`, color: C.purple }],
   },
   {
-    id: 'symbols', title: 'تعداد نمادهای مثبت و منفی',
-    series: [
-      { key: 'sym_pos', name: 'مثبت', color: C.green, kind: 'line' },
-      { key: 'sym_neg', name: 'منفی', color: C.red, kind: 'line' },
-    ],
-    sub: l => [{ txt: `مثبت ${fa(l.sym_pos)}`, color: C.green }, { txt: ' | ' }, { txt: `منفی ${fa(l.sym_neg)}`, color: C.red }],
-  },
-  {
     id: 'ind', title: 'سرانه خرید و فروش حقیقی', unit: ' میلیون تومان', dec: 1,
     series: [
       { key: 'indBuyM', name: 'سرانه خرید', color: C.green, kind: 'line' },
