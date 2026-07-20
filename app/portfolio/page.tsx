@@ -20,7 +20,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 import { useIsMobile } from '../../lib/useIsMobile'
-import { safe, fmtNum, fmtPct, todayShamsi } from '../../lib/format'
+import { safe, fmtNum, fmtPct, todayShamsi, toPersianWords } from '../../lib/format'
 
 const DatePicker = dynamic(() => import('react-multi-date-picker'), { ssr: false })
 
@@ -1195,22 +1195,33 @@ ${txs.map(tx => row([
               </div>
             </div>
 
-            <div>
-              <span style={label}>{picked?.type === 'cash' ? 'مبلغ (تومان)' : 'تعداد'}</span>
-              <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder={picked?.type === 'cash' ? '۵٬۰۰۰٬۰۰۰' : '۱۰۰۰'} />
-            </div>
+            {picked?.type === 'cash' ? (
+              <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 2' }}>
+                <span style={label}>ارزش (تومان)</span>
+                <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder="۵٬۰۰۰٬۰۰۰" />
+                <div style={{ fontSize: 11, color: cream, marginTop: 4 }}>
+                  {qty ? `${toPersianWords(qty)} تومان` : ''}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <span style={label}>تعداد</span>
+                  <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder="۱۰۰۰" />
+                </div>
 
-            <div>
-              <span style={label}>قیمت واحد (تومان)</span>
-              <input
-                style={{ ...input, opacity: picked?.type === 'cash' ? 0.6 : 1 }}
-                inputMode="numeric"
-                readOnly={picked?.type === 'cash'}
-                value={price}
-                onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, ''))}
-                placeholder={picked ? String(toToman(picked.price)) : '—'}
-              />
-            </div>
+                <div>
+                  <span style={label}>قیمت واحد (تومان)</span>
+                  <input
+                    style={input}
+                    inputMode="numeric"
+                    value={price}
+                    onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, ''))}
+                    placeholder={picked ? String(toToman(picked.price)) : '—'}
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <span style={label}>تاریخ (شمسی)</span>
