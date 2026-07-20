@@ -34,7 +34,7 @@ const dateObjectToShamsi = (d: any): string => {
   try { return d.format('YYYY/MM/DD') } catch { return '' }
 }
 
-type AssetType = 'stock' | 'fund' | 'physical'
+type AssetType = 'stock' | 'fund' | 'physical' | 'cash'
 
 type Instrument = {
   symbol: string        // l18 برای سهام، slug برای صندوق و دارایی فیزیکی
@@ -97,6 +97,10 @@ const PHYSICAL_ITEMS: { symbol: string; name: string }[] = [
   { symbol: 'silver',       name: 'نقره (گرم)' },
 ]
 const PHYSICAL_KEYWORDS = ['طلا', 'سکه', 'نقره', 'فیزیکی', 'گرم']
+
+// پول نقد — یک ابزار ثابت با قیمت واحد همیشه ۱ تومان (تعداد = مبلغ تومانی)، بدون کارمزد
+const CASH_ITEM: { symbol: string; name: string } = { symbol: 'cash-toman', name: 'پول نقد' }
+const CASH_KEYWORDS = ['نقد', 'کش', 'وجه نقد']
 
 // نرمال‌سازی فارسی برای جستجو — ی/ي، ک/ك، نیم‌فاصله، اعراب و همزه‌ها
 const normFa = (s: string) =>
@@ -262,6 +266,8 @@ export default function PortfolioPage() {
       for (const p of PHYSICAL_ITEMS) {
         list.push({ symbol: p.symbol, name: p.name, type: 'physical', price: safe(physPrices[p.symbol]), changePct: 0 })
       }
+      // پول نقد قیمت بازار ندارد — هر واحد همیشه دقیقاً ۱ تومان
+      list.push({ symbol: CASH_ITEM.symbol, name: CASH_ITEM.name, type: 'cash', price: RIAL_PER_TOMAN, changePct: 0 })
       setInstruments(list)
     }
     load()
@@ -343,16 +349,21 @@ export default function PortfolioPage() {
   // کارمزد خودکار وقتی تعداد/قیمت/جهت عوض می‌شود — فیزیکی کارمزد بورسی ندارد
   useEffect(() => {
     if (!autoFee) return
-    if (picked?.type === 'physical') { setCommission('0'); return }
+    if (picked?.type === 'physical' || picked?.type === 'cash') { setCommission('0'); return }
     const gross = safe(qty) * safe(price)
     if (gross <= 0) { setCommission(''); return }
     setCommission(String(Math.round(gross * (side === 'buy' ? FEE_BUY : FEE_SELL))))
   }, [qty, price, side, autoFee, picked])
 
+  // پول نقد قیمت واحد ثابت (۱ تومان) دارد — همیشه هم‌سو با قیمت ابزار نگه‌داشته می‌شود
+  useEffect(() => {
+    if (picked?.type === 'cash') setPrice('1')
+  }, [picked])
+
   // کارمزد خودکار برای فرم فروش/خرید مجدد سریع روی ردیف دارایی
   useEffect(() => {
     if (!quickTx || !qtAutoFee) return
-    if (quickTx.type === 'physical') { setQtCommission('0'); return }
+    if (quickTx.type === 'physical' || quickTx.type === 'cash') { setQtCommission('0'); return }
     const gross = safe(qtQty) * safe(qtPrice)
     if (gross <= 0) { setQtCommission(''); return }
     setQtCommission(String(Math.round(gross * (quickTx.side === 'buy' ? FEE_BUY : FEE_SELL))))
@@ -379,10 +390,16 @@ export default function PortfolioPage() {
     }
     // دارایی فیزیکی بالاتر بیاید وقتی جستجو به طلا/سکه/نقره می‌خورد
     const physBoost = PHYSICAL_KEYWORDS.some(k => q.includes(normFa(k)))
+    const cashBoost = CASH_KEYWORDS.some(k => q.includes(normFa(k)))
     scored.sort((a, b) => {
       if (physBoost) {
         const pa = a.i.type === 'physical' ? 0 : 1
         const pb = b.i.type === 'physical' ? 0 : 1
+        if (pa !== pb) return pa - pb
+      }
+      if (cashBoost) {
+        const pa = a.i.type === 'cash' ? 0 : 1
+        const pb = b.i.type === 'cash' ? 0 : 1
         if (pa !== pb) return pa - pb
       }
       if (a.score !== b.score) return a.score - b.score
@@ -420,8 +437,8 @@ export default function PortfolioPage() {
     const out: Holding[] = []
     for (const h of map.values()) {
       h.avgCost = h.qty > 0 ? h.totalCost / h.qty : 0
-      // فیزیکی کارمزد فروش بورسی ندارد — سربه‌سر همان میانگین است
-      h.breakEven = h.qty > 0 ? (h.type === 'physical' ? h.avgCost : h.avgCost / (1 - FEE_SELL)) : 0
+      // فیزیکی/نقد کارمزد فروش بورسی ندارند — سربه‌سر همان میانگین است
+      h.breakEven = h.qty > 0 ? (h.type === 'physical' || h.type === 'cash' ? h.avgCost : h.avgCost / (1 - FEE_SELL)) : 0
       const inst = priceMap.get(h.symbol)
       // قیمت روز: آنلاین، و در نبودش قیمت دستی کاربر (هر نوع دارایی —
       // مثلاً نمادی که در دیتای روز جا افتاده یا نماد متوقف)
@@ -764,7 +781,7 @@ export default function PortfolioPage() {
       ['نماد', 'نام', 'نوع', 'تعداد', 'میانگین خرید (تومان)', 'سربه‌سر (تومان)', 'قیمت روز (تومان)', 'ارزش روز (تومان)', 'سود/زیان باز (تومان)', 'سود/زیان ٪', 'سود/زیان محقق‌شده (تومان)'],
       ...holdings.map(h => [
         h.symbol, h.name,
-        h.type === 'stock' ? 'سهم' : h.type === 'fund' ? 'صندوق' : 'فیزیکی',
+        h.type === 'stock' ? 'سهم' : h.type === 'fund' ? 'صندوق' : h.type === 'cash' ? 'نقد' : 'فیزیکی',
         h.qty, toToman(h.avgCost), toToman(h.breakEven),
         h.price != null ? toToman(h.price) : '', h.value != null ? toToman(h.value) : '',
         h.unrealized != null ? toToman(h.unrealized) : '',
@@ -785,7 +802,7 @@ export default function PortfolioPage() {
         const gross = safe(tx.quantity) * safe(tx.price)
         return [
           tx.trade_date, tx.symbol, tx.name,
-          tx.asset_type === 'stock' ? 'سهم' : tx.asset_type === 'fund' ? 'صندوق' : 'فیزیکی',
+          tx.asset_type === 'stock' ? 'سهم' : tx.asset_type === 'fund' ? 'صندوق' : tx.asset_type === 'cash' ? 'نقد' : 'فیزیکی',
           tx.side === 'buy' ? 'خرید' : 'فروش',
           safe(tx.quantity), toToman(tx.price), toToman(tx.commission),
           toToman(tx.side === 'buy' ? gross + safe(tx.commission) : gross - safe(tx.commission)),
@@ -801,7 +818,7 @@ export default function PortfolioPage() {
   const exportPdf = () => {
     const row = (cells: (string | number)[], tag = 'td') =>
       `<tr>${cells.map(c => `<${tag}>${c}</${tag}>`).join('')}</tr>`
-    const typeLabel = (ty: AssetType) => ty === 'stock' ? 'سهم' : ty === 'fund' ? 'صندوق' : 'فیزیکی'
+    const typeLabel = (ty: AssetType) => ty === 'stock' ? 'سهم' : ty === 'fund' ? 'صندوق' : ty === 'cash' ? 'نقد' : 'فیزیکی'
     const html = `<!doctype html><html dir="rtl" lang="fa"><head><meta charset="utf-8">
 <title>پورتفوی من — بورس سنج</title>
 <style>
@@ -1107,12 +1124,12 @@ ${txs.map(tx => row([
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(6, 1fr)', gap: 12 }}>
             {/* جستجوی نماد */}
             <div style={{ position: 'relative', gridColumn: isMobile ? '1 / -1' : 'span 2' }}>
-              <span style={label}>نماد (سهم یا صندوق)</span>
+              <span style={label}>نماد (سهم، صندوق، فیزیکی یا نقد)</span>
               <input
                 style={input}
                 value={query}
                 onChange={e => { setQuery(e.target.value); setPicked(null) }}
-                placeholder="مثلاً: فولاد، سکه امامی، طلای ۱۸…"
+                placeholder="مثلاً: فولاد، سکه امامی، طلای ۱۸، پول نقد…"
               />
               {query.trim() && !picked && (
                 <div style={{
@@ -1137,7 +1154,7 @@ ${txs.map(tx => row([
                         <span style={{ color: t.muted, marginRight: 6, fontSize: 11 }}>{i.name}</span>
                       </span>
                       <span style={{ fontSize: 11, color: t.muted }}>
-                        {i.type === 'fund' ? 'صندوق' : i.type === 'physical' ? '🥇 فیزیکی' : 'سهم'}
+                        {i.type === 'fund' ? 'صندوق' : i.type === 'physical' ? '🥇 فیزیکی' : i.type === 'cash' ? '💵 نقد' : 'سهم'}
                         {i.price > 0 && <> · {fmtToman(i.price)}</>}
                       </span>
                     </button>
@@ -1179,13 +1196,20 @@ ${txs.map(tx => row([
             </div>
 
             <div>
-              <span style={label}>تعداد</span>
-              <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder="۱۰۰۰" />
+              <span style={label}>{picked?.type === 'cash' ? 'مبلغ (تومان)' : 'تعداد'}</span>
+              <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder={picked?.type === 'cash' ? '۵٬۰۰۰٬۰۰۰' : '۱۰۰۰'} />
             </div>
 
             <div>
               <span style={label}>قیمت واحد (تومان)</span>
-              <input style={input} inputMode="numeric" value={price} onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, ''))} placeholder={picked ? String(toToman(picked.price)) : '—'} />
+              <input
+                style={{ ...input, opacity: picked?.type === 'cash' ? 0.6 : 1 }}
+                inputMode="numeric"
+                readOnly={picked?.type === 'cash'}
+                value={price}
+                onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, ''))}
+                placeholder={picked ? String(toToman(picked.price)) : '—'}
+              />
             </div>
 
             <div>
@@ -1204,7 +1228,7 @@ ${txs.map(tx => row([
                 کارمزد (تومان)
                 <label style={{ marginRight: 10, fontSize: 10.5, color: cream, cursor: 'pointer' }}>
                   <input type="checkbox" checked={autoFee} onChange={e => setAutoFee(e.target.checked)} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
-                  محاسبه خودکار ({picked?.type === 'physical' ? 'فیزیکی: بدون کارمزد' : side === 'buy' ? '۰٫۳۷٪ خرید' : '۰٫۸۸٪ فروش'})
+                  محاسبه خودکار ({picked?.type === 'physical' ? 'فیزیکی: بدون کارمزد' : picked?.type === 'cash' ? 'نقد: بدون کارمزد' : side === 'buy' ? '۰٫۳۷٪ خرید' : '۰٫۸۸٪ فروش'})
                 </label>
               </span>
               <input style={input} inputMode="numeric" value={commission} onChange={e => { setAutoFee(false); setCommission(e.target.value.replace(/[^\d.]/g, '')) }} placeholder="۰" />
@@ -1395,9 +1419,11 @@ ${txs.map(tx => row([
                         ? <Link href={`/stock/${encodeURIComponent(h.symbol)}`} style={{ color: t.brand, textDecoration: 'none', fontWeight: 600 }}>{h.symbol}</Link>
                         : h.type === 'fund'
                           ? <Link href={`/fund/${encodeURIComponent(h.symbol)}`} style={{ color: t.brand, textDecoration: 'none', fontWeight: 600 }}>{h.name}</Link>
-                          : <span style={{ fontWeight: 600 }}>🥇 {h.name}</span>}
+                          : h.type === 'cash'
+                            ? <span style={{ fontWeight: 600 }}>💵 {h.name}</span>
+                            : <span style={{ fontWeight: 600 }}>🥇 {h.name}</span>}
                       <div style={{ fontSize: 10, color: cream, marginTop: 2 }}>
-                        {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.name}
+                        {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.type === 'cash' ? 'پول نقد' : h.name}
                       </div>
                     </td>
                     <td style={td}>{fmtNum(h.qty)}</td>
@@ -1564,7 +1590,7 @@ ${txs.map(tx => row([
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 800 }}>{h.type === 'stock' ? h.symbol : h.name}</div>
                   <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>
-                    {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.name}
+                    {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.type === 'cash' ? 'پول نقد' : h.name}
                   </div>
                 </div>
                 <button
