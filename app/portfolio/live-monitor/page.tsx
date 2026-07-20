@@ -114,20 +114,25 @@ export default function PortfolioLiveMonitorPage() {
   const [animate, setAnimate] = useState(true)
   const [now, setNow] = useState(() => Date.now())
 
-  // نمادهای پورتفو (سهام/صندوق — نه دارایی فیزیکی که در stock_watch_5m داده‌ای ندارد)
+  // نمادهای پورتفو فعلی (سهام/صندوق با مانده مثبت — نه کل تاریخچه تراکنش‌ها، وگرنه نمادهای کاملاً فروخته‌شده هم می‌ماندند)
   useEffect(() => {
     let stop = false
     supabase
       .from('portfolio_transactions')
-      .select('symbol, name, asset_type')
+      .select('symbol, name, asset_type, side, quantity')
       .in('asset_type', ['stock', 'fund'])
       .then(({ data }) => {
         if (stop) return
         // صندوق‌ها گاهی با کد ISIN وارد شده‌اند (symbol) نه با تیکر بورسی؛ name همیشه همان تیکر واقعی است
-        const uniq = Array.from(new Set((data ?? []).map((r: any) =>
-          (r.asset_type === 'fund' ? (r.name || r.symbol) : r.symbol) as string)))
+        const qtyByKey = new Map<string, number>()
+        for (const r of (data ?? []) as any[]) {
+          const key = r.asset_type === 'fund' ? (r.name || r.symbol) : r.symbol
+          const q = Number(r.quantity) || 0
+          qtyByKey.set(key, (qtyByKey.get(key) ?? 0) + (r.side === 'sell' ? -q : q))
+        }
+        const uniq = Array.from(qtyByKey.entries()).filter(([, q]) => q > 0).map(([k]) => k)
         setSymbols(uniq)
-        setSelected(prev => prev ?? uniq[0] ?? null)
+        setSelected(prev => (prev && uniq.includes(prev)) ? prev : (uniq[0] ?? null))
       })
     return () => { stop = true }
   }, [])
