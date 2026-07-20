@@ -730,6 +730,8 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
         callback(arr, { backward: false, forward: false })
       },
     })
+    // با دیتاست‌های بزرگ (مثل ۱۰ سال آتی پیوسته) نمای پیش‌فرض روی قدیمی‌ترین کندل می‌ماند — همیشه به امروز اسکرول کن
+    chart.scrollToRealTime()
 
     if (scaleMode !== 'normal') {
       chart.overrideYAxis({ name: scaleMode, paneId: 'candle_pane' })
