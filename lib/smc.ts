@@ -10,7 +10,7 @@ const isNum = (v: number) => !Number.isNaN(v)
 export type SwingResult = { highLow: number[]; level: number[] } // 1=سقف سوئینگ، -1=کف
 export type FvgResult = { fvg: number[]; top: number[]; bottom: number[]; mitigatedIndex: number[] }
 export type BosChochResult = { bos: number[]; choch: number[]; level: number[]; brokenIndex: number[] }
-export type ObResult = { ob: number[]; top: number[]; bottom: number[]; obVolume: number[]; mitigatedIndex: number[]; percentage: number[] }
+export type ObResult = { ob: number[]; top: number[]; bottom: number[]; obVolume: number[]; mitigatedIndex: number[]; percentage: number[]; confirmedIndex: number[] }
 export type LiquidityResult = { liquidity: number[]; level: number[]; end: number[]; swept: number[] }
 
 /** سقف/کف سوئینگ — بالاترین/پایین‌ترین در پنجره swingLength کندل قبل و بعد */
@@ -198,6 +198,7 @@ export function orderBlocks(candles: Candle[], swings: SwingResult, closeMitigat
   const highVol: number[] = new Array(n).fill(0)
   const percentage: number[] = new Array(n).fill(0)
   const mitigatedIndex: number[] = new Array(n).fill(0)
+  const confirmedIndex: number[] = new Array(n).fill(0) // ایندکس کندلی که OB روی آن تشخیص داده شد (نقطهٔ عملی برای بک‌تست، نه obIdx تاریخی)
   const breaker: boolean[] = new Array(n).fill(false)
   const crossed: boolean[] = new Array(n).fill(false)
 
@@ -215,7 +216,7 @@ export function orderBlocks(candles: Candle[], swings: SwingResult, closeMitigat
 
   const reset = (idx: number) => {
     ob[idx] = 0; top[idx] = 0; bottom[idx] = 0; obVolume[idx] = 0
-    lowVol[idx] = 0; highVol[idx] = 0; mitigatedIndex[idx] = 0; percentage[idx] = 0
+    lowVol[idx] = 0; highVol[idx] = 0; mitigatedIndex[idx] = 0; percentage[idx] = 0; confirmedIndex[idx] = 0
   }
   const setVolumes = (obIdx: number, i: number, bullish: boolean) => {
     const v0 = candles[i].volume
@@ -255,6 +256,7 @@ export function orderBlocks(candles: Candle[], swings: SwingResult, closeMitigat
       }
       ob[obIdx] = 1; top[obIdx] = obTop; bottom[obIdx] = obBtm
       setVolumes(obIdx, i, true)
+      confirmedIndex[obIdx] = i
       activeBull.push(obIdx)
     }
   }
@@ -286,6 +288,7 @@ export function orderBlocks(candles: Candle[], swings: SwingResult, closeMitigat
       }
       ob[obIdx] = -1; top[obIdx] = obTop; bottom[obIdx] = obBtm
       setVolumes(obIdx, i, false)
+      confirmedIndex[obIdx] = i
       activeBear.push(obIdx)
     }
   }
@@ -297,6 +300,7 @@ export function orderBlocks(candles: Candle[], swings: SwingResult, closeMitigat
     obVolume: obVolume.map((v, i) => (ob[i] !== 0 ? v : NaNv)),
     mitigatedIndex: mitigatedIndex.map((v, i) => (ob[i] !== 0 ? v : NaNv)),
     percentage: percentage.map((v, i) => (ob[i] !== 0 ? v : NaNv)),
+    confirmedIndex: confirmedIndex.map((v, i) => (ob[i] !== 0 ? v : NaNv)),
   }
 }
 

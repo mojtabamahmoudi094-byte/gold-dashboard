@@ -12,8 +12,11 @@
  *   node backtest-signals.js --probe            → ۵ سیگنال پرتکرار، بدون نوشتن
  *   node backtest-signals.js --probe --limit=30  → فقط ۳۰ نماد اول (تست سریع)
  *
- * دامنه: سیگنال‌های SMC (structure_break/fvg/ob) عمداً بک‌تست نمی‌شوند — محاسبه‌شان
- * (swingHighsLows/bosChoch/orderBlocks) روی هر ایندکس تاریخی گران است.
+ * سیگنال‌های SMC (smc_bos/smc_choch/smc_fvg/smc_ob) هم پوشش داده می‌شوند —
+ * swingHighsLows/bosChoch/orderBlocks/fvg هرکدام یک‌بار روی کل تاریخچهٔ هر نماد
+ * محاسبه می‌شوند (نه به‌ازای هر ایندکس)، سپس رخداد هرکدام با ایندکس تاییدشان
+ * (brokenIndex برای بوس/چوچ، confirmedIndex برای اردربلاک، i+1 برای گپ) به سیگنال‌های
+ * همان روز اضافه می‌شود.
  */
 
 'use strict'
@@ -42,6 +45,7 @@ const LIMIT = (() => {
 
 const { sma, rsi, macdHist } = require('./screener-daily')
 const { detectCandlePattern } = require('./candle-patterns')
+const { swingHighsLows, fvg, bosChoch, orderBlocks } = require('./smc-lib')
 
 let sb = null
 function initClient() {
@@ -74,6 +78,7 @@ function backtestSymbol(rows, acc) {
   const s200 = sma(closes, 200)
   const rArr = rsi(closes)
   const hist = macdHist(closes)
+  const smcEvents = buildSmcEvents(rows)
   const maxHorizon = Math.max(...HORIZONS)
 
   for (let i = LOOKBACK; i < n - maxHorizon; i++) {
@@ -115,6 +120,9 @@ function backtestSymbol(rows, acc) {
     const cp = detectCandlePattern(rows.slice(Math.max(0, i - 11), i + 1))
     if (cp && cp.bias) signals.push({ key: `candle_${cp.key}`, bias: cp.bias })
 
+    const smcHere = smcEvents.get(i)
+    if (smcHere) for (const s of smcHere) signals.push(s)
+
     if (signals.length === 0) continue
     const entry = adjCloses[i]
     if (!(entry > 0)) continue
@@ -135,6 +143,50 @@ function backtestSymbol(rows, acc) {
       }
     }
   }
+}
+
+// یک‌بار روی کل تاریخچهٔ نماد اجرا می‌شود (نه به‌ازای هر ایندکس) — هر رخداد با
+// ایندکس تاییدش (نه ایندکس تاریخی الگو) map می‌شود تا در بک‌تست lookahead بایاس ایجاد نشود
+function buildSmcEvents(rows) {
+  const n = rows.length
+  const events = new Map() // index → [{key,bias}]
+  const add = (idx, key, bias) => {
+    if (idx == null || Number.isNaN(idx) || idx < 0 || idx >= n) return
+    let arr = events.get(idx)
+    if (!arr) { arr = []; events.set(idx, arr) }
+    arr.push({ key, bias })
+  }
+  try {
+    const candles = rows.map(r => ({
+      open: Number(r.open ?? r.close), high: Number(r.high ?? r.close),
+      low: Number(r.low ?? r.close), close: Number(r.close), volume: Number(r.volume) || 0,
+    }))
+    const swings = swingHighsLows(candles, 10)
+
+    // شکست ساختار — تایید در brokenIndex (اولین کندلی که واقعاً قیمت را رد کرد)
+    const bc = bosChoch(candles, swings)
+    for (let i = 0; i < n; i++) {
+      const br = bc.brokenIndex[i]
+      if (Number.isNaN(br)) continue
+      if (!Number.isNaN(bc.bos[i])) add(br, 'smc_bos', bc.bos[i] === 1 ? 'bull' : 'bear')
+      else if (!Number.isNaN(bc.choch[i])) add(br, 'smc_choch', bc.choch[i] === 1 ? 'bull' : 'bear')
+    }
+
+    // اردر بلاک — تایید در confirmedIndex (کندلی که سوئینگ را شکست و OB را فعال کرد)
+    const ob = orderBlocks(candles, swings)
+    for (let i = 0; i < n; i++) {
+      if (Number.isNaN(ob.ob[i])) continue
+      add(ob.confirmedIndex[i], 'smc_ob', ob.ob[i] === 1 ? 'bull' : 'bear')
+    }
+
+    // گپ ارزش منصفانه — تایید در i+1 (گپ فقط با بسته‌شدن کندل بعدی قطعی می‌شود)
+    const f = fvg(candles)
+    for (let i = 0; i < n; i++) {
+      if (Number.isNaN(f.fvg[i])) continue
+      add(i + 1, 'smc_fvg', f.fvg[i] === 1 ? 'bull' : 'bear')
+    }
+  } catch { /* SMC اختیاری است — خطای آن نباید کل نماد را متوقف کند */ }
+  return events
 }
 
 function median(arr) {

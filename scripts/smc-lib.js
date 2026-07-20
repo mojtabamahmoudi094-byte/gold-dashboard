@@ -184,6 +184,7 @@ function orderBlocks(candles, swings, closeMitigation = false) {
   const highVol = new Array(n).fill(0)
   const percentage = new Array(n).fill(0)
   const mitigatedIndex = new Array(n).fill(0)
+  const confirmedIndex = new Array(n).fill(0) // ایندکس کندلی که OB روی آن تشخیص داده شد (نقطهٔ عملی برای بک‌تست، نه obIdx تاریخی)
   const breaker = new Array(n).fill(false)
   const crossed = new Array(n).fill(false)
 
@@ -201,7 +202,7 @@ function orderBlocks(candles, swings, closeMitigation = false) {
 
   const reset = (idx) => {
     ob[idx] = 0; top[idx] = 0; bottom[idx] = 0; obVolume[idx] = 0
-    lowVol[idx] = 0; highVol[idx] = 0; mitigatedIndex[idx] = 0; percentage[idx] = 0
+    lowVol[idx] = 0; highVol[idx] = 0; mitigatedIndex[idx] = 0; percentage[idx] = 0; confirmedIndex[idx] = 0
   }
   const setVolumes = (obIdx, i, bullish) => {
     const v0 = candles[i].volume
@@ -240,6 +241,7 @@ function orderBlocks(candles, swings, closeMitigation = false) {
       }
       ob[obIdx] = 1; top[obIdx] = obTop; bottom[obIdx] = obBtm
       setVolumes(obIdx, i, true)
+      confirmedIndex[obIdx] = i
       activeBull.push(obIdx)
     }
   }
@@ -270,6 +272,7 @@ function orderBlocks(candles, swings, closeMitigation = false) {
       }
       ob[obIdx] = -1; top[obIdx] = obTop; bottom[obIdx] = obBtm
       setVolumes(obIdx, i, false)
+      confirmedIndex[obIdx] = i
       activeBear.push(obIdx)
     }
   }
@@ -281,6 +284,7 @@ function orderBlocks(candles, swings, closeMitigation = false) {
     obVolume: obVolume.map((v, i) => (ob[i] !== 0 ? v : NaNv)),
     mitigatedIndex: mitigatedIndex.map((v, i) => (ob[i] !== 0 ? v : NaNv)),
     percentage: percentage.map((v, i) => (ob[i] !== 0 ? v : NaNv)),
+    confirmedIndex: confirmedIndex.map((v, i) => (ob[i] !== 0 ? v : NaNv)),
   }
 }
 
