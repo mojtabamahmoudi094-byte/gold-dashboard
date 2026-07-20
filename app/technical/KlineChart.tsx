@@ -730,21 +730,8 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
         callback(arr, { backward: false, forward: false })
       },
     })
-    // با دیتاست‌های بزرگ (مثل ۱۰ سال آتی پیوسته) نمای پیش‌فرض روی قدیمی‌ترین کندل می‌ماند.
-    // DEBUG TEMP
-    // eslint-disable-next-line no-console
-    console.log('[dbg] dataFullRef.length', dataFullRef.current.length, 'visibleRange before', chart.getVisibleRange?.())
-    requestAnimationFrame(() => {
-      // eslint-disable-next-line no-console
-      console.log('[dbg] rAF1 visibleRange', chart.getVisibleRange?.(), 'barSpace', (chart as unknown as { getBarSpace?: () => unknown }).getBarSpace?.())
-      requestAnimationFrame(() => {
-        // eslint-disable-next-line no-console
-        console.log('[dbg] rAF2 before scroll visibleRange', chart.getVisibleRange?.())
-        chart.scrollToRealTime()
-        // eslint-disable-next-line no-console
-        console.log('[dbg] rAF2 after scroll visibleRange', chart.getVisibleRange?.())
-      })
-    })
+    // نمای اولیه را به آخرین کندل می‌رساند (بی‌اثر اگر داده از قبل به‌روز رندر شود، دفاعی برای دیتاست‌های بزرگ)
+    requestAnimationFrame(() => requestAnimationFrame(() => chart.scrollToRealTime()))
 
     if (scaleMode !== 'normal') {
       chart.overrideYAxis({ name: scaleMode, paneId: 'candle_pane' })

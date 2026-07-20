@@ -61,21 +61,44 @@ export default function FuturesPage() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     setRows(null)
-    supabase
-      .from('global_futures_candles')
-      .select('trade_date, trade_date_shamsi, open, high, low, close, volume')
-      .eq('symbol', symbol)
-      .order('trade_date', { ascending: true })
-      .then(({ data }) => setRows((data as GlobalRow[]) ?? []))
+    // سوپابیس هر درخواست را حداکثر ۱۰۰۰ ردیف می‌دهد — ۱۰ سال روزانه از این بیشتره، صفحه‌بندی لازمه
+    async function loadAll() {
+      const all: GlobalRow[] = []
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from('global_futures_candles')
+          .select('trade_date, trade_date_shamsi, open, high, low, close, volume')
+          .eq('symbol', symbol)
+          .order('trade_date', { ascending: true })
+          .range(from, from + 999)
+        if (error || !data?.length) break
+        all.push(...(data as GlobalRow[]))
+        if (data.length < 1000) break
+      }
+      if (!cancelled) setRows(all)
+    }
+    loadAll()
+    return () => { cancelled = true }
   }, [symbol])
 
   useEffect(() => {
-    supabase
-      .from('ime_futures_candles')
-      .select('contract_code, contract_description, trade_date, trade_date_shamsi, close, volume, open_interest, day_remain')
-      .order('trade_date', { ascending: true })
-      .then(({ data }) => setImeAll((data as ImeRow[]) ?? []))
+    async function loadAll() {
+      const all: ImeRow[] = []
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from('ime_futures_candles')
+          .select('contract_code, contract_description, trade_date, trade_date_shamsi, close, volume, open_interest, day_remain')
+          .order('trade_date', { ascending: true })
+          .range(from, from + 999)
+        if (error || !data?.length) break
+        all.push(...(data as ImeRow[]))
+        if (data.length < 1000) break
+      }
+      setImeAll(all)
+    }
+    loadAll()
   }, [])
 
   const candles: Candle[] = useMemo(() => {
