@@ -18,6 +18,9 @@ export default function ComparePage() {
   const [fund1, setFund1] = useState<string>('')
   const [fund2, setFund2] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [copilotQuery, setCopilotQuery] = useState('')
+  const [copilotLoading, setCopilotLoading] = useState(false)
+  const [copilotError, setCopilotError] = useState('')
 
   const t: any = isDark ? darkTheme : lightTheme
 
@@ -78,6 +81,39 @@ export default function ComparePage() {
   const d1 = fund1 ? getFundData(fund1) : null
   const d2 = fund2 ? getFundData(fund2) : null
 
+  // Copilot محدود صندوق‌های کالایی — فقط دو صندوق را از روی جمله کاربر تشخیص می‌دهد و
+  // dropdownهای موجود بالا را پر می‌کند؛ خودِ مقایسه/امتیازدهی همان منطق قاعده‌محور همین صفحه است
+  const commodityAssets = assets.filter(a => ['طلا', 'نقره', 'زعفران'].includes(a.category))
+  const runCopilot = async () => {
+    if (!copilotQuery.trim() || commodityAssets.length === 0) return
+    setCopilotLoading(true)
+    setCopilotError('')
+    try {
+      const candidates = commodityAssets.map(a => `${a.name} (${a.category})`)
+      const res = await fetch('/api/fund-copilot-nl', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: copilotQuery, candidates }),
+      })
+      const data = await res.json()
+      if (!data.ok) { setCopilotError(data.error || 'خطا در پردازش'); return }
+      const findSlug = (label: string | null) => {
+        if (!label) return null
+        const a = commodityAssets.find(x => `${x.name} (${x.category})` === label)
+        return a?.slug ?? null
+      }
+      const slug1 = findSlug(data.fund1)
+      const slug2 = findSlug(data.fund2)
+      if (!slug1 || !slug2) { setCopilotError('نتونستم دو صندوق را از جمله‌ی شما تشخیص بدم — از لیست پایین انتخاب کنید'); return }
+      setFund1(slug1)
+      setFund2(slug2)
+    } catch {
+      setCopilotError('ارتباط با سرور برقرار نشد')
+    } finally {
+      setCopilotLoading(false)
+    }
+  }
+
   const selectStyle = {
     fontSize: 14, padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
     background: t.panel, border: `0.5px solid ${t.borderStrong}`,
@@ -116,6 +152,34 @@ export default function ComparePage() {
           قدرت خریدار و…) کنار هم چیده شود. معیاری که یک صندوق در آن برتری دارد با تیک سبز مشخص می‌شود؛
           پایین صفحه هم یک جمع‌بندی خودکار از ۵ معیار کلیدی می‌بینید.
         </TutorialPanel>
+
+        {/* Copilot محدود — مقایسه صندوق‌های کالایی با جمله فارسی */}
+        {!loading && commodityAssets.length > 0 && (
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 15 }}>🤖</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: t.textBright }}>بین کدوم صندوق کالایی مقایسه کنم؟</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                value={copilotQuery}
+                onChange={e => setCopilotQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') runCopilot() }}
+                placeholder="مثلاً: طلای زرین بهتره یا سپهر طلا؟"
+                style={{ flex: '1 1 240px', fontSize: 13, padding: '10px 14px', borderRadius: 10, background: t.bg, border: `0.5px solid ${t.borderStrong}`, color: t.text, fontFamily: 'inherit', outline: 'none' }}
+              />
+              <button
+                onClick={runCopilot}
+                disabled={copilotLoading || !copilotQuery.trim()}
+                style={{ fontSize: 12.5, fontWeight: 700, padding: '10px 18px', borderRadius: 10, border: 'none', background: t.accent, color: '#0a0e17', cursor: copilotLoading ? 'default' : 'pointer', opacity: copilotLoading || !copilotQuery.trim() ? 0.6 : 1 }}
+              >
+                {copilotLoading ? 'در حال بررسی…' : 'مقایسه کن'}
+              </button>
+            </div>
+            {copilotError && <div style={{ fontSize: 11.5, color: '#FF6B6B' }}>{copilotError}</div>}
+            <div style={{ fontSize: 10.5, color: t.muted }}>فقط بین صندوق‌های طلا/نقره/زعفران — پاسخ فقط انتخاب دو صندوق است، عدد جدیدی تولید نمی‌شود</div>
+          </div>
+        )}
 
         {/* انتخاب دو صندوق */}
         {loading ? (
