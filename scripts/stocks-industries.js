@@ -422,6 +422,25 @@ async function main() {
     try {
       const { data: prevRow } = await sb.from('stock_industries').select('data').eq('id', 1).single()
       const prevInd = prevRow?.data?.industries
+
+      // نمادهای متوقف/غایب از پاسخ لحظه‌ای BrsApi (AllSymbols فقط نمادهای بازگشایی‌شده را برمی‌گرداند) —
+      // از آخرین اسنپ‌شات موجود حفظ می‌شوند تا از جستجو و صفحهٔ سهم حذف نشوند
+      if (Array.isArray(prevInd)) {
+        let sayerInd = industries.find(ind => ind.name === 'سایر')
+        for (const ind of prevInd) {
+          for (const s of ind.symbols ?? []) {
+            if (allL18.has(s.l18)) continue
+            if (!sayerInd) {
+              sayerInd = { id: null, name: 'سایر', symbols: [], count: 0, tval: 0, mv: 0, up: 0, down: 0, moneyIn: 0 }
+              industries.push(sayerInd)
+            }
+            sayerInd.symbols.push({ ...s, halted: true })
+            sayerInd.count++
+            allL18.add(s.l18)
+          }
+        }
+      }
+
       if (prevRow?.data?.usdRate != null && Array.isArray(prevInd)) {
         const prevByL18 = new Map()
         for (const ind of prevInd) for (const s of ind.symbols) if (s.mv_usd != null) prevByL18.set(s.l18, s.mv_usd)
