@@ -43,6 +43,8 @@ const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: '/vip/filters', priority: 0.6 },
   { path: '/market-map', priority: 0.7 },
   { path: '/alerts', priority: 0.5 },
+  { path: '/best-bourse-tools', priority: 0.6 },
+  { path: '/alternatives/rahavard365', priority: 0.6 },
 ]
 
 async function fundSlugs(): Promise<string[]> {
