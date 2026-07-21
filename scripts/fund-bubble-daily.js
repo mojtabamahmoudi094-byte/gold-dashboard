@@ -38,7 +38,9 @@ const { createClient } = require('@supabase/supabase-js')
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 if (!SUPABASE_URL || !SUPABASE_KEY) { console.error('❌ SUPABASE_URL/SUPABASE_KEY تنظیم نشده'); process.exit(1) }
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+let wsTransport
+try { wsTransport = require('ws') } catch { /* Node 22+ نیازی ندارد */ }
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, wsTransport ? { realtime: { transport: wsTransport } } : {})
 
 const BACKFILL = process.argv.includes('--backfill')
 
