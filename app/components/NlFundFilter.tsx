@@ -20,10 +20,13 @@ type Filter = {
   topHoldingQuery?: string | null
   fundReturnFundName?: string | null
   fundReturnPeriod?: 'day' | 'week' | 'month' | 'quarter' | 'year' | null
+  fundPortfolioQuery?: string | null
+  fundPortfolioMode?: 'holdings' | 'buys' | 'sells' | null
 }
 
 type HoldingResult = { slug: string; symbol: string; holdingName: string; weightPct: number; period: string }
 type ReturnAnswer = { symbol: string; slug: string; periodLabel: string; pct: number; fromDate: string; toDate: string }
+type PortfolioAnswer = { symbol: string; slug: string; mode: 'holdings' | 'buys' | 'sells'; period: string; items: { name: string; value: number }[] }
 
 const PERIOD_LABEL: Record<string, string> = { day: 'روزانه', week: 'یک هفته اخیر', month: 'یک ماه اخیر', quarter: 'سه ماه اخیر', year: 'یک سال اخیر' }
 // تقریب تعداد روزهای کاری (نه تقویمی) بورس برای هر بازه
@@ -39,6 +42,7 @@ const EXAMPLES = [
   'صندوق درآمد ثابت با بیشترین بازده هفتگی',
   'بازده صندوق پایا تو یک ماه گذشته چقدره؟',
   'صندوق‌هایی با ورود پول قوی',
+  'پورتفوی صندوق آسام چیه؟',
 ]
 
 // دستیار زبان طبیعی برای فیلتر صندوق‌ها — Gemini فقط جمله را به فیلتر ساختاریافته ترجمه می‌کند
@@ -55,6 +59,7 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
   const [results, setResults] = useState<Fund[] | null>(null)
   const [holdingResults, setHoldingResults] = useState<HoldingResult[] | null>(null)
   const [returnAnswer, setReturnAnswer] = useState<ReturnAnswer | null>(null)
+  const [portfolioAnswer, setPortfolioAnswer] = useState<PortfolioAnswer | null>(null)
   const [activeMetric, setActiveMetric] = useState<'changePct' | 'weeklyReturn'>('changePct')
 
   const calcScore = (f: Omit<Fund, 'score'>, maxFlow: number, maxTrade: number) => {
@@ -74,6 +79,7 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
     setResults(null)
     setHoldingResults(null)
     setReturnAnswer(null)
+    setPortfolioAnswer(null)
     try {
       const filterRes = await fetch('/api/fund-filter-nl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }).then(r => r.json())
       if (!filterRes.ok) { setError(filterRes.error || 'فهم درخواست ناموفق بود'); setLoading(false); return }
@@ -125,6 +131,28 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
           symbol: asset.name, slug: asset.slug, periodLabel: PERIOD_LABEL[period] ?? PERIOD_LABEL.month,
           pct, fromDate: past.trade_date_shamsi, toDate: latest.trade_date_shamsi,
         })
+        setLoading(false)
+        return
+      }
+
+      // حالت «پورتفوی صندوق X چیه؟» یا «صندوق X چی خریده/فروخته؟» — پرتفوی واقعی همان صندوق
+      if (filter.fundPortfolioQuery) {
+        const nq = filter.fundPortfolioQuery.trim()
+        const asset = assets.find(a => a.name === nq)
+          || assets.find(a => a.name.includes(nq) || nq.includes(a.name))
+        if (!asset) {
+          setError(`صندوقی با نام «${nq}» پیدا نشد.`)
+          setLoading(false)
+          return
+        }
+        const mode = filter.fundPortfolioMode || 'holdings'
+        const pRes = await fetch(`/api/fund-portfolio?slug=${encodeURIComponent(asset.slug)}&mode=${mode}`, { cache: 'no-store' }).then(r => r.json())
+        if (!pRes.items || pRes.items.length === 0) {
+          setError(`اطلاعات پرتفوی برای «${asset.name}» موجود نیست.`)
+          setLoading(false)
+          return
+        }
+        setPortfolioAnswer({ symbol: asset.name, slug: asset.slug, mode, period: pRes.period, items: pRes.items })
         setLoading(false)
         return
       }
@@ -226,6 +254,31 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
             {returnAnswer.pct >= 0 ? '+' : ''}{returnAnswer.pct.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
           </span>
         </Link>
+      )}
+      {portfolioAnswer && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: muted, marginBottom: 8 }}>
+            {portfolioAnswer.mode === 'buys' ? 'خریدهای اخیر' : portfolioAnswer.mode === 'sells' ? 'فروش‌های اخیر' : 'پرتفوی'} صندوق{' '}
+            <Link href={`/fund/${encodeURIComponent(portfolioAnswer.slug)}`} style={{ color: ACCENT, fontWeight: 700 }}>{portfolioAnswer.symbol}</Link>
+            {' '}({portfolioAnswer.period})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {portfolioAnswer.items.map((it, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                padding: '9px 12px', borderRadius: 10,
+                background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,30,46,0.02)',
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: text }}>{it.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>
+                  {portfolioAnswer.mode === 'holdings'
+                    ? `${it.value.toLocaleString('fa-IR')}٪`
+                    : `${Math.round(it.value / 1e9).toLocaleString('fa-IR')} م.ت`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
       {holdingResults && (
         holdingResults.length === 0 ? (
