@@ -65,6 +65,8 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   const [goldWeights, setGoldWeights] = useState(FUND_WEIGHTS)
   const [silverWeights, setSilverWeights] = useState(SILVER_FUND_WEIGHTS)
   const [bubbleRaw, setBubbleRaw] = useState<{ nav: number | null; marketBubbles: { bullion: number | null; coin: number | null } | null; silverBubble: number | null } | null>(null)
+  const [bubbleHistory, setBubbleHistory] = useState<{ trade_date: string; bubble_asmi: number | null; bubble_zati: number | null; bubble_vaqei: number | null }[]>([])
+  const [bubbleRange, setBubbleRange] = useState<30 | 90 | 365>(30)
 
   useEffect(() => {
     if (asset?.category === 'طلا') {
@@ -101,6 +103,14 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
         setBubbleRaw({ nav, marketBubbles: null, silverBubble })
       }
     }).catch(() => {})
+  }, [asset?.name, asset?.category])
+
+  // تاریخچه حباب (fund_bubble_daily) — scripts/fund-bubble-daily.js هر روز پر می‌کند
+  useEffect(() => {
+    if (!asset || (asset.category !== 'طلا' && asset.category !== 'نقره')) { setBubbleHistory([]); return }
+    supabase.from('fund_bubble_daily').select('trade_date, bubble_asmi, bubble_zati, bubble_vaqei')
+      .eq('fund_name', asset.name).order('trade_date', { ascending: true }).limit(365)
+      .then(({ data }) => setBubbleHistory(data ?? []))
   }, [asset?.name, asset?.category])
 
   const openFundMetric = (key: keyof FundSnapshotRow, label: string, color: string, unit?: string) => {
@@ -392,6 +402,44 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
                 </div>
               </>
             )}
+            {bubbleHistory.length >= 2 && (() => {
+              const slice = bubbleHistory.slice(-bubbleRange)
+              const vals = slice.map(r => r.bubble_vaqei ?? r.bubble_asmi ?? 0)
+              const maxAbs = Math.max(...vals.map(v => Math.abs(v)), 1)
+              return (
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ fontSize: 10.5, color: t.muted }}>روند حباب واقعی</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {([30, 90, 365] as const).map(r => (
+                        <button key={r} onClick={() => setBubbleRange(r)} style={{
+                          fontSize: 10.5, padding: '3px 10px', borderRadius: 7, cursor: 'pointer',
+                          background: bubbleRange === r ? t.accent : 'transparent',
+                          color: bubbleRange === r ? '#0a0e14' : t.muted,
+                          border: `0.5px solid ${bubbleRange === r ? t.accent : t.border}`,
+                        }}>{r} روزه</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', direction: 'ltr', alignItems: 'flex-end', gap: slice.length > 40 ? 1 : 3, height: 90, minWidth: 0 }}>
+                    {slice.map((r, i) => {
+                      const v = r.bubble_vaqei ?? r.bubble_asmi ?? 0
+                      const h = Math.max((Math.abs(v) / maxAbs) * 100, 3)
+                      return (
+                        <div key={r.trade_date + i} title={`${r.trade_date}: ${v >= 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪`}
+                          style={{
+                            flex: 1, minWidth: 0, maxWidth: 14, height: `${h}%`,
+                            borderRadius: 2, background: v >= 0 ? '#FF4D6A' : '#00E5A0',
+                          }} />
+                      )
+                    })}
+                  </div>
+                  <div style={{ fontSize: 9.5, color: t.muted, marginTop: 6 }}>
+                    {slice[0]?.trade_date} تا {slice[slice.length - 1]?.trade_date}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
 
