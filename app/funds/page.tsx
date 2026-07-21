@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AuthGate from '../../components/AuthGate'
+import NlFundFilter from '../components/NlFundFilter'
 import { shouldUseDark } from '../../lib/theme'
 
 const CATS = [
@@ -120,6 +121,8 @@ export default function FundsPage() {
             مشاهده و تحلیل صندوق‌های سرمایه‌گذاری طلا، نقره و زعفران — جریان پول، رتبه‌بندی و هشدار آنومالی
           </div>
         </div>
+
+        <NlFundFilter isDark={isDark} />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {CATS.map(cat => (
