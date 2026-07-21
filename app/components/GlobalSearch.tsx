@@ -6,27 +6,54 @@ import { clean } from '../../lib/vipFiltersShared'
 
 type Sym = { l18: string; l30: string; plp: number | null }
 type Industry = { name: string; symbols: Sym[] }
-type Payload = { industries: Industry[] }
+type ExtraGroup = { name: string; symbols: Sym[] }
+type Payload = { industries: Industry[]; extraGroups?: ExtraGroup[] }
+type Asset = { id: number; name: string; slug: string; category: string }
+type FundsPayload = { assets: Asset[] }
 
 const norm = (s: unknown) =>
   clean(s).replace(/[آأإ]/g, 'ا').replace(/ة/g, 'ه').replace(/ؤ/g, 'و')
 
-let cache: { s: Sym; indName: string }[] | null = null
-let inflight: Promise<{ s: Sym; indName: string }[]> | null = null
+type Entry = { l18: string; l30: string; plp: number | null; sub: string; href: string }
+
+let cache: Entry[] | null = null
+let inflight: Promise<Entry[]> | null = null
 
 async function loadSymbols() {
   if (cache) return cache
   if (!inflight) {
-    inflight = fetch('/api/stocks-industries')
-      .then(r => r.json())
-      .then((data: Payload) => {
-        const out: { s: Sym; indName: string }[] = []
-        for (const ind of data?.industries ?? [])
-          for (const s of ind.symbols ?? []) out.push({ s, indName: ind.name })
-        cache = out
-        return out
-      })
-      .catch(() => [])
+    inflight = Promise.all([
+      fetch('/api/stocks-industries').then(r => r.json()).catch(() => ({ industries: [] })),
+      fetch('/api/funds').then(r => r.json()).catch(() => ({ assets: [] })),
+    ]).then(([stocksData, fundsData]: [Payload, FundsPayload]) => {
+      const out: Entry[] = []
+      const seen = new Set<string>()
+
+      for (const ind of stocksData?.industries ?? []) {
+        for (const s of ind.symbols ?? []) {
+          if (seen.has(s.l18)) continue
+          seen.add(s.l18)
+          out.push({ l18: s.l18, l30: s.l30, plp: s.plp, sub: `${s.l30} · ${ind.name}`, href: `/stock/${encodeURIComponent(s.l18)}` })
+        }
+      }
+      // صندوق‌های سهام‌محور (اهرمی/بخشی/سهامی) — فقط در extraGroups هستند، نه industries
+      for (const grp of stocksData?.extraGroups ?? []) {
+        for (const s of grp.symbols ?? []) {
+          if (seen.has(s.l18)) continue
+          seen.add(s.l18)
+          out.push({ l18: s.l18, l30: s.l30 || s.l18, plp: s.plp, sub: grp.name, href: `/stock/${encodeURIComponent(s.l18)}` })
+        }
+      }
+      // صندوق‌های درآمد ثابت/کالایی و بقیه — از جدول assets (شامل slug صفحه صندوق)
+      for (const a of fundsData?.assets ?? []) {
+        if (seen.has(a.name)) continue
+        seen.add(a.name)
+        out.push({ l18: a.name, l30: a.name, plp: null, sub: a.category, href: `/fund/${encodeURIComponent(a.slug)}` })
+      }
+
+      cache = out
+      return out
+    })
   }
   return inflight
 }
@@ -41,7 +68,7 @@ const SearchIcon = () => (
 export default function GlobalSearch({ isDark, compact }: { isDark: boolean; compact?: boolean }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [symbols, setSymbols] = useState<{ s: Sym; indName: string }[]>([])
+  const [symbols, setSymbols] = useState<Entry[]>([])
   const [activeIdx, setActiveIdx] = useState(0)
   const wrapRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -70,9 +97,9 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
       for (const ch of s) if (ch === nq[i]) i++
       return i === nq.length
     }
-    const rank = (x: { s: Sym; indName: string }) => {
-      const nSym = norm(x.s.l18)
-      const nName = norm(x.s.l30)
+    const rank = (x: Entry) => {
+      const nSym = norm(x.l18)
+      const nName = norm(x.l30)
       return nSym.startsWith(nq) ? 0
         : nSym.includes(nq) ? 1
         : nName.includes(nq) ? 2
@@ -89,17 +116,17 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
 
   useEffect(() => setActiveIdx(0), [nq])
 
-  const goTo = (sym: string) => {
+  const goTo = (href: string) => {
     setOpen(false)
     setQuery('')
-    router.push(`/stock/${encodeURIComponent(sym)}`)
+    router.push(href)
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { setOpen(false); return }
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, results.length - 1)); return }
     if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); return }
-    if (e.key === 'Enter' && results[activeIdx]) { goTo(results[activeIdx].s.l18) }
+    if (e.key === 'Enter' && results[activeIdx]) { goTo(results[activeIdx].href) }
   }
 
   const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'
@@ -143,7 +170,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
             aria-autocomplete="list"
             aria-expanded={!!nq && results.length > 0}
             aria-controls="global-search-listbox"
-            aria-activedescendant={nq && results[activeIdx] ? `global-search-option-${results[activeIdx].s.l18}` : undefined}
+            aria-activedescendant={nq && results[activeIdx] ? `global-search-option-${results[activeIdx].l18}` : undefined}
             style={{
               width: '100%', boxSizing: 'border-box',
               padding: '9px 12px', borderRadius: 10,
@@ -158,7 +185,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
             <div id="global-search-listbox" role="listbox" style={{ marginTop: 6, maxHeight: 320, overflowY: 'auto' }}>
               {results.length === 0 ? (
                 <div style={{ padding: '14px 8px', fontSize: 12, color: muted, textAlign: 'center' }}>نمادی یافت نشد</div>
-              ) : results.map(({ s, indName }, i) => {
+              ) : results.map((s, i) => {
                 const up = (s.plp ?? 0) > 0
                 const down = (s.plp ?? 0) < 0
                 return (
@@ -167,7 +194,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
                     id={`global-search-option-${s.l18}`}
                     role="option"
                     aria-selected={i === activeIdx}
-                    onMouseDown={() => goTo(s.l18)}
+                    onMouseDown={() => goTo(s.href)}
                     onMouseEnter={() => setActiveIdx(i)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 8,
@@ -179,7 +206,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
                     <span style={{
                       fontSize: 11, color: muted, flex: 1, minWidth: 0,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>{s.l30} · {indName}</span>
+                    }}>{s.sub}</span>
                     {s.plp != null && (
                       <span style={{
                         fontSize: 11, fontWeight: 700, flexShrink: 0,
