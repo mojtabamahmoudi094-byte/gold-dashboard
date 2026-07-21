@@ -33,7 +33,12 @@ type Industry = {
   tval: number; mv: number; mv_usd?: number; up: number; down: number
   symbols: Sym[]
 }
-type Payload = { updated: string; industries: Industry[]; usdRate?: number | null }
+type ExtraGroup = {
+  id: number; name: string; kind: string; count: number
+  tval: number; mv: number; up: number; down: number
+  symbols: Sym[]
+}
+type Payload = { updated: string; industries: Industry[]; extraGroups?: ExtraGroup[]; usdRate?: number | null }
 
 const hemat = (rial: number) =>
   rial >= 1e13
@@ -126,6 +131,11 @@ export default function StockPage({ symbol, initialData, initialReports }: {
       const s = ind.symbols.find(x => x.l18 === symbol)
       if (s) return { s, ind }
     }
+    // صندوق‌ها/حق تقدم/کالایی‌ها در extraGroups هستند، نه industries
+    for (const grp of data.extraGroups ?? []) {
+      const s = grp.symbols.find(x => x.l18 === symbol)
+      if (s) return { s, ind: { id: null, name: grp.name, count: grp.count, tval: grp.tval, mv: grp.mv, up: grp.up, down: grp.down, symbols: grp.symbols } as Industry }
+    }
     return null
   }, [data, symbol])
 
@@ -145,7 +155,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '28px 16px' : '40px 24px' }}>
 
         {found && (
-          <Link href={`/stocks/${found.ind.id}`} style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
+          <Link href={found.ind.id != null ? `/stocks/${found.ind.id}` : '/market-map'} style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
             ← بازگشت به {found.ind.name}
           </Link>
         )}
@@ -211,7 +221,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                       <span style={{ fontSize: 12.5, color: muted, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.l30}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                      <Link href={`/stocks/${ind.id}`} style={{
+                      <Link href={ind.id != null ? `/stocks/${ind.id}` : '/market-map'} style={{
                         display: 'inline-block',
                         fontSize: 11, color: isDark ? '#7FB5E8' : '#2563EB', textDecoration: 'none',
                         padding: '4px 11px', borderRadius: 8,

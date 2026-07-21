@@ -19,7 +19,12 @@ export type Industry = {
   tval: number; mv: number; mv_usd?: number; up: number; down: number
   symbols: Sym[]
 }
-export type StocksIndustriesPayload = { updated: string; industries: Industry[]; usdRate?: number | null }
+export type ExtraGroup = {
+  id: number; name: string; kind: 'fund' | 'right' | 'commodity'; count: number
+  tval: number; mv: number; up: number; down: number
+  symbols: Sym[]
+}
+export type StocksIndustriesPayload = { updated: string; industries: Industry[]; extraGroups?: ExtraGroup[]; usdRate?: number | null }
 
 // منبع مشترک برای app/api/stocks-industries/route.ts (کلاینت) و صفحات SSR — تا داده لحظه‌ای سهام هم به API هم به HTML اولیه صفحه نماد برسد
 export async function getStocksIndustries(): Promise<StocksIndustriesPayload> {
