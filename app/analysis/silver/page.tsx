@@ -6,6 +6,7 @@ import { SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { Skeleton } from '../../components/ui/Skeleton'
 import BubbleBar from '../../components/ui/BubbleBar'
 import AuthGate from '../../../components/AuthGate'
+import EqualWeightIndexCard from '../../components/EqualWeightIndexCard'
 
 const GRAMS_PER_OZ = 31.103431
 
@@ -424,6 +425,8 @@ export default function SilverAnalysisPage() {
             </div>
           </div>
         </div>
+
+        <EqualWeightIndexCard category="نقره" isDark />
 
         <div style={{ fontSize: 10.5, color: muted, textAlign: 'center', padding: '4px 0 8px' }}>
           داده‌های این صفحه جنبه اطلاع‌رسانی دارند و توصیه سرمایه‌گذاری نیستند

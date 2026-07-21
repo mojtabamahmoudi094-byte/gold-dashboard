@@ -6,6 +6,7 @@ import { FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { Skeleton } from '../../components/ui/Skeleton'
 import BubbleBar from '../../components/ui/BubbleBar'
 import AuthGate from '../../../components/AuthGate'
+import EqualWeightIndexCard from '../../components/EqualWeightIndexCard'
 
 const fmt = (n: number | null, decimals = 0) =>
   n == null ? '—' : Math.round(n).toLocaleString('fa-IR', { maximumFractionDigits: decimals })
@@ -369,6 +370,8 @@ export default function GoldAnalysisPage() {
 
         {/* ── Row 5: Gold Funds Matrix ── */}
         <GoldFundsMatrix border={border} muted={muted} text={text} accent={accent} bg={bg} />
+
+        <EqualWeightIndexCard category="طلا" isDark />
 
         {/* ── Row 6: بورس کالا ── */}
         <Section title="بورس کالا" subtitle="قیمت‌های نقدی بازار فیزیکی (BrsAPI — بورس کالا)">
