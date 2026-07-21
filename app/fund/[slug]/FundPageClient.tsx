@@ -68,6 +68,8 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   const [bubbleRaw, setBubbleRaw] = useState<{ nav: number | null; marketBubbles: { bullion: number | null; coin: number | null } | null; silverBubble: number | null } | null>(null)
   const [bubbleHistory, setBubbleHistory] = useState<{ trade_date: string; bubble_asmi: number | null; bubble_zati: number | null; bubble_vaqei: number | null }[]>([])
   const [bubbleRange, setBubbleRange] = useState<30 | 90 | 365>(30)
+  const [showBubbleAvg, setShowBubbleAvg] = useState(true)
+  const [bubbleHoverIdx, setBubbleHoverIdx] = useState<number | null>(null)
 
   useEffect(() => {
     if (asset?.category === 'طلا') {
@@ -407,11 +409,34 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
               const slice = bubbleHistory.slice(-bubbleRange)
               const vals = slice.map(r => r.bubble_vaqei ?? r.bubble_asmi ?? 0)
               const maxAbs = Math.max(...vals.map(v => Math.abs(v)), 1)
+              const avg = vals.reduce((a, b) => a + b, 0) / vals.length
+              const barsH = 90
+              const half = barsH / 2
+              const avgTop = Math.min(Math.max(half - (avg / maxAbs) * half, 0), barsH)
+              const hovered = bubbleHoverIdx != null ? slice[bubbleHoverIdx] : null
+              const hoveredV = hovered ? (hovered.bubble_vaqei ?? hovered.bubble_asmi ?? 0) : null
               return (
                 <div style={{ marginTop: 18 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-                    <div style={{ fontSize: 10.5, color: t.muted }}>روند حباب واقعی</div>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 10.5, color: t.muted }}>روند حباب واقعی</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9.5, color: t.muted }}>
+                        <span style={{ width: 7, height: 7, borderRadius: 2, background: '#FF4D6A', display: 'inline-block' }} /> حباب
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9.5, color: t.muted }}>
+                        <span style={{ width: 7, height: 7, borderRadius: 2, background: '#00E5A0', display: 'inline-block' }} /> تخفیف
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button onClick={() => setShowBubbleAvg(s => !s)} style={{
+                        fontSize: 10.5, padding: '3px 10px', borderRadius: 7, cursor: 'pointer',
+                        background: showBubbleAvg ? 'rgba(217,180,90,0.15)' : 'transparent',
+                        color: showBubbleAvg ? '#d9b45b' : t.muted,
+                        border: `0.5px dashed ${showBubbleAvg ? '#d9b45b' : t.border}`,
+                        fontFamily: 'inherit',
+                      }}>
+                        میانگین {avg >= 0 ? '+' : ''}{avg.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
+                      </button>
                       {([30, 90, 365] as const).map(r => (
                         <button key={r} onClick={() => setBubbleRange(r)} style={{
                           fontSize: 10.5, padding: '3px 10px', borderRadius: 7, cursor: 'pointer',
@@ -422,21 +447,49 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
                       ))}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', direction: 'ltr', alignItems: 'flex-end', gap: slice.length > 40 ? 1 : 3, height: 90, minWidth: 0 }}>
-                    {slice.map((r, i) => {
-                      const v = r.bubble_vaqei ?? r.bubble_asmi ?? 0
-                      const h = Math.max((Math.abs(v) / maxAbs) * 100, 3)
-                      return (
-                        <div key={r.trade_date + i} title={`${r.trade_date}: ${v >= 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪`}
-                          style={{
-                            flex: 1, minWidth: 0, maxWidth: 14, height: `${h}%`,
-                            borderRadius: 2, background: v >= 0 ? '#FF4D6A' : '#00E5A0',
-                          }} />
-                      )
-                    })}
+
+                  <div style={{ position: 'relative', height: barsH, minWidth: 0 }}>
+                    {/* خط صفر */}
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: half, height: 1, background: t.border }} />
+                    {/* خط میانگین */}
+                    {showBubbleAvg && (
+                      <div style={{ position: 'absolute', left: 0, right: 0, top: avgTop, height: 0, borderTop: '1px dashed #d9b45b', opacity: 0.85 }} />
+                    )}
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', direction: 'ltr', gap: slice.length > 40 ? 1 : 3 }}>
+                      {slice.map((r, i) => {
+                        const v = r.bubble_vaqei ?? r.bubble_asmi ?? 0
+                        const barPx = Math.max((Math.abs(v) / maxAbs) * half, 2)
+                        const up = v >= 0
+                        const dim = bubbleHoverIdx != null && bubbleHoverIdx !== i
+                        return (
+                          <div key={r.trade_date + i}
+                            onMouseEnter={() => setBubbleHoverIdx(i)}
+                            onMouseLeave={() => setBubbleHoverIdx(prev => prev === i ? null : prev)}
+                            style={{ flex: 1, minWidth: 0, maxWidth: 14, height: barsH, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+                            <div style={{ height: half, display: 'flex', alignItems: 'flex-end' }}>
+                              {up && <div style={{ height: barPx, width: '100%', borderRadius: '2px 2px 0 0', background: '#FF4D6A', opacity: dim ? 0.35 : 1, transition: 'opacity .15s ease' }} />}
+                            </div>
+                            <div style={{ height: half, display: 'flex', alignItems: 'flex-start' }}>
+                              {!up && <div style={{ height: barPx, width: '100%', borderRadius: '0 0 2px 2px', background: '#00E5A0', opacity: dim ? 0.35 : 1, transition: 'opacity .15s ease' }} />}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 9.5, color: t.muted, marginTop: 6 }}>
-                    {slice[0]?.trade_date} تا {slice[slice.length - 1]?.trade_date}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, minHeight: 15 }}>
+                    <div style={{ fontSize: 9.5, color: t.muted }}>
+                      {slice[0]?.trade_date} تا {slice[slice.length - 1]?.trade_date}
+                    </div>
+                    {hovered && hoveredV != null && (
+                      <div style={{ fontSize: 10.5, display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span style={{ color: t.muted }}>{hovered.trade_date}</span>
+                        <span style={{ fontWeight: 700, color: hoveredV >= 0 ? '#FF4D6A' : '#00E5A0' }}>
+                          {hoveredV >= 0 ? '+' : ''}{hoveredV.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )
