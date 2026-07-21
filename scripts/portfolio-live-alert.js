@@ -65,6 +65,18 @@ async function tg(method, body) {
   return res.json()
 }
 
+// ادعای ارسال یکتا (DB-backed) — جلوی هشدار دوباره را می‌گیرد وقتی دو اجرای پشت‌سرهم
+// cron هنوز تیک تازه‌ای نمی‌بینند و همان «cur» قبلی را دوباره ارزیابی می‌کنند
+// (مثلاً وقتی نوشتن تیک روی سرور دیگر تأخیر داشته). بدون این، big_buy/big_sell چون
+// فقط روی مقایسه‌ی حافظه‌ای «۲ تیک آخر» تکیه دارند، ممکن است دوبار پشت هم فایر شوند.
+async function claimSend(key) {
+  const { error } = await sb.from('telegram_alert_sent').insert({ key })
+  if (!error) return true
+  if (error.code === '23505') { console.log(`[portfolio-live-alert] قبلاً ارسال شده — رد شد: ${key}`); return false }
+  console.error(`[portfolio-live-alert] claimSend خطا داد (${error.message}) — برای امنیت رد شد: ${key}`)
+  return false
+}
+
 // نمادها → کاربرانی که هم‌اکنون در پورتفویشان نگه داشته‌اند (مقدار خالص > ۰)
 async function loadHolders() {
   const { data: txs, error } = await sb.from('portfolio_transactions').select('user_id, symbol, name, asset_type, side, quantity')
@@ -124,13 +136,13 @@ async function checkBigTrades(bySymbol, holders) {
 
     // ارزش نشان‌داده‌شده = سرانه خرید/فروش (buy_pc_i/sell_pc_i) — همان مقداری که آستانه ۲۰۰ میلیون تومان را رد کرده،
     // یعنی اندازه‌ی تقریبی همین معامله‌ی درشت (نه مجموع کل خرید/فروش حقیقی امروز)
-    if (cur.big_buy > 0 && !(prev?.big_buy > 0)) {
+    if (cur.big_buy > 0 && !(prev?.big_buy > 0) && await claimSend(`big_buy|${symbol}|${cur.ts}`)) {
       const value = Math.round((cur.buy_pc_i || 0) / 10)
       const shares = price > 0 ? Math.round(value / price) : 0
       await notifyHolders(holders, symbol,
         `🟢 <b>خرید درشت</b> ${symbol}\nقیمت: ${fa(price)} تومان (${fa(pct, 1)}٪)\nارزش: ${fa(value)} تومان\nحجم: ${fa(shares)} سهم`)
     }
-    if (cur.big_sell > 0 && !(prev?.big_sell > 0)) {
+    if (cur.big_sell > 0 && !(prev?.big_sell > 0) && await claimSend(`big_sell|${symbol}|${cur.ts}`)) {
       const value = Math.round((cur.sell_pc_i || 0) / 10)
       const shares = price > 0 ? Math.round(value / price) : 0
       await notifyHolders(holders, symbol,
