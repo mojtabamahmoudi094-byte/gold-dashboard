@@ -126,8 +126,13 @@ async function main() {
       (() => { try { return JSON.parse(goldByDate.get(date))?.raw_commodity } catch { return null } })(),
     )
     const ime = imeFromCache(imeByDate.get(date))
-    const marketBubbleBullion = fairBullion != null && ime.goldBarT != null
-      ? ((ime.goldBarT - fairBullion) / fairBullion) * 100 : null
+    // مقیاس‌بندی دقیقاً مثل app/analysis/gold/page.tsx: fairBullion برای شمش ۱۰۰۰گرمی
+    // محاسبه شده و باید /1000 شود، تابلوی IME هم ×10 — این دو معیار واحد متفاوت دارند
+    // و بدون این تبدیل، حباب شمش به اشتباه چیزی حدود -99٪ درمی‌آید.
+    const fairBullionK = fairBullion != null ? fairBullion / 1000 : null
+    const tabloBullionK = ime.goldBarT != null ? ime.goldBarT * 10 : null
+    const marketBubbleBullion = fairBullionK != null && tabloBullionK != null
+      ? ((tabloBullionK - fairBullionK) / fairBullionK) * 100 : null
     const marketBubbleCoin = fairCoinCert != null && ime.goldCoinT != null
       ? ((ime.goldCoinT - fairCoinCert) / fairCoinCert) * 100 : null
     const silverBubble = fairSilverGram != null && ime.silverBarT != null
