@@ -439,6 +439,36 @@ async function main() {
             allL18.add(s.l18)
           }
         }
+
+        // بازیابی نمادهای متوقفی که ممکن است از زنجیره carry-forward جا مانده باشند
+        // (مثلاً بعد از ری‌استارت جدول یا وقفهٔ چندروزه در اجرای کرون) — فقط در اولین ران
+        // روزانه (نزدیک باز شدن بازار) از آرشیو ۹۰ روزه stock_industries_history بازیابی می‌شود
+        // تا هر تیک ۵ دقیقه‌ای بار سنگین روی Supabase نیاندازد
+        if (FORCE || mins < STOCKS_OPEN + 10) {
+          try {
+            const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+            const { data: histRows } = await sb.from('stock_industries_history')
+              .select('trade_date, data')
+              .gte('trade_date', cutoff)
+              .order('trade_date', { ascending: false })
+            for (const row of histRows ?? []) {
+              for (const ind of row.data?.industries ?? []) {
+                for (const s of ind.symbols ?? []) {
+                  if (allL18.has(s.l18)) continue
+                  if (!sayerInd) {
+                    sayerInd = { id: null, name: 'سایر', symbols: [], count: 0, tval: 0, mv: 0, up: 0, down: 0, moneyIn: 0 }
+                    industries.push(sayerInd)
+                  }
+                  sayerInd.symbols.push({ ...s, halted: true })
+                  sayerInd.count++
+                  allL18.add(s.l18)
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[stocks-industries] بازیابی از آرشیو ۹۰ روزه ناموفق:', e.message)
+          }
+        }
       }
 
       if (prevRow?.data?.usdRate != null && Array.isArray(prevInd)) {
