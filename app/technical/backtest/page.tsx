@@ -39,6 +39,53 @@ const HORIZONS = [5, 10, 20] as const
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
 
+type SignalGroup = { key: string; bias: 'bull' | 'bear'; byHorizon: Map<number, StatRow> }
+
+function StatsTable({ groups, muted, line }: { groups: SignalGroup[]; muted: string; line: string }) {
+  const th = (label: string) => (
+    <th key={label} style={{ padding: '10px 12px', fontSize: 11.5, fontWeight: 700, color: muted, textAlign: 'right', whiteSpace: 'nowrap' }}>
+      {label}
+    </th>
+  )
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
+      <thead>
+        <tr style={{ borderBottom: `1px solid ${line}` }}>
+          {th('سیگنال')}
+          {th('تعداد رخداد')}
+          {HORIZONS.flatMap(h => [th(`نرخ برد ${fa(h)}روزه`), th(`میانگین بازده ${fa(h)}روزه`)])}
+        </tr>
+      </thead>
+      <tbody>
+        {groups.map(g => (
+          <tr key={g.key} style={{ borderBottom: `1px solid ${line}` }}>
+            <td style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+              <span style={{ color: g.bias === 'bull' ? GREEN : RED }}>{g.bias === 'bull' ? '▲' : '▼'}</span> {labelOf(g.key)}
+            </td>
+            <td style={{ padding: '9px 12px', fontSize: 12.5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: muted }}>
+              {fa(g.byHorizon.get(10)?.sample_count ?? 0)}
+            </td>
+            {HORIZONS.flatMap(h => {
+              const s = g.byHorizon.get(h)
+              return [
+                <td key={`wr${h}`} style={{ padding: '9px 12px', fontSize: 12.5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                  {s ? `${fa(s.win_rate, 1)}٪` : '—'}
+                </td>,
+                <td key={`ar${h}`} style={{
+                  padding: '9px 12px', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
+                  color: !s ? muted : s.avg_return_pct >= 0 ? GREEN : RED,
+                }}>
+                  {s ? `${s.avg_return_pct >= 0 ? '+' : ''}${fa(s.avg_return_pct, 2)}٪` : '—'}
+                </td>,
+              ]
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 export default function BacktestPage() {
   const isMobile = useIsMobile()
   const [isDark, setIsDark] = useState(true)
@@ -57,10 +104,9 @@ export default function BacktestPage() {
     })
   }, [])
 
-  const bySignal = useMemo(() => {
-    if (!rows) return []
+  const groupBySignal = (list: StatRow[]) => {
     const map = new Map<string, { key: string; bias: 'bull' | 'bear'; byHorizon: Map<number, StatRow> }>()
-    for (const r of rows) {
+    for (const r of list) {
       let g = map.get(r.signal_key)
       if (!g) { g = { key: r.signal_key, bias: r.bias, byHorizon: new Map() }; map.set(r.signal_key, g) }
       g.byHorizon.set(r.horizon_days, r)
@@ -72,19 +118,57 @@ export default function BacktestPage() {
       if (aReliable !== bReliable) return aReliable ? -1 : 1
       return (bs?.win_rate ?? -1) - (as?.win_rate ?? -1)
     })
-  }, [rows])
+  }
+
+  const bySignal = useMemo(() => (rows ? groupBySignal(rows) : []), [rows])
+
+  // بک‌تست تعاملی — نماد دلخواه کاربر (زنده از /api/backtest-signal-symbol، نه جدول تجمیعی)
+  const [allSymbols, setAllSymbols] = useState<string[]>([])
+  const [query, setQuery] = useState('')
+  const [symbolRows, setSymbolRows] = useState<StatRow[] | null>(null)
+  const [symbolLoading, setSymbolLoading] = useState(false)
+  const [symbolError, setSymbolError] = useState<string | null>(null)
+  const [activeSymbol, setActiveSymbol] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/stocks-industries').then(r => r.json()).then(j => {
+      const syms = new Set<string>()
+      for (const ind of j.industries ?? []) for (const s of ind.symbols ?? []) if (s.l18) syms.add(s.l18)
+      setAllSymbols([...syms])
+    }).catch(() => {})
+  }, [])
+
+  const suggestions = useMemo(() => {
+    const q = query.trim()
+    if (!q) return []
+    return allSymbols.filter(s => s.includes(q)).slice(0, 8)
+  }, [query, allSymbols])
+
+  const runSymbolBacktest = async (symbol: string) => {
+    setQuery(symbol)
+    setActiveSymbol(symbol)
+    setSymbolLoading(true)
+    setSymbolError(null)
+    setSymbolRows(null)
+    try {
+      const res = await fetch(`/api/backtest-signal-symbol?symbol=${encodeURIComponent(symbol)}`)
+      const j = await res.json()
+      if (j.error) setSymbolError(j.error)
+      setSymbolRows(j.rows ?? [])
+    } catch {
+      setSymbolError('دریافت داده ناموفق بود')
+    } finally {
+      setSymbolLoading(false)
+    }
+  }
+
+  const symbolGrouped = useMemo(() => (symbolRows ? groupBySignal(symbolRows) : []), [symbolRows])
 
   const bg    = isDark ? '#060B14' : '#F4F7FB'
   const text  = isDark ? '#E8F4FF' : '#0F1E2E'
   const muted = isDark ? '#ddd5bd' : '#475569'
   const line  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)'
   const glass = glassStyle(isDark)
-
-  const th = (label: string) => (
-    <th style={{ padding: '10px 12px', fontSize: 11.5, fontWeight: 700, color: muted, textAlign: 'right', whiteSpace: 'nowrap' }}>
-      {label}
-    </th>
-  )
 
   return (
     <AuthGate title="تحلیل تکنیکال">
@@ -129,41 +213,7 @@ export default function BacktestPage() {
               داده‌ای نیست — اسکریپت بک‌تست هنوز روی سرور اجرا نشده
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${line}` }}>
-                  {th('سیگنال')}
-                  {th('تعداد رخداد')}
-                  {HORIZONS.flatMap(h => [th(`نرخ برد ${fa(h)}روزه`), th(`میانگین بازده ${fa(h)}روزه`)])}
-                </tr>
-              </thead>
-              <tbody>
-                {bySignal.map(g => (
-                  <tr key={g.key} style={{ borderBottom: `1px solid ${line}` }}>
-                    <td style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                      <span style={{ color: g.bias === 'bull' ? GREEN : RED }}>{g.bias === 'bull' ? '▲' : '▼'}</span> {labelOf(g.key)}
-                    </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12.5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: muted }}>
-                      {fa(g.byHorizon.get(10)?.sample_count ?? 0)}
-                    </td>
-                    {HORIZONS.flatMap(h => {
-                      const s = g.byHorizon.get(h)
-                      return [
-                        <td key={`wr${h}`} style={{ padding: '9px 12px', fontSize: 12.5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                          {s ? `${fa(s.win_rate, 1)}٪` : '—'}
-                        </td>,
-                        <td key={`ar${h}`} style={{
-                          padding: '9px 12px', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
-                          color: !s ? muted : s.avg_return_pct >= 0 ? GREEN : RED,
-                        }}>
-                          {s ? `${s.avg_return_pct >= 0 ? '+' : ''}${fa(s.avg_return_pct, 2)}٪` : '—'}
-                        </td>,
-                      ]
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <StatsTable groups={bySignal} muted={muted} line={line} />
           )}
         </div>
 
@@ -171,6 +221,58 @@ export default function BacktestPage() {
           این آمار صرفاً بازتاب رفتار تاریخی قیمت در دوره بک‌تست است (ممکن است تحت تأثیر روند کلی بازار در همان بازه باشد)
           و تضمینی برای آینده نیست؛ توصیه خرید یا فروش نیست، مسئولیت تصمیم‌های معاملاتی با خود شماست.
         </p>
+
+        {/* بک‌تست تعاملی — نماد دلخواه کاربر */}
+        <h2 style={{ fontSize: isMobile ? 18 : 21, fontWeight: 800, margin: '36px 0 6px', color: text }}>
+          بک‌تست تعاملی روی نماد دلخواه
+        </h2>
+        <p style={{ fontSize: 12.5, color: muted, margin: '0 0 16px', lineHeight: 1.8 }}>
+          به‌جای میانگین همه نمادها، ببین همین سیگنال‌ها دقیقاً روی یک نماد خاص در ۳ سال اخیر چه بازدهی داشته‌اند.
+        </p>
+        <div style={{ position: 'relative', maxWidth: 340, marginBottom: 16 }}>
+          <input
+            value={query}
+            onChange={e => { setQuery(e.target.value); setActiveSymbol(null) }}
+            placeholder="نام نماد را بنویس… (مثلاً فولاد)"
+            style={{
+              width: '100%', padding: '10px 14px', borderRadius: 10, fontSize: 13, fontFamily: 'inherit',
+              background: isDark ? 'rgba(255,255,255,0.03)' : '#fff', color: text,
+              border: `0.5px solid ${line}`,
+            }}
+          />
+          {query && !activeSymbol && suggestions.length > 0 && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, left: 0, marginTop: 4, zIndex: 10,
+              background: isDark ? '#0B1220' : '#fff', border: `0.5px solid ${line}`, borderRadius: 10,
+              overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+            }}>
+              {suggestions.map(s => (
+                <div key={s} onClick={() => runSymbolBacktest(s)} style={{
+                  padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: text,
+                }}>{s}</div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {activeSymbol && (
+          <div style={{ ...glass, borderRadius: 20, overflowX: 'auto' }}>
+            {symbolLoading ? (
+              <div style={{ color: muted, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>در حال محاسبه بک‌تست {activeSymbol}…</div>
+            ) : symbolError ? (
+              <div style={{ color: muted, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>{symbolError}</div>
+            ) : symbolGrouped.length === 0 ? (
+              <div style={{ color: muted, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>هیچ سیگنالی در تاریخچه این نماد رخ نداده</div>
+            ) : (
+              <>
+                <StatsTable groups={symbolGrouped} muted={muted} line={line} />
+                <div style={{ fontSize: 10.5, color: muted, padding: '10px 14px', lineHeight: 1.8 }}>
+                  الگوهای کندلی این‌جا پوشش داده نمی‌شوند — برای آن‌ها جدول بالا (میانگین همه نمادها) را ببین.
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
       </main>
     </AuthGate>
