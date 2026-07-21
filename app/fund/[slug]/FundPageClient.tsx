@@ -9,6 +9,7 @@ import { Skeleton, SkeletonBlock, SkeletonRows } from '../../components/ui/Skele
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
+import CommentsSection from '../../components/CommentsSection'
 import { FUND_WEIGHTS, SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { type ChartModalPoint } from '../../../components/ChartModal'
 
@@ -458,6 +459,8 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
 
         {/* اطلاعیه‌های کدال — دریافت زنده کلاینت‌ساید */}
         <CodalAnnouncements symbol={slug} isDark={isDark} isMobile={isMobile} />
+
+        <CommentsSection targetType="fund" targetKey={slug} isDark={isDark} />
 
         {/* ─── بخش گیت‌شده: فقط برای اعضا ─── */}
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>

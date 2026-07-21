@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { supabase } from '../../../lib/supabase'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
+import CommentsSection from '../../components/CommentsSection'
 import { type ChartModalPoint } from '../../../components/ChartModal'
 
 const ChartModal = dynamic(() => import('../../../components/ChartModal'), { ssr: false })
@@ -343,6 +344,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
               <ShareholdersSection symbol={symbol} t={{ panel, text, muted, line, isDark }} />
               <CodalAnnouncements symbol={symbol} isDark={isDark} isMobile={isMobile} />
               <AiChatSection symbol={symbol} t={{ panel, text, muted, line, isDark }} isMobile={isMobile} />
+              <CommentsSection targetType="stock" targetKey={symbol} isDark={isDark} />
             </>
           )
         })()}
