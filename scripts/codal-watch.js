@@ -675,9 +675,17 @@ async function fetchRecent() {
   } catch (e) { log(`کدال ناموفق (${e.message}) — پشتیبان BrsApi`) }
 
   const days = Math.max(1, Math.ceil(HOURS / 24))
-  const list = await fromBrsApi(jDate(new Date(Date.now() - days * 86_400_000)), jDate())
-  log(`منبع: BrsApi (سقف ۲۰ ردیف) — ${list.length} اطلاعیه`)
-  return list
+  try {
+    const list = await fromBrsApi(jDate(new Date(Date.now() - days * 86_400_000)), jDate())
+    log(`منبع: BrsApi (سقف ۲۰ ردیف) — ${list.length} اطلاعیه`)
+    return list
+  } catch (e) {
+    // هر دو منبع شکست خوردن — قبلاً اینجا کل پروسه FATAL می‌کرد و کل سیکل هدر می‌رفت
+    // (باگ ۲۰۲۶-۰۷-۲۱: صف تا ۱۵۰ نماد جمع شد چون یک سیکل کامل رد شد). حالا فقط لاگ
+    // می‌کنیم و لیست خالی برمی‌گردانیم — اجرای بعدی (۱۵ دقیقه دیگر) دوباره تلاش می‌کند.
+    log(`⚠️ پشتیبان BrsApi هم شکست خورد (${e.message}) — این سیکل رد شد، اجرای بعدی retry می‌کند`)
+    return []
+  }
 }
 
 const loadState = () => {
