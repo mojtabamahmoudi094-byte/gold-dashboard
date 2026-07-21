@@ -17,7 +17,10 @@ type Filter = {
   minTradeValue?: number | null
   onlyPositiveFlow?: boolean | null
   onlyNegativeFlow?: boolean | null
+  topHoldingQuery?: string | null
 }
+
+type HoldingResult = { slug: string; symbol: string; holdingName: string; weightPct: number; period: string }
 
 const safe = (v: unknown) => Number(v) || 0
 const GREEN = '#00E5A0'
@@ -42,6 +45,7 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<Fund[] | null>(null)
+  const [holdingResults, setHoldingResults] = useState<HoldingResult[] | null>(null)
 
   const calcScore = (f: Omit<Fund, 'score'>, maxFlow: number, maxTrade: number) => {
     let score = 0
@@ -58,14 +62,21 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
     setLoading(true)
     setError(null)
     setResults(null)
+    setHoldingResults(null)
     try {
-      const [fundsRes, filterRes] = await Promise.all([
-        fetch('/api/funds', { cache: 'no-store' }).then(r => r.json()),
-        fetch('/api/fund-filter-nl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }).then(r => r.json()),
-      ])
+      const filterRes = await fetch('/api/fund-filter-nl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }).then(r => r.json())
       if (!filterRes.ok) { setError(filterRes.error || 'فهم درخواست ناموفق بود'); setLoading(false); return }
       const filter: Filter = filterRes.filter || {}
 
+      // حالت «کدام صندوق بیشترین وزن روی سهم X را دارد» — از پرتفوی واقعی صندوق‌ها، نه فیلتر عددی
+      if (filter.topHoldingQuery) {
+        const hRes = await fetch(`/api/fund-holding-search?q=${encodeURIComponent(filter.topHoldingQuery)}`).then(r => r.json())
+        setHoldingResults(hRes.results ?? [])
+        setLoading(false)
+        return
+      }
+
+      const fundsRes = await fetch('/api/funds', { cache: 'no-store' }).then(r => r.json())
       const assets: any[] = fundsRes.assets ?? []
       const records: any[] = fundsRes.records ?? []
       const recById = new Map(records.map(r => [r.asset_id, r]))
@@ -143,6 +154,27 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
         </div>
       )}
       {error && <div style={{ fontSize: 12, color: RED, marginTop: 8 }}>{error}</div>}
+      {holdingResults && (
+        holdingResults.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: muted, marginTop: 10 }}>صندوقی با این سهم در پرتفویش پیدا نشد.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+            {holdingResults.map(h => (
+              <Link key={h.slug} href={`/fund/${encodeURIComponent(h.slug)}`} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                padding: '9px 12px', borderRadius: 10, textDecoration: 'none',
+                background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,30,46,0.02)',
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: text }}>{h.symbol}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 10.5, color: muted }}>{h.period}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>{h.weightPct.toLocaleString('fa-IR')}٪</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )
+      )}
       {results && (
         results.length === 0 ? (
           <div style={{ fontSize: 12.5, color: muted, marginTop: 10 }}>صندوقی با این شرایط پیدا نشد.</div>
