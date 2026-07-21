@@ -5,12 +5,12 @@ import Link from 'next/link'
 
 type Fund = {
   symbol: string; slug: string; category: string
-  changePct: number; tradeValue: number; netFlow: number; buyPower: number; score: number
+  changePct: number; weeklyReturn: number; tradeValue: number; netFlow: number; buyPower: number; score: number
 }
 
 type Filter = {
   category?: string | null
-  sortBy?: 'score' | 'changePct' | 'tradeValue' | 'netFlow' | 'buyPower' | null
+  sortBy?: 'score' | 'changePct' | 'weeklyReturn' | 'tradeValue' | 'netFlow' | 'buyPower' | null
   sortDir?: 'asc' | 'desc' | null
   minChangePct?: number | null
   maxChangePct?: number | null
@@ -18,9 +18,16 @@ type Filter = {
   onlyPositiveFlow?: boolean | null
   onlyNegativeFlow?: boolean | null
   topHoldingQuery?: string | null
+  fundReturnFundName?: string | null
+  fundReturnPeriod?: 'day' | 'week' | 'month' | 'quarter' | 'year' | null
 }
 
 type HoldingResult = { slug: string; symbol: string; holdingName: string; weightPct: number; period: string }
+type ReturnAnswer = { symbol: string; slug: string; periodLabel: string; pct: number; fromDate: string; toDate: string }
+
+const PERIOD_LABEL: Record<string, string> = { day: 'روزانه', week: 'یک هفته اخیر', month: 'یک ماه اخیر', quarter: 'سه ماه اخیر', year: 'یک سال اخیر' }
+// تقریب تعداد روزهای کاری (نه تقویمی) بورس برای هر بازه
+const PERIOD_TRADING_DAYS: Record<string, number> = { day: 1, week: 5, month: 22, quarter: 66, year: 242 }
 
 const safe = (v: unknown) => Number(v) || 0
 const GREEN = '#00E5A0'
@@ -29,8 +36,9 @@ const ACCENT = '#38BDF8'
 
 const EXAMPLES = [
   'صندوق‌های طلا با بیشترین رشد امروز',
+  'صندوق درآمد ثابت با بیشترین بازده هفتگی',
+  'بازده صندوق پایا تو یک ماه گذشته چقدره؟',
   'صندوق‌هایی با ورود پول قوی',
-  'صندوق‌های نقره با بیشترین ارزش معاملات',
 ]
 
 // دستیار زبان طبیعی برای فیلتر صندوق‌ها — Gemini فقط جمله را به فیلتر ساختاریافته ترجمه می‌کند
@@ -46,6 +54,8 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<Fund[] | null>(null)
   const [holdingResults, setHoldingResults] = useState<HoldingResult[] | null>(null)
+  const [returnAnswer, setReturnAnswer] = useState<ReturnAnswer | null>(null)
+  const [activeMetric, setActiveMetric] = useState<'changePct' | 'weeklyReturn'>('changePct')
 
   const calcScore = (f: Omit<Fund, 'score'>, maxFlow: number, maxTrade: number) => {
     let score = 0
@@ -63,6 +73,7 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
     setError(null)
     setResults(null)
     setHoldingResults(null)
+    setReturnAnswer(null)
     try {
       const filterRes = await fetch('/api/fund-filter-nl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }).then(r => r.json())
       if (!filterRes.ok) { setError(filterRes.error || 'فهم درخواست ناموفق بود'); setLoading(false); return }
@@ -79,14 +90,58 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
       const fundsRes = await fetch('/api/funds', { cache: 'no-store' }).then(r => r.json())
       const assets: any[] = fundsRes.assets ?? []
       const records: any[] = fundsRes.records ?? []
+      const histRows: any[] = fundsRes.histRows ?? []
       const recById = new Map(records.map(r => [r.asset_id, r]))
+      const histByAsset = new Map<number, any[]>()
+      for (const r of [...records, ...histRows]) {
+        if (!histByAsset.has(r.asset_id)) histByAsset.set(r.asset_id, [])
+        histByAsset.get(r.asset_id)!.push(r)
+      }
+
+      // حالت «بازده صندوق X در بازه Y چقدره؟» — برای یک صندوق مشخص، نه لیست/فیلتر
+      if (filter.fundReturnFundName) {
+        const nq = filter.fundReturnFundName.trim()
+        const asset = assets.find(a => a.name === nq)
+          || assets.find(a => a.name.includes(nq) || nq.includes(a.name))
+        if (!asset) {
+          setError(`صندوقی با نام «${nq}» پیدا نشد.`)
+          setLoading(false)
+          return
+        }
+        const period = filter.fundReturnPeriod || 'month'
+        const snapRes = await fetch(`/api/fund-snapshot?slug=${encodeURIComponent(asset.slug)}`, { cache: 'no-store' }).then(r => r.json())
+        const rows: any[] = (snapRes.rows ?? []).filter((r: any) => safe(r.price_close) > 0)
+        if (rows.length < 2) {
+          setError(`تاریخچه قیمتی کافی برای «${asset.name}» موجود نیست.`)
+          setLoading(false)
+          return
+        }
+        const tradingDays = PERIOD_TRADING_DAYS[period] ?? PERIOD_TRADING_DAYS.month
+        const latest = rows[rows.length - 1]
+        const pastIdx = Math.max(0, rows.length - 1 - tradingDays)
+        const past = rows[pastIdx]
+        const pct = safe(past.price_close) > 0 ? (safe(latest.price_close) - safe(past.price_close)) / safe(past.price_close) * 100 : 0
+        setReturnAnswer({
+          symbol: asset.name, slug: asset.slug, periodLabel: PERIOD_LABEL[period] ?? PERIOD_LABEL.month,
+          pct, fromDate: past.trade_date_shamsi, toDate: latest.trade_date_shamsi,
+        })
+        setLoading(false)
+        return
+      }
+
       let list: Omit<Fund, 'score'>[] = assets.map(a => {
         const rec = recById.get(a.id)
         const buyAvg = safe(rec?.buy_count_i) > 0 ? (safe(rec?.buy_i_volume) * safe(rec?.price_close)) / safe(rec?.buy_count_i) : 0
         const sellAvg = safe(rec?.sell_count_i) > 0 ? (safe(rec?.sell_i_volume) * safe(rec?.price_close)) / safe(rec?.sell_count_i) : 0
+        const hist = (histByAsset.get(a.id) ?? []).slice().sort((x, y) => String(x.trade_date_shamsi).localeCompare(String(y.trade_date_shamsi)))
+        const oldest = hist[0]
+        const weeklyReturn = oldest && safe(oldest.price_close) > 0 && rec
+          ? (safe(rec.price_close) - safe(oldest.price_close)) / safe(oldest.price_close) * 100
+          : 0
         return {
           symbol: a.name, slug: a.slug, category: a.category || 'طلا',
           changePct: safe(rec?.price_change_pct),
+          weeklyReturn,
           tradeValue: Math.round(safe(rec?.trade_value) / 1e9),
           netFlow: (safe(rec?.buy_i_volume) - safe(rec?.sell_i_volume)) * safe(rec?.price_close),
           buyPower: sellAvg > 0 ? buyAvg / sellAvg : 0,
@@ -108,6 +163,7 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
       const dir = filter.sortDir === 'asc' ? 1 : -1
       withScore.sort((a, b) => dir * ((a[sortBy] ?? 0) - (b[sortBy] ?? 0)))
 
+      setActiveMetric(sortBy === 'weeklyReturn' ? 'weeklyReturn' : 'changePct')
       setResults(withScore.slice(0, 15))
     } catch {
       setError('دریافت داده ناموفق بود')
@@ -154,6 +210,23 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
         </div>
       )}
       {error && <div style={{ fontSize: 12, color: RED, marginTop: 8 }}>{error}</div>}
+      {returnAnswer && (
+        <Link href={`/fund/${encodeURIComponent(returnAnswer.slug)}`} style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+          padding: '12px 14px', borderRadius: 10, textDecoration: 'none', marginTop: 12,
+          background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,30,46,0.02)',
+        }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: text }}>{returnAnswer.symbol}</div>
+            <div style={{ fontSize: 10.5, color: muted, marginTop: 3 }}>
+              بازده {returnAnswer.periodLabel} ({returnAnswer.fromDate} تا {returnAnswer.toDate})
+            </div>
+          </div>
+          <span style={{ fontSize: 16, fontWeight: 700, color: returnAnswer.pct >= 0 ? GREEN : RED }}>
+            {returnAnswer.pct >= 0 ? '+' : ''}{returnAnswer.pct.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
+          </span>
+        </Link>
+      )}
       {holdingResults && (
         holdingResults.length === 0 ? (
           <div style={{ fontSize: 12.5, color: muted, marginTop: 10 }}>صندوقی با این سهم در پرتفویش پیدا نشد.</div>
@@ -189,8 +262,9 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
                 <span style={{ fontSize: 13, fontWeight: 700, color: text }}>{f.symbol}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 11.5, color: muted }}>{f.tradeValue.toLocaleString('fa-IR')} م.ت</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: f.changePct >= 0 ? GREEN : RED }}>
-                    {f.changePct >= 0 ? '+' : ''}{f.changePct.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
+                  {activeMetric === 'weeklyReturn' && <span style={{ fontSize: 10, color: muted }}>هفتگی</span>}
+                  <span style={{ fontSize: 12, fontWeight: 700, color: f[activeMetric] >= 0 ? GREEN : RED }}>
+                    {f[activeMetric] >= 0 ? '+' : ''}{f[activeMetric].toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪
                   </span>
                 </div>
               </Link>
