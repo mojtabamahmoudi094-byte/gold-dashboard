@@ -29,6 +29,10 @@ async function loadSymbols() {
       const out: Entry[] = []
       const seen = new Set<string>()
 
+      // نگاشت نام صندوق → slug صفحه اختصاصی /fund (اگر وجود داشته باشد)
+      const fundSlug = new Map<string, string>()
+      for (const a of fundsData?.assets ?? []) fundSlug.set(a.name, a.slug)
+
       for (const ind of stocksData?.industries ?? []) {
         for (const s of ind.symbols ?? []) {
           if (seen.has(s.l18)) continue
@@ -37,11 +41,14 @@ async function loadSymbols() {
         }
       }
       // صندوق‌های سهام‌محور (اهرمی/بخشی/سهامی) — فقط در extraGroups هستند، نه industries
+      // اگر صفحه اختصاصی صندوق داشته باشند به /fund می‌روند، وگرنه /stock
       for (const grp of stocksData?.extraGroups ?? []) {
         for (const s of grp.symbols ?? []) {
           if (seen.has(s.l18)) continue
           seen.add(s.l18)
-          out.push({ l18: s.l18, l30: s.l30 || s.l18, plp: s.plp, sub: grp.name, href: `/stock/${encodeURIComponent(s.l18)}` })
+          const slug = fundSlug.get(s.l18)
+          const href = slug != null ? `/fund/${encodeURIComponent(slug)}` : `/stock/${encodeURIComponent(s.l18)}`
+          out.push({ l18: s.l18, l30: s.l30 || s.l18, plp: s.plp, sub: grp.name, href })
         }
       }
       // صندوق‌های درآمد ثابت/کالایی و بقیه — از جدول assets (شامل slug صفحه صندوق)
