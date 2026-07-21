@@ -6,6 +6,8 @@ import { todayShamsi } from '../../lib/format'
 import { darkTheme as t } from '../../lib/theme'
 // supabase used only for auth (login/session), NOT for data queries (those go via /api/*)
 
+const fa = (n: number) => n.toLocaleString('fa-IR')
+
 const BRSAPI_KEY = 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const BRSAPI_URL = `https://api.brsapi.ir/IME/Fund.php?key=${BRSAPI_KEY}`
 
@@ -152,10 +154,22 @@ export default function AdminPage() {
   const [autoSync, setAutoSync] = useState(false)
   const syncingRef              = useRef(false)
   type Stats = {
-    viewsToday: number
     usersCount: number
-    viewsByDay: { date: string; count: number }[]
+    signupsToday: number
+    signups7d: number
+    signups30d: number
+    activeUsers7d: number
+    viewsToday: number
+    viewsYesterday: number
+    views30d: number
+    uniqueToday: number
+    unique30d: number
+    onlineNow: number
+    viewsByDay: { date: string; count: number; visitors: number }[]
     signupsByDay: { date: string; count: number }[]
+    topPages: { path: string; views: number; visitors: number }[]
+    referrers: { host: string; count: number }[]
+    devices: Record<string, number>
   }
   type AdminUser = { id: string; email: string; created_at: string; last_sign_in_at: string | null }
   const [stats, setStats]       = useState<Stats | null>(null)
@@ -280,39 +294,180 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* Stats cards */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="rounded-2xl border p-6" style={{ background: t.surface, borderColor: t.border }}>
-            <div className="text-sm mb-1" style={{ color: t.muted }}>بازدید امروز</div>
-            <div className="text-3xl font-bold" style={{ color: t.textBright }}>{stats?.viewsToday ?? '...'}</div>
-          </div>
-          <div className="rounded-2xl border p-6" style={{ background: t.surface, borderColor: t.border }}>
-            <div className="text-sm mb-1" style={{ color: t.muted }}>تعداد ثبت‌نامی</div>
-            <div className="text-3xl font-bold" style={{ color: t.textBright }}>{stats?.usersCount ?? '...'}</div>
-          </div>
+        {/* KPI cards — traffic */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          {[
+            {
+              label: 'بازدید امروز',
+              value: stats?.viewsToday,
+              sub: stats && stats.viewsYesterday > 0
+                ? `${stats.viewsToday >= stats.viewsYesterday ? '▲' : '▼'} دیروز: ${fa(stats.viewsYesterday)}`
+                : null,
+              subColor: stats && stats.viewsToday >= stats.viewsYesterday ? t.green : t.red,
+            },
+            { label: 'بازدیدکننده یکتای امروز', value: stats?.uniqueToday, sub: null, subColor: t.muted },
+            {
+              label: 'آنلاین همین حالا',
+              value: stats?.onlineNow,
+              sub: '۵ دقیقه اخیر',
+              subColor: t.green,
+            },
+            {
+              label: 'بازدید ۳۰ روز',
+              value: stats?.views30d,
+              sub: stats ? `${fa(stats.unique30d)} بازدیدکننده یکتا` : null,
+              subColor: t.muted,
+            },
+          ].map(c => (
+            <div key={c.label} className="rounded-2xl border p-4 md:p-5" style={{ background: t.surface, borderColor: t.border }}>
+              <div className="text-xs md:text-sm mb-1" style={{ color: t.muted }}>{c.label}</div>
+              <div className="text-2xl md:text-3xl font-bold" style={{ color: t.textBright }}>
+                {c.value !== undefined ? fa(c.value as number) : '...'}
+              </div>
+              {c.sub && <div className="text-[11px] mt-1" style={{ color: c.subColor }}>{c.sub}</div>}
+            </div>
+          ))}
         </div>
 
-        {/* Daily views chart */}
+        {/* KPI cards — users */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          {[
+            { label: 'کل کاربران', value: stats?.usersCount },
+            { label: 'ثبت‌نام امروز', value: stats?.signupsToday },
+            { label: 'ثبت‌نام ۷ روز اخیر', value: stats?.signups7d },
+            { label: 'کاربران فعال ۷ روز', value: stats?.activeUsers7d },
+          ].map(c => (
+            <div key={c.label} className="rounded-2xl border p-4 md:p-5" style={{ background: t.surface, borderColor: t.border }}>
+              <div className="text-xs md:text-sm mb-1" style={{ color: t.muted }}>{c.label}</div>
+              <div className="text-2xl md:text-3xl font-bold" style={{ color: t.textBright }}>
+                {c.value !== undefined ? fa(c.value as number) : '...'}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Daily views chart — 30 days */}
         {stats && (
-          <div className="rounded-2xl border p-6 mb-4" style={{ background: t.surface, borderColor: t.border }}>
-            <h2 className="font-bold mb-4" style={{ color: t.textBright }}>بازدید ۷ روز اخیر</h2>
-            <div className="flex items-end gap-2" style={{ height: 100 }}>
-              {stats.viewsByDay.map(d => {
+          <div className="rounded-2xl border p-4 md:p-6 mb-4" style={{ background: t.surface, borderColor: t.border }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold" style={{ color: t.textBright }}>بازدید ۳۰ روز اخیر</h2>
+              <div className="text-xs" style={{ color: t.muted }}>ستون = بازدید · عدد داخل تولتیپ</div>
+            </div>
+            <div className="flex items-end gap-[2px] md:gap-1" style={{ height: 120 }}>
+              {stats.viewsByDay.map((d, i) => {
                 const max = Math.max(1, ...stats.viewsByDay.map(x => x.count))
                 return (
-                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="text-xs" style={{ color: t.muted }}>{d.count}</div>
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${d.date} — ${fa(d.count)} بازدید، ${fa(d.visitors)} یکتا`}>
                     <div
-                      className="w-full rounded-t-md"
+                      className="w-full rounded-t-sm"
                       style={{
-                        height: Math.max(4, (d.count / max) * 70),
-                        background: `linear-gradient(180deg, ${t.brand}, ${t.brand2})`,
+                        height: Math.max(3, (d.count / max) * 95),
+                        background: i === stats.viewsByDay.length - 1
+                          ? `linear-gradient(180deg, ${t.brand2}, ${t.brand})`
+                          : `linear-gradient(180deg, ${t.brand}, ${t.brand}66)`,
                       }}
                     />
-                    <div className="text-[10px]" style={{ color: t.muted }}>{d.date.slice(5)}</div>
+                    <div className="text-[9px] leading-none" style={{ color: t.muted }}>
+                      {i % 5 === 0 || i === stats.viewsByDay.length - 1 ? d.date.slice(8) : ''}
+                    </div>
                   </div>
                 )
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Signups chart — 30 days */}
+        {stats && stats.signupsByDay.some(d => d.count > 0) && (
+          <div className="rounded-2xl border p-4 md:p-6 mb-4" style={{ background: t.surface, borderColor: t.border }}>
+            <h2 className="font-bold mb-4" style={{ color: t.textBright }}>ثبت‌نام ۳۰ روز اخیر</h2>
+            <div className="flex items-end gap-[2px] md:gap-1" style={{ height: 80 }}>
+              {stats.signupsByDay.map((d, i) => {
+                const max = Math.max(1, ...stats.signupsByDay.map(x => x.count))
+                return (
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${d.date} — ${fa(d.count)} ثبت‌نام`}>
+                    <div
+                      className="w-full rounded-t-sm"
+                      style={{ height: Math.max(3, (d.count / max) * 60), background: t.green }}
+                    />
+                    <div className="text-[9px] leading-none" style={{ color: t.muted }}>
+                      {i % 5 === 0 || i === stats.signupsByDay.length - 1 ? d.date.slice(8) : ''}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Top pages + devices/referrers */}
+        {stats && (
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="rounded-2xl border p-4 md:p-6" style={{ background: t.surface, borderColor: t.border }}>
+              <h2 className="font-bold mb-4" style={{ color: t.textBright }}>صفحات پربازدید (۳۰ روز)</h2>
+              {stats.topPages.length === 0 ? (
+                <div className="text-sm" style={{ color: t.muted }}>داده‌ای نیست</div>
+              ) : (
+                <div className="space-y-2">
+                  {stats.topPages.map(p => {
+                    const max = Math.max(1, stats.topPages[0].views)
+                    return (
+                      <div key={p.path} className="text-sm">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="font-mono text-xs truncate" dir="ltr" style={{ color: t.text }}>{p.path}</span>
+                          <span className="text-xs shrink-0" style={{ color: t.muted }}>
+                            {fa(p.views)} بازدید · {fa(p.visitors)} یکتا
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: t.border }}>
+                          <div className="h-full rounded-full" style={{ width: `${(p.views / max) * 100}%`, background: `linear-gradient(90deg, ${t.brand}, ${t.brand2})` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-2xl border p-4 md:p-6" style={{ background: t.surface, borderColor: t.border }}>
+                <h2 className="font-bold mb-4" style={{ color: t.textBright }}>دستگاه‌ها</h2>
+                {Object.keys(stats.devices).length === 0 ? (
+                  <div className="text-sm" style={{ color: t.muted }}>داده‌ای هنوز ثبت نشده (از این نسخه به بعد جمع می‌شود)</div>
+                ) : (
+                  <div className="space-y-2">
+                    {Object.entries(stats.devices).sort((a, b) => b[1] - a[1]).map(([dev, count]) => {
+                      const total = Object.values(stats.devices).reduce((s, n) => s + n, 0)
+                      const label = dev === 'mobile' ? 'موبایل' : dev === 'desktop' ? 'دسکتاپ' : dev === 'tablet' ? 'تبلت' : dev
+                      return (
+                        <div key={dev} className="flex items-center gap-3 text-sm">
+                          <span className="w-16 shrink-0" style={{ color: t.text }}>{label}</span>
+                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: t.border }}>
+                            <div className="h-full rounded-full" style={{ width: `${(count / total) * 100}%`, background: t.brand }} />
+                          </div>
+                          <span className="text-xs w-14 text-left shrink-0" style={{ color: t.muted }}>{fa(Math.round((count / total) * 100))}٪</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border p-4 md:p-6" style={{ background: t.surface, borderColor: t.border }}>
+                <h2 className="font-bold mb-4" style={{ color: t.textBright }}>منبع ورود (رفرر خارجی)</h2>
+                {stats.referrers.length === 0 ? (
+                  <div className="text-sm" style={{ color: t.muted }}>داده‌ای هنوز ثبت نشده (از این نسخه به بعد جمع می‌شود)</div>
+                ) : (
+                  <div className="space-y-2">
+                    {stats.referrers.map(r => (
+                      <div key={r.host} className="flex items-center justify-between text-sm">
+                        <span className="font-mono text-xs truncate" dir="ltr" style={{ color: t.text }}>{r.host}</span>
+                        <span className="text-xs shrink-0" style={{ color: t.muted }}>{fa(r.count)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
