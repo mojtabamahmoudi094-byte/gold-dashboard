@@ -94,7 +94,7 @@ function imeFromCache(note) {
 
 async function fetchCacheByDate(signalType) {
   const { data, error } = await sb.from('signals').select('signal_date_shamsi, note')
-    .eq('signal_type', signalType).order('id', { ascending: true })
+    .eq('signal_type', signalType).order('created_at', { ascending: true })
   if (error) throw error
   const byDate = new Map()
   for (const row of data || []) if (row.note) byDate.set(row.signal_date_shamsi, row.note)

@@ -238,6 +238,7 @@ export default function AdminPage() {
           <input
             type="email"
             placeholder="ایمیل"
+            aria-label="ایمیل"
             value={email}
             onChange={e => setEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && login()}
@@ -247,6 +248,7 @@ export default function AdminPage() {
           <input
             type="password"
             placeholder="رمز عبور"
+            aria-label="رمز عبور"
             value={password}
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && login()}

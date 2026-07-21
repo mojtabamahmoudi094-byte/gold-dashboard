@@ -145,7 +145,7 @@ function loadStockInfo() {
       }
       _groupPeAvg.set(ind.id, pes.length ? pes.reduce((a, b) => a + b, 0) / pes.length : null)
     }
-  } catch {}
+  } catch (e) { log(`⚠️ خواندن stocks-industries.json ناموفق — ${e.message}`) }
 }
 function peOf(symbol) { loadStockInfo(); return _stockMap.get(symbol)?.pe ?? null }
 // {pe, groupPe, mv (ریال), shares} یا null اگر نماد تو فید نبود

@@ -123,6 +123,25 @@ const ICON = {
       <polyline points="13 17 17 21 21 17" /><line x1="17" y1="21" x2="17" y2="7" />
     </svg>
   ),
+  futures: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" />
+      <line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" />
+      <path d="M7.5 15.5 L11 13 L13.5 15 L17 12" />
+    </svg>
+  ),
+  map: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="10" height="8" rx="1" /><rect x="15" y="3" width="6" height="5" rx="1" />
+      <rect x="15" y="10" width="6" height="11" rx="1" /><rect x="3" y="13" width="10" height="8" rx="1" />
+    </svg>
+  ),
+  bell: (c: string) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 4 C8 4 6.5 8 6.5 11.5 C6.5 15.5 4.5 16.5 4.5 17.5 L19.5 17.5 C19.5 16.5 17.5 15.5 17.5 11.5 C17.5 8 16 4 12 4 Z" />
+      <path d="M9.5 20.5 L14.5 20.5" />
+    </svg>
+  ),
 }
 
 const FEATURES: { href: string; title: string; desc: string; color: string; icon: (c: string) => ReactNode; badge?: string }[] = [
@@ -241,6 +260,35 @@ const FEATURES: { href: string; title: string; desc: string; color: string; icon
     desc: 'مقایسه‌ی عملکرد دو تا پنج صندوق کنار هم به صورت بصری',
     color: '#f4d795',
     icon: ICON.compare,
+  },
+  {
+    href: '/compare/stocks',
+    title: 'مقایسه سهام',
+    desc: 'مقایسه‌ی هم‌زمان تا ۴ نماد با نمودار بازدهی نرمال‌شده و جدول RSI',
+    color: 'oklch(0.75 0.14 230)',
+    icon: ICON.compare,
+  },
+  {
+    href: '/futures',
+    title: 'قراردادهای آتی',
+    desc: 'قیمت جهانی طلا، نقره، نفت و مس به‌همراه قراردادهای آتی بورس کالای ایران',
+    color: '#fb923c',
+    icon: ICON.futures,
+  },
+  {
+    href: '/market-map',
+    title: 'نقشه بازار',
+    desc: 'نمای بصری صنایع و نمادهای بازار بر اساس ارزش معاملات و درصد رشد قیمت',
+    color: 'oklch(0.7 0.14 250)',
+    icon: ICON.map,
+  },
+  {
+    href: '/alerts',
+    title: 'هشدارها',
+    desc: 'هشدار قیمت سهم و صندوق یا حباب طلا/نقره روی تلگرام، به‌محض رسیدن به هدف',
+    color: 'oklch(0.72 0.19 25)',
+    icon: ICON.bell,
+    badge: 'جدید',
   },
 ]
 
@@ -665,7 +713,7 @@ export default function HomePage() {
                 onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
                 <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.l18}</span>
-                <span style={{ fontSize: 12.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
+                <span style={{ fontSize: 12.5, color: softMuted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
                 <span style={{ marginInlineStart: 'auto', flexShrink: 0, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontWeight: 700, fontSize: 13, fontFamily: 'system-ui, sans-serif' }}>{s.pl.toLocaleString('fa-IR')}</span>
                   <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: t.green }}>▲ {s.plp.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪</span>
@@ -694,7 +742,7 @@ export default function HomePage() {
                   onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? rowBg : 'transparent' }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
                   <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.l18}</span>
-                  <span style={{ fontSize: 12.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
+                  <span style={{ fontSize: 12.5, color: softMuted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.l30}</span>
                   <span style={{ marginInlineStart: 'auto', flexShrink: 0, textAlign: 'left' }}>
                     <span style={{ display: 'block', fontWeight: 700, fontSize: 13, fontFamily: 'system-ui, sans-serif' }}>{fmtRial(s.tval)}</span>
                     <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: pos ? t.green : t.red }}>{pos ? '▲' : '▼'} {Math.abs(s.plp).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪</span>
@@ -765,7 +813,7 @@ export default function HomePage() {
               <div key={s.n} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, marginBottom: 6, background: i % 2 === 0 ? rowBg : 'transparent' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: softMuted, width: 16, flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>{(i + 1).toLocaleString('fa-IR')}</span>
                 <span style={{ fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{s.sym || s.n}</span>
-                {s.sym && <span style={{ fontSize: 12.5, color: softMuted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.n}</span>}
+                {s.sym && <span style={{ fontSize: 12.5, color: softMuted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.n}</span>}
                 <span style={{ marginInlineStart: 'auto', flexShrink: 0, fontWeight: 700, fontSize: 13, color: t.green, fontFamily: 'system-ui, sans-serif' }}>+{fmtBt(s.net)}</span>
               </div>
             ))}

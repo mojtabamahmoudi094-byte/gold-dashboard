@@ -222,6 +222,7 @@ async function main() {
       catch (e) { console.error(`[codal-portfolio-notify] ارسال به ${w.chatId} ناموفق: ${e.message}`) }
       await sleep(300) // رعایت rate limit تلگرام
     }
+    saveState(state) // فوری ذخیره کن — کرش وسط حلقه نباید باعث ارسال دوباره شود
   }
 
   // هرس ورودی‌های قدیمی‌تر از ۷ روز تا state بی‌نهایت بزرگ نشود

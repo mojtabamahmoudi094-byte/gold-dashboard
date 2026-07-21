@@ -87,24 +87,6 @@ export default function Footer() {
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: '#eef1f8' }}>ما را دنبال کنید</div>
           <div style={{ display: 'flex', gap: 10 }}>
-            {/* X / Twitter */}
-            <a href="#" aria-label="بورس سنج در توییتر" className="social-icon" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-              onMouseLeave={e => (e.currentTarget.style.background = ICON_BG)}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ICON_C} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 4 L3 11 L10 13 L12 20 Z"/>
-              </svg>
-            </a>
-            {/* Instagram */}
-            <a href="#" aria-label="بورس سنج در اینستاگرام" className="social-icon" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-              onMouseLeave={e => (e.currentTarget.style.background = ICON_BG)}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ICON_C} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="5"/>
-                <circle cx="12" cy="12" r="4"/>
-                <circle cx="17.5" cy="6.5" r="1" fill={ICON_C} stroke="none"/>
-              </svg>
-            </a>
             {/* Telegram */}
             <a href="https://t.me/bourssanjj" aria-label="کانال تلگرام بورس سنج" className="social-icon" target="_blank" rel="noopener noreferrer" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(42,171,238,0.15)')}

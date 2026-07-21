@@ -252,6 +252,7 @@ async function main() {
 
         await sendPhoto(buf, caption)
         seen.add(m.symbol)
+        saveState({ day: today, seen: [...seen] }) // فوری ذخیره کن — کرش وسط حلقه نباید باعث ارسال دوباره شود
         sent++
         log(`✅ ${m.symbol} ارسال شد`)
       } catch (e) {
