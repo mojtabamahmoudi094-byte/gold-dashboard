@@ -45,6 +45,7 @@ export const NAV: NavItem[] = [
     { label: 'مقایسه سهام', href: '/compare/stocks' },
   ] },
   { label: 'سیگنال‌ها',     href: '/signals' },
+  { label: 'هشدارها',       href: '/alerts' },
   { label: 'فیلترها',       href: '/vip/filters', menu: [
     { label: 'فیلترهای VIP', href: '/vip/filters' },
     { label: 'فیلترهای کاربردی', href: '/vip/useful-filters' },

@@ -482,7 +482,7 @@ export default function HomePage() {
 
             <h1 style={{ fontSize: isMobile ? 32 : 'clamp(38px,5vw,64px)', fontWeight: 900, lineHeight: 1.12, letterSpacing: '-0.5px', margin: '0 0 22px', color: t.text }}>
               بازار بورس را<br />
-              <span style={{ background: `linear-gradient(120deg, ${t.brand}, ${t.brand2} 55%, ${t.green})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              <span style={{ backgroundImage: `linear-gradient(120deg, ${t.brand}, ${t.brand2} 55%, ${t.green})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
                 هوشمندانه بسنجید
               </span>
             </h1>
@@ -875,7 +875,7 @@ export default function HomePage() {
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: isMobile ? '40px 20px 70px' : '50px 6vw 90px', textAlign: 'center', direction: 'rtl' }}>
         <h2 style={{ fontSize: isMobile ? 26 : 'clamp(30px,4.4vw,52px)', fontWeight: 900, letterSpacing: '-0.6px', margin: '0 0 18px', color: t.text }}>
           همین حالا رایگان با{' '}
-          <span style={{ background: `linear-gradient(120deg, ${t.brand}, ${t.green})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>بورس سنج</span>
+          <span style={{ backgroundImage: `linear-gradient(120deg, ${t.brand}, ${t.green})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>بورس سنج</span>
           {' '}شروع کنید
         </h2>
         <p style={{ color: muted, fontSize: 19, maxWidth: 560, margin: '0 auto 38px', lineHeight: 1.7 }}>

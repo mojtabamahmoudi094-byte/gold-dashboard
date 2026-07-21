@@ -124,10 +124,10 @@ export default function SmartMoneyRadarPage() {
     <span style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, overflow: 'hidden' }}>
       <span style={st.sym
         ? { fontWeight: 800, color: t.text, fontSize: size, flexShrink: 0, whiteSpace: 'nowrap' }
-        : { fontWeight: 800, color: t.text, fontSize: size, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }
+        : { fontWeight: 800, color: t.text, fontSize: size, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }
       }>{st.sym || st.n}</span>
       {st.sym && !isMobile && (
-        <span style={{ display: 'block', fontSize: size - 2, color: cream, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{st.n}</span>
+        <span style={{ flex: 1, fontSize: size - 2, color: cream, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{st.n}</span>
       )}
     </span>
   )

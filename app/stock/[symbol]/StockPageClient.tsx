@@ -1196,7 +1196,7 @@ function AiChatSection({ symbol, t, isMobile }: { symbol: string; t: Theme; isMo
                   </span>
                   <span aria-live="polite" style={{
                     fontSize: 11.5, fontWeight: 600,
-                    background: `linear-gradient(90deg, ${t.muted}, ${AI_ACCENT}, ${t.muted})`,
+                    backgroundImage: `linear-gradient(90deg, ${t.muted}, ${AI_ACCENT}, ${t.muted})`,
                     backgroundSize: '200% 100%', animation: 'aiShimmer 2.2s linear infinite',
                     WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
                   }}>
