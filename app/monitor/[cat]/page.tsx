@@ -21,6 +21,7 @@ import {
 import { useIsMobile } from '../../../lib/useIsMobile'
 import AuthGate from '../../../components/AuthGate'
 import MarketRegimeBadge from '../../components/MarketRegimeBadge'
+import MarketStoryCard from '../../components/MarketStoryCard'
 
 type Row = {
   ts: string; t: string; count: number
@@ -476,6 +477,7 @@ export default function MarketMonitorPage() {
       <main style={{ minHeight: '100vh', background: C.bg, color: '#eef1f8', fontFamily: FONT, direction: 'rtl', padding: isMobile ? '20px 12px 40px' : '28px 3vw 60px' }}>
         <div style={{ maxWidth: 1500, margin: '0 auto' }}>
 
+        {cat === 'stocks' && <MarketStoryCard isDark />}
         {cat === 'stocks' && <MarketRegimeBadge isDark />}
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 22 }}>
