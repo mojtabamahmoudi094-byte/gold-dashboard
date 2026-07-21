@@ -82,9 +82,10 @@ async function checkPriceAlerts() {
     const hit = a.direction === 'above' ? priceToman >= a.target_value : priceToman <= a.target_value
     if (!hit) continue
 
-    await sb.from('alerts').update({
+    const { data: claimed } = await sb.from('alerts').update({
       status: 'triggered', triggered_at: new Date().toISOString(), triggered_value: priceToman,
-    }).eq('id', a.id)
+    }).eq('id', a.id).eq('status', 'active').select('id')
+    if (!claimed?.length) continue // پروسه‌ی دیگری (کرون هم‌زمان دیگر) قبلاً همین alert را claim کرده
 
     const dirLabel = a.direction === 'above' ? 'به هدف رسید یا از آن بالاتر رفت' : 'به هدف رسید یا از آن پایین‌تر رفت'
     await notify(a.user_id,
@@ -116,9 +117,10 @@ async function checkBubbleAlerts() {
     const hit = a.direction === 'above' ? v >= a.target_value : v <= a.target_value
     if (!hit) continue
 
-    await sb.from('alerts').update({
+    const { data: claimed } = await sb.from('alerts').update({
       status: 'triggered', triggered_at: new Date().toISOString(), triggered_value: v,
-    }).eq('id', a.id)
+    }).eq('id', a.id).eq('status', 'active').select('id')
+    if (!claimed?.length) continue
 
     await notify(a.user_id,
       `🔔 <b>هشدار حباب</b>\n${labels[a.symbol] || a.symbol} به ${v.toFixed(1)}٪ رسید.\nهدف شما: ${a.direction === 'above' ? '≥' : '≤'} ${a.target_value}٪`)
