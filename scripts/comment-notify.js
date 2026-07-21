@@ -37,7 +37,9 @@ if (!TOKEN) { console.error('[comment-notify] TELEGRAM_PORTFOLIO_BOT_TOKEN تن�
 if (!SUPABASE_URL || !SUPABASE_KEY) { console.error('[comment-notify] SUPABASE_URL/SUPABASE_KEY تنظیم نشده'); process.exit(1) }
 
 const { createClient } = require('@supabase/supabase-js')
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+let wsTransport
+try { wsTransport = require('ws') } catch { /* Node 22+ */ }
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, wsTransport ? { realtime: { transport: wsTransport } } : {})
 
 async function tg(chatId, text) {
   const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
