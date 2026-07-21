@@ -142,6 +142,7 @@ async function main() {
   if (upErr) { console.error('[market-story] upsert:', upErr.message); return }
   console.log(`✅ ذخیره شد: ${headline}`)
 
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { console.log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — پست تلگرام رد شد'); return }
   const key = `market_story|${today.trade_date_shamsi}`
   if (await claimSend(key)) {
     const text = `📰 ${headline}\n\n${storyBody}\n\n@bourssanjj\n${SITE}`
