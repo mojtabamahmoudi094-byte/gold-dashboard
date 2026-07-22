@@ -16,7 +16,7 @@ import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import {
-  BRSAPI_KEY, num, clean, fPct, fX, faN, fToman as fTomanShared, isTehranMarketClosedDay,
+  num, clean, fPct, fX, faN, fToman as fTomanShared, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cPl, cRatioM, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
 import AuthGate from '../../../components/AuthGate'
@@ -312,7 +312,7 @@ export default function UsefulFiltersPage() {
       setHasFloat(floatMap.size > 0)
 
       // BrsApi فقط از IP ایران جواب می‌دهد — فچ سمت کلاینت (الگوی Header)
-      const res = await fetch(`https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${BRSAPI_KEY}`, {
+      const res = await fetch('/api/brs-proxy?endpoint=all-symbols', {
         cache: 'no-store', signal: AbortSignal.timeout(60_000),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)

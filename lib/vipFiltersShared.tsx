@@ -1,13 +1,11 @@
 /**
  * ابزارهای مشترک صفحات فیلتر بورس سنج (/vip/filters و /vip/useful-filters)
- * دیتای پایه: BrsApi AllSymbols (فقط IP ایران — فچ سمت کلاینت در هر صفحه جدا)
+ * دیتای پایه: BrsApi AllSymbols از طریق /api/brs-proxy (فقط IP ایران — فچ سمت کلاینت در هر صفحه جدا)
  */
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import FlashValue from '../app/components/ui/FlashValue'
-
-export const BRSAPI_KEY = process.env.NEXT_PUBLIC_BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 
 // بورس ایران پنج‌شنبه و جمعه تعطیل است — فچ لحظه‌ای BrsApi را در این دو روز نزنیم (سوختن کوتای درخواست بی‌فایده)
 export const isTehranMarketClosedDay = () => {

@@ -16,6 +16,7 @@ const ALLOW: Record<string, { url: string; params: string[] }> = {
   'ime-fund':         { url: 'https://api.brsapi.ir/IME/Fund.php',                params: [] },
   'gold-currency':    { url: 'https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php', params: ['section'] },
   commodity:          { url: 'https://api.brsapi.ir/Market/Commodity.php',        params: [] },
+  'all-symbols':      { url: 'https://Api.BrsApi.ir/Tsetmc/AllSymbols.php',       params: [] },
 }
 
 export async function GET(req: NextRequest) {

@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import {
-  BRSAPI_KEY, num, faN, fPct, fX, fBn, fToman, clean, isTehranMarketClosedDay,
+  num, faN, fPct, fX, fBn, fToman, clean, isTehranMarketClosedDay,
   type M, buildMetrics, type Col, type Card, cSym, cVol, FilterTable,
 } from '../../../lib/vipFiltersShared'
 import AuthGate from '../../../components/AuthGate'
@@ -131,7 +131,7 @@ export default function QueueFiltersPage() {
     setLoading(true)
     setFailed(false)
     try {
-      const res = await fetch(`https://Api.BrsApi.ir/Tsetmc/AllSymbols.php?key=${BRSAPI_KEY}`, {
+      const res = await fetch('/api/brs-proxy?endpoint=all-symbols', {
         cache: 'no-store', signal: AbortSignal.timeout(60_000),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
