@@ -1079,7 +1079,7 @@ function PortfolioSection({ t, data, isMobile }: { t: any, data: any, isMobile: 
               <span style={{ color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{s.name}</span>
               {/* نوار نسبی سهم از پورتفوی */}
               <span style={{ flex: 1, minWidth: 24, height: 4, borderRadius: 2, background: `${t.muted}22`, overflow: 'hidden' }}>
-                <span style={{ display: 'block', width: `${(s.frac / maxFrac) * 100}%`, height: '100%', borderRadius: 2, background: s.color, opacity: 0.75, transition: 'width 0.4s' }} />
+                <span style={{ display: 'block', width: '100%', height: '100%', borderRadius: 2, background: s.color, opacity: 0.75, transformOrigin: 'right', transform: `scaleX(${s.frac / maxFrac})`, transition: 'transform 0.4s' }} />
               </span>
               <span style={{ color: t.textBright, fontWeight: 700, fontFamily: 'system-ui, sans-serif', minWidth: 44, textAlign: 'left' }}>
                 {pctFa(s.frac)}٪

@@ -1070,10 +1070,11 @@ export default function SignalsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ flex: 1, height: 5, borderRadius: 3, background: BORDER, overflow: 'hidden', maxWidth: 100 }}>
                     <div style={{
-                      height: '100%', borderRadius: 3,
-                      width: `${autoSignal.confidence}%`,
+                      height: '100%', width: '100%', borderRadius: 3,
+                      transformOrigin: 'right',
+                      transform: `scaleX(${autoSignal.confidence / 100})`,
                       background: `linear-gradient(90deg, ${autoSignal.color}99, ${autoSignal.color})`,
-                      transition: 'width 0.5s ease',
+                      transition: 'transform 0.5s ease',
                     }} />
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: autoSignal.color }}>
@@ -1394,10 +1395,11 @@ export default function SignalsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ flex: 1, height: 4, borderRadius: 2, background: BORDER, overflow: 'hidden' }}>
                         <div style={{
-                          height: '100%', borderRadius: 2,
-                          width: `${sig.confidence}%`,
+                          height: '100%', width: '100%', borderRadius: 2,
+                          transformOrigin: 'right',
+                          transform: `scaleX(${sig.confidence / 100})`,
                           background: `linear-gradient(90deg, ${sig.color}99, ${sig.color})`,
-                          transition: 'width 0.5s ease',
+                          transition: 'transform 0.5s ease',
                         }} />
                       </div>
                       <span style={{ fontSize: 10.5, fontWeight: 700, color: sig.color, fontFamily: 'system-ui' }}>
@@ -1544,7 +1546,7 @@ export default function SignalsPage() {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                           <span style={{ fontSize: 13.5, fontWeight: 700, color: TEXT }}>{c.symbol}</span>
-                          <span style={{ fontSize: 10.5, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          <span style={{ fontSize: 10.5, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '0 1 auto' }}>{c.name}</span>
                           <span style={{ fontSize: 10.5, fontWeight: 600, marginRight: 'auto', color: c.chg >= 0 ? GREEN : RED, fontFamily: 'system-ui' }}>
                             {c.chg >= 0 ? '+' : ''}{c.chg.toFixed(2)}٪
                           </span>

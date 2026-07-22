@@ -37,7 +37,7 @@ export default function RsiBar({
       aria-label={`RSI ${value.toFixed(1)}`}
       style={{ width, height, borderRadius: height, background: trackColor, overflow: 'hidden', flexShrink: 0 }}
     >
-      <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width .3s ease' }} />
+      <div style={{ width: '100%', height: '100%', background: color, transformOrigin: 'right', transform: `scaleX(${pct / 100})`, transition: 'transform .3s ease' }} />
     </div>
   )
 }

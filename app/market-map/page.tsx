@@ -530,16 +530,22 @@ function AssetMenu({ value, onChange, muted, line, panel, text }: {
   // layout را جابجا کند، تا وقتی باز است با اسکرول/ریسایز هم به‌روز می‌شود.
   useLayoutEffect(() => {
     if (!open) return
+    let raf = 0
     const recompute = () => {
+      raf = 0
       const r = wrapRef.current?.getBoundingClientRect()
       if (r) setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
     }
+    const scheduleRecompute = () => {
+      if (!raf) raf = requestAnimationFrame(recompute)
+    }
     recompute()
-    window.addEventListener('scroll', recompute, true)
-    window.addEventListener('resize', recompute)
+    window.addEventListener('scroll', scheduleRecompute, true)
+    window.addEventListener('resize', scheduleRecompute)
     return () => {
-      window.removeEventListener('scroll', recompute, true)
-      window.removeEventListener('resize', recompute)
+      if (raf) cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', scheduleRecompute, true)
+      window.removeEventListener('resize', scheduleRecompute)
     }
   }, [open])
 
@@ -635,16 +641,22 @@ function MarketMenu({ value, onChange, muted, line, panel, text }: {
 
   useLayoutEffect(() => {
     if (!open) return
+    let raf = 0
     const recompute = () => {
+      raf = 0
       const r = wrapRef.current?.getBoundingClientRect()
       if (r) setPos({ top: r.bottom + 6, right: window.innerWidth - r.right })
     }
+    const scheduleRecompute = () => {
+      if (!raf) raf = requestAnimationFrame(recompute)
+    }
     recompute()
-    window.addEventListener('scroll', recompute, true)
-    window.addEventListener('resize', recompute)
+    window.addEventListener('scroll', scheduleRecompute, true)
+    window.addEventListener('resize', scheduleRecompute)
     return () => {
-      window.removeEventListener('scroll', recompute, true)
-      window.removeEventListener('resize', recompute)
+      if (raf) cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', scheduleRecompute, true)
+      window.removeEventListener('resize', scheduleRecompute)
     }
   }, [open])
 
