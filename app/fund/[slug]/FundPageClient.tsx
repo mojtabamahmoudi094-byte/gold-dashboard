@@ -66,7 +66,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   const [goldWeights, setGoldWeights] = useState(FUND_WEIGHTS)
   const [silverWeights, setSilverWeights] = useState(SILVER_FUND_WEIGHTS)
   const [bubbleRaw, setBubbleRaw] = useState<{ nav: number | null; marketBubbles: { bullion: number | null; coin: number | null } | null; silverBubble: number | null } | null>(null)
-  const [bubbleHistory, setBubbleHistory] = useState<{ trade_date: string; bubble_asmi: number | null; bubble_zati: number | null; bubble_vaqei: number | null }[]>([])
+  const [bubbleHistory, setBubbleHistory] = useState<{ trade_date: string; bubble_asmi: number | null; bubble_zati: number | null; bubble_vaqei: number | null; bubble_vaqei_zscore?: number | null; bubble_vaqei_pctile?: number | null; bubble_vaqei_sample?: number | null }[]>([])
   const [bubbleRange, setBubbleRange] = useState<30 | 90 | 365>(30)
   const [showBubbleAvg, setShowBubbleAvg] = useState(true)
   const [bubbleHoverIdx, setBubbleHoverIdx] = useState<number | null>(null)
@@ -111,7 +111,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   // تاریخچه حباب (fund_bubble_daily) — scripts/fund-bubble-daily.js هر روز پر می‌کند
   useEffect(() => {
     if (!asset || (asset.category !== 'طلا' && asset.category !== 'نقره')) { setBubbleHistory([]); return }
-    supabase.from('fund_bubble_daily').select('trade_date, bubble_asmi, bubble_zati, bubble_vaqei')
+    supabase.from('fund_bubble_daily').select('trade_date, bubble_asmi, bubble_zati, bubble_vaqei, bubble_vaqei_zscore, bubble_vaqei_pctile, bubble_vaqei_sample')
       .eq('fund_name', asset.name).order('trade_date', { ascending: true }).limit(365)
       .then(({ data }) => setBubbleHistory(data ?? []))
   }, [asset?.name, asset?.category])
@@ -386,6 +386,29 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
               <MetricCard t={t} label="حباب واقعی" value={pctFmt(bubbleVaqei)} color={pctColor(bubbleVaqei)}
                 tooltip="حباب اسمی + حباب ذاتی" />
             </div>
+            {(() => {
+              const stat = [...bubbleHistory].reverse().find(r => r.bubble_vaqei_pctile != null)
+              if (!stat || stat.bubble_vaqei_pctile == null) return null
+              const p = stat.bubble_vaqei_pctile
+              const cheap = p <= 40, rich = p >= 60
+              const barColor = cheap ? '#00E5A0' : rich ? '#FF4D6A' : t.muted
+              const verdict = cheap ? 'کم‌تر از معمولِ خودش (تاریخاً ارزان‌تر)' : rich ? 'بیش‌تر از معمولِ خودش (تاریخاً گران‌تر)' : 'نزدیک میانگین عادتِ خودش'
+              return (
+                <div style={{ marginBottom: compositionBars.length > 0 ? 16 : 0, padding: '10px 12px', borderRadius: 10, background: `${barColor}12`, border: `0.5px solid ${barColor}30` }}>
+                  <div style={{ fontSize: 11, color: t.textBright, fontWeight: 600, marginBottom: 8 }}>
+                    حباب واقعی نسبت به عادتِ خودِ صندوق: {verdict}
+                  </div>
+                  <div style={{ position: 'relative', height: 7, borderRadius: 999, background: t.border, overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', insetInlineStart: `calc(${p}% - 2px)`, top: -2, bottom: -2, width: 4, borderRadius: 2, background: barColor }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: t.muted, marginTop: 5 }}>
+                    <span>کم‌ترین</span>
+                    <span>صدک {p.toLocaleString('fa-IR')} از {(stat.bubble_vaqei_sample ?? 0).toLocaleString('fa-IR')} روز</span>
+                    <span>بیش‌ترین</span>
+                  </div>
+                </div>
+              )
+            })()}
             {compositionBars.length > 0 && (
               <>
                 <div style={{ fontSize: 10.5, color: t.muted, marginBottom: 8 }}>ترکیب دارایی صندوق</div>
