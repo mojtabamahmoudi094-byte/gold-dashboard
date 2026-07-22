@@ -178,7 +178,7 @@ const FEATURES: { href: string; title: string; desc: string; color: string; icon
   {
     href: '/funds/silver',
     title: 'صندوق‌های نقره',
-    desc: 'دیدبان جامع صندوق‌های سرمایه‌گذاری مبتنی بر نقره',
+    desc: 'دیده‌بان جامع صندوق‌های سرمایه‌گذاری مبتنی بر نقره',
     color: 'oklch(0.84 0.03 240)',
     icon: ICON.bars,
   },
@@ -462,8 +462,8 @@ export default function HomePage() {
         padding: isMobile ? '48px 20px 40px' : '56px 6vw 40px',
         direction: 'rtl',
       }}>
-        <div style={{ position: 'absolute', top: -220, right: -140, width: 640, height: 640, borderRadius: '50%', background: `radial-gradient(circle, rgba(217,180,91,${isDark ? 0.2 : 0.1}) 0%, transparent 65%)`, filter: 'blur(40px)', pointerEvents: 'none', animation: 'bs-glow 9s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', top: 280, left: -180, width: 560, height: 560, borderRadius: '50%', background: `radial-gradient(circle, rgba(244,215,149,${isDark ? 0.18 : 0.09}) 0%, transparent 65%)`, filter: 'blur(46px)', pointerEvents: 'none', animation: 'bs-glow 11s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: -220, right: -140, width: 640, height: 640, borderRadius: '50%', background: `radial-gradient(circle, rgba(217,180,91,${isDark ? 0.2 : 0.1}) 0%, transparent 65%)`, pointerEvents: 'none', animation: 'bs-glow 9s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: 280, left: -180, width: 560, height: 560, borderRadius: '50%', background: `radial-gradient(circle, rgba(244,215,149,${isDark ? 0.18 : 0.09}) 0%, transparent 65%)`, pointerEvents: 'none', animation: 'bs-glow 11s ease-in-out infinite' }} />
 
         <div style={{
           maxWidth: 1400, margin: '0 auto', position: 'relative',
@@ -518,13 +518,13 @@ export default function HomePage() {
           {/* ── Live Dashboard Card (RTL: left side) ── */}
           {!isMobile && (
             <div style={{ position: 'relative' }}>
-              <div style={{ position: 'relative', borderRadius: 26, padding: 22, background: cardBg, border: cardBorder, boxShadow: t.cardShadow, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', animation: 'bs-float 7s ease-in-out infinite' }}>
+              <div style={{ position: 'relative', borderRadius: 26, padding: 22, background: cardBg, border: cardBorder, boxShadow: t.cardShadow, animation: 'bs-float 7s ease-in-out infinite' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 34, height: 34, borderRadius: 10, background: `linear-gradient(135deg, ${t.brand}, ${t.brand2})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12 S5 4 12 4 22 12 22 12 19 20 12 20 2 12 2 12 Z"/><circle cx="12" cy="12" r="3"/></svg>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>دیدبان من</div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>دیده‌بان من</div>
                   </div>
                   <div style={{ fontSize: 12, color: t.green, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.green, display: 'inline-block', animation: 'bs-pulse 2s infinite' }} />
@@ -592,7 +592,7 @@ export default function HomePage() {
               </div>
 
               {/* Floating alert badge */}
-              <div style={{ position: 'absolute', bottom: -18, right: -22, padding: '12px 15px', borderRadius: 16, background: isDark ? 'rgba(20,24,36,0.92)' : 'rgba(255,252,244,0.96)', border: cardBorder, boxShadow: t.cardShadow, display: 'flex', alignItems: 'center', gap: 10, backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', animation: 'bs-float 8s ease-in-out infinite' }}>
+              <div style={{ position: 'absolute', bottom: -18, right: -22, padding: '12px 15px', borderRadius: 16, background: isDark ? 'rgba(20,24,36,0.97)' : 'rgba(255,252,244,0.99)', border: cardBorder, boxShadow: t.cardShadow, display: 'flex', alignItems: 'center', gap: 10, animation: 'bs-float 8s ease-in-out infinite' }}>
                 <div style={{ width: 34, height: 34, borderRadius: 10, background: 'oklch(0.78 0.15 70 / 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.82 0.15 70)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4 C8 4 7 8 7 11 C7 15 5 16 5 17 L19 17 C19 16 17 15 17 11 C17 8 16 4 12 4 Z"/><path d="M10 20 L14 20"/></svg>
                 </div>

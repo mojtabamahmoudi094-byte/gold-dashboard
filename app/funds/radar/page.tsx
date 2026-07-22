@@ -242,7 +242,7 @@ export default function SmartMoneyRadarPage() {
               width: '100%', boxSizing: 'border-box', background: t.inputBg,
               border: `1px solid ${t.borderStrong}`, borderRadius: 10,
               padding: '10px 14px', fontSize: 13, color: t.text,
-              fontFamily: 'inherit', outline: 'none', direction: 'rtl',
+              fontFamily: 'inherit', direction: 'rtl',
             }}
           />
           {matches.length > 0 && !selected && (

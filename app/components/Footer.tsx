@@ -1,16 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-
-const LINK_C = '#a9b0c2'
-const ICON_C = '#c7cddb'
-const MUTED  = '#8b93a7'
-const BORDER = 'rgba(255,255,255,0.09)'
-const ICON_BG = 'rgba(255,255,255,0.05)'
+import { useEffect, useState } from 'react'
+import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 
 const PRODUCT_LINKS = [
   { label: 'صندوق‌های طلا، نقره و زعفران', href: '/funds' },
-  { label: 'دیدبان',                        href: '/funds' },
+  { label: 'دیده‌بان',                       href: '/funds' },
   { label: 'تحلیل',                         href: '/analysis/gold' },
   { label: 'نقشه بازار',                    href: '/market-map' },
 ]
@@ -23,10 +19,26 @@ const COMPANY_LINKS = [
 ]
 
 export default function Footer() {
+  const [isDark, setIsDark] = useState(true)
+
+  useEffect(() => {
+    if (!shouldUseDark()) setIsDark(false)
+    const handler = () => setIsDark(window.localStorage.getItem('theme') !== 'light')
+    window.addEventListener('themechange', handler)
+    return () => window.removeEventListener('themechange', handler)
+  }, [])
+
+  const t = isDark ? darkTheme : lightTheme
+  const LINK_C = t.muted
+  const ICON_C = t.muted
+  const MUTED = t.muted
+  const BORDER = t.border
+  const ICON_BG = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(184,134,11,0.06)'
+
   return (
     <footer style={{
-      borderTop: '1px solid rgba(255,255,255,0.07)',
-      background: 'rgba(255,255,255,0.015)',
+      borderTop: `1px solid ${t.border}`,
+      background: isDark ? 'rgba(255,255,255,0.015)' : t.bg,
       fontFamily: 'Vazirmatn, Arial, sans-serif',
       direction: 'rtl',
     }}>
@@ -48,7 +60,7 @@ export default function Footer() {
               backgroundPosition: '38% 15%',
               backgroundRepeat: 'no-repeat',
             }} />
-            <div className="brand-title" style={{ fontWeight: 800, fontSize: 18, color: '#eef1f8' }}>بورس سنج</div>
+            <div className="brand-title" style={{ fontWeight: 800, fontSize: 18, color: t.text }}>بورس سنج</div>
           </div>
           <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.8, maxWidth: 300, margin: 0 }}>
             سامانه هوشمند رصد، تحلیل و پایش بازار سرمایه ایران. سریع، خصوصی و حرفه‌ای.
@@ -57,11 +69,11 @@ export default function Footer() {
 
         {/* محصول */}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: '#eef1f8' }}>محصول</div>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: t.text }}>محصول</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
             {PRODUCT_LINKS.map(l => (
               <Link key={l.label} href={l.href} style={{ color: LINK_C, textDecoration: 'none', transition: 'color 0.18s', padding: '6px 0', display: 'inline-block' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                onMouseEnter={e => (e.currentTarget.style.color = isDark ? '#fff' : t.textBright)}
                 onMouseLeave={e => (e.currentTarget.style.color = LINK_C)}>
                 {l.label}
               </Link>
@@ -71,11 +83,11 @@ export default function Footer() {
 
         {/* شرکت */}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: '#eef1f8' }}>شرکت</div>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: t.text }}>شرکت</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
             {COMPANY_LINKS.map(l => (
               <Link key={l.label} href={l.href} style={{ color: LINK_C, textDecoration: 'none', transition: 'color 0.18s', padding: '6px 0', display: 'inline-block' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                onMouseEnter={e => (e.currentTarget.style.color = isDark ? '#fff' : t.textBright)}
                 onMouseLeave={e => (e.currentTarget.style.color = LINK_C)}>
                 {l.label}
               </Link>
@@ -85,7 +97,7 @@ export default function Footer() {
 
         {/* ما را دنبال کنید */}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: '#eef1f8' }}>ما را دنبال کنید</div>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: t.text }}>ما را دنبال کنید</div>
           <div style={{ display: 'flex', gap: 10 }}>
             {/* Telegram */}
             <a href="https://t.me/bourssanjj" aria-label="کانال تلگرام بورس سنج" className="social-icon" target="_blank" rel="noopener noreferrer" style={{ width: 40, height: 40, borderRadius: 11, background: ICON_BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s', flexShrink: 0 }}
@@ -100,9 +112,9 @@ export default function Footer() {
 
         {/* نماد اعتماد الکترونیکی */}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: '#eef1f8' }}>نماد اعتماد</div>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: t.text }}>نماد اعتماد</div>
           <a referrerPolicy="origin" target="_blank" href="https://trustseal.enamad.ir/?id=759107&amp;Code=iADodrOqhpz8onS32a8nRMedm9LAUWay">
-            <img referrerPolicy="origin" src="https://trustseal.enamad.ir/logo.aspx?id=759107&amp;Code=iADodrOqhpz8onS32a8nRMedm9LAUWay" alt="" style={{ cursor: 'pointer' }} {...{ code: 'iADodrOqhpz8onS32a8nRMedm9LAUWay' }} />
+            <img referrerPolicy="origin" src="https://trustseal.enamad.ir/logo.aspx?id=759107&amp;Code=iADodrOqhpz8onS32a8nRMedm9LAUWay" alt="نماد اعتماد الکترونیکی" style={{ cursor: 'pointer' }} {...{ code: 'iADodrOqhpz8onS32a8nRMedm9LAUWay' }} />
           </a>
         </div>
 
@@ -116,7 +128,7 @@ export default function Footer() {
       </div>
 
       {/* Bottom bar */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', maxWidth: 1400, margin: '0 auto', padding: '20px 6vw', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ borderTop: `1px solid ${t.border}`, maxWidth: 1400, margin: '0 auto', padding: '20px 6vw', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 13, color: MUTED }}>ساخته‌شده برای فعالان بازار سرمایه ایران</span>
         <span style={{ fontSize: 13, color: MUTED }}>© بورس سنج ۱۴۰۵ — تمامی حقوق محفوظ است</span>
       </div>

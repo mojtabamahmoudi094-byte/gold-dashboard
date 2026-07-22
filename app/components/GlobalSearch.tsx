@@ -184,7 +184,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
               border: `1px solid ${border}`,
               background: isDark ? '#0d1017' : '#fff',
               color: isDark ? '#eef1f8' : '#1A1205',
-              fontSize: 13, fontFamily: 'inherit', outline: 'none',
+              fontSize: 13, fontFamily: 'inherit',
             }}
           />
 

@@ -405,7 +405,7 @@ export default function TerminalPage() {
                     style={{
                       width: '100%', background: t.inputBg, border: `0.5px solid ${t.borderStrong}`,
                       borderRadius: 8, padding: '10px 12px', color: t.text, fontSize: 13,
-                      outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', direction: 'rtl',
+                      boxSizing: 'border-box', fontFamily: 'inherit', direction: 'rtl',
                     }} />
                 </div>
                 <button onClick={saveData} disabled={loading} style={{
@@ -456,7 +456,7 @@ export default function TerminalPage() {
         {/* لینک‌های سریع */}
         {!isLoggedIn && (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>
-            <QuickLink t={t} href="/funds" emoji="📊" title="دیدبان صندوق‌ها" desc="جدول، نقشه‌ی بازار و ورود/خروج پول حقیقی" />
+            <QuickLink t={t} href="/funds" emoji="📊" title="دیده‌بان صندوق‌ها" desc="جدول، نقشه‌ی بازار و ورود/خروج پول حقیقی" />
             <QuickLink t={t} href="/signals" emoji="📡" title="تاریخچه سیگنال" desc="سیگنال‌های خرید و فروش صادر شده" />
             <QuickLink t={t} href="/funds" emoji="🗺️" title="نقشه‌ی بازار" desc="نقشه‌ی حرارتی صندوق‌های کالایی" />
           </div>
@@ -520,11 +520,11 @@ export default function TerminalPage() {
                       {isLoggedIn && (
                         <td style={{ padding: '9px 10px' }}>
                           {editingId === r.id ? (
-                            <span onClick={() => saveEdit(r.id)} style={{ color: t.accent, cursor: 'pointer', fontSize: 11 }}>ذخیره</span>
+                            <button onClick={() => saveEdit(r.id)} style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', color: t.accent, cursor: 'pointer', fontSize: 11 }}>ذخیره</button>
                           ) : (
                             <span style={{ display: 'flex', gap: 10 }}>
-                              <span onClick={() => { setEditingId(r.id); setEditValue(String(r.trade_value)); setEditDate(r.trade_date_shamsi) }} style={{ color: t.muted, cursor: 'pointer', fontSize: 11 }}>ویرایش</span>
-                              <span onClick={() => deleteRecord(r.id)} style={{ color: '#FF4D6A', cursor: 'pointer', fontSize: 11 }}>حذف</span>
+                              <button onClick={() => { setEditingId(r.id); setEditValue(String(r.trade_value)); setEditDate(r.trade_date_shamsi) }} style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', color: t.muted, cursor: 'pointer', fontSize: 11 }}>ویرایش</button>
+                              <button onClick={() => deleteRecord(r.id)} style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', color: '#FF4D6A', cursor: 'pointer', fontSize: 11 }}>حذف</button>
                             </span>
                           )}
                         </td>

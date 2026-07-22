@@ -11,7 +11,6 @@ type NavItem = { label: string; href: string; menu?: { label: string; href: stri
 
 type IdxItem = { name: string; value: number; change: number | null; pct: number | null }
 
-const BRSAPI_KEY = process.env.NEXT_PUBLIC_BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 
 const idxNum = (v: unknown): number | null => {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
@@ -25,7 +24,7 @@ export const NAV: NavItem[] = [
   { label: 'خانه',          href: '/' },
   { label: 'سهام',          href: '/stocks' },
   { label: 'صندوق‌ها',      href: '/funds', menu: [
-    { label: 'دیدبان صندوق‌ها', href: '/funds' },
+    { label: 'دیده‌بان صندوق‌ها', href: '/funds' },
   ] },
   { label: 'نمودار',        href: '/monitor', menu: [
     { label: 'نمودار لحظه‌ای رصد بازارها', href: '/monitor' },
@@ -131,8 +130,8 @@ export default function Header() {
     setIdxLoading(true)
     try {
       const [selRes, faraRes] = await Promise.allSettled([
-        fetch(`https://Api.BrsApi.ir/Tsetmc/Index.php?key=${BRSAPI_KEY}&type=3`, { cache: 'no-store', signal: AbortSignal.timeout(8_000) }),
-        fetch(`https://Api.BrsApi.ir/Tsetmc/Index.php?key=${BRSAPI_KEY}&type=2`, { cache: 'no-store', signal: AbortSignal.timeout(8_000) }),
+        fetch(`/api/brs-proxy?endpoint=index&type=3`, { cache: 'no-store', signal: AbortSignal.timeout(8_000) }),
+        fetch(`/api/brs-proxy?endpoint=index&type=2`, { cache: 'no-store', signal: AbortSignal.timeout(8_000) }),
       ])
       const items: IdxItem[] = []
 
@@ -221,6 +220,7 @@ export default function Header() {
     : 'none'
   const TEXT_NAV   = isDark ? '#6b7280' : '#7A6A50'
   const MOBILE_BG  = isDark ? '#080a10' : '#fcf9f2'
+  const BRAND      = isDark ? '#d9b45b' : '#b8860b'
 
   const renderIdxRows = (compact = false) => {
     if (idxLoading && !idxItems) {
@@ -270,7 +270,7 @@ export default function Header() {
     textDecoration: 'none',
     fontSize: 13.5,
     fontWeight: active ? 600 : 400,
-    color: active ? '#d9b45b' : TEXT_NAV,
+    color: active ? BRAND : TEXT_NAV,
     padding: '7px 14px',
     borderRadius: 8,
     background: active ? 'rgba(217,180,91,0.1)' : 'transparent',
@@ -354,7 +354,7 @@ export default function Header() {
                     style={{ ...navLink(isActive(item.href)), display: 'inline-flex', alignItems: 'center', gap: 5 }}
                     onMouseEnter={e => {
                       if (!isActive(item.href)) {
-                        e.currentTarget.style.color = '#d9b45b'
+                        e.currentTarget.style.color = BRAND
                         e.currentTarget.style.background = 'rgba(217,180,91,0.08)'
                       }
                     }}
@@ -407,7 +407,7 @@ export default function Header() {
                             }}
                             onMouseEnter={e => {
                               e.currentTarget.style.background = 'rgba(217,180,91,0.1)'
-                              e.currentTarget.style.color = '#d9b45b'
+                              e.currentTarget.style.color = BRAND
                             }}
                             onMouseLeave={e => {
                               e.currentTarget.style.background = 'transparent'
@@ -436,7 +436,7 @@ export default function Header() {
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                   border: 'none', borderBottom: '1.5px solid transparent',
                   background: openDrop === '__idx__' ? 'rgba(217,180,91,0.08)' : 'transparent',
-                  color: openDrop === '__idx__' ? '#d9b45b' : TEXT_NAV,
+                  color: openDrop === '__idx__' ? BRAND : TEXT_NAV,
                   cursor: 'pointer',
                 }}
               >
@@ -485,7 +485,7 @@ export default function Header() {
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.background = 'rgba(217,180,91,0.1)'
-                e.currentTarget.style.color = '#d9b45b'
+                e.currentTarget.style.color = BRAND
                 e.currentTarget.style.borderColor = 'rgba(217,180,91,0.3)'
               }}
               onMouseLeave={e => {
@@ -581,7 +581,7 @@ export default function Header() {
                 width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
                 background: menuOpen ? 'rgba(217,180,91,0.1)' : 'transparent',
                 border: `1px solid ${menuOpen ? 'rgba(217,180,91,0.35)' : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
-                color: menuOpen ? '#d9b45b' : isDark ? '#6b7280' : '#7A6A50',
+                color: menuOpen ? BRAND : isDark ? '#6b7280' : '#7A6A50',
                 transition: 'all 0.2s',
               }}
             >
@@ -615,7 +615,7 @@ export default function Header() {
                   display: 'flex', alignItems: 'center',
                   textDecoration: 'none', fontSize: 14,
                   fontWeight: active ? 600 : 400,
-                  color: active ? '#d9b45b' : isDark ? '#8A9BAE' : '#7A6A50',
+                  color: active ? BRAND : isDark ? '#8A9BAE' : '#7A6A50',
                   padding: '13px 16px', borderRadius: 10,
                   background: active ? 'rgba(217,180,91,0.08)' : 'transparent',
                   fontFamily: 'inherit', marginBottom: 2,
@@ -633,7 +633,7 @@ export default function Header() {
                         <Link key={m.href} href={m.href} aria-current={mActive ? 'page' : undefined} style={{
                           display: 'block', textDecoration: 'none', fontSize: 12.5,
                           fontWeight: mActive ? 600 : 400,
-                          color: mActive ? '#d9b45b' : isDark ? '#6b7a8c' : '#8a7a5a',
+                          color: mActive ? BRAND : isDark ? '#6b7a8c' : '#8a7a5a',
                           padding: '9px 16px 9px 16px', margin: '0 16px 0 0', borderRadius: 8,
                           background: mActive ? 'rgba(217,180,91,0.07)' : 'transparent',
                           fontFamily: 'inherit',
@@ -652,7 +652,7 @@ export default function Header() {
           <div style={{ height: 1, background: BORDER, margin: '10px 0' }} />
 
           {/* شاخص‌های بازار در منوی موبایل — هاور وجود ندارد، همیشه نمایش داده می‌شود */}
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#d9b45b', padding: '4px 16px 6px' }}>شاخص‌های بازار</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: BRAND, padding: '4px 16px 6px' }}>شاخص‌های بازار</div>
           <div>{renderIdxRows(true)}</div>
 
           <div style={{ height: 1, background: BORDER, margin: '10px 0' }} />
