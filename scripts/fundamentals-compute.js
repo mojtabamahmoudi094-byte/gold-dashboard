@@ -66,34 +66,85 @@ function computeFundamentals(quarters, price) {
 }
 
 async function loadPriceMap(sb) {
-  const map = new Map()
+  const priceMap = new Map()
+  const industryMap = new Map() // نماد → نام صنعت، برای صدک نسبی درون‌صنعتی
   const { data, error } = await sb.from('stock_industries').select('data').eq('id', 1).maybeSingle()
-  if (error || !data?.data?.industries) return map
-  for (const ind of data.data.industries) for (const s of ind.symbols ?? []) map.set(s.l18, s.pl ?? null)
-  return map
+  if (error || !data?.data?.industries) return { priceMap, industryMap }
+  for (const ind of data.data.industries) for (const s of ind.symbols ?? []) {
+    priceMap.set(s.l18, s.pl ?? null)
+    industryMap.set(s.l18, ind.name)
+  }
+  return { priceMap, industryMap }
+}
+
+// صدک یک مقدار در آرایه (۰..۱۰۰): چه نسبتی از اعضا کوچک‌تر یا مساوی‌اند
+function percentileOf(sortedAsc, v) {
+  if (!sortedAsc.length) return null
+  let count = 0
+  for (const x of sortedAsc) { if (x <= v) count++; else break }
+  return Math.round((count / sortedAsc.length) * 100)
+}
+
+function median(sortedAsc) {
+  const n = sortedAsc.length
+  if (!n) return null
+  const mid = Math.floor(n / 2)
+  return n % 2 ? sortedAsc[mid] : (sortedAsc[mid - 1] + sortedAsc[mid]) / 2
 }
 
 async function main() {
   const sb = sbClient()
   if (!sb) { console.log('⚠️ SUPABASE_URL/SUPABASE_KEY تنظیم نشده — خروجی محاسبه نمی‌شود'); process.exit(1) }
 
-  const [{ data: reports, error }, priceMap] = await Promise.all([
+  const [{ data: reports, error }, { priceMap, industryMap }] = await Promise.all([
     sb.from('stock_reports').select('symbol, data'),
     loadPriceMap(sb),
   ])
   if (error) throw new Error(`stock_reports select: ${error.message}`)
 
-  let ok = 0, skipped = 0
+  // پاس ۱: محاسبهٔ نسبت‌های هر نماد
+  const computed = [] // { symbol, fr }
+  let skipped = 0
   for (const row of reports ?? []) {
-    const quarters = row.data?.quarters
-    const fr = computeFundamentals(quarters, priceMap.get(row.symbol) ?? null)
+    const fr = computeFundamentals(row.data?.quarters, priceMap.get(row.symbol) ?? null)
     if (!fr) { skipped++; continue }
+    computed.push({ symbol: row.symbol, fr })
+  }
+
+  // پاس ۲: صدک و میانهٔ P/E درون هر صنعت. P/E مطلق ۸ برای پالایشی ارزان و برای دارویی
+  // گران است؛ صدک نسبی این سوگیری cross-industry را رفع می‌کند. فقط P/E مثبت (سودده) شمرده می‌شود.
+  const peByIndustry = new Map() // نام صنعت → آرایهٔ P/E مثبت مرتب‌شده
+  for (const { symbol, fr } of computed) {
+    const ind = industryMap.get(symbol)
+    if (!ind || fr.pe == null || !(fr.pe > 0)) continue
+    if (!peByIndustry.has(ind)) peByIndustry.set(ind, [])
+    peByIndustry.get(ind).push(fr.pe)
+  }
+  for (const arr of peByIndustry.values()) arr.sort((a, b) => a - b)
+
+  for (const { symbol, fr } of computed) {
+    const ind = industryMap.get(symbol)
+    const arr = ind ? peByIndustry.get(ind) : null
+    // صدک فقط وقتی معنادار است که چند نماد سودده در صنعت باشند
+    if (arr && arr.length >= 3 && fr.pe != null && fr.pe > 0) {
+      fr.industry = ind
+      fr.peIndustryMedian = median(arr)
+      fr.pePercentile = percentileOf(arr, fr.pe)
+      fr.peIndustryCount = arr.length
+    } else if (ind) {
+      fr.industry = ind
+    }
+  }
+
+  // پاس ۳: upsert
+  let ok = 0
+  for (const { symbol, fr } of computed) {
     const { error: upErr } = await sb.from('stock_fundamentals')
-      .upsert({ symbol: row.symbol, data: fr, updated: new Date().toISOString() }, { onConflict: 'symbol' })
-    if (upErr) { console.log(`  ⚠️ ${row.symbol}: ${upErr.message}`); continue }
+      .upsert({ symbol, data: fr, updated: new Date().toISOString() }, { onConflict: 'symbol' })
+    if (upErr) { console.log(`  ⚠️ ${symbol}: ${upErr.message}`); continue }
     ok++
   }
-  console.log(`✅ ${ok} نماد محاسبه شد، ${skipped} رد شد (بدون گزارش سالانه)`)
+  console.log(`✅ ${ok} نماد محاسبه شد، ${skipped} رد شد (بدون گزارش سالانه)؛ صدک صنعتی برای ${peByIndustry.size} صنعت`)
 }
 
 main().catch(e => { console.error(e); process.exit(1) })
