@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { bestNameMatch } from '../../lib/faNorm'
 
 type Fund = {
   symbol: string; slug: string; category: string
@@ -138,8 +139,7 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
       // حالت «بازده صندوق X در بازه Y چقدره؟» — برای یک صندوق مشخص، نه لیست/فیلتر
       if (filter.fundReturnFundName) {
         const nq = filter.fundReturnFundName.trim()
-        const asset = assets.find(a => a.name === nq)
-          || assets.find(a => a.name.includes(nq) || nq.includes(a.name))
+        const asset = bestNameMatch(assets, a => a.name, nq)
         if (!asset) {
           setError(`صندوقی با نام «${nq}» پیدا نشد.`)
           setLoading(false)
@@ -169,8 +169,7 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
       // حالت «پورتفوی صندوق X چیه؟» یا «صندوق X چی خریده/فروخته؟» — پرتفوی واقعی همان صندوق
       if (filter.fundPortfolioQuery) {
         const nq = filter.fundPortfolioQuery.trim()
-        const asset = assets.find(a => a.name === nq)
-          || assets.find(a => a.name.includes(nq) || nq.includes(a.name))
+        const asset = bestNameMatch(assets, a => a.name, nq)
         if (!asset) {
           setError(`صندوقی با نام «${nq}» پیدا نشد.`)
           setLoading(false)

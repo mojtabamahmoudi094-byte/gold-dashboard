@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs/promises'
 import path from 'path'
+import { faNorm } from '../../../lib/faNorm'
 
 // جست‌وجوی وزن یک سهم خاص (مثلاً «بانک ملت») در پرتفوی صندوق‌های سهامی/مختلط —
 // از فایل‌های public/portfolio/<slug>.json می‌خواند (خروجی scripts/codal-portfolio.js)
 // که همان داده‌ای‌ست که صفحه هر صندوق (CodalSections) هم نمایش می‌دهد.
 export const dynamic = 'force-dynamic'
 
-const norm = (s: string) => s.replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim()
+const norm = faNorm // نرمال‌ساز مشترک (ی/ک عربی + اعراب + نیم‌فاصله) — ZWNJ در نام‌های کدال رایج است
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q')?.trim()
