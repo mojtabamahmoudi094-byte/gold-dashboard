@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
 import { darkTheme, lightTheme, shouldUseDark } from '../../../lib/theme'
 import { Skeleton, SkeletonBlock, SkeletonRows } from '../../components/ui/Skeleton'
+import TelegramChannelCta from '../../components/TelegramChannelCta'
 import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
@@ -535,6 +536,8 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
 
         {/* اطلاعیه‌های کدال — دریافت زنده کلاینت‌ساید */}
         <CodalAnnouncements symbol={slug} isDark={isDark} isMobile={isMobile} />
+
+        <TelegramChannelCta context="fund" />
 
         <CommentsSection targetType="fund" targetKey={slug} isDark={isDark} />
 

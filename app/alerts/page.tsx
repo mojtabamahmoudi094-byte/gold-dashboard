@@ -213,7 +213,45 @@ export default function AlertsPage() {
           {loading ? (
             <div style={{ color: t.muted, fontSize: 13, textAlign: 'center', padding: '40px 0' }}>در حال بارگذاری…</div>
           ) : alerts.length === 0 ? (
-            <div style={{ color: t.muted, fontSize: 13, textAlign: 'center', padding: '40px 0' }}>هنوز هشداری نساخته‌اید</div>
+            // آنبوردینگ اولین هشدار — به‌جای پیام خشک، سه قدم + دکمهٔ پرکردن نمونه
+            <div style={{
+              background: t.panel, border: `1px dashed ${t.borderStrong}`, borderRadius: 12,
+              padding: isMobile ? '20px 16px' : '24px 28px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }} aria-hidden>🔔</div>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>اولین هشدارت را بساز</div>
+              <ol style={{ listStyle: 'none', padding: 0, margin: '0 auto 18px', maxWidth: 380, textAlign: 'right' }}>
+                {[
+                  linked === false ? 'بات تلگرام را از صفحه پورتفوی وصل کن' : 'بات تلگرام وصل است ✓',
+                  'سهم، صندوق یا حباب بازار را انتخاب کن',
+                  'قیمت یا درصد هدف را تعیین کن — بقیه‌اش با ما',
+                ].map((s, i) => (
+                  <li key={i} style={{ fontSize: 13, lineHeight: 2.3, color: t.text }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 22, height: 22, borderRadius: '50%', marginLeft: 8,
+                      background: t.brand, color: '#0A0805', fontSize: 12, fontWeight: 800,
+                    }}>{fa(i + 1)}</span>
+                    {s}
+                  </li>
+                ))}
+              </ol>
+              <button
+                onClick={() => {
+                  setAssetType('market'); setSymbol('coin'); setDirection('above'); setTarget('5'); setError('')
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                style={{
+                  fontSize: 13, fontWeight: 700, padding: '11px 24px', borderRadius: 10, cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #d9b45b, #f4d795)', color: '#0A0805', border: 'none',
+                  fontFamily: 'inherit', minHeight: 44,
+                }}>
+                امتحان با یک نمونه: حباب سکه بالای ۵٪
+              </button>
+              <div style={{ fontSize: 11, color: t.muted, marginTop: 10 }}>
+                فرم بالا با مقدارهای نمونه پر می‌شود — قبل از ثبت هرطور خواستی عوضش کن.
+              </div>
+            </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {alerts.map(a => (
