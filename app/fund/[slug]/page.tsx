@@ -4,22 +4,25 @@ import { getFundDetail } from '../../../lib/fundDetailData'
 import { safe } from '../../../lib/format'
 import JsonLd from '../../../components/JsonLd'
 import { SITE_URL } from '../../../lib/site'
+import { pageMetadata } from '../../../lib/pageMetadata'
 
 export const revalidate = 60
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const slug = decodeURIComponent((await params).slug)
   const { asset, record } = await getFundDetail(slug)
-  if (!asset) return { title: slug }
-  if (!record) return { title: asset.name }
+  const path = `/fund/${encodeURIComponent(slug)}`
+  if (!asset) return pageMetadata({ title: `قیمت صندوق ${slug} امروز + تحلیل لحظه‌ای رایگان`, description: `قیمت لحظه‌ای، حباب و تحلیل صندوق ${slug} — رایگان و بدون ثبت‌نام`, path })
+  if (!record) return pageMetadata({ title: `قیمت صندوق ${asset.name} امروز + تحلیل لحظه‌ای رایگان`, description: `قیمت لحظه‌ای، حباب، جریان پول حقیقی و تحلیل صندوق ${asset.name} — رایگان و بدون ثبت‌نام`, path })
 
   const priceIsRial = safe(record.trade_value) > 1e6
   const priceToman = priceIsRial ? Math.round(safe(record.price_close) / 10) : safe(record.price_close)
   const changePct = safe(record.price_change_pct)
-  return {
+  return pageMetadata({
     title: `قیمت صندوق ${asset.name} امروز + تحلیل لحظه‌ای رایگان`,
     description: `قیمت لحظه‌ای صندوق ${asset.name} (${slug}) — قیمت پایانی ${priceToman.toLocaleString('fa-IR')} تومان (${changePct > 0 ? '+' : ''}${changePct.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪) — حباب، جریان پول حقیقی، ارزش بازار و تحلیل صندوق، رایگان و بدون ثبت‌نام.`,
-  }
+    path,
+  })
 }
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {

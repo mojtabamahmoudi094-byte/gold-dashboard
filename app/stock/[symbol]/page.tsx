@@ -5,6 +5,7 @@ import { getStockReport } from '../../../lib/stockReportsData'
 import type { Reports } from '../../../lib/stockInsights'
 import JsonLd from '../../../components/JsonLd'
 import { SITE_URL } from '../../../lib/site'
+import { pageMetadata } from '../../../lib/pageMetadata'
 
 // ISR به‌جای force-dynamic: دیتای زنده هرچند دقیقه آپدیت می‌شود، کلاینت هم خودش رفرش دارد —
 // نیازی به هیت Supabase در هر ریکوئست SSR نیست (روی Render رایگان صرفه‌جویی CPU/تاخیر می‌کند)
@@ -27,13 +28,15 @@ async function findSymbolData(symbol: string) {
 export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }): Promise<Metadata> {
   const symbol = decodeURIComponent((await params).symbol)
   const { s, ind, isExtra } = await findSymbolData(symbol)
-  if (!s || !ind) return { title: symbol }
+  const path = `/stock/${encodeURIComponent(symbol)}`
+  if (!s || !ind) return pageMetadata({ title: `قیمت ${symbol} امروز + نمودار لحظه‌ای و تحلیل رایگان`, description: `قیمت لحظه‌ای نماد ${symbol} در بورس تهران (tsetmc) — گزارش‌های کدال و تحلیل بنیادی، رایگان و بدون ثبت‌نام`, path })
   const price = s.pc == null ? '' : `قیمت پایانی ${s.pc.toLocaleString('fa-IR')} ریال`
   const change = s.pcp == null ? '' : `(${s.pcp > 0 ? '+' : ''}${s.pcp.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪)`
-  return {
+  return pageMetadata({
     title: `قیمت ${s.l18} امروز + نمودار لحظه‌ای و تحلیل رایگان`,
-    description: `قیمت لحظه‌ای نماد ${s.l18} (${s.l30}) در بورس تهران (tsetmc) — ${price} ${change} — آخرین گزارش‌های کدال، ارزش بازار، حجم معاملات و تحلیل بنیادی، رایگان و بدون ثبت‌نام.`.trim(),
-  }
+    description: `قیمت لحظه‌ای نماد ${s.l18} (${s.l30}) در بورس تهران (tsetmc) — ${price} ${change} — آخرین گزارش‌های کدال، ارزش بازار، حجم معاملات و تحلیل بنیادی، رایگان و بدون ثبت‌نام.`.replace(/\s+/g, ' ').trim(),
+    path,
+  })
 }
 
 export default async function StockPage({ params }: { params: Promise<{ symbol: string }> }) {
