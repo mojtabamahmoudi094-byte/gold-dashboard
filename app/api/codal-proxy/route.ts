@@ -9,9 +9,8 @@ import { clientIp } from '../../../lib/clientIp'
 
 export const dynamic = 'force-dynamic'
 
-// کلید «رایگان» که هرمس داد نامعتبر بود (BrsAPI: 401 unauthorized) — از همان کلید
-// موجود پروژه استفاده می‌کنیم (همان‌جایی که scripts/codal-watch.js و بقیه استفاده می‌کنند)
-const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+// کلید از env — hardcode fallback حذف شد (کلید قبلی در ریپوی عمومی افشا و باید revoke شود)
+const KEY = process.env.BRSAPI_KEY
 const PASS_PARAMS = ['l18', 'date_start', 'date_end', 'page', 'length', 'category', 'audited', 'unaudited']
 
 // این دسته‌ها را هرمس اصلاً لازم ندارد — حذف سمت سرور تا وقت/بودجهٔ LLM او تلف نشود
@@ -27,6 +26,10 @@ export async function GET(req: NextRequest) {
   const ip = clientIp(req)
   if (!rateLimit(`codal-proxy:${ip}`, 20, 60_000)) {
     return NextResponse.json({ error: 'تعداد درخواست‌ها زیاد است' }, { status: 429, headers: { 'Cache-Control': 'no-store' } })
+  }
+
+  if (!KEY) {
+    return NextResponse.json({ error: 'BRSAPI_KEY تنظیم نشده است' }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
   }
 
   const qs = new URLSearchParams()

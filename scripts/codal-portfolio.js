@@ -34,7 +34,7 @@ function loadEnv(file) {
 loadEnv('../.env.local')
 loadEnv('.env.sync')
 
-const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const KEY = process.env.BRSAPI_KEY
 const SYMBOL = process.argv[2] || 'اهرم'
 const MONTHS_WANTED = 3   // سه گزارش ماهانه اخیر — یک فصل کامل (بهار: فروردین تا خرداد)
 

@@ -33,7 +33,7 @@ loadEnv('../.env.local')
 loadEnv('.env.sync')
 loadEnv('.env')
 
-const KEY   = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const KEY   = process.env.BRSAPI_KEY
 const FORCE = process.argv.includes('--force')
 const OUT_DIR = path.join(__dirname, 'reports-out')
 

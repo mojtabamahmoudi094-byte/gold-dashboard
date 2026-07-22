@@ -33,7 +33,7 @@ const { buildMonthlyReportData, renderMonthlyReportCardHtml, screenshotMonthlyRe
 const { buildQuarterlyReportData, renderQuarterlyReportCardHtml, screenshotQuarterlyReportCard } = require('./quarterly-report-card.js')
 const { TELEGRAM_CHANNEL } = require('./brand-assets.js')
 
-const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const KEY = process.env.BRSAPI_KEY
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 // مقصد پست‌های عمومی، کانال است — نه چت شخصی/ادمین که TELEGRAM_CHAT_ID برای هشدار خطا استفاده می‌شود
 const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID

@@ -19,7 +19,7 @@
 const path = require('path')
 const fs   = require('fs')
 
-const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const KEY = process.env.BRSAPI_KEY
 const SYMBOL = process.argv[2] || 'شپدیس'
 
 // ماسک BrsAPI روی base64: QQQaQQQ = %2f و OOObOOO = %2b — فقط id فایل unmask شود

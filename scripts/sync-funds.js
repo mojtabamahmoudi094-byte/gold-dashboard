@@ -16,7 +16,7 @@
  *      (روزهای 6,0-3 = شنبه تا چهارشنبه؛ در cron عدد 0 یعنی یکشنبه و 6 یعنی شنبه)
  *
  * متغیرهای لازم (.env.sync):
- *   BRSAPI_KEY=BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj
+ *   BRSAPI_KEY=your_brsapi_key_here
  *   SUPABASE_URL=https://xxxx.supabase.co
  *   SUPABASE_KEY=eyJ...   (service_role یا anon با دسترسی write)
  */
@@ -38,7 +38,7 @@ function loadEnv(file) {
 loadEnv('../.env.local')   // Next.js env (fallback)
 loadEnv('.env.sync')        // script-specific env (priority)
 
-const BRSAPI_KEY    = process.env.BRSAPI_KEY    || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const BRSAPI_KEY    = process.env.BRSAPI_KEY   
 const SUPABASE_URL  = process.env.SUPABASE_URL  || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_KEY  = process.env.SUPABASE_KEY  || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 

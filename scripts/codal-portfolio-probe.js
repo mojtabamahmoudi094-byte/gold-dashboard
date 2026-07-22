@@ -28,7 +28,7 @@ function loadEnv(file) {
 loadEnv('../.env.local')
 loadEnv('.env.sync')
 
-const KEY = process.env.BRSAPI_KEY || 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const KEY = process.env.BRSAPI_KEY
 const SYMBOL = process.argv[2] || 'اهرم'
 
 async function fetchJson(url) {
