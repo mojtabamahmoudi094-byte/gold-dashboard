@@ -136,6 +136,27 @@ function backtestSymbol(rows, acc) {
     const smcHere = smcEvents.get(i)
     if (smcHere) for (const s of smcHere) signals.push(s)
 
+    // خط پایه: بازده آتی «همهٔ روزها» بدون هیچ شرط سیگنالی. نرخ برد ۵۶٪ یک سیگنال گاوی
+    // در بازاری که خودش صعودی بوده هیچ برتری (edge) نشان نمی‌دهد — سیگنال فقط وقتی معنا
+    // دارد که از این خط پایه بالاتر باشد. bias='bull' یعنی win = بازده مثبت.
+    {
+      const bEntry = adjCloses[i]
+      if (bEntry > 0) {
+        for (const h of HORIZONS) {
+          const exit = adjCloses[i + h]
+          if (!(exit > 0)) continue
+          const ret = (exit - bEntry) / bEntry * 100
+          const accKey = `baseline_all_days|${h}`
+          let a = acc.get(accKey)
+          if (!a) { a = { signal_key: 'baseline_all_days', horizon_days: h, bias: 'bull', count: 0, winCount: 0, sumReturn: 0, returns: [] }; acc.set(accKey, a) }
+          a.count++
+          if (ret > 0) a.winCount++
+          a.sumReturn += ret
+          a.returns.push(ret)
+        }
+      }
+    }
+
     if (signals.length === 0) continue
     const entry = adjCloses[i]
     if (!(entry > 0)) continue

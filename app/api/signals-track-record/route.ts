@@ -174,11 +174,33 @@ export async function GET() {
     }
   }
 
+  // کالیبراسیون اعتماد: آیا سیگنال‌های «اعتماد ۸۰» واقعاً بیشتر از «اعتماد ۶۰» می‌برند؟
+  // اگر نرخ برد سطل‌ها هم‌ترتیبِ اعتماد نباشد، عدد confidence نمایشی است نه اطلاعاتی —
+  // خودِ این شفافیت برای کاربر ارزش است.
+  const CONF_BUCKETS = [
+    { key: 'low', label: 'اعتماد زیر ۶۰', min: -Infinity, max: 60 },
+    { key: 'mid', label: 'اعتماد ۶۰ تا ۷۵', min: 60, max: 75 },
+    { key: 'high', label: 'اعتماد بالای ۷۵', min: 75, max: Infinity },
+  ]
+  const byConfidence = CONF_BUCKETS.map(b => {
+    const rows = settled.filter(r => typeof r.confidence === 'number' && r.confidence >= b.min && r.confidence < b.max)
+    if (rows.length === 0) return { key: b.key, label: b.label, n: 0, winRate: null, avgReturn: null }
+    const w = rows.filter(r => (r.outcomePct as number) > 0)
+    return {
+      key: b.key,
+      label: b.label,
+      n: rows.length,
+      winRate: Math.round(w.length / rows.length * 100),
+      avgReturn: Math.round(rows.reduce((a, r) => a + (r.outcomePct as number), 0) / rows.length * 100) / 100,
+    }
+  })
+
   return NextResponse.json({
     updated: new Date().toISOString(),
     horizonDays: N,
     overall,
     byCategory,
+    byConfidence,
     categoryLabels: CATEGORY_LABELS,
     recent: recent.slice(0, 200),
   })

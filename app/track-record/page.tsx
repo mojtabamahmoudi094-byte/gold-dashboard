@@ -13,10 +13,12 @@ type Row = {
   outcomePct: number | null
 }
 type CatStat = { n: number; winRate: number | null; avgReturn: number | null }
+type ConfStat = { key: string; label: string; n: number; winRate: number | null; avgReturn: number | null }
 type Payload = {
   updated: string; horizonDays: number
   overall: { n: number; pending: number; winRate: number | null; avgReturn: number | null }
   byCategory: Record<string, CatStat>
+  byConfidence?: ConfStat[]
   categoryLabels: Record<string, string>
   recent: Row[]
 }
@@ -167,6 +169,43 @@ export default function TrackRecordPage() {
                           </td>
                           <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif', color: (c.avgReturn ?? 0) >= 0 ? t.green : t.red }}>
                             {c.avgReturn === null ? '—' : `${c.avgReturn >= 0 ? '+' : ''}${fa(c.avgReturn, 1)}٪`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {(data.byConfidence ?? []).some(b => b.n > 0) && (
+              <div style={{ ...panelStyle(t.brand2), marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>
+                  کالیبراسیون اعتماد سیگنال‌ها
+                </div>
+                <div style={{ fontSize: 10.5, color: t.muted, marginBottom: 10 }}>
+                  آیا سیگنال‌های با اعتماد بالاتر واقعاً بیشتر برنده شده‌اند؟ اگر ترتیب نرخ موفقیت با ترتیب اعتماد نخواند، عدد اعتماد هنوز قابل اتکا نیست.
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ color: t.muted, textAlign: 'right' }}>
+                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>سطح اعتماد</th>
+                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>نمونه</th>
+                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>نرخ موفقیت</th>
+                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>میانگین بازده</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.byConfidence ?? []).map(b => (
+                        <tr key={b.key} style={{ borderTop: `0.5px solid ${t.border}` }}>
+                          <td style={{ padding: '8px', fontWeight: 700 }}>{b.label}</td>
+                          <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{b.n === 0 ? '—' : fa(b.n)}</td>
+                          <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif', color: b.winRate === null ? t.muted : b.winRate >= 50 ? t.green : t.red, fontWeight: 700 }}>
+                            {b.winRate === null ? '—' : `${fa(b.winRate)}٪`}
+                          </td>
+                          <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif', color: b.avgReturn === null ? t.muted : b.avgReturn >= 0 ? t.green : t.red }}>
+                            {b.avgReturn === null ? '—' : `${b.avgReturn >= 0 ? '+' : ''}${fa(b.avgReturn, 1)}٪`}
                           </td>
                         </tr>
                       ))}

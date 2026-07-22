@@ -28,6 +28,7 @@ const SIGNAL_LABELS: Record<string, string> = {
   rsi_oversold: 'RSI اشباع فروش', rsi_overbought: 'RSI اشباع خرید',
   macd_cross_up: 'سیگنال خرید مکدی', macd_cross_down: 'سیگنال فروش مکدی',
   vol_spike: 'حجم مشکوک', new_high_52w: 'سقف جدید ۵۲ هفته', new_low_52w: 'کف جدید ۵۲ هفته',
+  baseline_all_days: 'خط پایه (همه روزها)',
 }
 
 function labelOf(key: string): string {
@@ -41,7 +42,7 @@ const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigi
 
 type SignalGroup = { key: string; bias: 'bull' | 'bear'; byHorizon: Map<number, StatRow> }
 
-function StatsTable({ groups, muted, line }: { groups: SignalGroup[]; muted: string; line: string }) {
+function StatsTable({ groups, muted, line, baseline }: { groups: SignalGroup[]; muted: string; line: string; baseline?: Map<number, StatRow> }) {
   const th = (label: string) => (
     <th key={label} style={{ padding: '10px 12px', fontSize: 11.5, fontWeight: 700, color: muted, textAlign: 'right', whiteSpace: 'nowrap' }}>
       {label}
@@ -67,9 +68,19 @@ function StatsTable({ groups, muted, line }: { groups: SignalGroup[]; muted: str
             </td>
             {HORIZONS.flatMap(h => {
               const s = g.byHorizon.get(h)
+              const b = baseline?.get(h)
+              // برتری (edge) نسبت به خط پایه: برای سیگنال گاوی مقایسه با نرخ مثبت‌بودن بازار،
+              // برای خرسی با مکملش (اگر بازار ۵۵٪ روزها مثبت است، شانس خام سیگنال خرسی ۴۵٪ است)
+              const baseWr = s && b ? (g.bias === 'bull' ? b.win_rate : 100 - b.win_rate) : null
+              const edge = s && baseWr !== null ? s.win_rate - baseWr : null
               return [
                 <td key={`wr${h}`} style={{ padding: '9px 12px', fontSize: 12.5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                   {s ? `${fa(s.win_rate, 1)}٪` : '—'}
+                  {edge !== null && (
+                    <div style={{ fontSize: 9.5, color: edge >= 0 ? GREEN : RED }} title="اختلاف با خط پایهٔ بازار (بدون سیگنال)">
+                      {edge >= 0 ? '+' : ''}{fa(edge, 1)} نسبت به پایه
+                    </div>
+                  )}
                 </td>,
                 <td key={`ar${h}`} style={{
                   padding: '9px 12px', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
@@ -120,7 +131,17 @@ export default function BacktestPage() {
     })
   }
 
-  const bySignal = useMemo(() => (rows ? groupBySignal(rows) : []), [rows])
+  // خط پایه: بازده آتی همهٔ روزها بدون سیگنال — مرجع مقایسهٔ همهٔ سیگنال‌ها
+  const baseline = useMemo(() => {
+    const m = new Map<number, StatRow>()
+    for (const r of rows ?? []) if (r.signal_key === 'baseline_all_days') m.set(r.horizon_days, r)
+    return m
+  }, [rows])
+
+  const bySignal = useMemo(
+    () => (rows ? groupBySignal(rows.filter(r => r.signal_key !== 'baseline_all_days')) : []),
+    [rows],
+  )
 
   // بک‌تست تعاملی — نماد دلخواه کاربر (زنده از /api/backtest-signal-symbol، نه جدول تجمیعی)
   const [allSymbols, setAllSymbols] = useState<string[]>([])
@@ -208,6 +229,21 @@ export default function BacktestPage() {
           مرتب شده (سیگنال‌های با کمتر از ۵ رخداد، غیرقابل‌اتکا و در انتها هستند).
         </p>
 
+        {baseline.size > 0 && (
+          <div style={{ ...glass, borderRadius: 14, padding: '12px 16px', marginBottom: 14, ...enterAnim(1) }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>خط پایهٔ بازار (بدون هیچ سیگنالی)</div>
+            <div style={{ fontSize: 11.5, color: muted, lineHeight: 2 }}>
+              {HORIZONS.map(h => {
+                const b = baseline.get(h)
+                return b ? `افق ${fa(h)}روزه: ${fa(b.win_rate, 1)}٪ روزها مثبت (میانگین ${b.avg_return_pct >= 0 ? '+' : ''}${fa(b.avg_return_pct, 2)}٪)` : null
+              }).filter(Boolean).join(' · ')}
+            </div>
+            <div style={{ fontSize: 10.5, color: muted, marginTop: 4 }}>
+              سیگنالی «برتری» دارد که نرخ بردش از این خط پایه بالاتر بزند — عدد ریز زیر هر نرخ برد همین اختلاف است.
+            </div>
+          </div>
+        )}
+
         <div style={{ ...glass, borderRadius: 20, overflowX: 'auto', ...enterAnim(2) }}>
           {rows === null ? (
             <div style={{ color: muted, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>در حال بارگذاری…</div>
@@ -216,7 +252,7 @@ export default function BacktestPage() {
               داده‌ای نیست — اسکریپت بک‌تست هنوز روی سرور اجرا نشده
             </div>
           ) : (
-            <StatsTable groups={bySignal} muted={muted} line={line} />
+            <StatsTable groups={bySignal} muted={muted} line={line} baseline={baseline} />
           )}
         </div>
 
