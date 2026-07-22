@@ -216,7 +216,7 @@ export default function TerminalChart({ data, ma5, ma10, anomalies, height = 360
   }, [anomalies, showAnomaly, isDark])
 
   const btnStyle = (active: boolean, activeColor: string) => ({
-    fontSize: 11, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' as const,
+    fontSize: 12, padding: '9px 14px', minHeight: 40, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' as const,
     background: active ? `${activeColor}26` : 'rgba(128,128,128,0.08)',
     border: `0.5px solid ${active ? `${activeColor}80` : 'rgba(128,128,128,0.25)'}`,
     color: active ? activeColor : colors.text,

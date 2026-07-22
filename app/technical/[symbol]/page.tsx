@@ -443,10 +443,14 @@ export default function TechnicalSymbolPage() {
         )}
         {!failed && rows === null && (
           <div style={{
-            color: muted, fontSize: 13, padding: '70px 0', textAlign: 'center',
-            ...glass,
+            color: muted, fontSize: 14, minHeight: 380, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 12, ...glass,
           }}>
-            در حال بارگذاری…
+            <div className="ta-skeleton-pulse" style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: isDark ? 'rgba(217,180,91,0.18)' : 'rgba(217,180,91,0.22)',
+            }} />
+            در حال بارگذاری نمودار «{symbol}»…
           </div>
         )}
         {!failed && rows !== null && candles.length === 0 && (

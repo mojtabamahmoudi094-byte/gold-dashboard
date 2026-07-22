@@ -254,7 +254,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                     border: `0.5px solid ${chgC}40`,
                   }}>
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 9.5, color: muted, marginBottom: 3 }}>قیمت پایانی</div>
+                      <div style={{ fontSize: 12, color: muted, marginBottom: 3 }}>قیمت پایانی</div>
                       <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: text }}>
                         {s.pc === null ? '—' : s.pc.toLocaleString('fa-IR')}
                       </div>
@@ -286,7 +286,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                       display: 'block', width: '100%', textAlign: 'right', fontFamily: 'inherit',
                     }}>
                       {accent && <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 3, background: c }} />}
-                      <div style={{ fontSize: 10.5, color: muted, marginBottom: 6 }}>{k}</div>
+                      <div style={{ fontSize: 12, color: muted, marginBottom: 6 }}>{k}</div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: c, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</div>
                     </button>
                   )
@@ -910,8 +910,9 @@ function QuarterlyFinSection({ quarters, t, isMobile }: { quarters: RQuarter[]; 
         <Chip t={t} label="سود هر سهم (EPS)" value={last.eps === null ? '—' : `${last.eps.toLocaleString('fa-IR')} ریال`} />
       </div>
 
-      {/* جدول دوره‌ها */}
-      <div style={{ overflowX: 'auto' }}>
+      {/* جدول دوره‌ها — در موبایل عرض جدول از صفحه بیشتر است؛ fade لبه چپ نشانه‌ی قابل‌کشیدن‌بودن (RTL: محتوای بریده سمت چپ) */}
+      <div style={{ position: 'relative' }}>
+        <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? 11 : 12, whiteSpace: 'nowrap' }}>
           <thead>
             <tr style={{ color: t.muted, fontSize: 10 }}>
@@ -951,6 +952,13 @@ function QuarterlyFinSection({ quarters, t, isMobile }: { quarters: RQuarter[]; 
             })}
           </tbody>
         </table>
+        </div>
+        {isMobile && (
+          <div aria-hidden style={{
+            position: 'absolute', top: 0, bottom: 0, left: 0, width: 28, pointerEvents: 'none',
+            background: `linear-gradient(to left, transparent, ${t.isDark ? 'rgba(10,18,30,0.9)' : 'rgba(255,255,255,0.9)'})`,
+          }} />
+        )}
       </div>
     </SectionCard>
   )
@@ -1142,7 +1150,7 @@ function AiChatSection({ symbol, t, isMobile }: { symbol: string; t: Theme; isMo
                 <button key={q} className="ai-chip" onClick={() => send(q)} disabled={loading} aria-label={`پرسیدن: ${q}`} style={{
                   fontSize: isMobile ? 11 : 11.5, padding: '10px 15px', borderRadius: 999, cursor: 'pointer',
                   background: `${AI_ACCENT}10`, border: `0.5px solid ${AI_ACCENT}38`, color: t.text,
-                  fontFamily: 'inherit', minHeight: 40,
+                  fontFamily: 'inherit', minHeight: 44,
                 }}>{q}</button>
               ))}
             </div>

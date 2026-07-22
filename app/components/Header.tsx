@@ -478,7 +478,7 @@ export default function Header() {
               aria-label={isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب'}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 34, height: 34, borderRadius: 8, cursor: 'pointer',
+                width: 40, height: 40, borderRadius: 8, cursor: 'pointer',
                 background: 'transparent',
                 border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
                 color: isDark ? '#6b7280' : '#7A6A50',
@@ -565,7 +565,7 @@ export default function Header() {
               aria-label={isDark ? 'تغییر به حالت روز' : 'تغییر به حالت شب'}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
+                width: 40, height: 40, borderRadius: 8, cursor: 'pointer',
                 background: 'transparent',
                 border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
                 color: isDark ? '#6b7280' : '#7A6A50',
@@ -579,7 +579,7 @@ export default function Header() {
               aria-expanded={menuOpen}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
+                width: 40, height: 40, borderRadius: 8, cursor: 'pointer',
                 background: menuOpen ? 'rgba(217,180,91,0.1)' : 'transparent',
                 border: `1px solid ${menuOpen ? 'rgba(217,180,91,0.35)' : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
                 color: menuOpen ? BRAND : isDark ? '#6b7280' : '#7A6A50',

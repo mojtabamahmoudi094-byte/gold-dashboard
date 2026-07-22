@@ -31,7 +31,9 @@ export const TA_KEYFRAMES = `
   @keyframes taBlob1 { from { transform: translate(0,0) scale(1) } to { transform: translate(-60px,50px) scale(1.15) } }
   @keyframes taBlob2 { from { transform: translate(0,0) scale(1.1) } to { transform: translate(70px,-40px) scale(0.95) } }
   @keyframes taBlob3 { from { transform: translate(0,0) scale(1) } to { transform: translate(40px,60px) scale(1.2) } }
-  @media (prefers-reduced-motion: reduce) { .ta-anim, .ta-anim * { animation: none !important } }
+  @keyframes taSkeletonPulse { 0%,100% { opacity: 0.4 } 50% { opacity: 1 } }
+  .ta-skeleton-pulse { animation: taSkeletonPulse 1.3s ease-in-out infinite }
+  @media (prefers-reduced-motion: reduce) { .ta-anim, .ta-anim *, .ta-skeleton-pulse { animation: none !important } }
 `
 
 export const enterAnim = (i: number): React.CSSProperties => ({
