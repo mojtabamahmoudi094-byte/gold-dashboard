@@ -2,19 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { clean } from '../../lib/vipFiltersShared'
+import { faNorm, faNormTight } from '../../lib/faNorm'
 
-type Sym = { l18: string; l30: string; plp: number | null }
+type Sym = { l18: string; l30: string; plp: number | null; tval?: number | null }
 type Industry = { name: string; symbols: Sym[] }
 type ExtraGroup = { name: string; symbols: Sym[] }
 type Payload = { industries: Industry[]; extraGroups?: ExtraGroup[] }
 type Asset = { id: number; name: string; slug: string; category: string }
 type FundsPayload = { assets: Asset[] }
 
-const norm = (s: unknown) =>
-  clean(s).replace(/[آأإ]/g, 'ا').replace(/ة/g, 'ه').replace(/ؤ/g, 'و')
+const norm = faNorm // نرمال‌ساز مشترک (NFKC + ی/ک + اعراب + نیم‌فاصله→فاصله)
 
-type Entry = { l18: string; l30: string; plp: number | null; sub: string; href: string }
+type Entry = { l18: string; l30: string; plp: number | null; tval: number | null; sub: string; href: string }
 
 let cache: Entry[] | null = null
 let inflight: Promise<Entry[]> | null = null
@@ -37,7 +36,7 @@ async function loadSymbols() {
         for (const s of ind.symbols ?? []) {
           if (seen.has(s.l18)) continue
           seen.add(s.l18)
-          out.push({ l18: s.l18, l30: s.l30, plp: s.plp, sub: `${s.l30} · ${ind.name}`, href: `/stock/${encodeURIComponent(s.l18)}` })
+          out.push({ l18: s.l18, l30: s.l30, plp: s.plp, tval: s.tval ?? null, sub: `${s.l30} · ${ind.name}`, href: `/stock/${encodeURIComponent(s.l18)}` })
         }
       }
       // صندوق‌های سهام‌محور (اهرمی/بخشی/سهامی) — فقط در extraGroups هستند، نه industries
@@ -48,14 +47,14 @@ async function loadSymbols() {
           seen.add(s.l18)
           const slug = fundSlug.get(s.l18)
           const href = slug != null ? `/fund/${encodeURIComponent(slug)}` : `/stock/${encodeURIComponent(s.l18)}`
-          out.push({ l18: s.l18, l30: s.l30 || s.l18, plp: s.plp, sub: grp.name, href })
+          out.push({ l18: s.l18, l30: s.l30 || s.l18, plp: s.plp, tval: s.tval ?? null, sub: grp.name, href })
         }
       }
       // صندوق‌های درآمد ثابت/کالایی و بقیه — از جدول assets (شامل slug صفحه صندوق)
       for (const a of fundsData?.assets ?? []) {
         if (seen.has(a.name)) continue
         seen.add(a.name)
-        out.push({ l18: a.name, l30: a.name, plp: null, sub: a.category, href: `/fund/${encodeURIComponent(a.slug)}` })
+        out.push({ l18: a.name, l30: a.name, plp: null, tval: null, sub: a.category, href: `/fund/${encodeURIComponent(a.slug)}` })
       }
 
       cache = out
@@ -96,6 +95,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
   }, [])
 
   const nq = norm(query)
+  const nqTight = faNormTight(query) // واریانت بدون‌فاصله — کاربری که نام را چسبیده تایپ کند
 
   const results = useMemo(() => {
     if (!nq) return []
@@ -107,19 +107,24 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
     const rank = (x: Entry) => {
       const nSym = norm(x.l18)
       const nName = norm(x.l30)
+      const tSym = nSym.replace(/\s+/g, '')
+      const tName = nName.replace(/\s+/g, '')
       return nSym.startsWith(nq) ? 0
         : nSym.includes(nq) ? 1
-        : nName.includes(nq) ? 2
-        : nq.length >= 2 && isSubseq(nSym) ? 3
+        : tSym.includes(nqTight) ? 2       // بدون‌فاصله روی نماد (نیم‌فاصلهٔ متفاوت)
+        : nName.includes(nq) ? 3
+        : tName.includes(nqTight) ? 4      // بدون‌فاصله روی نام شرکت
+        : nq.length >= 2 && isSubseq(nSym) ? 5
         : -1
     }
     return symbols
       .map(x => ({ x, r: rank(x) }))
       .filter(m => m.r >= 0)
-      .sort((a, b) => a.r - b.r)
+      // در هم‌رتبه‌ها، پرمعامله‌تر اول (tval)؛ «فولاد» قبل «فولاژ». صندوق‌های بدون tval آخر.
+      .sort((a, b) => a.r - b.r || (b.x.tval ?? 0) - (a.x.tval ?? 0))
       .slice(0, 8)
       .map(m => m.x)
-  }, [symbols, nq])
+  }, [symbols, nq, nqTight])
 
   useEffect(() => setActiveIdx(0), [nq])
 
