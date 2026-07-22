@@ -129,6 +129,7 @@ export default function BacktestPage() {
   const [symbolLoading, setSymbolLoading] = useState(false)
   const [symbolError, setSymbolError] = useState<string | null>(null)
   const [activeSymbol, setActiveSymbol] = useState<string | null>(null)
+  const [activeIdx, setActiveIdx] = useState(0)
 
   useEffect(() => {
     fetch('/api/stocks-industries').then(r => r.json()).then(j => {
@@ -137,6 +138,8 @@ export default function BacktestPage() {
       setAllSymbols([...syms])
     }).catch(() => {})
   }, [])
+
+  useEffect(() => setActiveIdx(0), [query])
 
   const suggestions = useMemo(() => {
     const q = query.trim()
@@ -233,7 +236,17 @@ export default function BacktestPage() {
           <input
             value={query}
             onChange={e => { setQuery(e.target.value); setActiveSymbol(null) }}
+            onKeyDown={e => {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, suggestions.length - 1)) }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)) }
+              else if (e.key === 'Enter' && suggestions[activeIdx]) { runSymbolBacktest(suggestions[activeIdx]) }
+            }}
             placeholder="نام نماد را بنویس… (مثلاً فولاد)"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={!!query && !activeSymbol && suggestions.length > 0}
+            aria-controls="backtest-symbol-listbox"
+            aria-activedescendant={suggestions[activeIdx] ? `backtest-symbol-option-${suggestions[activeIdx]}` : undefined}
             style={{
               width: '100%', padding: '10px 14px', borderRadius: 10, fontSize: 13, fontFamily: 'inherit',
               background: isDark ? 'rgba(255,255,255,0.03)' : '#fff', color: text,
@@ -241,15 +254,23 @@ export default function BacktestPage() {
             }}
           />
           {query && !activeSymbol && suggestions.length > 0 && (
-            <div style={{
+            <div id="backtest-symbol-listbox" role="listbox" style={{
               position: 'absolute', top: '100%', right: 0, left: 0, marginTop: 4, zIndex: 10,
               background: isDark ? '#0B1220' : '#fff', border: `0.5px solid ${line}`, borderRadius: 10,
               overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
             }}>
-              {suggestions.map(s => (
-                <div key={s} onClick={() => runSymbolBacktest(s)} style={{
-                  padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: text,
-                }}>{s}</div>
+              {suggestions.map((s, i) => (
+                <div
+                  key={s}
+                  id={`backtest-symbol-option-${s}`}
+                  role="option"
+                  aria-selected={i === activeIdx}
+                  onMouseDown={() => runSymbolBacktest(s)}
+                  onMouseEnter={() => setActiveIdx(i)}
+                  style={{
+                    padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: text,
+                    background: i === activeIdx ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.05)') : 'transparent',
+                  }}>{s}</div>
               ))}
             </div>
           )}

@@ -202,7 +202,7 @@ async function buildCaption(cat, facts) {
       lines.push(`• نماد مثبت / منفی: ${signed(dl.sym_pos)} / ${signed(dl.sym_neg)}`)
   }
 
-  lines.push('', CHANNEL_TAG, SITE)
+  lines.push('', '⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.', CHANNEL_TAG, SITE)
   return capCaption(lines.join('\n'))
 }
 

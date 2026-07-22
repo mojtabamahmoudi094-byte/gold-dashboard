@@ -3,6 +3,8 @@ import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { supabaseAdmin as sb } from '../../../../lib/supabaseAdmin'
 import { publicEnv } from '../../../../lib/env'
+import { rateLimit } from '../../../../lib/rateLimit'
+import { clientIp } from '../../../../lib/clientIp'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +25,11 @@ async function requireUser(req: Request): Promise<string | null> {
 }
 
 export async function POST(req: Request) {
+  // سقف تلاش per-IP تا brute-force موازی (که شمارنده‌ی غیراتمیک attempts را دور می‌زند) بسته شود
+  if (!rateLimit(`verify-otp:${clientIp(req)}`, 10, 10 * 60 * 1000)) {
+    return NextResponse.json({ error: 'تعداد تلاش‌ها زیاد است. کمی صبر کنید' }, { status: 429 })
+  }
+
   const userId = await requireUser(req)
   if (!userId) {
     return NextResponse.json({ error: 'ابتدا وارد حساب کاربری شوید' }, { status: 401 })
@@ -65,10 +72,13 @@ export async function POST(req: Request) {
 
   await sb.from('otp_verifications').update({ verified_at: new Date().toISOString() }).eq('id', row.id)
 
+  // وضعیت تایید در app_metadata نوشته می‌شود، نه user_metadata:
+  // user_metadata را خودِ کاربر با anon key و auth.updateUser می‌تواند بنویسد
+  // (یعنی phone_verified قابل جعل بود)؛ app_metadata فقط با service role نوشتنی است.
   const { data: userRes } = await sb.auth.admin.getUserById(userId)
-  const existingMeta = userRes?.user?.user_metadata ?? {}
+  const existingAppMeta = userRes?.user?.app_metadata ?? {}
   await sb.auth.admin.updateUserById(userId, {
-    user_metadata: { ...existingMeta, phone_verified: true },
+    app_metadata: { ...existingAppMeta, phone_verified: true, verified_phone: phone },
   })
 
   return NextResponse.json({ ok: true })

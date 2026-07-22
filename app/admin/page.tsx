@@ -8,8 +8,7 @@ import { darkTheme as t } from '../../lib/theme'
 
 const fa = (n: number) => n.toLocaleString('fa-IR')
 
-const BRSAPI_KEY = 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
-const BRSAPI_URL = `https://api.brsapi.ir/IME/Fund.php?key=${BRSAPI_KEY}`
+const BRSAPI_URL = `/api/brs-proxy?endpoint=ime-fund`
 
 function pickStr(obj: Record<string, unknown>, ...keys: string[]): string | null {
   for (const k of keys) {
@@ -108,8 +107,8 @@ async function runSync(addLog: (msg: string) => void): Promise<void> {
   let goldCache: { raw_pro: unknown; raw_commodity: unknown } | undefined
   try {
     const [proRes, commodRes] = await Promise.all([
-      fetch(`https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php?key=${BRSAPI_KEY}&section=gold,currency,cryptocurrency`, { cache: 'no-store' }),
-      fetch(`https://api.brsapi.ir/Market/Commodity.php?key=${BRSAPI_KEY}`, { cache: 'no-store' }),
+      fetch(`/api/brs-proxy?endpoint=gold-currency&section=${encodeURIComponent('gold,currency,cryptocurrency')}`, { cache: 'no-store' }),
+      fetch(`/api/brs-proxy?endpoint=commodity`, { cache: 'no-store' }),
     ])
     if (proRes.ok && commodRes.ok) {
       goldCache = { raw_pro: await proRes.json(), raw_commodity: await commodRes.json() }

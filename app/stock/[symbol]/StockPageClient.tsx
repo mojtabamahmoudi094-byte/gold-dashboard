@@ -218,7 +218,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                         background: 'linear-gradient(135deg, #d9b45b, #f4d795)',
                         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
                       }}>{s.l18}</span>
-                      <span style={{ fontSize: 12.5, color: muted, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.l30}</span>
+                      <span style={{ fontSize: 12.5, color: muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 auto' }}>{s.l30}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                       <Link href={ind.id != null ? `/stocks/${ind.id}` : '/market-map'} style={{

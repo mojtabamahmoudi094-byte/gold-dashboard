@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 import { supabaseAdmin as sb } from '../../../../lib/supabaseAdmin'
 import { sendOtpSms } from '../../../../lib/smsIr'
 import { publicEnv } from '../../../../lib/env'
+import { rateLimit } from '../../../../lib/rateLimit'
+import { clientIp } from '../../../../lib/clientIp'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +29,11 @@ async function requireUser(req: Request): Promise<string | null> {
 }
 
 export async function POST(req: Request) {
+  // سقف per-IP تا مهاجم نتواند با ساختن اکانت‌های متعدد از یک IP، پیامک‌بمباران کند
+  if (!rateLimit(`send-otp:${clientIp(req)}`, 10, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'تعداد درخواست‌ها زیاد است. کمی صبر کنید' }, { status: 429 })
+  }
+
   const userId = await requireUser(req)
   if (!userId) {
     return NextResponse.json({ error: 'ابتدا وارد حساب کاربری شوید' }, { status: 401 })
@@ -40,24 +47,31 @@ export async function POST(req: Request) {
   }
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const { data: recent } = await sb
-    .from('otp_verifications')
-    .select('created_at')
-    .eq('user_id', userId)
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
 
-  if (recent && recent.length > 0) {
-    const lastSentMs = new Date(recent[0].created_at).getTime()
-    if (Date.now() - lastSentMs < RESEND_COOLDOWN_MS) {
-      return NextResponse.json({ error: 'لطفاً کمی صبر کنید و دوباره تلاش کنید' }, { status: 429 })
-    }
-    if (recent.length >= MAX_PER_DAY) {
-      return NextResponse.json({ error: 'تعداد درخواست کد امروز به سقف رسیده است' }, { status: 429 })
+  // cooldown و سقف روزانه هم per-account و هم per-phone بررسی می‌شوند:
+  // شماره مقصد به اکانت گره نخورده، پس چک صرفاً per-user اجازه می‌داد مهاجم با
+  // اکانت‌های تازه به یک شماره‌ی قربانی بی‌نهایت پیامک بزند.
+  const [{ data: recentUser }, { data: recentPhone }] = await Promise.all([
+    sb.from('otp_verifications').select('created_at').eq('user_id', userId)
+      .gte('created_at', since).order('created_at', { ascending: false }),
+    sb.from('otp_verifications').select('created_at').eq('phone', phone)
+      .gte('created_at', since).order('created_at', { ascending: false }),
+  ])
+
+  const now = Date.now()
+  for (const recent of [recentUser, recentPhone]) {
+    if (recent && recent.length > 0) {
+      const lastSentMs = new Date(recent[0].created_at).getTime()
+      if (now - lastSentMs < RESEND_COOLDOWN_MS) {
+        return NextResponse.json({ error: 'لطفاً کمی صبر کنید و دوباره تلاش کنید' }, { status: 429 })
+      }
+      if (recent.length >= MAX_PER_DAY) {
+        return NextResponse.json({ error: 'تعداد درخواست کد امروز به سقف رسیده است' }, { status: 429 })
+      }
     }
   }
 
-  const code = String(crypto.randomInt(10000, 99999))
+  const code = String(crypto.randomInt(100000, 999999))
 
   try {
     await sendOtpSms(phone, code)

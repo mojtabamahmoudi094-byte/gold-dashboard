@@ -325,6 +325,9 @@ async function main() {
         const buf = await screenshotCard(browser, buildCardHtml(c))
         await sendPhoto(buf, caption)
         seen.add(`${c.symbol}|${c.reasonTag}`)
+        // state بلافاصله بعد هر ارسال ذخیره می‌شود، نه فقط انتهای حلقه: اگر puppeteer
+        // وسط حلقه OOM/kill شود، اجرای بعدی cron همان هشدارها را دوباره نفرستد.
+        saveState({ day: today, seen: [...seen] })
         sent++
         log(`✅ ${c.symbol} ارسال شد`)
       } catch (e) {

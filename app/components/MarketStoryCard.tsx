@@ -35,7 +35,10 @@ export default function MarketStoryCard({ isDark }: { isDark: boolean }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: accent }}>{row.headline}</div>
       </div>
       <div style={{ fontSize: 12.5, lineHeight: 1.9, color: isDark ? cream : text }}>{row.body}</div>
-      <div style={{ fontSize: 10.5, color: muted, marginTop: 8 }}>{row.trade_date_shamsi}</div>
+      <div style={{ fontSize: 10.5, color: muted, marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <span>⚠️ تولید هوش مصنوعی؛ صرفاً اطلاع‌رسانی است و توصیه سرمایه‌گذاری نیست.</span>
+        <span>{row.trade_date_shamsi}</span>
+      </div>
     </div>
   )
 }

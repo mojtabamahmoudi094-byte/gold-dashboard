@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { TELEGRAM_BASE } from '../../../lib/upstreams'
 import { rateLimit } from '../../../lib/rateLimit'
+import { clientIp } from '../../../lib/clientIp'
 
 // پیام کاربر به مدیر — ارسال خودکار به ایمیل (formsubmit.co، بدون نیاز به API key)
 // + یک کپی به تلگرام اگر بات تنظیم شده باشد
@@ -8,7 +9,7 @@ import { rateLimit } from '../../../lib/rateLimit'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'mojtabamahmoudi093@gmail.com'
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  const ip = clientIp(req)
   if (!rateLimit(`contact-admin:${ip}`, 5, 60_000)) {
     return NextResponse.json({ ok: false, error: 'تعداد درخواست‌ها زیاد است' }, { status: 429 })
   }

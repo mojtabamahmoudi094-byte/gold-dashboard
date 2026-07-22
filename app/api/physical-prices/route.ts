@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const BRSAPI_KEY = process.env.BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const BRSAPI_KEY = process.env.BRSAPI_KEY ?? ''
 
 /**
  * قیمت لحظه‌ای طلا، سکه و نقره فیزیکی از BrsApi برای صفحه پورتفو.

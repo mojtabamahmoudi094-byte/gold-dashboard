@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '../../../lib/rateLimit'
+import { clientIp } from '../../../lib/clientIp'
 import { GEMINI_BASE } from '../../../lib/upstreams'
 
 // Gemini با ورودی تصویری (چارت کندلی) — تفسیر فنی فارسی می‌نویسد
@@ -19,7 +20,7 @@ const SYSTEM = `تو دستیار «بورس سنج» هستی. یک عکس نم
 - فقط همان JSON را برگردان، بدون Markdown fence یا توضیح اضافه.`
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  const ip = clientIp(req)
   if (!rateLimit(`chart-narrative:${ip}`, 10, 60_000)) {
     return NextResponse.json({ ok: false, error: 'تعداد درخواست‌ها زیاد است' }, { status: 429 })
   }

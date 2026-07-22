@@ -531,9 +531,11 @@ export default function ChatWidget() {
             </>
           )}
 
-          {/* امضا */}
-          <div style={{ flexShrink: 0, textAlign: 'center', fontSize: 9.5, color: MUTED, padding: '0 0 8px' }}>
+          {/* امضا + سلب‌مسئولیت */}
+          <div style={{ flexShrink: 0, textAlign: 'center', fontSize: 9.5, color: MUTED, padding: '0 8px 8px', lineHeight: 1.7 }}>
             قدرت‌گرفته از هوش مصنوعی بورس سنج
+            <br />
+            پاسخ‌ها صرفاً اطلاع‌رسانی است و توصیه خرید یا فروش نیست.
           </div>
         </div>
       )}

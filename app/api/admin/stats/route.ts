@@ -46,9 +46,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // مرزهای «امروز/دیروز» و باکت‌های روزانه به وقت تهران (UTC+3:30) محاسبه می‌شوند،
+  // نه به وقت سرور (Render روی UTC است). قبلاً روز از نیمه‌شب UTC = ۳:۳۰ بامداد تهران
+  // جدا می‌شد، پس بازدیدهای ۰۰:۰۰–۰۳:۳۰ تهران زیر روز قبل شمرده می‌شدند.
+  const TEHRAN_OFFSET_MIN = 210
   const now = new Date()
-  const startOfToday = new Date(now)
-  startOfToday.setHours(0, 0, 0, 0)
+  const dayKey = (iso: string) =>
+    new Date(new Date(iso).getTime() + TEHRAN_OFFSET_MIN * 60000).toISOString().slice(0, 10)
+
+  const todayStr = dayKey(now.toISOString())
+  const startOfToday = new Date(new Date(`${todayStr}T00:00:00.000Z`).getTime() - TEHRAN_OFFSET_MIN * 60000)
   const startOfYesterday = new Date(startOfToday)
   startOfYesterday.setDate(startOfYesterday.getDate() - 1)
   const daysBack = 30
@@ -59,12 +66,6 @@ export async function GET(req: Request) {
     fetchViews(windowStart.toISOString()),
     fetchAllUsers(),
   ])
-
-  const dayKey = (iso: string) => {
-    const d = new Date(iso)
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
-    return d.toISOString().slice(0, 10)
-  }
   const days = Array.from({ length: daysBack }, (_, i) => {
     const d = new Date(windowStart)
     d.setDate(d.getDate() + i)

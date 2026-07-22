@@ -409,12 +409,36 @@ async function main() {
     return
   }
 
-  // حذف داده‌های همین روز و درج دوباره (به جای upsert که نیاز به unique constraint دارد)
+  const assetIds = rows.map(r => r.asset_id)
+  // تاریخ درج هر ردیف از خود API می‌آید (mapFundRow: FIELD.date_shamsi(item) || date)
+  // و ممکن است با `date` (تاریخ هدف اجرا) فرق کند — مثلاً اول جلسه که API هنوز
+  // تاریخ دیروز می‌دهد. حذف باید دقیقاً همان تاریخ‌هایی را پاک کند که درج می‌شوند،
+  // وگرنه حذفِ صفر ردیف + درج = ردیف تکراری در هر اجرای ۵ دقیقه‌ای.
+  const dates = [...new Set(rows.map(r => r.trade_date_shamsi))]
+
+  // carry-forward برای market_value_usd: این ستون را sync-usd-market-value یک‌بار
+  // ساعت ۱۳:۰۰ می‌نویسد، اما این cron هر ۵ دقیقه delete+reinsert می‌کند و
+  // mapFundRow این ستون را ندارد؛ بدون این خواندن، مقدار دلاری هر ۵ دقیقه پاک
+  // می‌شد (بازگشت باگ mv_usd wipe). پیش از حذف، مقدار موجود را نگه می‌داریم.
+  const { data: existingUsd } = await sb()
+    .from('gold_funds')
+    .select('asset_id, trade_date_shamsi, market_value_usd')
+    .in('trade_date_shamsi', dates)
+    .in('asset_id', assetIds)
+    .not('market_value_usd', 'is', null)
+
+  const usdByKey = new Map((existingUsd ?? []).map(r => [`${r.asset_id}|${r.trade_date_shamsi}`, r.market_value_usd]))
+  for (const r of rows) {
+    const k = `${r.asset_id}|${r.trade_date_shamsi}`
+    if (usdByKey.has(k)) r.market_value_usd = usdByKey.get(k)
+  }
+
+  // حذف داده‌های همین تاریخ‌ها و درج دوباره (به جای upsert که نیاز به unique constraint دارد)
   const { error: delErr } = await sb()
     .from('gold_funds')
     .delete()
-    .eq('trade_date_shamsi', date)
-    .in('asset_id', rows.map(r => r.asset_id))
+    .in('trade_date_shamsi', dates)
+    .in('asset_id', assetIds)
 
   if (delErr) {
     console.warn('[sync-funds] خطا در حذف داده قدیمی (ادامه می‌دهیم):', delErr.message)

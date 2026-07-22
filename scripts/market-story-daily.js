@@ -53,8 +53,15 @@ async function claimSend(key) {
   return false
 }
 
+async function releaseClaim(key) {
+  // اگر ارسال ناموفق بود کلید dedupe را پس بگیر تا اجرای بعدی cron دوباره تلاش کند
+  const { error } = await sb.from('telegram_alert_sent').delete().eq('key', key)
+  if (error) console.error(`[market-story] releaseClaim خطا داد: ${error.message}`)
+}
+
+// true اگر واقعاً ارسال شد (مستقیم یا رله)، false اگر هر دو مسیر شکست خوردند
 async function sendTelegram(text) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { console.log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — پست تلگرام رد شد'); return }
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { console.log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — پست تلگرام رد شد'); return false }
   try {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -63,7 +70,7 @@ async function sendTelegram(text) {
       signal: AbortSignal.timeout(20_000),
     })
     const data = await res.json()
-    if (data.ok) return
+    if (data.ok) return true
     console.error(`⚠️ ارسال مستقیم تلگرام ناموفق: ${data.description || 'نامشخص'} — تلاش از راه رله`)
   } catch (e) { console.error(`⚠️ ارسال مستقیم تلگرام خطا داد (${e.message}) — تلاش از راه رله`) }
 
@@ -75,8 +82,10 @@ async function sendTelegram(text) {
       signal: AbortSignal.timeout(90_000),
     })
     const data = await res.json()
-    if (!data.ok) console.error(`⚠️ رله تلگرام هم ناموفق: ${data.error || res.status}`)
+    if (data.ok) return true
+    console.error(`⚠️ رله تلگرام هم ناموفق: ${data.error || res.status}`)
   } catch (e) { console.error(`⚠️ رله تلگرام هم خطا داد: ${e.message}`) }
+  return false
 }
 
 async function avgBubble(date, category) {
@@ -92,11 +101,29 @@ async function avgBubble(date, category) {
   return vals.reduce((a, b) => a + b, 0) / vals.length
 }
 
+// شمسی امروز به وقت تهران — دقیقاً همان فرمت market-regime-daily (YYYY/MM/DD)
+function todayShamsiTehran() {
+  const parts = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tehran',
+  }).formatToParts(new Date())
+  const g = (t) => parts.find(p => p.type === t).value
+  return `${g('year')}/${g('month')}/${g('day')}`
+}
+
 async function main() {
   const { data: regimeRows, error: regErr } = await sb.from('market_regime_daily')
     .select('*').order('trade_date_shamsi', { ascending: false }).limit(2)
   if (regErr) { console.error('[market-story] market_regime_daily:', regErr.message); return }
   if (!regimeRows || regimeRows.length === 0) { console.log('[market-story] هنوز داده‌ای در Regime Engine نیست'); return }
+
+  // ردیف امروز را با تاریخ صریح انتخاب می‌کنیم، نه «آخرین ردیف». اگر Regime Engine
+  // امروز اجرا نشده باشد، آخرین ردیف مربوط به دیروز است و نباید دیروز را دوباره
+  // به‌عنوان «روایت امروز» پردازش و overwrite کنیم (کلاس باگ انتخاب‌بر اساس آخرین ردیف).
+  const todayShamsi = todayShamsiTehran()
+  if (regimeRows[0].trade_date_shamsi !== todayShamsi) {
+    console.log(`[market-story] ردیف Regime امروز (${todayShamsi}) نیست — آخرین: ${regimeRows[0].trade_date_shamsi}؛ رد شد`)
+    return
+  }
 
   const today = regimeRows[0]
   const yesterday = regimeRows[1] || null
@@ -145,9 +172,17 @@ async function main() {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { console.log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — پست تلگرام رد شد'); return }
   const key = `market_story|${today.trade_date_shamsi}`
   if (await claimSend(key)) {
-    const text = `📰 ${headline}\n\n${storyBody}\n\n@bourssanjj\n${SITE}`
-    await sendTelegram(text)
-    console.log('✅ به تلگرام پست شد')
+    const text = `📰 ${headline}\n\n${storyBody}\n\n⚠️ صرفاً اطلاع‌رسانی است، توصیه مالی نیست.\n\n@bourssanjj\n${SITE}`
+    const sent = await sendTelegram(text)
+    if (sent) {
+      console.log('✅ به تلگرام پست شد')
+    } else {
+      // ارسال شکست خورد: claim را پس بگیر تا فردا/اجرای بعدی دوباره تلاش کند و
+      // با خروج غیرصفر، run-with-alert.sh هشدار بدهد (قبلاً پیام گم می‌شد ولی «موفق» لاگ می‌شد)
+      await releaseClaim(key)
+      console.error('❌ ارسال تلگرام ناموفق بود — claim پس گرفته شد')
+      process.exit(1)
+    }
   }
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callNarrate } from '@/lib/llmNarrate'
 import { rateLimit } from '../../../lib/rateLimit'
+import { clientIp } from '../../../lib/clientIp'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,7 @@ const OPENROUTER_SCHEMA = {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  const ip = clientIp(req)
   if (!rateLimit(`fund-copilot-nl:${ip}`, 10, 60_000)) {
     return NextResponse.json({ ok: false, error: 'تعداد درخواست‌ها زیاد است' }, { status: 429 })
   }

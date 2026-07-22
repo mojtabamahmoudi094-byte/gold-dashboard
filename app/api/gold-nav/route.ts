@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin as sb } from '../../../lib/supabaseAdmin'
+import { todayShamsi } from '../../../lib/format'
 
 export const dynamic = 'force-dynamic'
 
-const BRSAPI_KEY = process.env.BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const BRSAPI_KEY = process.env.BRSAPI_KEY ?? ''
 
 function n(v: unknown): number | null {
   const x = parseFloat(String(v ?? '').replace(/,/g, ''))
@@ -34,7 +35,7 @@ export async function GET() {
   const fundNames: string[] = (assets ?? []).map((a: any) => a.name)
 
   // Try BrsAPI (Iranian IP only — will fail on Render)
-  let navs: Record<string, number | null> = {}
+  const navs: Record<string, number | null> = {}
   let gotLive = false
 
   try {
@@ -46,11 +47,30 @@ export async function GET() {
       for (const { name, nav } of results) navs[name] = nav
       gotLive = true
 
-      await sb.from('signals').insert([{
-        signal_type: '_nav_cache',
-        note: JSON.stringify({ navs }),
-        signal_date_shamsi: new Date().toISOString().slice(0, 10),
-      }])
+      // dedupe روزانه: هر GET ناشناس که به داده‌ی زنده برسد یک ردیف کش می‌نوشت،
+      // پس یک حلقه‌ی crawler می‌توانست جدول signals را بی‌نهایت بزرگ کند. فقط اگر
+      // برای امروز ردیفی نیست insert کن. تاریخ هم شمسی نوشته می‌شود نه میلادی
+      // (ستون signal_date_shamsi بود؛ رشته‌ی میلادی مرتب‌سازی تاریخ را خراب می‌کرد).
+      const shamsi = todayShamsi()
+      const { data: already } = await sb
+        .from('signals')
+        .select('id')
+        .eq('signal_type', '_nav_cache')
+        .eq('signal_date_shamsi', shamsi)
+        .limit(1)
+
+      if (!already || already.length === 0) {
+        await sb.from('signals').insert([{
+          signal_type: '_nav_cache',
+          note: JSON.stringify({ navs }),
+          signal_date_shamsi: shamsi,
+        }])
+      } else {
+        await sb.from('signals')
+          .update({ note: JSON.stringify({ navs }) })
+          .eq('signal_type', '_nav_cache')
+          .eq('signal_date_shamsi', shamsi)
+      }
     }
   } catch {
     // Expected on Render — fall through to Supabase cache

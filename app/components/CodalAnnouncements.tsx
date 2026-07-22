@@ -7,7 +7,6 @@ import { useCallback, useEffect, useState } from 'react'
 // از IP خارجی (سرور Next) جواب نمی‌دهد. الگو مثل app/admin/page.tsx
 // پاسخ صفر اطلاعیه = throttle موقت کدال؛ پیام + دکمه تلاش دوباره
 
-const KEY = 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 const ACCENT = '#38BDF8'   // آبی آسمانی — اطلاعیه‌های کدال
 const CACHE_TTL = 60 * 60 * 1000   // ۱ ساعت
 const SHOW_LIMIT = 12
@@ -93,8 +92,8 @@ export default function CodalAnnouncements({ symbol, isDark, isMobile }: {
     }
     setState('loading')
     try {
-      const url = `https://Api.BrsApi.ir/Codal/Announcement.php?key=${KEY}`
-        + `&l18=${encodeURIComponent(symbol)}&date_start=${twoMonthsAgoShamsi()}`
+      const url = `/api/brs-proxy?endpoint=codal-announcement`
+        + `&l18=${encodeURIComponent(symbol)}&date_start=${encodeURIComponent(twoMonthsAgoShamsi())}`
       const res = await fetch(url, { signal: AbortSignal.timeout(40_000) })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()

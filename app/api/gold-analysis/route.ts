@@ -3,7 +3,7 @@ import { supabase as sbClient } from '../../../lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
-const BRSAPI_KEY    = process.env.BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
+const BRSAPI_KEY    = process.env.BRSAPI_KEY ?? ''
 const PRO_URL       = `https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php?key=${BRSAPI_KEY}&section=gold,currency,cryptocurrency`
 const COMMODITY_URL = `https://api.brsapi.ir/Market/Commodity.php?key=${BRSAPI_KEY}`
 const CACHE_TTL     = 60_000

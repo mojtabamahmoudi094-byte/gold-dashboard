@@ -17,7 +17,6 @@ type SymRow = { l18: string; pcp: number | null }
 type Pulse = { up: number; down: number; oversold: number; overbought: number }
 
 const POPULAR = ['کگل', 'فملی', 'شستا', 'خودرو', 'ذوب', 'وبملت', 'شپنا', 'اهرم']
-const BRSAPI_KEY = process.env.NEXT_PUBLIC_BRSAPI_KEY ?? 'BYQlFNWUXNFWNHvNnuCETT5TdJKn3WDj'
 
 const fa = (v: number, d = 0) => v.toLocaleString('fa-IR', { maximumFractionDigits: d })
 const toSlug = (s: string) => encodeURIComponent(s.replace(/\s+/g, '-'))
@@ -151,8 +150,8 @@ export default function TechnicalIndexPage() {
     const load = async () => {
       try {
         const [sel, fara] = await Promise.allSettled([
-          fetch(`https://Api.BrsApi.ir/Tsetmc/Index.php?key=${BRSAPI_KEY}&type=3`, { cache: 'no-store', signal: AbortSignal.timeout(8000) }),
-          fetch(`https://Api.BrsApi.ir/Tsetmc/Index.php?key=${BRSAPI_KEY}&type=2`, { cache: 'no-store', signal: AbortSignal.timeout(8000) }),
+          fetch(`/api/brs-proxy?endpoint=index&type=3`, { cache: 'no-store', signal: AbortSignal.timeout(8000) }),
+          fetch(`/api/brs-proxy?endpoint=index&type=2`, { cache: 'no-store', signal: AbortSignal.timeout(8000) }),
         ])
         if (stop) return
         const map = new Map<string, { value: number; pct: number | null }>()
@@ -160,7 +159,10 @@ export default function TechnicalIndexPage() {
           const items = await sel.value.json()
           for (const it of Array.isArray(items) ? items : []) {
             const v = parseFloat(String(it?.index).replace(/,/g, ''))
-            if (Number.isFinite(v)) map.set(cleanName(String(it?.name ?? '')), { value: v, pct: parseFloat(it?.index_change_percent) || null })
+            // pct را با Number.isFinite نگه می‌داریم نه `|| null`: تغییر واقعی ۰٪ falsy است
+            // و با `|| null` به داده‌ی کهنه‌ی دیروز (ix.change_pct) fallback می‌شد.
+            const p = parseFloat(String(it?.index_change_percent).replace(/,/g, ''))
+            if (Number.isFinite(v)) map.set(cleanName(String(it?.name ?? '')), { value: v, pct: Number.isFinite(p) ? p : null })
           }
         }
         if (fara.status === 'fulfilled' && fara.value.ok) {

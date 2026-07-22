@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '../../../lib/rateLimit'
+import { clientIp } from '../../../lib/clientIp'
 
 // پروکسی کدال برای هرمس (ایجنت خارجی) — کدال/BrsAPI به IP خارج جواب نمی‌دهد،
 // این سایت (Render) هم خارج از ایرانه ولی هرمس فقط به همین می‌رسه، پس واسط می‌شویم.
@@ -23,7 +24,7 @@ type RawItem = {
 }
 
 export async function GET(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  const ip = clientIp(req)
   if (!rateLimit(`codal-proxy:${ip}`, 20, 60_000)) {
     return NextResponse.json({ error: 'تعداد درخواست‌ها زیاد است' }, { status: 429, headers: { 'Cache-Control': 'no-store' } })
   }

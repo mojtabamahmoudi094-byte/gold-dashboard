@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { rateLimit } from '../../../lib/rateLimit'
+import { clientIp } from '../../../lib/clientIp'
 import { publicEnv } from '../../../lib/env'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
@@ -21,7 +22,7 @@ async function resolveUserId(req: NextRequest): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  const ip = clientIp(req)
   if (!rateLimit(`chat:${ip}`, LIMIT, WINDOW_MS)) {
     return NextResponse.json({ error: 'تعداد درخواست‌ها زیاد است، کمی صبر کنید.' }, { status: 429 })
   }
