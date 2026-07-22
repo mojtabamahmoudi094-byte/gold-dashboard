@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callNarrate } from '@/lib/llmNarrate'
-import { rateLimit } from '../../../lib/rateLimit'
+import { rateLimit, quotaExceeded, quotaConsume } from '../../../lib/rateLimit'
 import { clientIp } from '../../../lib/clientIp'
 
 export const dynamic = 'force-dynamic'
@@ -95,6 +95,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'تعداد درخواست‌ها زیاد است' }, { status: 429 })
   }
 
+  // سهمیه روزانه: هر کاربر ۳ جست‌وجوی موفق در ۲۴ ساعت — مصرف فقط بعد از پاسخ موفق مدل
+  // انجام می‌شود (پایین‌تر) تا خطای upstream سهمیه کاربر را نسوزاند.
+  const DAILY_KEY = `fund-filter-nl-daily:${ip}`
+  const DAILY_LIMIT = 3
+  const DAY_MS = 24 * 60 * 60 * 1000
+  if (quotaExceeded(DAILY_KEY, DAILY_LIMIT)) {
+    return NextResponse.json(
+      { ok: false, error: 'شما ۳ بار استفاده روزانه‌تان را انجام داده‌اید؛ فردا دوباره تلاش کنید.' },
+      { status: 429 },
+    )
+  }
+
   const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY
   const GEMINI_KEY = process.env.GEMINI_API_KEY
   if (!OPENROUTER_KEY && !GEMINI_KEY) {
@@ -124,6 +136,7 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ ok: false, error: 'خروجی غیرقابل‌پردازش از مدل' }, { status: 502 })
     }
+    quotaConsume(DAILY_KEY, DAY_MS)
     return NextResponse.json({ ok: true, filter })
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'fetch failed' }, { status: 502 })
