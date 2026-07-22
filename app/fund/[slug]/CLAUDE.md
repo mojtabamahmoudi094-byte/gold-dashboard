@@ -2,14 +2,14 @@
 
 ## Overview
 Persian-language gold/silver/saffron fund market intelligence platform.
-URL: bourssanj.ir | bourssanj.onrender.com
+URL: bourssanj.ir (Iran VPS 45.94.215.115 — Render no longer used)
 Telegram: t.me/shagerdebazar (شاگرد تنبل بازار)
 
 ## Tech Stack
 - **Frontend**: Next.js 16.2.9 (App Router, Turbopack), TypeScript
 - **Backend**: Supabase (PostgreSQL + Auth + RLS)
 - **Charts**: lightweight-charts v5 (home page), CSS custom charts (funds page)
-- **Deployment**: Render.com (auto-deploy on git push)
+- **Deployment**: Iran VPS 45.94.215.115 (git pull + build on server, not Render)
 - **Font**: Vazirmatn (Persian), RTL layout
 - **Theme**: Dark (#060B14) / Light (#F4F7FB), synced via localStorage + 'themechange' event
 
@@ -81,11 +81,11 @@ lib/
 - Admin page (/admin) is hidden — NO link from anywhere
 - Theme: Header sets localStorage('theme') + dispatches 'themechange'; pages listen
 - Old 'gold' asset hidden from dropdowns with `.neq('slug', 'gold')`
-- Supabase env vars: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (set in Render)
+- Supabase env vars: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (set in `.env.local` on VPS)
 - User works solo, pastes code manually into VS Code
 - Persian/English on SEPARATE lines in instructions, never mixed
 
-## Env Variables (Render)
+## Env Variables (VPS)
 - NEXT_PUBLIC_SUPABASE_URL=https://jtrusonoqkolckhidgch.supabase.co
 - NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_6_H9XGHkJU3EKKCG9LkVJw_1PSS00zo
 
