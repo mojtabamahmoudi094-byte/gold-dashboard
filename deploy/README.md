@@ -2,12 +2,15 @@
 
 معماری: بیلد روی مک (`deploy/deploy-from-mac.sh`) → rsync خروجی standalone → systemd + nginx روی سرور ایران.
 سرویس‌های بلاک‌شده از IP ایران (Gemini، OpenRouter، Telegram) از طریق relay روی Apache سرور آلمان
-(`newbot.dadashchekhabare.qzz.io/relay/…`) رد می‌شوند — کانفیگ: `deploy/apache-relay-germany.conf`.
+(`relay.bourssanj.ir/relay/…` → 168.222.43.75) رد می‌شوند — کانفیگ: `deploy/apache-relay-germany.conf`.
+دامنه‌ی اختصاصی relay لازم بود چون فیلترینگ ایران SNI دامنه‌ی بات را می‌کشید؛ نکته‌ی مهم:
+سرور آلمان IPv6ش به گوگل/کلادفلر خراب است، در `/etc/gai.conf` خط `precedence ::ffff:0:0/96 100`
+اضافه شد تا کل سیستم IPv4 را ترجیح دهد (وگرنه mod_proxy روی IPv6 تایم‌اوت می‌کند).
 
 ## مراحل (به ترتیب، هر کدام یک بار)
 
 ۱. **ارتقای سرور ایران به ۲ گیگ رم** (پنل ParsPack) — خروجی مورد انتظار: `free -h` مقدار total ≈ 2.0Gi.
-۲. **relay روی سرور آلمان**: فایل `apache-relay-germany.conf` به `/etc/apache2/conf-available/bourssanj-relay.conf` کپی شود، بعد داخل vhost اولِ 443 در `sites-enabled/newbot.dadashchekhabare.qzz.io-ssl.conf` خط `Include conf-available/bourssanj-relay.conf` اضافه شود؛ سپس `apache2ctl configtest && systemctl reload apache2`. تست از سرور ایران: `curl -s https://newbot.dadashchekhabare.qzz.io/relay/gemini/` باید جواب گوگل (خطای ۴۰۴/۴۰۳ گوگل، نه تایم‌اوت) بدهد.
+۲. **relay روی سرور آلمان** (✅ انجام شد ۲۰۲۶-۰۷-۲۲): vhost اختصاصی `relay.bourssanj.ir` روی Apache 168.222.43.75 با گواهی certbot (webroot، چون پلاگین apache نصب نبود). فایل‌ها: `relay.bourssanj.ir.conf` (پورت ۸۰) و `relay.bourssanj.ir-ssl.conf` (۴۴۳ با proxy paths). تست از سرور ایران: `curl https://relay.bourssanj.ir/relay/gemini/v1beta/models` = 403 گوگل، openrouter = 200، telegram = JSON. محدود به IP `45.94.215.115`.
 ۳. **آماده‌سازی سرور ایران**: `apt install nginx certbot python3-certbot-nginx`، ساخت `/opt/bourssanj-site/`، کپی `env.example` به `/opt/bourssanj-site/.env` و پرکردن مقادیر از Environment سرویس Render.
 ۴. **سرویس systemd**: `bourssanj-site.service` به `/etc/systemd/system/` و بعد `systemctl daemon-reload && systemctl enable bourssanj-site`.
 ۵. **اولین دیپلوی**: روی مک `bash deploy/deploy-from-mac.sh` — خروجی مورد انتظار: `200 OK` در انتها.
