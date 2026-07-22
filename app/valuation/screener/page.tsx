@@ -11,6 +11,7 @@ import { TutorialPanel } from '../../components/ui/TutorialPanel'
 type Row = {
   symbol: string; name: string; price: number; pe: number | null
   eps: number; growthPct: number; intrinsic: number; ratio: number
+  intrinsicBear: number; intrinsicBull: number; ratioBear: number; ratioBull: number
   verdict: 'undervalued' | 'overvalued' | 'fair'
 }
 type Payload = {
@@ -99,7 +100,9 @@ export default function ValuationScreenerPage() {
           برای هر نماد، ارزش ذاتی با مدل رشد گوردون (P = D₁ / (r − g)) با فرضیات یکسان محاسبه می‌شود:
           {data && ` بازده مورد انتظار ${fa(data.assumptions.expectedReturnPct)}٪، نسبت تقسیم سود ${fa(data.assumptions.payoutPct)}٪،`}
           {' '}و نرخ رشد از میانگین رشد واقعی EPS همان شرکت در گزارش‌های کدال. ستون «نسبت» یعنی ارزش ذاتی تقسیم بر
-          قیمت روز — بالای ۱٫۰۸ یعنی سهم زیر ارزش ذاتی‌اش معامله می‌شود، زیر ۰٫۹۲ یعنی بالای ارزش ذاتی. این فرضیات
+          قیمت روز و عدد ریز زیرش، همین نسبت در سناریوی بدبینانه (بازده بالاتر، رشد کمتر) تا خوش‌بینانه است.
+          برچسب «زیر ارزش ذاتی» فقط وقتی داده می‌شود که سهم حتی در سناریوی بدبینانه هم ارزنده باشد و «بالای ارزش ذاتی»
+          فقط وقتی حتی در خوش‌بینانه هم گران باشد — تا اطمینان کاذب ندهد. این فرضیات
           پیش‌فرض برای مقایسه سریع همه نمادهاست؛ برای بررسی دقیق یک نماد با فرضیات دلخواه خودتان،
           از <Link href="/valuation" style={{ color: t.accent }}>ماشین‌حساب</Link> استفاده کنید.
           </TutorialPanel>
@@ -162,8 +165,14 @@ export default function ValuationScreenerPage() {
                         <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fa(r.price)}</td>
                         <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fa(r.eps)}</td>
                         <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{r.growthPct >= 0 ? '+' : ''}{fa(r.growthPct, 1)}٪</td>
-                        <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>{fa(r.intrinsic)}</td>
-                        <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif', fontWeight: 700, color: verdictColor(r.verdict) }}>{fa(r.ratio, 2)}</td>
+                        <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif' }}>
+                          {fa(r.intrinsic)}
+                          <div style={{ fontSize: 9.5, color: cream }} title="بازهٔ بدبینانه تا خوش‌بینانه">{fa(r.intrinsicBear)}–{fa(r.intrinsicBull)}</div>
+                        </td>
+                        <td style={{ padding: '8px', fontFamily: 'system-ui, sans-serif', fontWeight: 700, color: verdictColor(r.verdict) }}>
+                          {fa(r.ratio, 2)}
+                          <div style={{ fontSize: 9.5, color: cream, fontWeight: 400 }} title="نسبت در سناریوی بدبینانه تا خوش‌بینانه">{fa(r.ratioBear, 2)}–{fa(r.ratioBull, 2)}</div>
+                        </td>
                         <td style={{ padding: '8px', color: verdictColor(r.verdict), fontWeight: 700 }}>{VERDICT_LABEL[r.verdict]}</td>
                       </tr>
                     ))}

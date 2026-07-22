@@ -17,6 +17,16 @@ type Sym = { l18: string; l30: string; pl: number | null; pe: number | null }
 const DEFAULT_R = 0.30
 const DEFAULT_PAYOUT = 0.50
 const DEFAULT_G = 0.15
+// حداقل فاصلهٔ r-g؛ مدل گوردون وقتی g به r نزدیک می‌شود مخرج را منفجر می‌کند و
+// ارزش ذاتی نجومی و کاذب می‌سازد. این کف، همان کلاس باگ را می‌بندد.
+const MIN_SPREAD = 0.10
+
+// ارزش ذاتی گوردون با تضمین فاصلهٔ حداقلی r-g (کلمپ g تا r-MIN_SPREAD)
+function gordon(eps: number, payout: number, r: number, g: number): number {
+  const gg = Math.min(g, r - MIN_SPREAD)
+  const D1 = eps * payout * (1 + gg)
+  return D1 / (r - gg)
+}
 
 async function reportSymbols(): Promise<string[]> {
   try {
@@ -80,11 +90,19 @@ export async function GET() {
     const price = priceMap.get(symbol)
     if (!price?.pl) return null
 
-    const D0 = eps * DEFAULT_PAYOUT
-    const D1 = D0 * (1 + g)
-    if (DEFAULT_R <= g) return null // مدل گوردون فقط وقتی r > g معتبر است
-    const intrinsic = D1 / (DEFAULT_R - g)
-    const ratio = intrinsic / price.pl
+    // سه سناریو: پایه، بدبینانه (r بالاتر، g پایین‌تر)، خوش‌بینانه (r پایین‌تر، g بالاتر).
+    // هر سناریو با gordon() فاصلهٔ حداقلی r-g را تضمین می‌کند تا انفجار مخرج رخ ندهد.
+    const base = gordon(eps, DEFAULT_PAYOUT, DEFAULT_R, g)
+    const bear = gordon(eps, DEFAULT_PAYOUT, DEFAULT_R + 0.05, g - 0.05)
+    const bull = gordon(eps, DEFAULT_PAYOUT, DEFAULT_R - 0.05, g + 0.05)
+
+    const ratio = base / price.pl
+    const bearRatio = bear / price.pl
+    const bullRatio = bull / price.pl
+
+    // verdict محافظه‌کارانه: «زیر ارزش» فقط وقتی حتی در سناریوی بدبینانه هم ارزنده باشد،
+    // «بالای ارزش» فقط وقتی حتی در سناریوی خوش‌بینانه هم گران باشد. جلوی اطمینان کاذب را می‌گیرد.
+    const verdict = bearRatio > 1.08 ? 'undervalued' : bullRatio < 0.92 ? 'overvalued' : 'fair'
 
     return {
       symbol,
@@ -93,9 +111,13 @@ export async function GET() {
       pe: price.pe,
       eps,
       growthPct: Math.round(g * 1000) / 10,
-      intrinsic: Math.round(intrinsic),
+      intrinsic: Math.round(base),
+      intrinsicBear: Math.round(bear),
+      intrinsicBull: Math.round(bull),
       ratio: Math.round(ratio * 1000) / 1000,
-      verdict: ratio > 1.08 ? 'undervalued' : ratio < 0.92 ? 'overvalued' : 'fair',
+      ratioBear: Math.round(bearRatio * 1000) / 1000,
+      ratioBull: Math.round(bullRatio * 1000) / 1000,
+      verdict,
     }
   }))
 
