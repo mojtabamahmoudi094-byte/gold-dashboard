@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import AnalysisPage from './AnalysisClient'
+import AiDisclaimer from '../../components/AiDisclaimer'
 
 export const metadata: Metadata = {
   title: 'تحلیل بازارها',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 }
 
 export default function Page() {
-  return <AnalysisPage />
+  return (
+    <>
+      <AiDisclaimer />
+      <AnalysisPage />
+    </>
+  )
 }

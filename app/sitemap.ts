@@ -47,9 +47,27 @@ const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: '/alternatives/rahavard365', priority: 0.6 },
 ]
 
-async function fundSlugs(): Promise<string[]> {
-  const { data } = await supabase.from('assets').select('slug')
-  return (data ?? []).map((r) => r.slug as string).filter(Boolean)
+async function fundEntriesData(): Promise<{ slug: string; updated: Date }[]> {
+  const { data: assets } = await supabase.from('assets').select('id, slug')
+  const rows = assets ?? []
+  if (rows.length === 0) return []
+
+  // آخرین به‌روزرسانی هر صندوق برای lastmod واقعی (نه تاریخ ثابت build) —
+  // ۲۰۰ ردیف اخیر کل جدول برای ~۴۰ صندوق کافیست چون sync-funds همه صندوق‌ها را با هم آپدیت می‌کند
+  const { data: recent } = await supabase
+    .from('gold_funds')
+    .select('asset_id, created_at')
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  const latestByAsset = new Map<number, Date>()
+  for (const r of recent ?? []) {
+    if (!latestByAsset.has(r.asset_id)) latestByAsset.set(r.asset_id, new Date(r.created_at))
+  }
+
+  return rows
+    .filter((r) => r.slug)
+    .map((r) => ({ slug: r.slug as string, updated: latestByAsset.get(r.id) ?? new Date() }))
 }
 
 async function stockSymbols(): Promise<{ symbols: string[]; updated: Date }> {
@@ -68,11 +86,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority,
   }))
 
-  const [slugs, { symbols, updated }] = await Promise.all([fundSlugs(), stockSymbols()])
+  const [funds, { symbols, updated }] = await Promise.all([fundEntriesData(), stockSymbols()])
 
-  const fundEntries = slugs.map((slug) => ({
+  const fundEntries = funds.map(({ slug, updated: fundUpdated }) => ({
     url: `${SITE_URL}/fund/${encodeURIComponent(slug)}`,
-    lastModified,
+    lastModified: fundUpdated,
     changeFrequency: 'hourly' as const,
     priority: 0.5,
   }))

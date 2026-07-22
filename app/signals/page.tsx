@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import SignalsPage from './SignalsClient'
+import AiDisclaimer from '../../components/AiDisclaimer'
 
 export const metadata: Metadata = {
   title: 'سیگنال‌ها',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 }
 
 export default function Page() {
-  return <SignalsPage />
+  return (
+    <>
+      <AiDisclaimer />
+      <SignalsPage />
+    </>
+  )
 }

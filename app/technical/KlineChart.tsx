@@ -16,6 +16,7 @@ import type { Candle } from '../../lib/indicators'
 import { swingHighsLows, fvg, bosChoch, orderBlocks, liquidity } from '../../lib/smc'
 import { registerCustomIndicators } from '../../lib/klineIndicators'
 import { GREEN, RED } from './colors'
+import { useReplay, useCompareSymbols, useChartLayoutsSnapshots, useChartScreenshot, useDrawingTools } from './useKlineChartControls'
 
 type PeriodType = 'day' | 'week' | 'month'
 
@@ -574,22 +575,10 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
   const [mainInds, setMainInds] = useState<string[]>(savedCfg?.mainInds ?? [])
   const [subInds, setSubInds] = useState<string[]>(savedCfg?.subInds ?? ['VOL'])
   const [smcActive, setSmcActive] = useState<string[]>(savedCfg?.smcActive ?? [])
-  const [compares, setCompares] = useState<string[]>([])
-  const [cmpInput, setCmpInput] = useState('')
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [isFull, setIsFull] = useState(false)
   const [toast, setToast] = useState('')
-  const [layouts, setLayouts] = useState<SavedLayout[]>([])
-  const [snapshots, setSnapshots] = useState<SavedSnapshot[]>([])
-  const [layoutName, setLayoutName] = useState('')
-  const [, setStackVersion] = useState(0)
   const [rebuildKey, setRebuildKey] = useState(0)
-
-  // ابزار فعال + مگنت + قفل/نمایش رسم‌ها
-  const [activeTool, setActiveTool] = useState<string | null>(null)
-  const [magnetOn, setMagnetOn] = useState(false)
-  const [locked, setLocked] = useState(false)
-  const [drawingsHidden, setDrawingsHidden] = useState(false)
 
   // منبع قیمت (پایانی / آخرین) + تعدیل + مقیاس محور + تنظیمات نمایش
   const [priceSrc, setPriceSrc] = useState<'close' | 'last'>(() => {
@@ -606,14 +595,6 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
     try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('ta-settings') ?? '{}') } } catch { return DEFAULT_SETTINGS }
   })
 
-  // بازپخش
-  const [replayOn, setReplayOn] = useState(false)
-  const [replayPlaying, setReplayPlaying] = useState(false)
-  const [replaySpeed, setReplaySpeed] = useState(1)
-  const [replayIdx, setReplayIdx] = useState(0)
-  const replayCutRef = useRef<number | null>(null)
-  const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-
   // جست‌وجوی نماد داخل هدر نمودار
   const [searchQ, setSearchQ] = useState('')
 
@@ -622,47 +603,32 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
 
   const aggregatedRef = useRef<Candle[]>([])
   const dataFullRef = useRef<KLineData[]>([])
-  const stateRef = useRef({ mainInds, subInds, smcActive, compares })
-  stateRef.current = { mainInds, subInds, smcActive, compares }
-  const undoStack = useRef<Array<DrawingSave & { id: string }>>([])
-  const redoStack = useRef<Array<DrawingSave & { id: string }>>([])
   const pendingDrawings = useRef<DrawingSave[] | null>(
     autoSave && initialAuto.current?.drawings?.length ? initialAuto.current.drawings : null
   )
   // رسم‌های نگه‌داشته‌شده فقط به نماد خودشان برمی‌گردند
   const pendingSymbol = useRef(symbol)
-  const pendingDrawId = useRef<string | null>(null)
-  const cmpCandles = useRef<Map<string, Candle[]>>(new Map())
-  const userId = useRef<string | null>(null)
   const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const bump = () => setStackVersion(v => v + 1)
   const notify = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2600) }
 
-  // ── کاربر + قالب‌ها و نماهای ذخیره‌شده
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      userId.current = data.user?.id ?? null
-      if (userId.current) {
-        supabase.from('chart_layouts').select('id, kind, name, symbol, config')
-          .order('created_at', { ascending: false })
-          .then(({ data: rows }) => {
-            if (!rows) return
-            setLayouts(rows.filter(r => r.kind === 'layout').map(r => ({ id: r.id, name: r.name, config: r.config as ChartConfig })))
-            setSnapshots(rows.filter(r => r.kind === 'snapshot').map(r => ({
-              id: r.id, name: r.name, symbol: r.symbol ?? '',
-              config: (r.config as { config: ChartConfig }).config ?? (r.config as ChartConfig),
-              drawings: (r.config as { drawings?: DrawingSave[] }).drawings ?? [],
-            })))
-          })
-      } else {
-        try {
-          setLayouts(JSON.parse(localStorage.getItem('ta-layouts') ?? '[]'))
-          setSnapshots(JSON.parse(localStorage.getItem('ta-snapshots') ?? '[]'))
-        } catch { /* خراب بود — خالی */ }
-      }
-    })
-  }, [])
+  const { compares, setCompares, cmpInput, setCmpInput, addCompare, removeCompare, applyCompare } = useCompareSymbols({
+    chartRef, aggregatedRef, period, symbol, notify,
+    colors: CMP_COLORS, ensureCompareIndicator, cmpData, aggregate,
+  })
+
+  const stateRef = useRef({ mainInds, subInds, smcActive, compares })
+  stateRef.current = { mainInds, subInds, smcActive, compares }
+
+  const scheduleAutoSaveRef = useRef<() => void>(() => {})
+  const {
+    activeTool, magnetOn, setMagnetOn, locked, drawingsHidden,
+    canUndo, canRedo, startDraw, cancelDraw, undo, redo, clearDrawings,
+    toggleLockAll, toggleHideAll, collectDrawings, resetOnRebuild,
+  } = useDrawingTools({
+    chartRef, drawToolNames: DRAW_TOOL_NAMES,
+    scheduleAutoSave: () => scheduleAutoSaveRef.current(),
+  })
 
   // ── ساعت زنده تهران
   useEffect(() => {
@@ -693,6 +659,11 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
     out[out.length - 1] = l
     return out
   }, [baseCandles, priceSrc, livePl])
+
+  const {
+    replayOn, replayPlaying, replaySpeed, replayIdx, replayCutRef, REPLAY_SPEEDS,
+    enterReplay, exitReplay, toggleReplayPlay, changeReplaySpeed, scrubReplay, stepReplay,
+  } = useReplay({ chartRef, dataFullRef, period, symbol, effCandles, notify })
 
   // ── ساخت نمودار
   useEffect(() => {
@@ -779,9 +750,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
       ro.disconnect()
       dispose(el)
       chartRef.current = null
-      undoStack.current = []
-      redoStack.current = []
-      pendingDrawId.current = null
+      resetOnRebuild()
     }
     // اندیکاتور/رسم‌ها جدا مدیریت می‌شوند تا toggle باعث پاک‌شدن بقیه نشود
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1380,7 +1349,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
                   placeholder="جست‌وجوی نماد…"
                   style={{
                     width: '100%', boxSizing: 'border-box', fontSize: 12.5, fontFamily: 'inherit',
-                    padding: '9px 11px', borderRadius: 6, outline: 'none', background: 'transparent',
+                    padding: '9px 11px', borderRadius: 6, background: 'transparent',
                     color: text, border: `1px solid ${line}`,
                   }}
                 />
@@ -1541,7 +1510,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
                   placeholder="نماد… مثلاً فملی"
                   style={{
                     flex: 1, fontSize: 12.5, fontFamily: 'inherit', padding: '8px 10px',
-                    borderRadius: 6, outline: 'none', background: 'transparent',
+                    borderRadius: 6, background: 'transparent',
                     color: text, border: `1px solid ${line}`,
                   }}
                 />
@@ -1610,7 +1579,7 @@ export default function KlineChart({ symbol, candles, isDark, symbols = [], live
                     onKeyDown={e => { if (e.key === 'Enter') saveLayout() }}
                     style={{
                       flex: 1, fontSize: 12.5, fontFamily: 'inherit', padding: '8px 10px',
-                      borderRadius: 6, outline: 'none', background: 'transparent',
+                      borderRadius: 6, background: 'transparent',
                       color: text, border: `1px solid ${line}`,
                     }} />
                   <button onClick={saveLayout} style={{ ...btn(true), border: '1px solid rgba(217,180,91,0.4)' }}>ذخیره</button>
