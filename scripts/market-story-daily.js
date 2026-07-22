@@ -59,6 +59,14 @@ async function releaseClaim(key) {
   if (error) console.error(`[market-story] releaseClaim خطا داد: ${error.message}`)
 }
 
+// دکمهٔ شیشه‌ای زیر پست — لینک با UTM تا ترافیک کانال قابل سنجش باشد
+const CTA_MARKUP = {
+  inline_keyboard: [[{
+    text: '📊 داشبورد کامل بازار در بورس سنج',
+    url: `${SITE}/?utm_source=telegram&utm_medium=channel&utm_campaign=market_story`,
+  }]],
+}
+
 // true اگر واقعاً ارسال شد (مستقیم یا رله)، false اگر هر دو مسیر شکست خوردند
 async function sendTelegram(text) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { console.log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — پست تلگرام رد شد'); return false }
@@ -66,7 +74,7 @@ async function sendTelegram(text) {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }),
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, reply_markup: CTA_MARKUP }),
       signal: AbortSignal.timeout(20_000),
     })
     const data = await res.json()
@@ -78,7 +86,7 @@ async function sendTelegram(text) {
     const res = await fetch(`${SITE}/api/telegram-relay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: TELEGRAM_CHAT_ID, text }),
+      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: TELEGRAM_CHAT_ID, text, reply_markup: CTA_MARKUP }),
       signal: AbortSignal.timeout(90_000),
     })
     const data = await res.json()

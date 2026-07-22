@@ -223,13 +223,22 @@ function buildCardHtml(cat, series, includeQueueSym = true) {
   })
 }
 
+// دکمهٔ شیشه‌ای زیر پست — لینک عمیق با UTM تا ترافیک کانال در PostHog/GA4 قابل سنجش باشد
+const cta = (path, label) => ({
+  inline_keyboard: [[{
+    text: label || '📊 مشاهده در بورس سنج',
+    url: `${SITE}${path}${path.includes('?') ? '&' : '?'}utm_source=telegram&utm_medium=channel&utm_campaign=market_report`,
+  }]],
+})
+
 // ارسال عکس به تلگرام | send a photo to Telegram
 // api.telegram.org از داخل ایران فیلتر است — اول مستقیم، بعد از راه رلهٔ سایت (خارج از ایران)
-async function sendPhoto(buf, caption) {
+async function sendPhoto(buf, caption, replyMarkup) {
   try {
     const form = new FormData()
     form.append('chat_id', CHAT_ID)
     form.append('caption', caption)
+    if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup))
     form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'report.jpg')
     const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(15_000) })
     const data = await res.json()
@@ -242,7 +251,7 @@ async function sendPhoto(buf, caption) {
   const res = await fetch(`${SITE}/api/telegram-relay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: TOKEN, chat_id: CHAT_ID, photo: buf.toString('base64'), caption }),
+    body: JSON.stringify({ token: TOKEN, chat_id: CHAT_ID, photo: buf.toString('base64'), caption, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }),
     signal: AbortSignal.timeout(90_000), // کلد-استارت Render
   })
   const data = await res.json()
@@ -300,7 +309,7 @@ async function main() {
       const facts = computeFacts(snap.rows, includeQueueSym)
       const series = computeSeries(snap.rows)
       const buf = await screenshotCard(browser, buildCardHtml(cat, series, includeQueueSym))
-      await sendPhoto(buf, await buildCaption(cat, facts))
+      await sendPhoto(buf, await buildCaption(cat, facts), cta(`/monitor/${cat}`, '📊 مانیتور زنده در بورس سنج'))
       state[cat] = { day: today, ts: Date.now() }
       saveState(state)
       console.log(`[report] ✅ sent ${cat}`)

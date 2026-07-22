@@ -450,12 +450,13 @@ async function sendTelegram(text, opts = {}) {
   const chatId = opts.chatId || TELEGRAM_CHAT_ID
   if (!TELEGRAM_BOT_TOKEN || !chatId) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — اعلان ارسال نشد'); return }
   const parseModeField = opts.html ? { parse_mode: 'HTML' } : {}
+  const markupField = opts.replyMarkup ? { reply_markup: opts.replyMarkup } : {}
   // مستقیم — از داخل ایران معمولاً فیلتر است، ولی اگر باز بود سریع‌ترین راه است
   try {
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, ...parseModeField }),
+      body: JSON.stringify({ chat_id: chatId, text, ...parseModeField, ...markupField }),
       signal: AbortSignal.timeout(20_000),
     })
     const data = await res.json()
@@ -468,7 +469,7 @@ async function sendTelegram(text, opts = {}) {
     const res = await fetch(`${SITE}/api/telegram-relay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: chatId, text, ...parseModeField }),
+      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: chatId, text, ...parseModeField, ...markupField }),
       signal: AbortSignal.timeout(90_000), // کلد-استارت Render
     })
     const data = await res.json()
@@ -487,13 +488,22 @@ async function sendAdminAlert(text) {
 const CAPTION_LIMIT = 1024
 const capCaption = (s) => (s.length > CAPTION_LIMIT ? s.slice(0, CAPTION_LIMIT - 1) + '…' : s)
 
+// دکمهٔ شیشه‌ای زیر پست — لینک عمیق صفحهٔ نماد با UTM تا ترافیک کانال قابل سنجش باشد
+const cta = (symbol) => ({
+  inline_keyboard: [[{
+    text: `📈 تحلیل کامل ${symbol} در بورس سنج`,
+    url: `${SITE}/stock/${encodeURIComponent(symbol)}?utm_source=telegram&utm_medium=channel&utm_campaign=codal_watch`,
+  }]],
+})
+
 // api.telegram.org از داخل ایران فیلتر است — اول مستقیم، بعد از راه رلهٔ سایت (همون الگوی telegram-report.js)
-async function sendPhoto(buf, caption) {
+async function sendPhoto(buf, caption, replyMarkup) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) { log('⚠️ TELEGRAM_BOT_TOKEN/CHAT_ID تنظیم نشده — عکس ارسال نشد'); return }
   try {
     const form = new FormData()
     form.append('chat_id', TELEGRAM_CHAT_ID)
     form.append('caption', caption)
+    if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup))
     form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'report.jpg')
     const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(15_000) })
     const data = await res.json()
@@ -505,7 +515,7 @@ async function sendPhoto(buf, caption) {
     const res = await fetch(`${SITE}/api/telegram-relay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: TELEGRAM_CHAT_ID, photo: buf.toString('base64'), caption }),
+      body: JSON.stringify({ token: TELEGRAM_BOT_TOKEN, chat_id: TELEGRAM_CHAT_ID, photo: buf.toString('base64'), caption, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }),
       signal: AbortSignal.timeout(90_000), // کلد-استارت Render
     })
     const data = await res.json()
@@ -546,7 +556,7 @@ async function sendMonthlyPhoto(symbol, payload, monthEntry, opts = {}) {
   const browser = await getBrowser()
   const html = renderMonthlyReportCardHtml(data, symbol)
   const buf = await screenshotMonthlyReportCard(browser, html)
-  await sendPhoto(buf, caption)
+  await sendPhoto(buf, caption, cta(symbol))
   return true
 }
 
@@ -570,7 +580,7 @@ async function sendQuarterlyPhoto(symbol, payload, quarterEntry, opts = {}) {
   const browser = await getBrowser()
   const html = renderQuarterlyReportCardHtml(data, symbol)
   const buf = await screenshotQuarterlyReportCard(browser, html)
-  await sendPhoto(buf, caption)
+  await sendPhoto(buf, caption, cta(symbol))
   return true
 }
 
@@ -940,7 +950,7 @@ async function run() {
                   if (extracted) {
                     const deepText = await buildDeepAnalysisText(s, latestQuarter, extracted)
                     if (deepText && (await claimSend(`deep-audited|${s}|${latestQuarter.period}`))) {
-                      await sendTelegram(deepPostFooter(s, deepText), { html: true })
+                      await sendTelegram(deepPostFooter(s, deepText), { html: true, replyMarkup: cta(s) })
                     }
                   } else {
                     log(`ℹ️ ${s}: نامهٔ حسابرسی قابل استخراج نبود — پست تحلیل عمیق رد شد`)
@@ -952,7 +962,7 @@ async function run() {
               try {
                 const deepText = await buildDeepQuarterlyText(s, latestQuarter)
                 if (deepText && (await claimSend(`deep-quarterly|${s}|${latestQuarter.period}`))) {
-                  await sendTelegram(deepPostFooter(s, deepText), { html: true })
+                  await sendTelegram(deepPostFooter(s, deepText), { html: true, replyMarkup: cta(s) })
                 }
               } catch (e) { log(`⚠️ ${s}: پست تحلیل عمیق میاندوره‌ای شکست خورد (نادیده گرفته شد) — ${e.message}`) }
             }
@@ -961,7 +971,7 @@ async function run() {
             const kp = buildKeyPoints(s, payload, freshTitles, { skipMonthly: monthlyPhotoSent, skipQuarterly: quarterlyPhotoSent, monthlyAmendment, quarterlyAmendment })
             if (kp && (await claimSend(`summary|${s}|${[...freshTitles].sort().join('~')}`))) {
               const narrated = await narrate(s, kp.facts)
-              await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text)
+              await sendTelegram(narrated ? `${narrated}\n\n${kp.text}` : kp.text, { replyMarkup: cta(s) })
             }
           }
         } catch (e) { log(`⚠️ ${s}: ساخت/ارسال خلاصه تلگرام شکست خورد — ${e.message}`) }

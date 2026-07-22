@@ -239,12 +239,21 @@ function buildCardHtml(c) {
   })
 }
 
+// دکمهٔ شیشه‌ای زیر پست — لینک عمیق با UTM تا ترافیک کانال قابل سنجش باشد
+const cta = (path, label) => ({
+  inline_keyboard: [[{
+    text: label || '📊 مشاهده در بورس سنج',
+    url: `${SITE}${path}${path.includes('?') ? '&' : '?'}utm_source=telegram&utm_medium=channel&utm_campaign=anomaly_watch`,
+  }]],
+})
+
 // api.telegram.org از داخل ایران فیلتر است — اول مستقیم، بعد از راه رلهٔ سایت (خارج از ایران)
-async function sendPhoto(buf, caption) {
+async function sendPhoto(buf, caption, replyMarkup) {
   try {
     const form = new FormData()
     form.append('chat_id', CHAT_ID)
     form.append('caption', caption)
+    if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup))
     form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'anomaly.jpg')
     const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(15_000) })
     const data = await res.json()
@@ -257,7 +266,7 @@ async function sendPhoto(buf, caption) {
   const res = await fetch(`${SITE}/api/telegram-relay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: TOKEN, chat_id: CHAT_ID, photo: buf.toString('base64'), caption }),
+    body: JSON.stringify({ token: TOKEN, chat_id: CHAT_ID, photo: buf.toString('base64'), caption, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }),
     signal: AbortSignal.timeout(90_000), // کلد-استارت Render
   })
   const data = await res.json()
@@ -323,7 +332,7 @@ async function main() {
         const caption = capCaption(lines.join('\n'))
 
         const buf = await screenshotCard(browser, buildCardHtml(c))
-        await sendPhoto(buf, caption)
+        await sendPhoto(buf, caption, cta(`/stock/${encodeURIComponent(c.symbol)}`, `📈 تحلیل کامل ${c.symbol} در بورس سنج`))
         seen.add(`${c.symbol}|${c.reasonTag}`)
         // state بلافاصله بعد هر ارسال ذخیره می‌شود، نه فقط انتهای حلقه: اگر puppeteer
         // وسط حلقه OOM/kill شود، اجرای بعدی cron همان هشدارها را دوباره نفرستد.

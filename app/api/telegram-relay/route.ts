@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Telegram env vars not set' }, { status: 500 })
   }
 
-  let body: { token?: string; text?: string; chat_id?: string; photo?: string; caption?: string; parse_mode?: string }
+  let body: { token?: string; text?: string; chat_id?: string; photo?: string; caption?: string; parse_mode?: string; reply_markup?: { inline_keyboard?: { text?: string; url?: string }[][] } }
   try {
     body = await req.json()
   } catch {
@@ -38,6 +38,19 @@ export async function POST(req: NextRequest) {
   // دارندهٔ توکن به‌هرحال اختیار کامل ربات را دارد، پس chat_id دلخواه خطر تازه‌ای نیست.
   const target = body.chat_id && /^-?\d+$/.test(body.chat_id) ? body.chat_id : chatId
 
+  // دکمهٔ شیشه‌ای زیر پست — فقط دکمه‌های url (https) پذیرفته می‌شود
+  let replyMarkup: { inline_keyboard: { text: string; url: string }[][] } | null = null
+  const kb = body.reply_markup?.inline_keyboard
+  if (Array.isArray(kb)) {
+    const rows = kb
+      .filter(Array.isArray)
+      .map(row => row.filter(b => b && typeof b.text === 'string' && typeof b.url === 'string' && b.url.startsWith('https://'))
+        .map(b => ({ text: (b.text as string).slice(0, 64), url: b.url as string })))
+      .filter(row => row.length > 0)
+      .slice(0, 3)
+    if (rows.length > 0) replyMarkup = { inline_keyboard: rows }
+  }
+
   // عکس (base64) — سرور ایران عکس اسکرین‌شات را رمزگذاری و اینجا می‌فرستد، این‌طرف sendPhoto واقعی را صدا می‌زند
   if (body.photo) {
     try {
@@ -45,6 +58,7 @@ export async function POST(req: NextRequest) {
       const form = new FormData()
       form.append('chat_id', target)
       if (body.caption) form.append('caption', body.caption.slice(0, 1024))
+      if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup))
       form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'report.jpg')
       // ۴۵ ثانیه — ۳۰ هم گاهی کم بود (Apache آلمان گاهی کند)، کلاینت (codal-watch.js)
       // خودش ۹۰ ثانیه صبر می‌کند پس جا برای رشد بیشتر هست (۲۰۲۶-۰۷-۲۲)
@@ -70,6 +84,7 @@ export async function POST(req: NextRequest) {
         chat_id: target,
         text,
         ...(body.parse_mode ? { parse_mode: body.parse_mode } : {}),
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
       signal: AbortSignal.timeout(30_000),
     })
