@@ -19,8 +19,7 @@ const nextConfig: NextConfig = {
       { key: "X-Frame-Options", value: "SAMEORIGIN" },
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
       {
-        // report-only تا اول واقعاً چیزی که نقض می‌شود دیده شود، قبل از سخت‌گیرکردن به enforce
-        key: "Content-Security-Policy-Report-Only",
+        key: "Content-Security-Policy",
         value: [
           "default-src 'self'",
           "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://us.i.posthog.com https://us-assets.i.posthog.com",
