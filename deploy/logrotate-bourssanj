@@ -22,9 +22,9 @@
 /var/log/screener-daily.log
 /var/log/chip-distribution.log
 /var/log/equal-weight-index.log
-/var/log/alternatives.log
 /var/log/portfolio-*.log
 /var/log/signals-*.log
+/var/log/comment-notify.log
 {
   weekly
   rotate 4
