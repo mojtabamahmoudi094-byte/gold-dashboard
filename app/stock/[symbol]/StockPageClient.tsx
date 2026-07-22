@@ -279,15 +279,16 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                 {cards.map(([k, v, c, metricKey]) => {
                   const accent = c === (GREEN as string) || c === (RED as string)
                   return (
-                    <div key={k} onClick={() => openMetric(metricKey, k, accent ? c : '#d9b45b')} style={{
+                    <button key={k} onClick={() => openMetric(metricKey, k, accent ? c : '#d9b45b')} style={{
                       position: 'relative', overflow: 'hidden', cursor: 'pointer',
                       background: panel, border: `0.5px solid ${accent ? `${c}33` : line}`, borderRadius: 14,
                       padding: '14px 16px', backdropFilter: 'blur(12px)', minWidth: 0,
+                      display: 'block', width: '100%', textAlign: 'right', fontFamily: 'inherit',
                     }}>
                       {accent && <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 3, background: c }} />}
                       <div style={{ fontSize: 10.5, color: muted, marginBottom: 6 }}>{k}</div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: c, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -1231,7 +1232,7 @@ function AiChatSection({ symbol, t, isMobile }: { symbol: string; t: Theme; isMo
             style={{
               flex: 1, minWidth: 0, padding: '13px 17px', borderRadius: 999, fontSize: isMobile ? 12 : 12.5,
               background: t.isDark ? 'rgba(255,255,255,0.045)' : 'rgba(15,30,46,0.045)',
-              border: `0.5px solid ${t.line}`, color: t.text, outline: 'none',
+              border: `0.5px solid ${t.line}`, color: t.text,
               fontFamily: 'inherit', minHeight: 46, transition: 'border-color .2s ease, box-shadow .2s ease',
             }}
           />

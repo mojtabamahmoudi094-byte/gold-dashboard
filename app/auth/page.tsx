@@ -210,7 +210,6 @@ function AuthPageInner() {
     color: '#E8F4FF',
     fontSize: 13,
     fontFamily: 'Vazirmatn, Arial, sans-serif',
-    outline: 'none',
     direction: 'rtl',
     boxSizing: 'border-box',
     transition: 'border-color 0.2s, background 0.2s',
@@ -339,7 +338,7 @@ function AuthPageInner() {
 
         {/* message */}
         {msg && (
-          <div style={{
+          <div role="alert" style={{
             padding: '13px 16px', borderRadius: 10, marginBottom: 22,
             background: msg.type === 'success' ? 'rgba(0,229,160,0.08)' : 'rgba(255,77,106,0.08)',
             border: `0.5px solid ${msg.type === 'success' ? 'rgba(0,229,160,0.4)' : 'rgba(255,77,106,0.4)'}`,

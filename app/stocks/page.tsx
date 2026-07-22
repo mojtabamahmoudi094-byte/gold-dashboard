@@ -165,7 +165,7 @@ export default function StocksPage() {
               padding: '11px 16px', marginBottom: 20,
               borderRadius: 12, border: `1px solid ${line}`,
               background: panel, color: text,
-              fontSize: 13, fontFamily: 'inherit', outline: 'none',
+              fontSize: 13, fontFamily: 'inherit',
             }}
           />
         )}

@@ -694,7 +694,7 @@ function AdminConstants({ constants, onChange, border, muted, text, accent }: an
                 <input
                   type="number" value={local[key]}
                   onChange={e => setLocal((prev: any) => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))}
-                  style={{ width: 100, background: 'rgba(0,200,255,0.06)', border: `0.5px solid ${accent}44`, borderRadius: 6, color: text, fontSize: 12, fontFamily: 'system-ui', padding: '4px 8px', textAlign: 'left', outline: 'none' }}
+                  style={{ width: 100, background: 'rgba(0,200,255,0.06)', border: `0.5px solid ${accent}44`, borderRadius: 6, color: text, fontSize: 12, fontFamily: 'system-ui', padding: '4px 8px', textAlign: 'left' }}
                 />
               ) : (
                 <span style={{ fontSize: 12, color: text, fontWeight: 600, fontFamily: 'system-ui' }}>

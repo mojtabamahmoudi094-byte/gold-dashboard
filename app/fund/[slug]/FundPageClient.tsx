@@ -1340,13 +1340,26 @@ function QuarterlySection({ t, data, isMobile }: { t: any, data: any, isMobile: 
 }
 
 function MetricCard({ t, label, value, color, tooltip, onClick }: any) {
-  return (
-    <div title={tooltip || ''} onClick={onClick} style={{
-      background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12,
-      padding: '14px 16px', backdropFilter: 'blur(12px)', cursor: onClick ? 'pointer' : (tooltip ? 'help' : 'default'),
-    }}>
+  const style = {
+    background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12,
+    padding: '14px 16px', backdropFilter: 'blur(12px)',
+  }
+  const inner = (
+    <>
       <div style={{ fontSize: 10, color: t.muted, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 15, fontWeight: 700, color: color || t.textBright }}>{value}</div>
+    </>
+  )
+  if (onClick) {
+    return (
+      <button title={tooltip || ''} onClick={onClick} style={{ ...style, cursor: 'pointer', display: 'block', width: '100%', textAlign: 'right', fontFamily: 'inherit' }}>
+        {inner}
+      </button>
+    )
+  }
+  return (
+    <div title={tooltip || ''} aria-label={tooltip || undefined} style={{ ...style, cursor: tooltip ? 'help' : 'default' }}>
+      {inner}
     </div>
   )
 }

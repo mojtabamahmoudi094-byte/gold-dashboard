@@ -11,7 +11,7 @@
  * کلیک روی هر کارت → مودال تمام‌صفحه همان نمودار.
  */
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import {
@@ -254,12 +254,20 @@ export default function MarketMonitorPage() {
   }, [loading, rows.length > 0]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const close = useCallback(() => setExpanded(null), [])
+  const modalTriggerRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     if (!expanded) return
+    modalTriggerRef.current = document.activeElement as HTMLElement
+    const closeBtn = document.querySelector<HTMLElement>('.chart-modal button[aria-label="بستن"]')
+    closeBtn?.focus()
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
-    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = '' }
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+      modalTriggerRef.current?.focus()
+    }
   }, [expanded, close])
 
   const data: Datum[] = useMemo(() => rows.map((r, i) => ({
@@ -606,7 +614,7 @@ export default function MarketMonitorPage() {
 
       {/* ── مودال بزرگ‌نمایی ── */}
       {expanded === 'plp_dist' && last?.plp_dist && (
-        <div onClick={close} role="dialog" aria-modal="true" style={{
+        <div onClick={close} role="dialog" aria-modal="true" aria-labelledby="modal-title-plp-dist" style={{
           position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(4,6,10,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
           padding: isMobile ? 10 : 32,
@@ -620,7 +628,7 @@ export default function MarketMonitorPage() {
             fontFamily: FONT, direction: 'rtl',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, padding: '0 8px' }}>
-              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{distTitle}</span>
+              <span id="modal-title-plp-dist" style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{distTitle}</span>
               <button onClick={close} aria-label="بستن" style={{
                 all: 'unset', cursor: 'pointer', width: 34, height: 34, borderRadius: 10,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -633,7 +641,7 @@ export default function MarketMonitorPage() {
         </div>
       )}
       {expanded === 'sym_pie' && last && (
-        <div onClick={close} role="dialog" aria-modal="true" style={{
+        <div onClick={close} role="dialog" aria-modal="true" aria-labelledby="modal-title-sym-pie" style={{
           position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(4,6,10,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
           padding: isMobile ? 10 : 32,
@@ -647,7 +655,7 @@ export default function MarketMonitorPage() {
             fontFamily: FONT, direction: 'rtl',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, padding: '0 8px' }}>
-              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{symPieTitle}</span>
+              <span id="modal-title-sym-pie" style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{symPieTitle}</span>
               <button onClick={close} aria-label="بستن" style={{
                 all: 'unset', cursor: 'pointer', width: 34, height: 34, borderRadius: 10,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -660,7 +668,7 @@ export default function MarketMonitorPage() {
         </div>
       )}
       {expanded === 'seg_pie' && last?.tval_by_segment && (
-        <div onClick={close} role="dialog" aria-modal="true" style={{
+        <div onClick={close} role="dialog" aria-modal="true" aria-labelledby="modal-title-seg-pie" style={{
           position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(4,6,10,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
           padding: isMobile ? 10 : 32,
@@ -674,7 +682,7 @@ export default function MarketMonitorPage() {
             fontFamily: FONT, direction: 'rtl',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, padding: '0 8px' }}>
-              <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{segPieTitle}</span>
+              <span id="modal-title-seg-pie" style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{segPieTitle}</span>
               <button onClick={close} aria-label="بستن" style={{
                 all: 'unset', cursor: 'pointer', width: 34, height: 34, borderRadius: 10,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -687,7 +695,7 @@ export default function MarketMonitorPage() {
         </div>
       )}
       {expandedDef && last && (
-        <div onClick={close} role="dialog" aria-modal="true" style={{
+        <div onClick={close} role="dialog" aria-modal="true" aria-labelledby="modal-title-def" style={{
           position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(4,6,10,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
           padding: isMobile ? 10 : 32,
@@ -702,7 +710,7 @@ export default function MarketMonitorPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, padding: '0 8px' }}>
               <div>
-                <span style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{expandedDef.title}</span>
+                <span id="modal-title-def" style={{ fontSize: isMobile ? 15 : 18, fontWeight: 800, color: '#eef1f8' }}>{expandedDef.title}</span>
                 <span style={{ fontSize: isMobile ? 11.5 : 13, color: C.cream, marginRight: 12 }}>
                   {expandedDef.sub(last).map((p, j) => <span key={j} style={p.color ? { color: p.color, fontWeight: 700 } : undefined}>{p.txt}</span>)}
                 </span>

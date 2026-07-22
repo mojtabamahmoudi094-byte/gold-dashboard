@@ -131,7 +131,7 @@ export default function ValuationScreenerPage() {
                 style={{
                   marginRight: 'auto', minWidth: 160, padding: '7px 12px', borderRadius: 999,
                   border: `0.5px solid ${t.border}`, background: t.inputBg, color: t.text,
-                  fontSize: 11.5, fontFamily: 'inherit', outline: 'none',
+                  fontSize: 11.5, fontFamily: 'inherit',
                 }}
               />
             </div>

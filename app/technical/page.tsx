@@ -334,7 +334,7 @@ export default function TechnicalIndexPage() {
               placeholder="جست‌وجوی نماد… مثلاً فولاد"
               style={{
                 width: '100%', boxSizing: 'border-box', fontSize: 13.5, fontFamily: 'inherit',
-                padding: '12px 16px', outline: 'none',
+                padding: '12px 16px',
                 ...glass, borderRadius: 99, color: text, transition: 'border-color 0.2s',
               }}
               onFocus={e => { e.currentTarget.style.borderColor = 'rgba(217,180,91,0.55)' }}

@@ -400,7 +400,7 @@ export default function ScreenerPage() {
           aria-label="جست‌وجوی نماد"
           style={{
             width: '100%', boxSizing: 'border-box', fontSize: 13.5, fontFamily: 'inherit',
-            padding: '12px 16px', outline: 'none', marginBottom: 14,
+            padding: '12px 16px', marginBottom: 14,
             ...glass, borderRadius: 99, color: text, transition: 'border-color 0.2s',
             ...enterAnim(3),
           }}

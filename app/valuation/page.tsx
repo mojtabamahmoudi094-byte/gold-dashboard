@@ -306,7 +306,7 @@ export default function ValuationCalculatorPage() {
               width: '100%', boxSizing: 'border-box', background: t.inputBg,
               border: `1px solid ${t.borderStrong}`, borderRadius: 10,
               padding: '10px 14px', fontSize: 13, color: t.text,
-              fontFamily: 'inherit', outline: 'none', direction: 'rtl',
+              fontFamily: 'inherit', direction: 'rtl',
             }}
           />
           {matches.length > 0 && !sym && (
@@ -359,7 +359,7 @@ export default function ValuationCalculatorPage() {
                     style={{
                       width: '100%', boxSizing: 'border-box', background: t.inputBg, border: `1px solid ${t.borderStrong}`,
                       borderRadius: 9, padding: '9px 12px', fontSize: 14, fontWeight: 800, color: t.accent,
-                      fontFamily: 'system-ui, sans-serif', outline: 'none', marginBottom: 4,
+                      fontFamily: 'system-ui, sans-serif', marginBottom: 4,
                     }}
                   />
                   <div style={{ fontSize: 10.5, color: cream, marginBottom: 16 }}>

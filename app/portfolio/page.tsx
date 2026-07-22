@@ -34,6 +34,25 @@ const dateObjectToShamsi = (d: any): string => {
   try { return d.format('YYYY/MM/DD') } catch { return '' }
 }
 
+// Escape می‌بندد، فوکوس اول داخل مودال می‌رود و با بسته‌شدن به عنصر فراخوان برمی‌گردد
+function useModalA11y(isOpen: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null)
+  const prevFocus = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    prevFocus.current = document.activeElement as HTMLElement
+    const focusable = ref.current?.querySelector<HTMLElement>('input, button, [href], select, textarea')
+    focusable?.focus()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      prevFocus.current?.focus()
+    }
+  }, [isOpen])
+  return ref
+}
+
 type AssetType = 'stock' | 'fund' | 'physical' | 'cash'
 
 type Instrument = {
@@ -154,6 +173,7 @@ export default function PortfolioPage() {
   const [historyPage, setHistoryPage] = useState(1)
   const historyRef = useRef<HTMLDivElement>(null)
   const [txPickerSymbol, setTxPickerSymbol] = useState<string | null>(null)
+  const txPickerModalRef = useModalA11y(!!txPickerSymbol, () => setTxPickerSymbol(null))
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [dbMissing, setDbMissing] = useState(false)
@@ -185,6 +205,7 @@ export default function PortfolioPage() {
   const [qtAutoFee, setQtAutoFee] = useState(true)
   const [qtSaving, setQtSaving] = useState(false)
   const [qtMsg, setQtMsg] = useState<string | null>(null)
+  const quickTxModalRef = useModalA11y(!!quickTx, () => setQuickTx(null))
 
   // ویرایش یک تراکنش ثبت‌شده (مثلاً وقتی واحد ریال/تومان اشتباه وارد شده)
   const [editTx, setEditTx] = useState<Tx | null>(null)
@@ -193,6 +214,8 @@ export default function PortfolioPage() {
   const [editPrice, setEditPrice] = useState('')
   const [editCommission, setEditCommission] = useState('')
   const [editDate, setEditDate] = useState('')
+  const editTxModalRef = useModalA11y(!!editTx, () => setEditTx(null))
+  const pieSelectedModalRef = useModalA11y(!!pieSelected, () => setPieSelected(null))
   const [editSaving, setEditSaving] = useState(false)
   const [editMsg, setEditMsg] = useState<string | null>(null)
 
@@ -914,7 +937,7 @@ ${txs.map(tx => row([
   const input: React.CSSProperties = {
     width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13,
     background: t.inputBg, color: t.text, border: `1px solid ${t.borderStrong}`,
-    fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+    fontFamily: 'inherit', boxSizing: 'border-box',
   }
   const label: React.CSSProperties = { fontSize: 11.5, color: t.muted, marginBottom: 5, display: 'block' }
   const th: React.CSSProperties = {
@@ -1144,6 +1167,7 @@ ${txs.map(tx => row([
                 value={query}
                 onChange={e => { setQuery(e.target.value); setPicked(null) }}
                 placeholder="مثلاً: فولاد، سکه امامی، طلای ۱۸، پول نقد…"
+                aria-label="نماد (سهم، صندوق، فیزیکی یا نقد)"
               />
               {query.trim() && !picked && (
                 <div style={{
@@ -1212,7 +1236,7 @@ ${txs.map(tx => row([
             {picked?.type === 'cash' ? (
               <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 2' }}>
                 <span style={label}>ارزش (تومان)</span>
-                <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder="۵٬۰۰۰٬۰۰۰" />
+                <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder="۵٬۰۰۰٬۰۰۰" aria-label="ارزش (تومان)" />
                 <div style={{ fontSize: 11, color: cream, marginTop: 4 }}>
                   {qty ? `${toPersianWords(qty)} تومان` : ''}
                 </div>
@@ -1221,7 +1245,7 @@ ${txs.map(tx => row([
               <>
                 <div>
                   <span style={label}>تعداد</span>
-                  <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder="۱۰۰۰" />
+                  <input style={input} inputMode="numeric" value={qty} onChange={e => setQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder="۱۰۰۰" aria-label="تعداد" />
                 </div>
 
                 <div>
@@ -1232,6 +1256,7 @@ ${txs.map(tx => row([
                     value={price}
                     onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, ''))}
                     placeholder={picked ? String(toToman(picked.price)) : '—'}
+                    aria-label="قیمت واحد (تومان)"
                   />
                 </div>
               </>
@@ -1244,7 +1269,7 @@ ${txs.map(tx => row([
                 locale={persian_fa}
                 value={shamsiToDateObject(date)}
                 onChange={(v: any) => setDate(dateObjectToShamsi(v))}
-                render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" />}
+                render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" aria-label="تاریخ (شمسی)" />}
               />
             </div>
 
@@ -1256,7 +1281,7 @@ ${txs.map(tx => row([
                   محاسبه خودکار ({picked?.type === 'physical' ? 'فیزیکی: بدون کارمزد' : picked?.type === 'cash' ? 'نقد: بدون کارمزد' : side === 'buy' ? '۰٫۳۷٪ خرید' : '۰٫۸۸٪ فروش'})
                 </label>
               </span>
-              <input style={input} inputMode="numeric" value={commission} onChange={e => { setAutoFee(false); setCommission(e.target.value.replace(/[^\d.]/g, '')) }} placeholder="۰" />
+              <input style={input} inputMode="numeric" value={commission} onChange={e => { setAutoFee(false); setCommission(e.target.value.replace(/[^\d.]/g, '')) }} placeholder="۰" aria-label="کارمزد (تومان)" />
             </div>
 
             <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 4', display: 'flex', alignItems: 'flex-end', gap: 12 }}>
@@ -1267,7 +1292,7 @@ ${txs.map(tx => row([
               }}>
                 {saving ? 'در حال ثبت…' : 'ثبت تراکنش'}
               </button>
-              {msg && <span style={{ fontSize: 12, color: t.red }}>{msg}</span>}
+              {msg && <span role="alert" style={{ fontSize: 12, color: t.red }}>{msg}</span>}
             </div>
           </div>
         </form>
@@ -1623,6 +1648,10 @@ ${txs.map(tx => row([
             }}
           >
             <div
+              ref={pieSelectedModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="pieselected-title"
               onClick={e => e.stopPropagation()}
               style={{
                 ...card, maxWidth: 380, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
@@ -1631,7 +1660,7 @@ ${txs.map(tx => row([
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 800 }}>{h.type === 'stock' ? h.symbol : h.name}</div>
+                  <div id="pieselected-title" style={{ fontSize: 16, fontWeight: 800 }}>{h.type === 'stock' ? h.symbol : h.name}</div>
                   <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>
                     {h.type === 'fund' ? 'صندوق' : h.type === 'physical' ? 'دارایی فیزیکی' : h.type === 'cash' ? 'پول نقد' : h.name}
                   </div>
@@ -1868,8 +1897,8 @@ ${txs.map(tx => row([
           }}
           onClick={() => setQuickTx(null)}
         >
-          <div onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 4px' }}>
+          <div ref={quickTxModalRef} role="dialog" aria-modal="true" aria-labelledby="quicktx-title" onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
+            <h3 id="quicktx-title" style={{ fontSize: 15, fontWeight: 700, margin: '0 0 4px' }}>
               {quickTx.side === 'sell' ? '📤 فروش' : '📥 خرید مجدد'} {quickTx.symbol}
             </h3>
             <p style={{ fontSize: 11.5, color: t.muted, margin: '0 0 16px', lineHeight: 1.9 }}>
@@ -1880,11 +1909,11 @@ ${txs.map(tx => row([
             <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
               <div>
                 <span style={label}>تعداد {quickTx.side === 'sell' ? `(حداکثر ${fmtNum(quickTx.maxQty)})` : ''}</span>
-                <input style={input} inputMode="numeric" value={qtQty} onChange={e => setQtQty(e.target.value.replace(/[^\d.]/g, ''))} />
+                <input style={input} inputMode="numeric" value={qtQty} onChange={e => setQtQty(e.target.value.replace(/[^\d.]/g, ''))} aria-label="تعداد" />
               </div>
               <div>
                 <span style={label}>قیمت واحد (تومان)</span>
-                <input style={input} inputMode="numeric" value={qtPrice} onChange={e => setQtPrice(e.target.value.replace(/[^\d.]/g, ''))} />
+                <input style={input} inputMode="numeric" value={qtPrice} onChange={e => setQtPrice(e.target.value.replace(/[^\d.]/g, ''))} aria-label="قیمت واحد (تومان)" />
               </div>
               <div>
                 <span style={label}>تاریخ (شمسی)</span>
@@ -1893,7 +1922,7 @@ ${txs.map(tx => row([
                   locale={persian_fa}
                   value={shamsiToDateObject(qtDate)}
                   onChange={(v: any) => setQtDate(dateObjectToShamsi(v))}
-                  render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" />}
+                  render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" aria-label="تاریخ (شمسی)" />}
                 />
               </div>
               <div>
@@ -1904,10 +1933,10 @@ ${txs.map(tx => row([
                     محاسبه خودکار
                   </label>
                 </span>
-                <input style={input} inputMode="numeric" value={qtCommission} onChange={e => { setQtAutoFee(false); setQtCommission(e.target.value.replace(/[^\d.]/g, '')) }} />
+                <input style={input} inputMode="numeric" value={qtCommission} onChange={e => { setQtAutoFee(false); setQtCommission(e.target.value.replace(/[^\d.]/g, '')) }} aria-label="کارمزد (تومان)" />
               </div>
             </div>
-            {qtMsg && <p style={{ fontSize: 12, color: t.red, margin: '0 0 12px' }}>{qtMsg}</p>}
+            {qtMsg && <p role="alert" style={{ fontSize: 12, color: t.red, margin: '0 0 12px' }}>{qtMsg}</p>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={submitQuickTx} disabled={qtSaving} style={{
                 flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -1934,8 +1963,8 @@ ${txs.map(tx => row([
           }}
           onClick={() => setTxPickerSymbol(null)}
         >
-          <div onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 14px' }}>
+          <div ref={txPickerModalRef} role="dialog" aria-modal="true" aria-labelledby="txpicker-title" onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
+            <h3 id="txpicker-title" style={{ fontSize: 15, fontWeight: 700, margin: '0 0 14px' }}>
               کدام تراکنش {txPickerSymbol} ویرایش شود؟
             </h3>
             <div style={{ display: 'grid', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
@@ -1970,8 +1999,8 @@ ${txs.map(tx => row([
           }}
           onClick={() => setEditTx(null)}
         >
-          <div onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 16px' }}>
+          <div ref={editTxModalRef} role="dialog" aria-modal="true" aria-labelledby="edittx-title" onClick={e => e.stopPropagation()} style={{ ...card, width: '100%', maxWidth: 420 }}>
+            <h3 id="edittx-title" style={{ fontSize: 15, fontWeight: 700, margin: '0 0 16px' }}>
               ✏️ ویرایش تراکنش {editTx.asset_type === 'stock' ? editTx.symbol : editTx.name}
             </h3>
             <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
@@ -1993,11 +2022,11 @@ ${txs.map(tx => row([
               </div>
               <div>
                 <span style={label}>تعداد</span>
-                <input style={input} inputMode="numeric" value={editQty} onChange={e => setEditQty(e.target.value.replace(/[^\d.]/g, ''))} />
+                <input style={input} inputMode="numeric" value={editQty} onChange={e => setEditQty(e.target.value.replace(/[^\d.]/g, ''))} aria-label="تعداد" />
               </div>
               <div>
                 <span style={label}>قیمت واحد (تومان)</span>
-                <input style={input} inputMode="numeric" value={editPrice} onChange={e => setEditPrice(e.target.value.replace(/[^\d.]/g, ''))} />
+                <input style={input} inputMode="numeric" value={editPrice} onChange={e => setEditPrice(e.target.value.replace(/[^\d.]/g, ''))} aria-label="قیمت واحد (تومان)" />
               </div>
               <div>
                 <span style={label}>تاریخ (شمسی)</span>
@@ -2006,15 +2035,15 @@ ${txs.map(tx => row([
                   locale={persian_fa}
                   value={shamsiToDateObject(editDate)}
                   onChange={(v: any) => setEditDate(dateObjectToShamsi(v))}
-                  render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" />}
+                  render={<input style={input} placeholder="۱۴۰۵/۰۴/۱۵" aria-label="تاریخ (شمسی)" />}
                 />
               </div>
               <div>
                 <span style={label}>کارمزد (تومان)</span>
-                <input style={input} inputMode="numeric" value={editCommission} onChange={e => setEditCommission(e.target.value.replace(/[^\d.]/g, ''))} />
+                <input style={input} inputMode="numeric" value={editCommission} onChange={e => setEditCommission(e.target.value.replace(/[^\d.]/g, ''))} aria-label="کارمزد (تومان)" />
               </div>
             </div>
-            {editMsg && <p style={{ fontSize: 12, color: t.red, margin: '0 0 12px' }}>{editMsg}</p>}
+            {editMsg && <p role="alert" style={{ fontSize: 12, color: t.red, margin: '0 0 12px' }}>{editMsg}</p>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={submitEditTx} disabled={editSaving} style={{
                 flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',

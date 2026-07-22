@@ -350,6 +350,7 @@ export default function Header() {
                     key={item.menu ? undefined : item.href}
                     href={item.href}
                     aria-current={isActive(item.href) ? 'page' : undefined}
+                    aria-haspopup={item.menu ? 'menu' : undefined}
                     aria-expanded={item.menu ? openDrop === item.href : undefined}
                     style={{ ...navLink(isActive(item.href)), display: 'inline-flex', alignItems: 'center', gap: 5 }}
                     onMouseEnter={e => {

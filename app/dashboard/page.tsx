@@ -582,6 +582,9 @@ export default function TerminalPage() {
           outline: none !important; box-sizing: border-box !important;
           font-family: Vazirmatn, Arial, sans-serif !important; direction: rtl !important;
         }
+        .db-input:focus-visible {
+          outline: 2px solid rgba(59,130,246,0.5) !important; outline-offset: 2px !important;
+        }
         .rmdp-wrapper { background: ${t.panelSolid} !important; border: 0.5px solid ${t.borderStrong} !important; border-radius: 10px !important; }
         .rmdp-day.rmdp-selected span { background: ${t.accent} !important; }
         .rmdp-day:not(.rmdp-disabled):not(.rmdp-day-hidden) span:hover { background: ${t.accent}33 !important; }

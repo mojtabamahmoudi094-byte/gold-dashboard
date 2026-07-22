@@ -117,7 +117,7 @@ export default function ComparePage() {
   const selectStyle = {
     fontSize: 14, padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
     background: t.panel, border: `0.5px solid ${t.borderStrong}`,
-    color: t.text, fontFamily: 'inherit', outline: 'none', width: '100%',
+    color: t.text, fontFamily: 'inherit', width: '100%',
   }
 
   return (
@@ -166,7 +166,7 @@ export default function ComparePage() {
                 onChange={e => setCopilotQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') runCopilot() }}
                 placeholder="مثلاً: طلای زرین بهتره یا سپهر طلا؟"
-                style={{ flex: '1 1 240px', fontSize: 13, padding: '10px 14px', borderRadius: 10, background: t.bg, border: `0.5px solid ${t.borderStrong}`, color: t.text, fontFamily: 'inherit', outline: 'none' }}
+                style={{ flex: '1 1 240px', fontSize: 13, padding: '10px 14px', borderRadius: 10, background: t.bg, border: `0.5px solid ${t.borderStrong}`, color: t.text, fontFamily: 'inherit' }}
               />
               <button
                 onClick={runCopilot}

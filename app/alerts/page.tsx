@@ -163,6 +163,7 @@ export default function AlertsPage() {
                 <>
                   <input list="stock-symbols" value={symbol} onChange={e => setSymbol(e.target.value)}
                     placeholder="نماد سهم (مثلاً فولاد)"
+                    aria-label="نماد سهم"
                     style={{ flex: '1 1 180px', padding: '9px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.inputBg, color: t.text, fontSize: 13 }} />
                   <datalist id="stock-symbols">
                     {stockSymbols.map(s => <option key={s.symbol} value={s.symbol}>{s.name}</option>)}
@@ -171,6 +172,7 @@ export default function AlertsPage() {
               )}
               {assetType === 'fund' && (
                 <select value={symbol} onChange={e => setSymbol(e.target.value)}
+                  aria-label="انتخاب صندوق"
                   style={{ flex: '1 1 180px', padding: '9px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.inputBg, color: t.text, fontSize: 13 }}>
                   <option value="">انتخاب صندوق…</option>
                   {funds.map(f => <option key={f.slug} value={f.slug}>{f.name} ({f.category})</option>)}
@@ -178,6 +180,7 @@ export default function AlertsPage() {
               )}
               {assetType === 'market' && (
                 <select value={symbol} onChange={e => setSymbol(e.target.value)}
+                  aria-label="انتخاب نوع حباب"
                   style={{ flex: '1 1 180px', padding: '9px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.inputBg, color: t.text, fontSize: 13 }}>
                   <option value="">انتخاب نوع حباب…</option>
                   {BUBBLE_TARGETS.map(b => <option key={b.symbol} value={b.symbol}>{b.label}</option>)}
@@ -185,6 +188,7 @@ export default function AlertsPage() {
               )}
 
               <select value={direction} onChange={e => setDirection(e.target.value as Direction)}
+                aria-label="جهت هشدار"
                 style={{ padding: '9px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.inputBg, color: t.text, fontSize: 13 }}>
                 <option value="above">رسید به یا بالاتر رفت از</option>
                 <option value="below">رسید به یا پایین‌تر رفت از</option>
@@ -192,6 +196,7 @@ export default function AlertsPage() {
 
               <input type="number" value={target} onChange={e => setTarget(e.target.value)}
                 placeholder={assetType === 'market' ? 'هدف حباب (٪)' : 'قیمت هدف (تومان)'}
+                aria-label={assetType === 'market' ? 'هدف حباب' : 'قیمت هدف'}
                 style={{ width: 160, padding: '9px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.inputBg, color: t.text, fontSize: 13 }} />
 
               <button onClick={submit} disabled={saving} style={{

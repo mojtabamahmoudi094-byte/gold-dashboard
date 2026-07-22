@@ -323,7 +323,7 @@ export default function MarketMapPage() {
             <Field label="سابقه" muted={muted}>
               <input disabled placeholder="به‌زودی" style={{
                 width: 90, padding: '7px 10px', borderRadius: 9, border: `0.5px solid ${line}`,
-                background: 'transparent', color: muted, fontSize: 11.5, fontFamily: 'inherit', outline: 'none',
+                background: 'transparent', color: muted, fontSize: 11.5, fontFamily: 'inherit',
               }} />
             </Field>
 
@@ -728,7 +728,7 @@ function Select({ value, onChange, line, panel, text, disabled, children }: {
       style={{
         padding: '7px 10px', borderRadius: 9, border: `0.5px solid ${line}`,
         background: disabled ? 'transparent' : panel, color: disabled ? '#8b93a7' : text,
-        fontSize: 11.5, fontFamily: 'inherit', outline: 'none',
+        fontSize: 11.5, fontFamily: 'inherit',
         cursor: disabled ? 'not-allowed' : 'pointer', maxWidth: 140,
       }}
     >

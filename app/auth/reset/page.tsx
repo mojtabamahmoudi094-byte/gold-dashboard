@@ -54,7 +54,6 @@ export default function ResetPasswordPage() {
     color: '#E8F4FF',
     fontSize: 13,
     fontFamily: 'Vazirmatn, Arial, sans-serif',
-    outline: 'none',
     direction: 'rtl',
     boxSizing: 'border-box',
   }
