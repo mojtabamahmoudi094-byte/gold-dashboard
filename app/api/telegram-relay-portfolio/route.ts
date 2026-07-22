@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { TELEGRAM_BASE } from '../../../lib/upstreams'
 import crypto from 'crypto'
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`${TELEGRAM_BASE}/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),

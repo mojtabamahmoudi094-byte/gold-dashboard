@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // خروجی standalone برای میزبانی روی VPS — بیلد روی مک/CI انجام می‌شود و فقط
+  // .next/standalone (بدون node_modules کامل) به سرور rsync می‌شود
+  output: "standalone",
   async redirects() {
     return [
       // /team از قبل در گوگل ایندکس شده ولی صفحه‌ای نساخته بودیم — به‌جای 404 به contact هدایتش کن

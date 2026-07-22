@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { TELEGRAM_BASE } from '../../../lib/upstreams'
 import { rateLimit } from '../../../lib/rateLimit'
 
 // پیام کاربر به مدیر — ارسال خودکار به ایمیل (formsubmit.co، بدون نیاز به API key)
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
         '',
         'bourssanj.ir',
       ].join('\n')
-      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      const res = await fetch(`${TELEGRAM_BASE}/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text }),

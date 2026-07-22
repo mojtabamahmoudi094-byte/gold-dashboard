@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { TELEGRAM_BASE } from '../../../lib/upstreams'
 import crypto from 'crypto'
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
       form.append('chat_id', target)
       if (body.caption) form.append('caption', body.caption.slice(0, 1024))
       form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'report.jpg')
-      const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(10_000) })
+      const res = await fetch(`${TELEGRAM_BASE}/bot${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(10_000) })
       const data = await res.json()
       if (!data.ok) return NextResponse.json({ ok: false, error: data.description || 'sendPhoto failed' }, { status: 502 })
       return NextResponse.json({ ok: true, message_id: data.result?.message_id })
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`${TELEGRAM_BASE}/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

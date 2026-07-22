@@ -1,0 +1,22 @@
+# systemd unit برای سایت بورس سنج روی سرور ایران (45.94.215.115)
+# نصب: cp به /etc/systemd/system/ سپس systemctl daemon-reload && systemctl enable --now bourssanj-site
+[Unit]
+Description=bourssanj.ir Next.js site (standalone)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/bourssanj-site/app
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+EnvironmentFile=/opt/bourssanj-site/.env
+# سرور ۲ گیگ رم دارد و کرون‌های سهام هم روی همین سرور هستند — سقف بگذار تا OOM کل سرور را نگیرد
+MemoryMax=1200M
+StandardOutput=append:/var/log/bourssanj-site.log
+StandardError=append:/var/log/bourssanj-site.log
+
+[Install]
+WantedBy=multi-user.target

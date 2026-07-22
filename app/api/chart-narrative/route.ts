@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '../../../lib/rateLimit'
+import { GEMINI_BASE } from '../../../lib/upstreams'
 
 // Gemini با ورودی تصویری (چارت کندلی) — تفسیر فنی فارسی می‌نویسد
 // الگوی AI-Kline: LLM مستقیم عکس چارت را می‌بیند، نه فقط اعداد خام
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean).join('\n')
 
   const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`
+  const url = `${GEMINI_BASE}/v1beta/models/${MODEL}:generateContent?key=${KEY}`
 
   try {
     const res = await fetch(url, {

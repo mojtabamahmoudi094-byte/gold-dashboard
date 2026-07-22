@@ -3,6 +3,8 @@
 // کلید مستقیم Gemini (رایگان، بدون billing) ترجیح دارد؛ فقط وقتی شکست بخورد (از جمله
 // سقف روزانه‌ی رایگان تمام شود) به OpenRouter (پولی، شارژ‌شده) fallback می‌شود.
 
+import { GEMINI_BASE, OPENROUTER_BASE } from './upstreams'
+
 type JsonSchema = Record<string, unknown>
 
 export type LlmResult = { ok: true; text: string } | { ok: false; error: string }
@@ -20,7 +22,7 @@ export async function callOpenRouter(
     // users» رد می‌شه (باگ/قطعی زودهنگام گوگل، قبل تاریخ رسمی deprecate اکتبر) — تا اطلاع
     // ثانوی نسل بعدی (پایدار، پشتیبانی تا می ۲۰۲۷) پیش‌فرض است.
     const model = process.env.OPENROUTER_MODEL || 'google/gemini-3.1-flash-lite'
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetch(`${OPENROUTER_BASE}/api/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -63,7 +65,7 @@ export async function callGemini(
     // fallback مسیر مستقیم Gemini: 2.5-flash-lite رو بک‌اند گوگل الان خطای «no longer
     // available» می‌ده (۲۵.۷.۲۰۲۶) — 2.5-flash کامل هنوز جواب می‌ده، فقط quota محدودتره
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+    const url = `${GEMINI_BASE}/v1beta/models/${model}:generateContent?key=${apiKey}`
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
