@@ -73,15 +73,25 @@ function backtestSymbol(rows, acc) {
   const n = rows.length
   if (n < MIN_ROWS) return
 
-  const closes = rows.map(r => Number(r.close))
   const vols = rows.map(r => Number(r.volume) || 0)
   const adjCloses = rows.map(r => (r.adj_close != null && Number(r.adj_close) > 0) ? Number(r.adj_close) : Number(r.close))
+  // ضریب تعدیل هر روز؛ اندیکاتورها و الگوها باید روی سری تعدیل‌شده محاسبه شوند وگرنه
+  // افزایش سرمایه، افت مصنوعی قیمت خام می‌سازد → «کراس مرگ»/«کف ۵۲هفته» جعلی و آمار آلوده.
+  // بازده هم از همین adjCloses گرفته می‌شود، پس سیگنال و بازده هم‌مقیاس می‌مانند.
+  const adjFactor = rows.map((r, i) => { const c = Number(r.close); return c > 0 ? adjCloses[i] / c : 1 })
+  const adjRows = rows.map((r, i) => ({
+    ...r,
+    open: Number(r.open ?? r.close) * adjFactor[i],
+    high: Number(r.high ?? r.close) * adjFactor[i],
+    low: Number(r.low ?? r.close) * adjFactor[i],
+    close: adjCloses[i],
+  }))
 
-  const s50 = sma(closes, 50)
-  const s200 = sma(closes, 200)
-  const rArr = rsi(closes)
-  const hist = macdHist(closes)
-  const smcEvents = buildSmcEvents(rows)
+  const s50 = sma(adjCloses, 50)
+  const s200 = sma(adjCloses, 200)
+  const rArr = rsi(adjCloses)
+  const hist = macdHist(adjCloses)
+  const smcEvents = buildSmcEvents(adjRows)
   const maxHorizon = Math.max(...HORIZONS)
 
   for (let i = LOOKBACK; i < n - maxHorizon; i++) {
@@ -105,22 +115,22 @@ function backtestSymbol(rows, acc) {
       const avg20 = sum / 20
       if (avg20 > 0 && vols[i] / avg20 >= 2.5) {
         // حجم مشکوک خودش صعودی/نزولی نیست — بایاس از جهت تغییر قیمت همان روز گرفته می‌شود
-        signals.push({ key: 'vol_spike', bias: closes[i] >= closes[i - 1] ? 'bull' : 'bear' })
+        signals.push({ key: 'vol_spike', bias: adjCloses[i] >= adjCloses[i - 1] ? 'bull' : 'bear' })
       }
     }
     {
       const from = Math.max(0, i - 252 + 1)
       let maxClose = -Infinity, minClose = Infinity
       for (let j = from; j < i; j++) {
-        if (closes[j] > maxClose) maxClose = closes[j]
-        if (closes[j] < minClose) minClose = closes[j]
+        if (adjCloses[j] > maxClose) maxClose = adjCloses[j]
+        if (adjCloses[j] < minClose) minClose = adjCloses[j]
       }
       if (maxClose > -Infinity) {
-        if (closes[i] > maxClose) signals.push({ key: 'new_high_52w', bias: 'bull' })
-        if (closes[i] < minClose) signals.push({ key: 'new_low_52w', bias: 'bear' })
+        if (adjCloses[i] > maxClose) signals.push({ key: 'new_high_52w', bias: 'bull' })
+        if (adjCloses[i] < minClose) signals.push({ key: 'new_low_52w', bias: 'bear' })
       }
     }
-    const cp = detectCandlePattern(rows.slice(Math.max(0, i - 11), i + 1))
+    const cp = detectCandlePattern(adjRows.slice(Math.max(0, i - 11), i + 1))
     if (cp && cp.bias) signals.push({ key: `candle_${cp.key}`, bias: cp.bias })
 
     const smcHere = smcEvents.get(i)

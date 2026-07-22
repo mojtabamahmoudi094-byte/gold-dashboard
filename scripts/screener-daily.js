@@ -116,19 +116,28 @@ function computeRow(symbol, rows) {
   // rows: صعودی بر اساس تاریخ — {trade_date, trade_date_shamsi, close, high, low, volume, change_pct}
   const n = rows.length
   if (n < 60) return null
-  const closes = rows.map(r => Number(r.close))
+  const closes = rows.map(r => Number(r.close)) // فقط برای نمایش قیمت خام روز
+  // اندیکاتورها و الگوها روی سری تعدیل‌شده؛ وگرنه افزایش سرمایه «کراس مرگ»/«کف ۵۲هفته»
+  // جعلی می‌سازد. مقایسه‌های near/platform هم با lastAdjClose انجام می‌شوند تا هم‌مقیاس بمانند.
+  const adjCloses = rows.map(r => (r.adj_close != null && Number(r.adj_close) > 0) ? Number(r.adj_close) : Number(r.close))
+  const adjFactor = rows.map((r, i) => { const c = Number(r.close); return c > 0 ? adjCloses[i] / c : 1 })
+  const adjRows = rows.map((r, i) => ({
+    open: Number(r.open ?? r.close) * adjFactor[i], high: Number(r.high ?? r.close) * adjFactor[i],
+    low: Number(r.low ?? r.close) * adjFactor[i], close: adjCloses[i], volume: Number(r.volume) || 0,
+  }))
+  const lastAdjClose = adjCloses[n - 1]
   const vols = rows.map(r => Number(r.volume) || 0)
   const last = rows[n - 1]
 
-  const r = rsi(closes)
+  const r = rsi(adjCloses)
   const lastRsi = r[n - 1]
 
-  const s50 = sma(closes, 50)
-  const s200 = sma(closes, 200)
+  const s50 = sma(adjCloses, 50)
+  const s200 = sma(adjCloses, 200)
   let golden = false, death = false, trend = null
   if (s200[n - 1] !== null) {
-    trend = closes[n - 1] > s50[n - 1] && s50[n - 1] > s200[n - 1] ? 'up'
-      : closes[n - 1] < s50[n - 1] && s50[n - 1] < s200[n - 1] ? 'down' : 'side'
+    trend = adjCloses[n - 1] > s50[n - 1] && s50[n - 1] > s200[n - 1] ? 'up'
+      : adjCloses[n - 1] < s50[n - 1] && s50[n - 1] < s200[n - 1] ? 'down' : 'side'
     for (let i = Math.max(1, n - 5); i < n; i++) {
       if (s200[i - 1] === null) continue
       if (s50[i] > s200[i] && s50[i - 1] <= s200[i - 1]) golden = true
@@ -136,7 +145,7 @@ function computeRow(symbol, rows) {
     }
   }
 
-  const hist = macdHist(closes)
+  const hist = macdHist(adjCloses)
   let macdUp = false, macdDown = false
   for (let i = Math.max(1, n - 3); i < n; i++) {
     if (hist[i] === null || hist[i - 1] === null) continue
@@ -144,10 +153,10 @@ function computeRow(symbol, rows) {
     if (hist[i] < 0 && hist[i - 1] >= 0) macdDown = true
   }
 
-  const window = rows.slice(-252)
-  const maxClose = Math.max(...window.slice(0, -1).map(x => Number(x.close)))
-  const minClose = Math.min(...window.slice(0, -1).map(x => Number(x.close)))
-  const lastClose = closes[n - 1]
+  const adjWindow = adjCloses.slice(-252)
+  const maxClose = Math.max(...adjWindow.slice(0, -1))
+  const minClose = Math.min(...adjWindow.slice(0, -1))
+  const lastClose = closes[n - 1] // قیمت خام برای نمایش
 
   const avgVol20 = vols.length >= 21
     ? vols.slice(-21, -1).reduce((a, b) => a + b, 0) / 20
@@ -159,10 +168,7 @@ function computeRow(symbol, rows) {
   let fvgBullNear = false, fvgBearNear = false
   let obBullNear = false, obBearNear = false
   try {
-    const smcRows = rows.slice(-260).map(r => ({
-      open: Number(r.open ?? r.close), high: Number(r.high ?? r.close),
-      low: Number(r.low ?? r.close), close: Number(r.close), volume: Number(r.volume) || 0,
-    }))
+    const smcRows = adjRows.slice(-260)
     const m = smcRows.length
     const swings = swingHighsLows(smcRows, 10)
     const NEAR = 0.03 // فاصله ≤۳٪ قیمت
@@ -180,7 +186,7 @@ function computeRow(symbol, rows) {
     const f = fvg(smcRows)
     for (let i = 0; i < m; i++) {
       if (Number.isNaN(f.fvg[i]) || f.mitigatedIndex[i] !== 0) continue
-      const near = lastClose >= f.bottom[i] * (1 - NEAR) && lastClose <= f.top[i] * (1 + NEAR)
+      const near = lastAdjClose >= f.bottom[i] * (1 - NEAR) && lastAdjClose <= f.top[i] * (1 + NEAR)
       if (!near) continue
       if (f.fvg[i] === 1) fvgBullNear = true
       else fvgBearNear = true
@@ -190,7 +196,7 @@ function computeRow(symbol, rows) {
     const ob = orderBlocks(smcRows, swings)
     for (let i = 0; i < m; i++) {
       if (Number.isNaN(ob.ob[i]) || ob.mitigatedIndex[i] !== 0) continue
-      const near = lastClose >= ob.bottom[i] * (1 - NEAR) && lastClose <= ob.top[i] * (1 + NEAR)
+      const near = lastAdjClose >= ob.bottom[i] * (1 - NEAR) && lastAdjClose <= ob.top[i] * (1 + NEAR)
       if (!near) continue
       if (ob.ob[i] === 1) obBullNear = true
       else obBearNear = true
@@ -200,24 +206,24 @@ function computeRow(symbol, rows) {
   // ── الگوی کندلی امروز (candle-patterns.js) — نیاز به ~۱۲ کندل برای context روند
   let candlePattern = null, candlePatternBias = null
   try {
-    const cp = detectCandlePattern(rows.slice(-12))
+    const cp = detectCandlePattern(adjRows.slice(-12))
     if (cp) { candlePattern = cp.key; candlePatternBias = cp.bias }
   } catch { /* اختیاری — خطای آن نباید اسکرینر را بیندازد */ }
 
-  // ── سه سیگنال پایه استراتژی‌های آماده (preset strategies)
-  const win20 = rows.slice(-21, -1)
-  const platformHigh = win20.length === 20 ? Math.max(...win20.map(r => Number(r.high))) : null
-  const platformLow = win20.length === 20 ? Math.min(...win20.map(r => Number(r.low))) : null
+  // ── سه سیگنال پایه استراتژی‌های آماده (preset strategies) — روی سری تعدیل‌شده
+  const adjWin20 = adjRows.slice(-21, -1)
+  const platformHigh = adjWin20.length === 20 ? Math.max(...adjWin20.map(r => r.high)) : null
+  const platformLow = adjWin20.length === 20 ? Math.min(...adjWin20.map(r => r.low)) : null
   const platformBreakout = platformHigh !== null && platformLow !== null
     && (platformHigh - platformLow) / platformLow <= 0.12
-    && lastClose > platformHigh
+    && lastAdjClose > platformHigh
     && volRatio !== null && volRatio >= 1.5
 
   const yearLinePullback = n > 205 && s200[n - 1] !== null && s200[n - 6] !== null
     && s200[n - 1] > s200[n - 6]
-    && Math.abs(lastClose - s200[n - 1]) <= s200[n - 1] * 0.02
+    && Math.abs(lastAdjClose - s200[n - 1]) <= s200[n - 1] * 0.02
 
-  const turtleBreakout20d = platformHigh !== null && lastClose > platformHigh
+  const turtleBreakout20d = platformHigh !== null && lastAdjClose > platformHigh
 
   return {
     symbol,
@@ -234,10 +240,10 @@ function computeRow(symbol, rows) {
     death_cross: death,
     macd_cross_up: macdUp,
     macd_cross_down: macdDown,
-    near_high_52w: lastClose >= maxClose * 0.95,
-    near_low_52w: lastClose <= minClose * 1.05,
-    new_high_52w: lastClose > maxClose,
-    new_low_52w: lastClose < minClose,
+    near_high_52w: lastAdjClose >= maxClose * 0.95,
+    near_low_52w: lastAdjClose <= minClose * 1.05,
+    new_high_52w: lastAdjClose > maxClose,
+    new_low_52w: lastAdjClose < minClose,
     vol_spike: volRatio !== null && volRatio >= 2.5,
     structure_break: structureBreak,
     fvg_bull_near: fvgBullNear,
@@ -267,7 +273,7 @@ async function main() {
   for (;;) {
     const { data, error } = await sb
       .from('stock_candles')
-      .select('symbol, trade_date, trade_date_shamsi, open, high, low, close, volume, change_pct')
+      .select('symbol, trade_date, trade_date_shamsi, open, high, low, close, volume, change_pct, adj_close')
       .gte('trade_date', since)
       .order('symbol', { ascending: true })
       .order('trade_date', { ascending: true })
