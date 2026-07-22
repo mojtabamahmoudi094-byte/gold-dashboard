@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import JsonLd from '../../../components/JsonLd'
+import AiDisclaimer from '../../../components/AiDisclaimer'
 import { SITE_URL } from '../../../lib/site'
 
 export const metadata: Metadata = {
@@ -37,6 +38,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <JsonLd data={jsonLd} />
+      <AiDisclaimer />
       {children}
     </>
   )

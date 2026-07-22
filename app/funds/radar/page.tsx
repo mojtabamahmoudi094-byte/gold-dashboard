@@ -202,7 +202,7 @@ export default function SmartMoneyRadarPage() {
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 64px' }}>
 
         {/* ── سربرگ ── */}
-        <Link href="/funds" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← بازگشت به دیدبان صندوق‌ها</Link>
+        <Link href="/funds" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>← بازگشت به دیده‌بان صندوق‌ها</Link>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', margin: '10px 0 4px' }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: t.textBright, margin: 0 }}>رادار پول هوشمند</h1>
           <span style={{

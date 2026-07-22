@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import AiDisclaimer from '../../components/AiDisclaimer'
 
 export const metadata: Metadata = {
   title: 'تحلیل بازارها',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return children
+  return (
+    <>
+      <AiDisclaimer />
+      {children}
+    </>
+  )
 }
