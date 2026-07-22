@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
 type Fund = {
@@ -61,6 +61,23 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
   const [returnAnswer, setReturnAnswer] = useState<ReturnAnswer | null>(null)
   const [portfolioAnswer, setPortfolioAnswer] = useState<PortfolioAnswer | null>(null)
   const [activeMetric, setActiveMetric] = useState<'changePct' | 'weeklyReturn'>('changePct')
+  // شمارش معکوس تا تلاش خودکار بعد از خطای سهمیه (quota) سرور هوش مصنوعی
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
+  const retriedRef = useRef(false)
+  const retryQueryRef = useRef('')
+
+  // هر ثانیه یکی کم کن؛ به صفر که رسید همان جست‌وجو را خودکار دوباره اجرا کن (فقط یک بار)
+  useEffect(() => {
+    if (retryCountdown == null) return
+    if (retryCountdown <= 0) {
+      setRetryCountdown(null)
+      if (retryQueryRef.current) run(retryQueryRef.current)
+      return
+    }
+    const t = setTimeout(() => setRetryCountdown(c => (c == null ? null : c - 1)), 1000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retryCountdown])
 
   const calcScore = (f: Omit<Fund, 'score'>, maxFlow: number, maxTrade: number) => {
     let score = 0
@@ -80,9 +97,23 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
     setHoldingResults(null)
     setReturnAnswer(null)
     setPortfolioAnswer(null)
+    setRetryCountdown(null)
     try {
       const filterRes = await fetch('/api/fund-filter-nl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) }).then(r => r.json())
-      if (!filterRes.ok) { setError(filterRes.error || 'فهم درخواست ناموفق بود'); setLoading(false); return }
+      if (!filterRes.ok) {
+        // خطای سهمیه سرور هوش مصنوعی — یک بار خودکار با شمارش معکوس دوباره تلاش کن
+        if (filterRes.retryAfterSec != null && !retriedRef.current) {
+          retriedRef.current = true
+          retryQueryRef.current = q
+          setRetryCountdown(Math.min(Number(filterRes.retryAfterSec) || 60, 90))
+          setLoading(false)
+          return
+        }
+        setError(filterRes.error || 'فهم درخواست ناموفق بود')
+        setLoading(false)
+        return
+      }
+      retriedRef.current = false
       const filter: Filter = filterRes.filter || {}
 
       // حالت «کدام صندوق بیشترین وزن روی سهم X را دارد» — از پرتفوی واقعی صندوق‌ها، نه فیلتر عددی
@@ -238,6 +269,20 @@ export default function NlFundFilter({ isDark }: { isDark: boolean }) {
         </div>
       )}
       {error && <div style={{ fontSize: 12, color: RED, marginTop: 8 }}>{error}</div>}
+      {retryCountdown != null && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginTop: 10,
+          fontSize: 12.5, color: muted, padding: '9px 12px', borderRadius: 10,
+          background: isDark ? 'rgba(56,189,248,0.06)' : 'rgba(56,189,248,0.08)',
+          border: `0.5px solid ${isDark ? 'rgba(56,189,248,0.25)' : 'rgba(56,189,248,0.35)'}`,
+        }}>
+          <span aria-hidden style={{ flexShrink: 0 }}>⏳</span>
+          <span>
+            سرور هوش مصنوعی موقتاً شلوغ است — تلاش دوباره تا{' '}
+            <b style={{ color: text }}>{retryCountdown.toLocaleString('fa-IR')}</b> ثانیه دیگر…
+          </span>
+        </div>
+      )}
       {returnAnswer && (
         <Link href={`/fund/${encodeURIComponent(returnAnswer.slug)}`} style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,

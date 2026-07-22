@@ -111,7 +111,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const raw = await callNarrate(GEMINI_KEY, OPENROUTER_KEY, SYSTEM, body.query, GEMINI_SCHEMA, OPENROUTER_SCHEMA, 'fund_filter', 250)
-    if (!raw.ok) return NextResponse.json({ ok: false, error: raw.error }, { status: 502 })
+    if (!raw.ok) {
+      // خطای سهمیه (quota) — کلاینت با retryAfterSec شمارش معکوس و تلاش خودکار نشان می‌دهد
+      if (raw.retryAfterSec != null) {
+        return NextResponse.json({ ok: false, error: raw.error, retryAfterSec: raw.retryAfterSec }, { status: 503 })
+      }
+      return NextResponse.json({ ok: false, error: raw.error }, { status: 502 })
+    }
     let filter: Record<string, unknown>
     try {
       filter = JSON.parse(raw.text)

@@ -7,7 +7,18 @@ import { GEMINI_BASE, OPENROUTER_BASE } from './upstreams'
 
 type JsonSchema = Record<string, unknown>
 
-export type LlmResult = { ok: true; text: string } | { ok: false; error: string }
+export type LlmResult = { ok: true; text: string } | { ok: false; error: string; retryAfterSec?: number }
+
+// خطای خام سهمیه (429/quota) گوگل نباید مستقیم به کاربر برسد — پیام فارسی دوستانه
+// برمی‌گردانیم و اگر گوگل «Please retry in Ns» گفته بود، ثانیه را هم استخراج می‌کنیم
+// تا کلاینت بتواند شمارش معکوس/تلاش خودکار نشان دهد.
+export function sanitizeQuotaError(rawError: string): { error: string; retryAfterSec?: number } | null {
+  const isQuota = /quota|RESOURCE_EXHAUSTED|rate.?limit|429|exceeded/i.test(rawError)
+  if (!isQuota) return null
+  const m = rawError.match(/retry in ([\d.]+)s/i)
+  const retryAfterSec = m ? Math.ceil(Number(m[1])) : 60
+  return { error: 'سرور هوش مصنوعی موقتاً شلوغ است؛ چند لحظه دیگر دوباره تلاش می‌شود.', retryAfterSec }
+}
 
 export async function callOpenRouter(
   apiKey: string,
@@ -108,10 +119,36 @@ export async function callNarrate(
   if (geminiKey) {
     const viaGemini = await callGemini(geminiKey, system, user, geminiSchema, maxTokens)
     if (viaGemini.ok) return viaGemini
-    if (!openrouterKey) return viaGemini
+    if (!openrouterKey) {
+      // خطای خام گوگل (متن انگلیسی quota) به کاربر نشان داده نشود
+      const q = sanitizeQuotaError(viaGemini.error)
+      if (q) {
+        console.error(`[llmNarrate] Gemini quota تمام شد، OpenRouter هم تنظیم نیست: ${viaGemini.error}`)
+        return { ok: false, ...q }
+      }
+      return viaGemini
+    }
     console.error(`[llmNarrate] Gemini شکست خورد (${viaGemini.error}) — fallback به OpenRouter پولی`)
-    return callOpenRouter(openrouterKey, system, user, openrouterSchema, schemaName, maxTokens)
+    const viaOpenRouter = await callOpenRouter(openrouterKey, system, user, openrouterSchema, schemaName, maxTokens)
+    if (!viaOpenRouter.ok) {
+      const q = sanitizeQuotaError(viaOpenRouter.error)
+      if (q) {
+        console.error(`[llmNarrate] OpenRouter هم شکست خورد: ${viaOpenRouter.error}`)
+        return { ok: false, ...q }
+      }
+    }
+    return viaOpenRouter
   }
-  if (openrouterKey) return callOpenRouter(openrouterKey, system, user, openrouterSchema, schemaName, maxTokens)
+  if (openrouterKey) {
+    const viaOpenRouter = await callOpenRouter(openrouterKey, system, user, openrouterSchema, schemaName, maxTokens)
+    if (!viaOpenRouter.ok) {
+      const q = sanitizeQuotaError(viaOpenRouter.error)
+      if (q) {
+        console.error(`[llmNarrate] OpenRouter شکست خورد: ${viaOpenRouter.error}`)
+        return { ok: false, ...q }
+      }
+    }
+    return viaOpenRouter
+  }
   return { ok: false, error: 'GEMINI_API_KEY/OPENROUTER_API_KEY تنظیم نشده' }
 }
