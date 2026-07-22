@@ -20,8 +20,14 @@ type StatRow = {
   sample_count: number
   win_rate: number
   avg_return_pct: number
-  median_return_pct: number
+  median_return_pct?: number
 }
+
+// آمار به تفکیک رژیم بازار — رژیم تاریخی هر روز از breadth کندل‌ها بازسازی شده (backtest-signals.js)
+type RegimeRow = StatRow & { regime: string }
+
+const REGIMES = ['همه', 'صعودی', 'نوسانی', 'نزولی'] as const
+type RegimeFilter = (typeof REGIMES)[number]
 
 const SIGNAL_LABELS: Record<string, string> = {
   golden_cross: 'کراس طلایی', death_cross: 'کراس مرگ',
@@ -101,6 +107,8 @@ export default function BacktestPage() {
   const isMobile = useIsMobile()
   const [isDark, setIsDark] = useState(true)
   const [rows, setRows] = useState<StatRow[] | null>(null)
+  const [regimeRows, setRegimeRows] = useState<RegimeRow[]>([])
+  const [regime, setRegime] = useState<RegimeFilter>('همه')
 
   useEffect(() => {
     if (!shouldUseDark()) setIsDark(false)
@@ -112,6 +120,9 @@ export default function BacktestPage() {
   useEffect(() => {
     supabase.from('signal_backtest_stats').select('*').then(({ data, error }) => {
       if (!error && data) setRows(data as StatRow[])
+    })
+    supabase.from('signal_backtest_regime_stats').select('*').then(({ data, error }) => {
+      if (!error && data) setRegimeRows(data as RegimeRow[])
     })
   }, [])
 
@@ -131,16 +142,22 @@ export default function BacktestPage() {
     })
   }
 
+  // منبع مؤثر جدول: کل دوره یا فقط روزهای یک رژیم خاص (خط پایه هم از همان رژیم)
+  const effRows = useMemo<StatRow[] | null>(() => {
+    if (regime === 'همه') return rows
+    return regimeRows.filter(r => r.regime === regime)
+  }, [rows, regimeRows, regime])
+
   // خط پایه: بازده آتی همهٔ روزها بدون سیگنال — مرجع مقایسهٔ همهٔ سیگنال‌ها
   const baseline = useMemo(() => {
     const m = new Map<number, StatRow>()
-    for (const r of rows ?? []) if (r.signal_key === 'baseline_all_days') m.set(r.horizon_days, r)
+    for (const r of effRows ?? []) if (r.signal_key === 'baseline_all_days') m.set(r.horizon_days, r)
     return m
-  }, [rows])
+  }, [effRows])
 
   const bySignal = useMemo(
-    () => (rows ? groupBySignal(rows.filter(r => r.signal_key !== 'baseline_all_days')) : []),
-    [rows],
+    () => (effRows ? groupBySignal(effRows.filter(r => r.signal_key !== 'baseline_all_days')) : []),
+    [effRows],
   )
 
   // بک‌تست تعاملی — نماد دلخواه کاربر (زنده از /api/backtest-signal-symbol، نه جدول تجمیعی)
@@ -229,9 +246,39 @@ export default function BacktestPage() {
           مرتب شده (سیگنال‌های با کمتر از ۵ رخداد، غیرقابل‌اتکا و در انتها هستند).
         </p>
 
+        {regimeRows.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 14, ...enterAnim(1) }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: muted }}>رژیم بازار:</span>
+            {REGIMES.map(r => {
+              const active = regime === r
+              const tone = r === 'صعودی' ? GREEN : r === 'نزولی' ? RED : text
+              return (
+                <button
+                  key={r}
+                  onClick={() => setRegime(r)}
+                  aria-pressed={active}
+                  style={{
+                    padding: '8px 16px', borderRadius: 999, fontSize: 12.5, fontWeight: active ? 800 : 600,
+                    fontFamily: 'inherit', cursor: 'pointer', minHeight: 40,
+                    color: active ? tone : muted,
+                    background: active ? (isDark ? 'rgba(217,180,91,0.12)' : 'rgba(217,180,91,0.15)') : 'transparent',
+                    border: `1px solid ${active ? '#d9b45b' : line}`,
+                  }}>
+                  {r}
+                </button>
+              )
+            })}
+            {regime !== 'همه' && (
+              <span style={{ fontSize: 11, color: muted }}>
+                فقط رخدادهایی که در روزهای {regime} بازار ثبت شده‌اند — خط پایه هم از همان روزها.
+              </span>
+            )}
+          </div>
+        )}
+
         {baseline.size > 0 && (
           <div style={{ ...glass, borderRadius: 14, padding: '12px 16px', marginBottom: 14, ...enterAnim(1) }}>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>خط پایهٔ بازار (بدون هیچ سیگنالی)</div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>خط پایهٔ بازار {regime === 'همه' ? '(بدون هیچ سیگنالی)' : `در روزهای ${regime} (بدون هیچ سیگنالی)`}</div>
             <div style={{ fontSize: 11.5, color: muted, lineHeight: 2 }}>
               {HORIZONS.map(h => {
                 const b = baseline.get(h)
@@ -245,7 +292,7 @@ export default function BacktestPage() {
         )}
 
         <div style={{ ...glass, borderRadius: 20, overflowX: 'auto', ...enterAnim(2) }}>
-          {rows === null ? (
+          {effRows === null ? (
             <div style={{ color: muted, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>در حال بارگذاری…</div>
           ) : bySignal.length === 0 ? (
             <div style={{ color: muted, fontSize: 13, padding: '60px 0', textAlign: 'center' }}>

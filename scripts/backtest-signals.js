@@ -67,9 +67,29 @@ const HORIZONS = [5, 10, 20]
 const LOOKBACK = 260 // برای SMA200 + پنجره ۵۲هفته (۲۵۲ روز)
 const MIN_ROWS = LOOKBACK + Math.max(...HORIZONS) + 10
 
+// ───────────────────── رژیم تاریخی بازار از خود کندل‌ها ─────────────────────
+// market_regime_daily فقط از راه‌اندازی پایپلاین لحظه‌ای پر می‌شود (چند روز) — برای بک‌تست
+// ۳ساله باید رژیم هر روز را از breadth و میانگین تغییر روزانهٔ کل نمادها بازسازی کنیم.
+// ۳ کلاسه (بدون تجمیع/توزیع) چون ورود/خروج پول حقیقی (net_flow) در تاریخچهٔ کندل نیست.
+// آستانه‌ها همان classify() در market-regime-daily.js.
+function classifyRegime(breadthPct, avgChangePct) {
+  if (breadthPct >= 60 && avgChangePct >= 0.5) return 'صعودی'
+  if (breadthPct <= 40 && avgChangePct <= -0.5) return 'نزولی'
+  return 'نوسانی'
+}
+
+// تجمیع per-date داخل هر accumulator — بعد از پایان همهٔ نمادها با رژیم همان روز fold می‌شود
+function bumpByDate(a, date, ret, win) {
+  let d = a.byDate.get(date)
+  if (!d) { d = { count: 0, winCount: 0, sumReturn: 0 }; a.byDate.set(date, d) }
+  d.count++
+  if (win) d.winCount++
+  d.sumReturn += ret
+}
+
 // ───────────────────── بک‌تست یک نماد — تجمیع در acc (Map مشترک بین همه نمادها) ─────────────────────
 
-function backtestSymbol(rows, acc) {
+function backtestSymbol(rows, acc, dailyMkt) {
   const n = rows.length
   if (n < MIN_ROWS) return
 
@@ -86,6 +106,22 @@ function backtestSymbol(rows, acc) {
     low: Number(r.low ?? r.close) * adjFactor[i],
     close: adjCloses[i],
   }))
+
+  // سهم این نماد در breadth بازارِ هر روز — روی کل تاریخچه، نه فقط بازهٔ سیگنال‌گیری
+  if (dailyMkt) {
+    for (let i = 1; i < n; i++) {
+      const prev = adjCloses[i - 1]
+      if (!(prev > 0) || !(adjCloses[i] > 0)) continue
+      const chg = (adjCloses[i] - prev) / prev * 100
+      const date = rows[i].trade_date
+      let m = dailyMkt.get(date)
+      if (!m) { m = { up: 0, down: 0, sumChg: 0, n: 0 }; dailyMkt.set(date, m) }
+      if (chg > 0) m.up++
+      else if (chg < 0) m.down++
+      m.sumChg += chg
+      m.n++
+    }
+  }
 
   const s50 = sma(adjCloses, 50)
   const s200 = sma(adjCloses, 200)
@@ -148,11 +184,12 @@ function backtestSymbol(rows, acc) {
           const ret = (exit - bEntry) / bEntry * 100
           const accKey = `baseline_all_days|${h}`
           let a = acc.get(accKey)
-          if (!a) { a = { signal_key: 'baseline_all_days', horizon_days: h, bias: 'bull', count: 0, winCount: 0, sumReturn: 0, returns: [] }; acc.set(accKey, a) }
+          if (!a) { a = { signal_key: 'baseline_all_days', horizon_days: h, bias: 'bull', count: 0, winCount: 0, sumReturn: 0, returns: [], byDate: new Map() }; acc.set(accKey, a) }
           a.count++
           if (ret > 0) a.winCount++
           a.sumReturn += ret
           a.returns.push(ret)
+          bumpByDate(a, rows[i].trade_date, ret, ret > 0)
         }
       }
     }
@@ -169,11 +206,12 @@ function backtestSymbol(rows, acc) {
         const win = sig.bias === 'bull' ? ret > 0 : ret < 0
         const accKey = `${sig.key}|${h}`
         let a = acc.get(accKey)
-        if (!a) { a = { signal_key: sig.key, horizon_days: h, bias: sig.bias, count: 0, winCount: 0, sumReturn: 0, returns: [] }; acc.set(accKey, a) }
+        if (!a) { a = { signal_key: sig.key, horizon_days: h, bias: sig.bias, count: 0, winCount: 0, sumReturn: 0, returns: [], byDate: new Map() }; acc.set(accKey, a) }
         a.count++
         if (win) a.winCount++
         a.sumReturn += ret
         a.returns.push(ret)
+        bumpByDate(a, rows[i].trade_date, ret, win)
       }
     }
   }
@@ -275,6 +313,7 @@ async function main() {
   console.log(`[backtest] ${allSymbols.length} نماد یافت شد — ${symbols.length} نماد پردازش می‌شود`)
 
   const acc = new Map()
+  const dailyMkt = new Map() // trade_date → {up, down, sumChg, n} — برای بازسازی رژیم تاریخی
   const t0 = Date.now()
   let done = 0
   for (let i = 0; i < symbols.length; i += CONCURRENCY) {
@@ -282,7 +321,7 @@ async function main() {
     await Promise.all(batch.map(async symbol => {
       try {
         const rows = await fetchSymbolCandles(symbol)
-        backtestSymbol(rows, acc)
+        backtestSymbol(rows, acc, dailyMkt)
       } catch (e) { console.warn(`[backtest] ${symbol} ناموفق: ${e.message}`) }
     }))
     done += batch.length
@@ -300,9 +339,52 @@ async function main() {
     median_return_pct: +median(a.returns).toFixed(3),
   }))
 
+  // رژیم هر روز از breadth بازار (حداقل ۵۰ نماد تا روزهای کم‌داده — اوایل تاریخچه/تعطیلات نصفه — رژیم جعلی نسازند)
+  const MIN_MARKET_SYMBOLS = 50
+  const regimeByDate = new Map()
+  const regimeDays = { 'صعودی': 0, 'نزولی': 0, 'نوسانی': 0 }
+  for (const [date, m] of dailyMkt) {
+    if (m.n < MIN_MARKET_SYMBOLS) continue
+    const denom = m.up + m.down
+    if (denom === 0) continue
+    const regime = classifyRegime(m.up / denom * 100, m.sumChg / m.n)
+    regimeByDate.set(date, regime)
+    regimeDays[regime]++
+  }
+  console.log(`[backtest] رژیم تاریخی: ${regimeByDate.size} روز — صعودی ${regimeDays['صعودی']} | نزولی ${regimeDays['نزولی']} | نوسانی ${regimeDays['نوسانی']}`)
+
+  // fold تجمیع per-date به per-regime
+  const regimeOut = []
+  for (const a of acc.values()) {
+    const byRegime = new Map()
+    for (const [date, d] of a.byDate) {
+      const regime = regimeByDate.get(date)
+      if (!regime) continue
+      let r = byRegime.get(regime)
+      if (!r) { r = { count: 0, winCount: 0, sumReturn: 0 }; byRegime.set(regime, r) }
+      r.count += d.count
+      r.winCount += d.winCount
+      r.sumReturn += d.sumReturn
+    }
+    for (const [regime, r] of byRegime) {
+      if (r.count === 0) continue
+      regimeOut.push({
+        signal_key: a.signal_key,
+        horizon_days: a.horizon_days,
+        regime,
+        bias: a.bias,
+        sample_count: r.count,
+        win_rate: +(r.winCount / r.count * 100).toFixed(2),
+        avg_return_pct: +(r.sumReturn / r.count).toFixed(3),
+      })
+    }
+  }
+
   if (PROBE) {
     const top = out.filter(r => r.horizon_days === 10).sort((a, b) => b.sample_count - a.sample_count).slice(0, 10)
     console.log(JSON.stringify(top, null, 2))
+    const topRegime = regimeOut.filter(r => r.horizon_days === 10).sort((a, b) => b.sample_count - a.sample_count).slice(0, 12)
+    console.log(JSON.stringify(topRegime, null, 2))
     return
   }
 
@@ -316,6 +398,16 @@ async function main() {
   }
   console.log(`[backtest] ✅ ${ok}/${out.length} ردیف upsert شد`)
   if (ok === 0) process.exit(1)
+
+  // آمار per-regime — جدول جدا؛ شکستش نباید آمار اصلی را که همین حالا نوشته شد بی‌اعتبار کند
+  let okR = 0
+  for (let i = 0; i < regimeOut.length; i += BATCH) {
+    const batch = regimeOut.slice(i, i + BATCH)
+    const { error } = await sb.from('signal_backtest_regime_stats').upsert(batch, { onConflict: 'signal_key,horizon_days,regime' })
+    if (error) console.error(`[backtest] regime batch #${i / BATCH + 1}:`, error.message)
+    else okR += batch.length
+  }
+  console.log(`[backtest] ✅ ${okR}/${regimeOut.length} ردیف per-regime upsert شد`)
 }
 
 if (require.main === module) {
