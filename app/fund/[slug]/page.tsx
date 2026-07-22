@@ -10,7 +10,7 @@ export const revalidate = 60
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const slug = decodeURIComponent((await params).slug)
   const { asset, record } = await getFundDetail(slug)
-  if (!asset) return { title: `${slug} — بورس سنج` }
+  if (!asset) return { title: slug }
   if (!record) return { title: asset.name }
 
   const priceIsRial = safe(record.trade_value) > 1e6

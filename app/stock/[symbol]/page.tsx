@@ -27,7 +27,7 @@ async function findSymbolData(symbol: string) {
 export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }): Promise<Metadata> {
   const symbol = decodeURIComponent((await params).symbol)
   const { s, ind, isExtra } = await findSymbolData(symbol)
-  if (!s || !ind) return { title: `${symbol} — بورس سنج` }
+  if (!s || !ind) return { title: symbol }
   const price = s.pc == null ? '' : `قیمت پایانی ${s.pc.toLocaleString('fa-IR')} ریال`
   const change = s.pcp == null ? '' : `(${s.pcp > 0 ? '+' : ''}${s.pcp.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪)`
   return {
