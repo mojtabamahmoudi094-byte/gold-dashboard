@@ -31,7 +31,8 @@ echo "$OUTPUT"
 if [ -n "${HC_PING_KEY_URL:-}" ]; then
   HC_SUFFIX=""
   [ "$CODE" -ne 0 ] && HC_SUFFIX="/fail"
-  curl -fsS -m 10 --retry 2 "${HC_PING_KEY_URL%/}/${LABEL}${HC_SUFFIX}" >/dev/null 2>&1 || true
+  # create=1 → auto-provision: اولین ping هر LABEL خودش چک را در پنل می‌سازد
+  curl -fsS -m 10 --retry 2 "${HC_PING_KEY_URL%/}/${LABEL}${HC_SUFFIX}?create=1" >/dev/null 2>&1 || true
 fi
 
 if [ "$CODE" -ne 0 ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
