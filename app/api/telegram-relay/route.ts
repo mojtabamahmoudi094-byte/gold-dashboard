@@ -46,9 +46,9 @@ export async function POST(req: NextRequest) {
       form.append('chat_id', target)
       if (body.caption) form.append('caption', body.caption.slice(0, 1024))
       form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'report.jpg')
-      // ۳۰ ثانیه، نه ۱۰ — از مهاجرت به سرور ایران، این خودش هم از طریق relay آلمان
-      // می‌رود (یک hop اضافه)، آپلود عکس زیر ۱۰ ثانیه مدام timeout می‌خورد (۲۰۲۶-۰۷-۲۲)
-      const res = await fetch(`${TELEGRAM_BASE}/bot${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(30_000) })
+      // ۴۵ ثانیه — ۳۰ هم گاهی کم بود (Apache آلمان گاهی کند)، کلاینت (codal-watch.js)
+      // خودش ۹۰ ثانیه صبر می‌کند پس جا برای رشد بیشتر هست (۲۰۲۶-۰۷-۲۲)
+      const res = await fetch(`${TELEGRAM_BASE}/bot${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(45_000) })
       const data = await res.json()
       if (!data.ok) return NextResponse.json({ ok: false, error: data.description || 'sendPhoto failed' }, { status: 502 })
       return NextResponse.json({ ok: true, message_id: data.result?.message_id })
