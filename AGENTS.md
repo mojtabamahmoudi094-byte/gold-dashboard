@@ -11,4 +11,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Data selection**: pipeline scripts must select records by explicit date/period, never by insertion order or auto-increment id (past bug class in the funds pipeline).
 - **Persian text/encoding**: no `t.faint`-style low-contrast tokens for Persian body text (see `dark_theme_text_colors` convention: use the cream `#ddd5bd`); ellipsis truncation on Persian strings must use the flex pattern already established, not naive CSS `text-overflow` alone.
 - **Brand name**: user-facing copy says "بورس سنج", never "بورسنج".
+- **«دیده‌بان» spelling**: user-facing copy spells it «دیده‌بان» (with ZWNJ), never «دیدبان».
+- **Shell theming**: Header, Breadcrumb, and Footer must all branch on theme via the `themechange` event + `lib/theme.ts` tokens — no component-local hardcoded dark/light literals.
 - **Financial content**: any AI-generated Persian market content (Telegram posts, reports) must carry a non-advice disclaimer and must not contain invented numbers — see the `finance-persian-content-writer` agent's rules.
