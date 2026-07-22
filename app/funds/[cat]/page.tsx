@@ -193,19 +193,10 @@ export default function FundsCatPage() {
 
         <div id="fund-list" style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* Breadcrumb */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: t.muted }}>
-          <Link href="/" style={{ color: '#d9b45b', textDecoration: 'none' }}>خانه</Link>
-          <span>/</span>
-          <Link href="/funds" style={{ color: '#d9b45b', textDecoration: 'none' }}>صندوق‌ها</Link>
-          <span>/</span>
-          <span style={{ color: t.text }}>{catInfo.label}</span>
-        </div>
-
         {/* نوار ابزار */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: t.textBright }}>
-            دیدبان صندوق‌های {catInfo.label}
+            دیده‌بان صندوق‌های {catInfo.label}
             <span style={{ fontSize: 11, color: t.muted, fontWeight: 400, marginRight: 10 }}>
               {funds.length > 0 ? `${funds[0].date} · ${funds.length} صندوق` : ''}
             </span>
@@ -265,7 +256,7 @@ export default function FundsCatPage() {
               style={{
                 background: t.inputBg, border: `0.5px solid ${searchQuery ? t.accent : t.border}`,
                 borderRadius: 8, padding: '9px 14px', color: t.text,
-                fontSize: 12, fontFamily: 'Vazirmatn, inherit', outline: 'none',
+                fontSize: 12, fontFamily: 'Vazirmatn, inherit',
                 width: isMobile ? '100%' : 160,
                 direction: 'rtl', transition: 'border 0.2s',
               }}

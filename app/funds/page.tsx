@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AuthGate from '../../components/AuthGate'
 import NlFundFilter from '../components/NlFundFilter'
-import { shouldUseDark } from '../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../lib/theme'
 
 const CATS = [
   {
     slug: 'gold',
     title: 'صندوق‌های طلا',
-    desc: 'دیدبان کامل صندوق‌های سرمایه‌گذاری طلا — قیمت، جریان پول، رتبه‌بندی و تحلیل هوشمند',
+    desc: 'دیده‌بان کامل صندوق‌های سرمایه‌گذاری طلا — قیمت، جریان پول، رتبه‌بندی و تحلیل هوشمند',
     color: 'oklch(0.82 0.15 70)',
     borderColor: 'oklch(0.82 0.15 70 / 0.3)',
     bgColor: 'oklch(0.82 0.15 70 / 0.07)',
@@ -27,7 +27,7 @@ const CATS = [
   {
     slug: 'silver',
     title: 'صندوق‌های نقره',
-    desc: 'دیدبان صندوق‌های سرمایه‌گذاری نقره — قیمت، حجم معاملات و تحلیل جریان پول حقیقی',
+    desc: 'دیده‌بان صندوق‌های سرمایه‌گذاری نقره — قیمت، حجم معاملات و تحلیل جریان پول حقیقی',
     color: 'oklch(0.84 0.03 240)',
     borderColor: 'oklch(0.84 0.03 240 / 0.3)',
     bgColor: 'oklch(0.84 0.03 240 / 0.07)',
@@ -43,7 +43,7 @@ const CATS = [
   {
     slug: 'saffron',
     title: 'صندوق‌های زعفران',
-    desc: 'دیدبان صندوق‌های سرمایه‌گذاری زعفران — قیمت، حجم معاملات و تحلیل جریان پول حقیقی',
+    desc: 'دیده‌بان صندوق‌های سرمایه‌گذاری زعفران — قیمت، حجم معاملات و تحلیل جریان پول حقیقی',
     color: 'oklch(0.74 0.19 40)',
     borderColor: 'oklch(0.74 0.19 40 / 0.3)',
     bgColor: 'oklch(0.74 0.19 40 / 0.07)',
@@ -102,10 +102,11 @@ export default function FundsPage() {
     return () => window.removeEventListener('themechange', handler)
   }, [])
 
-  const bg    = isDark ? '#060B14' : '#F4F7FB'
-  const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
-  const text  = isDark ? '#E8F4FF' : '#0F1E2E'
-  const muted = isDark ? '#ddd5bd' : '#6B7F90'
+  const t = isDark ? darkTheme : lightTheme
+  const bg    = t.bg
+  const panel = t.panel
+  const text  = t.text
+  const muted = isDark ? '#ddd5bd' : '#6B5A3A'
 
   return (
     <AuthGate title="دیده‌بان صندوق‌ها">
@@ -116,7 +117,7 @@ export default function FundsPage() {
         <div style={{ maxWidth: 1000, margin: '0 auto', padding: '40px 24px' }}>
 
         <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: text, margin: '0 0 6px' }}>دیدبان صندوق‌های کالایی</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: text, margin: '0 0 6px' }}>دیده‌بان صندوق‌های کالایی</h1>
           <div style={{ fontSize: 13, color: muted }}>
             مشاهده و تحلیل صندوق‌های سرمایه‌گذاری طلا، نقره و زعفران — جریان پول، رتبه‌بندی و هشدار آنومالی
           </div>

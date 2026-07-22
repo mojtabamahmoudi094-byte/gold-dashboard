@@ -150,7 +150,7 @@ export default function GlobalSearch({ isDark, compact }: { isDark: boolean; com
           width: compact ? 36 : 34, height: compact ? 36 : 34, borderRadius: 8, cursor: 'pointer',
           background: open ? 'rgba(217,180,91,0.1)' : 'transparent',
           border: `1px solid ${open ? 'rgba(217,180,91,0.35)' : border}`,
-          color: open ? '#d9b45b' : muted,
+          color: open ? (isDark ? '#d9b45b' : '#b8860b') : muted,
           transition: 'all 0.2s',
         }}
       >

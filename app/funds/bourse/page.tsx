@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AuthGate from '../../../components/AuthGate'
-import { shouldUseDark } from '../../../lib/theme'
+import { darkTheme, lightTheme, shouldUseDark } from '../../../lib/theme'
 
 const SUBCATS = [
   {
@@ -67,10 +67,11 @@ export default function BourseFundsPage() {
     return () => window.removeEventListener('themechange', handler)
   }, [])
 
-  const bg    = isDark ? '#060B14' : '#F4F7FB'
-  const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
-  const text  = isDark ? '#E8F4FF' : '#0F1E2E'
-  const muted = isDark ? '#ddd5bd' : '#6B7F90'
+  const t = isDark ? darkTheme : lightTheme
+  const bg    = t.bg
+  const panel = t.panel
+  const text  = t.text
+  const muted = isDark ? '#ddd5bd' : '#6B5A3A'
 
   return (
     <AuthGate title="دیده‌بان صندوق‌ها">
@@ -82,7 +83,7 @@ export default function BourseFundsPage() {
 
           <div style={{ marginBottom: 32 }}>
             <Link href="/funds" style={{ fontSize: 12, color: muted, textDecoration: 'none' }}>
-              ← بازگشت به دیدبان صندوق‌ها
+              ← بازگشت به دیده‌بان صندوق‌ها
             </Link>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: text, margin: '10px 0 6px' }}>صندوق‌های بورسی</h1>
           <div style={{ fontSize: 13, color: muted }}>

@@ -6,7 +6,29 @@ import { useEffect, useState } from 'react'
 import { NAV } from './Header'
 import { shouldUseDark } from '../../lib/theme'
 
-const LABELS: Record<string, string> = {}
+// مسیرهایی که در NAV نیستند ولی برچسب فارسی مشخص دارند (NAV در تداخل برنده است)
+const EXTRA_LABELS: Record<string, string> = {
+  '/funds/gold': 'طلا',
+  '/funds/silver': 'نقره',
+  '/funds/saffron': 'زعفران',
+  '/funds/leveraged': 'اهرمی',
+  '/funds/sector': 'بخشی',
+  '/funds/equity': 'سهامی',
+  '/funds/fixed-income': 'درآمد ثابت',
+  '/funds/bourse': 'صندوق‌های بورسی',
+  '/track-record': 'سابقه عملکرد سیگنال‌ها',
+  '/valuation/screener': 'اسکرینر ارزش‌گذاری',
+  '/technical/backtest': 'بک‌تست استراتژی تکنیکال',
+  '/about': 'درباره ما',
+  '/contact': 'تماس با ما',
+  '/terms': 'قوانین و شرایط استفاده',
+  '/privacy': 'حریم خصوصی',
+  '/vip': 'فیلترها',
+  '/stock': 'سهام',
+  '/fund': 'صندوق‌ها',
+}
+
+const LABELS: Record<string, string> = { ...EXTRA_LABELS }
 for (const item of NAV) {
   LABELS[item.href] = item.label
   for (const sub of item.menu ?? []) LABELS[sub.href] = sub.label
