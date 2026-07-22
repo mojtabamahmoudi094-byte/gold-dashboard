@@ -247,7 +247,15 @@ export default function VipFiltersPage() {
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <AuthGate title="فیلترها">
+    <AuthGate
+      title="فیلترهای لحظه‌ای بازار"
+      description="۱۲ فیلتر استاندارد فیلترنویسی، زنده روی کل سهام بازار — بدون نیاز به کدنویسی."
+      features={[
+        'کراس RSI و سیگنال‌های تکنیکال لحظه‌ای',
+        'حجم مشکوک و ورود پول هوشمند',
+        'الگوهای کندلی روی دادهٔ زنده',
+        'به‌روزرسانی خودکار در ساعت بازار',
+      ]}>
       <main style={{
         minHeight: '100vh', background: bg, color: text,
         fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',

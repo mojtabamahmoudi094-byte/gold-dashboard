@@ -174,7 +174,14 @@ export default function QueueFiltersPage() {
   )
 
   return (
-    <AuthGate title="فیلترها">
+    <AuthGate
+      title="فیلترهای صف خرید و فروش"
+      description="صف‌های در حال تشکیل را قبل از قفل‌شدن ببین — آستانهٔ صف، عرضه در صف و برگشت از صف."
+      features={[
+        'نمادهای نزدیک به صف (قبل از قفل‌شدن)',
+        'قدرت صف و حجم عرضه/تقاضا',
+        'برگشت از صف فروش — فرصت‌های چرخش',
+      ]}>
       <main style={{
         minHeight: '100vh', background: bg, color: text,
         fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',

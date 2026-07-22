@@ -222,7 +222,14 @@ export default function HotMoneyPage() {
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <AuthGate title="فیلترها">
+    <AuthGate
+      title="پول داغ"
+      description="رصد لحظه‌ای معاملات درشت حقیقی — ببین پول سنگین همین حالا کجا می‌رود."
+      features={[
+        'معاملات بلوکی و درشت حقیقی به‌صورت زنده',
+        'سرانه خرید هر کد معامله‌گر',
+        'تشخیص ورود پول هوشمند پیش از حرکت قیمت',
+      ]}>
       <main style={{
         minHeight: '100vh', background: bg, color: text,
         fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',

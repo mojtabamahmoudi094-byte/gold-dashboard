@@ -387,7 +387,14 @@ export default function UsefulFiltersPage() {
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <AuthGate title="فیلترها">
+    <AuthGate
+      title="فیلترهای کاربردی"
+      description="فیلترهای پرکاربرد معامله‌گران حرفه‌ای — سرانه خریدار، حجم به شناوری و قدرت خریدار."
+      features={[
+        'افزایش سرانه خریدار حقیقی',
+        'نسبت حجم به شناوری بالا',
+        'قدرت خریدار به فروشنده',
+      ]}>
       <main style={{
         minHeight: '100vh', background: bg, color: text,
         fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',

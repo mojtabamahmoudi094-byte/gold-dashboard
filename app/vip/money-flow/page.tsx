@@ -532,7 +532,14 @@ export default function MoneyFlowPage() {
   const cream = isDark ? '#ddd5bd' : '#6B7F90'
 
   return (
-    <AuthGate title="فیلترها">
+    <AuthGate
+      title="فیلترهای ورود/خروج پول"
+      description="ورود و خروج پول حقیقی به تفکیک صنعت — بفهم پول به کدام صنعت می‌رود و از کدام فرار می‌کند."
+      features={[
+        'ورود/خروج پول حقیقی هر صنعت به‌صورت روزانه',
+        'روند چندروزهٔ جریان پول صنایع',
+        'نمادهای پیشروی هر صنعت',
+      ]}>
       <main style={{
         minHeight: '100vh', background: bg, color: text,
         fontFamily: 'Vazirmatn, Arial, sans-serif', direction: 'rtl',
