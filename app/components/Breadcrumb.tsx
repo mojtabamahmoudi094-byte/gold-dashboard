@@ -8,6 +8,7 @@ import { shouldUseDark } from '../../lib/theme'
 
 // مسیرهایی که در NAV نیستند ولی برچسب فارسی مشخص دارند (NAV در تداخل برنده است)
 const EXTRA_LABELS: Record<string, string> = {
+  '/dashboard': 'داشبورد',
   '/funds/gold': 'طلا',
   '/funds/silver': 'نقره',
   '/funds/saffron': 'زعفران',

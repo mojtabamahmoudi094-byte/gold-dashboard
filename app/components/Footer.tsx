@@ -114,7 +114,8 @@ export default function Footer() {
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: t.text }}>نماد اعتماد</div>
           <a referrerPolicy="origin" target="_blank" href="https://trustseal.enamad.ir/?id=759107&amp;Code=iADodrOqhpz8onS32a8nRMedm9LAUWay">
-            <img referrerPolicy="origin" src="https://trustseal.enamad.ir/logo.aspx?id=759107&amp;Code=iADodrOqhpz8onS32a8nRMedm9LAUWay" alt="نماد اعتماد الکترونیکی" style={{ cursor: 'pointer' }} {...{ code: 'iADodrOqhpz8onS32a8nRMedm9LAUWay' }} />
+            {/* lazy + async: تصویر روی سرور enamad از خارج ایران کند/تایم‌اوت می‌شود؛ نباید رویداد window.load و Core Web Vitals را بلاک کند (فوتر خارج viewport اولیه است) */}
+            <img referrerPolicy="origin" loading="lazy" decoding="async" src="https://trustseal.enamad.ir/logo.aspx?id=759107&amp;Code=iADodrOqhpz8onS32a8nRMedm9LAUWay" alt="نماد اعتماد الکترونیکی" style={{ cursor: 'pointer' }} {...{ code: 'iADodrOqhpz8onS32a8nRMedm9LAUWay' }} />
           </a>
         </div>
 
