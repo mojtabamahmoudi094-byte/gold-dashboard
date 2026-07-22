@@ -100,6 +100,37 @@ export default function FundamentalsPage({ symbol, initialData }: {
               <Card title="EV/EBIT" value={ratio(data.evToEbit)} formula="ارزش شرکت ÷ سود عملیاتی (نه EBITDA — بدون استهلاک)" accent={t.muted} />
             </div>
 
+            {data.pePercentile != null && data.peIndustryMedian != null && data.industry && (
+              (() => {
+                const cheaper = data.pePercentile <= 50
+                const barColor = cheaper ? t.green : t.red
+                return (
+                  <div style={{ ...panelStyle(barColor), marginBottom: 20 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>
+                      جایگاه P/E در صنعت «{data.industry}»
+                    </div>
+                    <div style={{ fontSize: 11.5, color: cream, marginBottom: 12 }}>
+                      P/E این نماد {ratio(data.pe)} در برابر میانهٔ صنعت {ratio(data.peIndustryMedian)}
+                      {' '}— {cheaper ? 'ارزان‌تر' : 'گران‌تر'} از {fa(cheaper ? 100 - data.pePercentile : data.pePercentile)}٪ نمادهای هم‌صنعت
+                      {' '}({fa(data.peIndustryCount ?? 0)} نماد سودده)
+                    </div>
+                    <div style={{ position: 'relative', height: 8, borderRadius: 999, background: t.border, overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', insetInlineStart: 0, top: 0, bottom: 0, width: `${data.pePercentile}%`, background: barColor, opacity: 0.5 }} />
+                      <div style={{ position: 'absolute', insetInlineStart: `calc(${data.pePercentile}% - 2px)`, top: -2, bottom: -2, width: 4, borderRadius: 2, background: barColor }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: t.muted, marginTop: 5 }}>
+                      <span>ارزان‌ترین صنعت</span>
+                      <span>صدک {fa(data.pePercentile)}</span>
+                      <span>گران‌ترین صنعت</span>
+                    </div>
+                    <div style={{ fontSize: 9.5, color: cream, marginTop: 8, opacity: 0.7 }}>
+                      P/E پایین‌تر از صنعت لزوماً «بهتر» نیست؛ می‌تواند نشانهٔ ریسک یا رشد کمتر باشد. این فقط یک مقایسهٔ نسبی است.
+                    </div>
+                  </div>
+                )
+              })()
+            )}
+
             <div style={{ fontSize: 10, color: cream, marginTop: 10, textAlign: 'center', opacity: 0.75 }}>
               محاسبه‌شده از صورت‌های مالی رسمی کدال — این صفحه تحلیل کمکی است و توصیه سرمایه‌گذاری نیست.
               نسبت‌های وابسته به ترازنامه (P/B, ROE, ROA, اهرم مالی) ممکن است برای برخی نمادها هنوز در دسترس نباشند.

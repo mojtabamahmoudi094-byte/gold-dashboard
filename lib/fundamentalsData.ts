@@ -9,6 +9,9 @@ export type Fundamentals = {
   assetTurnover: number | null; equityMultiplier: number | null
   debtToEquity: number | null; bookValuePerShare: number | null
   marketCap: number | null; enterpriseValue: number | null; evToEbit: number | null
+  // مقایسهٔ نسبی P/E درون صنعت (از fundamentals-compute پاس دوم) — ممکن است نباشد
+  industry?: string | null
+  peIndustryMedian?: number | null; pePercentile?: number | null; peIndustryCount?: number | null
   updated: string
 }
 
