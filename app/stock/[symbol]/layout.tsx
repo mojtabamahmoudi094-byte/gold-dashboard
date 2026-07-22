@@ -7,8 +7,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { symbol } = await params
   const name = decodeURIComponent(symbol)
   return pageMetadata({
-    title: `نماد ${name}`,
-    description: `قیمت لحظه‌ای، تحلیل بنیادی و تکنیکال نماد ${name} در بورس تهران`,
+    title: `قیمت ${name} امروز + نمودار لحظه‌ای و تحلیل رایگان`,
+    description: `قیمت لحظه‌ای نماد ${name} در بورس تهران (tsetmc) — گزارش‌های کدال، تحلیل بنیادی و تکنیکال، رایگان و بدون ثبت‌نام`,
     path: `/stock/${symbol}`,
   })
 }

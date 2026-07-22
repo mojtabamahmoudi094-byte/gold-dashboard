@@ -10,11 +10,11 @@ export const revalidate = 300
 export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }): Promise<Metadata> {
   const raw = decodeURIComponent((await params).symbol).replace(/-/g, ' ')
   const data = await getFundamentals(raw)
-  if (!data) return pageMetadata({ title: `نسبت‌های مالی ${raw}`, description: `نسبت‌های مالی نماد ${raw}`, path: `/fundamentals/${encodeURIComponent(raw)}` })
+  if (!data) return pageMetadata({ title: `تحلیل بنیادی ${raw} + نسبت‌های مالی رایگان`, description: `تحلیل بنیادی و نسبت‌های مالی نماد ${raw} از صورت‌های مالی کدال`, path: `/fundamentals/${encodeURIComponent(raw)}` })
   const ratio = (v: number | null) => (v == null ? '—' : v.toLocaleString('fa-IR', { maximumFractionDigits: 2 }))
   return pageMetadata({
-    title: `نسبت‌های مالی ${data.symbol}`,
-    description: `نسبت‌های مالی نماد ${data.symbol} — P/E ${ratio(data.pe)}, P/B ${ratio(data.pb)}, ROE، ROA، حاشیه سود و اهرم مالی، محاسبه‌شده از صورت‌های مالی سالانه کدال (دوره ${data.period}).`,
+    title: `تحلیل بنیادی ${data.symbol} + نسبت‌های مالی رایگان`,
+    description: `تحلیل بنیادی نماد ${data.symbol} — P/E ${ratio(data.pe)}, P/B ${ratio(data.pb)}, ROE، ROA، حاشیه سود و اهرم مالی، محاسبه‌شده از صورت‌های مالی سالانه کدال (دوره ${data.period})، رایگان و بدون ثبت‌نام.`,
     path: `/fundamentals/${encodeURIComponent(raw)}`,
   })
 }

@@ -7,8 +7,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const name = decodeURIComponent(slug)
   return pageMetadata({
-    title: `صندوق ${name}`,
-    description: `اطلاعات، NAV و تحلیل صندوق ${name} در بورس سنج`,
+    title: `قیمت صندوق ${name} امروز + تحلیل لحظه‌ای رایگان`,
+    description: `قیمت لحظه‌ای، حباب، NAV، جریان پول حقیقی و تحلیل صندوق ${name} — رایگان و بدون ثبت‌نام`,
     path: `/fund/${slug}`,
   })
 }

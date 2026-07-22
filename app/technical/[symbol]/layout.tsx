@@ -7,8 +7,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { symbol } = await params
   const name = decodeURIComponent(symbol)
   return pageMetadata({
-    title: `تحلیل تکنیکال ${name}`,
-    description: `نمودار و اندیکاتورهای تحلیل تکنیکال نماد ${name}`,
+    title: `تحلیل تکنیکال ${name} + نمودار لحظه‌ای رایگان`,
+    description: `نمودار کندل‌استیک، RSI، MACD، میانگین متحرک و سطوح حمایت و مقاومت نماد ${name} — تحلیل تکنیکال رایگان و بدون ثبت‌نام`,
     path: `/technical/${symbol}`,
   })
 }

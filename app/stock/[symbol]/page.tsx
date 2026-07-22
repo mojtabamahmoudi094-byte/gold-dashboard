@@ -31,8 +31,8 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
   const price = s.pc == null ? '' : `قیمت پایانی ${s.pc.toLocaleString('fa-IR')} ریال`
   const change = s.pcp == null ? '' : `(${s.pcp > 0 ? '+' : ''}${s.pcp.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪)`
   return {
-    title: `${s.l18} — ${s.l30}`,
-    description: `نماد ${s.l18} (${s.l30}) در ${isExtra ? 'گروه' : 'صنعت'} ${ind.name} — ${price} ${change} — ارزش بازار، حجم معاملات، گزارش‌های کدال و تحلیل بنیادی.`.trim(),
+    title: `قیمت ${s.l18} امروز + نمودار لحظه‌ای و تحلیل رایگان`,
+    description: `قیمت لحظه‌ای نماد ${s.l18} (${s.l30}) در بورس تهران (tsetmc) — ${price} ${change} — آخرین گزارش‌های کدال، ارزش بازار، حجم معاملات و تحلیل بنیادی، رایگان و بدون ثبت‌نام.`.trim(),
   }
 }
 

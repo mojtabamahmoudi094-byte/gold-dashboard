@@ -1,10 +1,11 @@
-import type { Metadata } from 'next'
+import { pageMetadata } from '../../lib/pageMetadata'
 
-export const metadata: Metadata = {
-  title: 'سابقه عملکرد سیگنال‌ها',
-  description: 'بررسی دقت و عملکرد گذشته سیگنال‌های صادر شده به تفکیک دسته دارایی',
-  alternates: { canonical: '/track-record' },
-}
+export const metadata = pageMetadata({
+  title: 'نتایج واقعی سیگنال‌های بورس و طلا — آمار شفاف موفقیت',
+  description:
+    'عملکرد ثبت‌شده تمام سیگنال‌های خرید و فروش بورس سنج به تفکیک سهام، طلا و نقره — درصد موفقیت و بازدهی واقعی هر سیگنال، شفاف و رایگان.',
+  path: '/track-record',
+})
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children

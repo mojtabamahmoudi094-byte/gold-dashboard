@@ -17,8 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const priceToman = priceIsRial ? Math.round(safe(record.price_close) / 10) : safe(record.price_close)
   const changePct = safe(record.price_change_pct)
   return {
-    title: asset.name,
-    description: `صندوق ${asset.name} (${slug}) — قیمت پایانی ${priceToman.toLocaleString('fa-IR')} تومان (${changePct > 0 ? '+' : ''}${changePct.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪) — ارزش بازار، ارزش معاملات، جریان پول حقیقی و تحلیل صندوق.`,
+    title: `قیمت صندوق ${asset.name} امروز + تحلیل لحظه‌ای رایگان`,
+    description: `قیمت لحظه‌ای صندوق ${asset.name} (${slug}) — قیمت پایانی ${priceToman.toLocaleString('fa-IR')} تومان (${changePct > 0 ? '+' : ''}${changePct.toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪) — حباب، جریان پول حقیقی، ارزش بازار و تحلیل صندوق، رایگان و بدون ثبت‌نام.`,
   }
 }
 
