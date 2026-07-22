@@ -5,6 +5,25 @@ const nextConfig: NextConfig = {
   // خروجی standalone برای میزبانی روی VPS — بیلد روی مک/CI انجام می‌شود و فقط
   // .next/standalone (بدون node_modules کامل) به سرور rsync می‌شود
   output: "standalone",
+  // PostHog روی endpointهایی با اسلش انتهایی حساب می‌کند — ریدایرکت trailing-slash نکست خرابش می‌کند
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      // پروکسی معکوس PostHog — مسیر خنثی «masir» تا ad blockerها نشناسند
+      {
+        source: "/masir/static/:path*",
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/masir/array/:path*",
+        destination: "https://us-assets.i.posthog.com/array/:path*",
+      },
+      {
+        source: "/masir/:path*",
+        destination: "https://us.i.posthog.com/:path*",
+      },
+    ];
+  },
   async redirects() {
     return [
       // /team از قبل در گوگل ایندکس شده ولی صفحه‌ای نساخته بودیم — به‌جای 404 به contact هدایتش کن
