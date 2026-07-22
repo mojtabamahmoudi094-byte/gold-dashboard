@@ -54,6 +54,59 @@ function n(v) {
 }
 function bySymbol(arr, sym) { return (arr || []).find(x => x.symbol === sym) ?? null }
 
+// z-score و صدک یک مقدار نسبت به یک پنجرهٔ تاریخی (آرایهٔ اعداد)
+function stats(vals) {
+  const n = vals.length
+  if (!n) return null
+  const mean = vals.reduce((a, b) => a + b, 0) / n
+  const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / n
+  return { mean, std: Math.sqrt(variance) }
+}
+function percentileOf(sortedAsc, v) {
+  if (!sortedAsc.length) return null
+  let c = 0
+  for (const x of sortedAsc) { if (x <= v) c++; else break }
+  return Math.round((c / sortedAsc.length) * 100)
+}
+
+// پاس دوم: حباب واقعی امروز نسبت به «عادت خودِ» صندوق — «حباب ۴٪» بی‌معناست مگر بدانی
+// میانگین ۶ماههٔ این صندوق ۱٪ بوده (گران) یا ۷٪ (ارزان). z-score + صدک این را می‌دهد.
+async function computeBubbleZScores(processedDates) {
+  const WINDOW = 120 // ~۶ ماه کاری
+  const MIN_HISTORY = 15 // حداقل نمونه؛ کمتر از این z-score/صدک بی‌معناست. با رشد تاریخچه، پنجره و دقت بیشتر می‌شود.
+  const dateSet = new Set(processedDates)
+  const funds = [...new Set(
+    (await sb.from('fund_bubble_daily').select('fund_name').not('bubble_vaqei', 'is', null))
+      .data?.map(r => r.fund_name) ?? [],
+  )]
+
+  let updated = 0
+  for (const fund of funds) {
+    const { data: hist } = await sb.from('fund_bubble_daily')
+      .select('trade_date, bubble_vaqei')
+      .eq('fund_name', fund).not('bubble_vaqei', 'is', null)
+      .order('trade_date', { ascending: true })
+    if (!hist || hist.length < MIN_HISTORY) continue
+
+    for (let i = 0; i < hist.length; i++) {
+      const d = hist[i].trade_date
+      if (!dateSet.has(d)) continue // فقط تاریخ‌های پردازش‌شدهٔ این اجرا آپدیت می‌شوند
+      // پنجرهٔ trailing تا همین روز (شامل خودش)
+      const window = hist.slice(Math.max(0, i + 1 - WINDOW), i + 1).map(r => r.bubble_vaqei)
+      if (window.length < MIN_HISTORY) continue
+      const today = hist[i].bubble_vaqei
+      const st = stats(window)
+      const zscore = st && st.std > 0 ? +((today - st.mean) / st.std).toFixed(2) : 0
+      const pctile = percentileOf([...window].sort((a, b) => a - b), today)
+      const { error } = await sb.from('fund_bubble_daily')
+        .update({ bubble_vaqei_zscore: zscore, bubble_vaqei_pctile: pctile, bubble_vaqei_sample: window.length })
+        .eq('fund_name', fund).eq('trade_date', d)
+      if (!error) updated++
+    }
+  }
+  console.log(`✅ z-score/صدک حباب برای ${updated} ردیف به‌روزرسانی شد`)
+}
+
 // همان extractPrices/فرمول fairBullion در app/api/gold-analysis/route.ts
 function computeFairValues(rawPro, rawCommodity) {
   const goldOunce = rawPro?.gold?.ounce ?? []
@@ -176,6 +229,9 @@ async function main() {
   const { error } = await sb.from('fund_bubble_daily').upsert(rows, { onConflict: 'fund_name,trade_date' })
   if (error) { console.error('❌ upsert شکست خورد:', error.message); process.exit(1) }
   console.log(`✅ ${rows.length} ردیف در fund_bubble_daily ذخیره شد`)
+
+  // پاس دوم: z-score/صدک حباب واقعی نسبت به تاریخچهٔ خود صندوق، فقط برای روزهای همین اجرا
+  await computeBubbleZScores(dates)
 }
 
 main().catch(e => { console.error('❌', e.message); process.exit(1) })
