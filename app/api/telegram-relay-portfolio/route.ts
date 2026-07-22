@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(30_000), // ۲۰۲۶-۰۷-۲۲: بعد مهاجرت این روت هم از relay آلمان رد می‌شود، ۱۰ ثانیه کم بود
     })
     const data = await res.json()
     if (!data.ok) {

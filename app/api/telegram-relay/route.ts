@@ -9,8 +9,9 @@ function timingSafeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB)
 }
 
-// رله تلگرام برای سرور ایران — api.telegram.org از داخل ایران فیلتر است،
-// ولی سرور ایران به این سایت (خارج از ایران) می‌رسد و این سایت به تلگرام.
+// رله تلگرام — api.telegram.org از داخل ایران فیلتر است. این روت خودش الان
+// رو سرور ایران اجرا می‌شود (بعد مهاجرت از Render)، پس TELEGRAM_BASE را از
+// طریق relay.bourssanj.ir (سرور آلمان) صدا می‌زند، نه مستقیم.
 // احراز: فرستنده باید خودِ توکن ربات را بفرستد (همان رازی که هر دو طرف دارند)؛
 // هیچ env جدیدی لازم نیست و توکن غریبه هم پذیرفته نمی‌شود.
 
@@ -45,7 +46,9 @@ export async function POST(req: NextRequest) {
       form.append('chat_id', target)
       if (body.caption) form.append('caption', body.caption.slice(0, 1024))
       form.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'report.jpg')
-      const res = await fetch(`${TELEGRAM_BASE}/bot${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(10_000) })
+      // ۳۰ ثانیه، نه ۱۰ — از مهاجرت به سرور ایران، این خودش هم از طریق relay آلمان
+      // می‌رود (یک hop اضافه)، آپلود عکس زیر ۱۰ ثانیه مدام timeout می‌خورد (۲۰۲۶-۰۷-۲۲)
+      const res = await fetch(`${TELEGRAM_BASE}/bot${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(30_000) })
       const data = await res.json()
       if (!data.ok) return NextResponse.json({ ok: false, error: data.description || 'sendPhoto failed' }, { status: 502 })
       return NextResponse.json({ ok: true, message_id: data.result?.message_id })
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest) {
         text,
         ...(body.parse_mode ? { parse_mode: body.parse_mode } : {}),
       }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(30_000),
     })
     const data = await res.json()
     if (!data.ok) {
