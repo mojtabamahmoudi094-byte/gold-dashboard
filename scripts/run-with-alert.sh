@@ -23,6 +23,17 @@ CODE=$?
 
 echo "$OUTPUT"
 
+# Dead-man switch — ping به Healthchecks.io (اختیاری، فقط اگر HC_PING_KEY_URL در .env.sync باشد).
+# کلاس باگ تکرارشوندهٔ این پروژه «کرونی که اصلاً اجرا نشده» است (مثلاً fundamentals که هرگز
+# نصب نشده بود)، نه «کرونی که fail شده». این ping مستقل از رلهٔ تلگرام آن را می‌گیرد — اگر اجرا
+# نشود، Healthchecks خودش هشدار می‌دهد. با slug-based ping، هر LABEL چک خودش را auto-provision می‌کند.
+# هرگز نباید cron را بیندازد؛ pipefail/خطای شبکه با || true بلعیده می‌شود.
+if [ -n "${HC_PING_KEY_URL:-}" ]; then
+  HC_SUFFIX=""
+  [ "$CODE" -ne 0 ] && HC_SUFFIX="/fail"
+  curl -fsS -m 10 --retry 2 "${HC_PING_KEY_URL%/}/${LABEL}${HC_SUFFIX}" >/dev/null 2>&1 || true
+fi
+
 if [ "$CODE" -ne 0 ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
   TAIL="$(printf '%s' "$OUTPUT" | tail -c 2000)"
   MSG="⚠️ بورس سنج — شکست ${LABEL} (exit ${CODE})

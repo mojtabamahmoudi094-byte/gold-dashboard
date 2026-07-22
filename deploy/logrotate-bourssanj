@@ -1,0 +1,37 @@
+# logrotate برای لاگ‌های بورس سنج — نصب: cp این فایل به /etc/logrotate.d/bourssanj (روی هر دو سرور)
+# چرا copytruncate: هم کرون‌ها با «>>» و هم سرویس systemd با «StandardOutput=append:» هندل باز
+# نگه می‌دارند؛ بدون copytruncate بعد از rotate به فایل حذف‌شده می‌نویسند و لاگ گم می‌شود.
+# glob ها فقط اپ‌لاگ‌ها را می‌گیرند؛ auth/kern/dpkg/cloud-init/syslog سیستمی جدا مدیریت می‌شوند.
+
+/var/log/codal-*.log
+/var/log/sync-*.log
+/var/log/candles-*.log
+/var/log/market-*.log
+/var/log/fund-*.log
+/var/log/fundamentals-*.log
+/var/log/stock-*.log
+/var/log/stocks-*.log
+/var/log/bourssanj-*.log
+/var/log/reports-rebuild-*.log
+/var/log/anomaly-watch.log
+/var/log/hot-money.log
+/var/log/telegram-report.log
+/var/log/update-portfolio.log
+/var/log/option-chain.log
+/var/log/technical-narrate-watch.log
+/var/log/screener-daily.log
+/var/log/chip-distribution.log
+/var/log/equal-weight-index.log
+/var/log/alternatives.log
+/var/log/portfolio-*.log
+/var/log/signals-*.log
+{
+  weekly
+  rotate 4
+  compress
+  delaycompress
+  missingok
+  notifempty
+  copytruncate
+  su root root
+}
