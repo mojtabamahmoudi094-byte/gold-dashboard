@@ -41,6 +41,11 @@ const GOLD_FUNDS = [
   'زرگر', 'نفیس', 'نگین فارس', 'قیراط', 'درنا', 'گلدیس', 'همیان', 'دفینه',
 ]
 const SILVER_FUNDS = ['نقرسا', 'نقرین', 'نقرفام', 'نقران', 'سیمین', 'نقرابی', 'سیلور', 'سیگلو']
+// صندوق‌هایى که در جدول assets دستهٔ «زعفران» دارند. ترکیب دارایى‌شان از ستون ارزش روز
+// خوانده مى‌شود (ستون درصدِ گزارششان ناهم‌تراز است) و به تفکیک قلمِ گواهى گزارش مى‌شود.
+// توجه: گزارش کدال «نهال» شمش نقره و «دفینه» شمش طلا است — برچسب هر قلم همان چیزى است
+// که در گزارش آمده، نه دستهٔ ثبت‌شده در دیتابیس.
+const SAFFRON_FUNDS = ['سافرون', 'نهال', 'دفینه']
 
 const ONE_SCRIPT = path.join(__dirname, 'sync-fund-weight-one.js')
 
@@ -58,16 +63,21 @@ function runOne(name, kind) {
 }
 
 async function main() {
-  const names = PROBE ? ['عیار', 'نقرفام'] : [...GOLD_FUNDS, ...SILVER_FUNDS]
-  const goldOut = {}, silverOut = {}
+  // دفینه هم در GOLD_FUNDS است هم زعفران — یک‌بار و با نوع زعفران پردازش شود
+  const goldNames = GOLD_FUNDS.filter(n => !SAFFRON_FUNDS.includes(n))
+  const names = PROBE ? ['عیار', 'نقرفام'] : [...goldNames, ...SILVER_FUNDS, ...SAFFRON_FUNDS]
+  const goldOut = {}, silverOut = {}, saffronOut = {}
   const failed = []
 
   for (const [i, name] of names.entries()) {
     const isSilver = SILVER_FUNDS.includes(name)
-    process.stdout.write(`[${i + 1}/${names.length}] ${name} (${isSilver ? 'نقره' : 'طلا'}) … `)
-    const r = runOne(name, isSilver ? 'silver' : 'gold')
+    const isSaffron = SAFFRON_FUNDS.includes(name)
+    const kind = isSaffron ? 'saffron' : isSilver ? 'silver' : 'gold'
+    process.stdout.write(`[${i + 1}/${names.length}] ${name} (${isSaffron ? 'زعفران' : isSilver ? 'نقره' : 'طلا'}) … `)
+    const r = runOne(name, kind)
     if (r.ok) {
-      if (isSilver) { silverOut[name] = r.weights; console.log(`✅ نقره=${r.weights.silver}٪ سایر=${r.weights.other}٪`) }
+      if (isSaffron) { saffronOut[name] = r.weights; console.log(`✅ ${r.weights.parts.map(p => `${p.name}=${p.pct}٪`).join(' ')}`) }
+      else if (isSilver) { silverOut[name] = r.weights; console.log(`✅ نقره=${r.weights.silver}٪ سایر=${r.weights.other}٪`) }
       else { goldOut[name] = r.weights; console.log(`✅ سکه=${r.weights.coin}٪ شمش=${r.weights.bar}٪ نقد=${r.weights.liq}٪`) }
     } else {
       console.log(`❌ ${r.error}`)
@@ -76,7 +86,7 @@ async function main() {
     await sleep(4000) // رعایت rate limit کدال — همان الگوی codal-portfolio.js
   }
 
-  console.log(`\n═══ نتیجه: ${Object.keys(goldOut).length + Object.keys(silverOut).length} موفق، ${failed.length} ناموفق ═══`)
+  console.log(`\n═══ نتیجه: ${Object.keys(goldOut).length + Object.keys(silverOut).length + Object.keys(saffronOut).length} موفق، ${failed.length} ناموفق ═══`)
   failed.forEach(f => console.log('  -', f))
 
   if (PROBE) { console.log('\n--probe: فایلی نوشته نشد'); return }
@@ -85,7 +95,8 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true })
   fs.writeFileSync(path.join(outDir, 'gold.json'), JSON.stringify({ updated: new Date().toISOString(), weights: goldOut }, null, 0))
   fs.writeFileSync(path.join(outDir, 'silver.json'), JSON.stringify({ updated: new Date().toISOString(), weights: silverOut }, null, 0))
-  console.log(`\nنوشته شد: ${outDir}/gold.json ، ${outDir}/silver.json`)
+  fs.writeFileSync(path.join(outDir, 'saffron.json'), JSON.stringify({ updated: new Date().toISOString(), weights: saffronOut }, null, 0))
+  console.log(`\nنوشته شد: ${outDir}/gold.json ، ${outDir}/silver.json ، ${outDir}/saffron.json`)
 }
 
 main().catch(e => { console.error(e); process.exit(1) })

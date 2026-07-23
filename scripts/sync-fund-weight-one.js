@@ -16,7 +16,7 @@
 const { buildSymbol } = require('./codal-portfolio')
 
 const name = process.argv[2]
-const kind = process.argv[3] // 'gold' | 'silver'
+const kind = process.argv[3] // 'gold' | 'silver' | 'saffron'
 
 const norm = (s) => String(s ?? '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim()
 
@@ -29,10 +29,43 @@ function sumPct(holdings, pattern, scale) {
   return holdings.filter(h => pattern.test(norm(h.name))).reduce((s, h) => s + (h.pct || 0), 0) * scale
 }
 
+// برچسب خواناى هر قلم دارایى صندوق کالایى
+// «زعفران0510نگین سحرخیز(پ)» → «سحرخیز» · «گواهی سپرده پیوسته شمش نقره 999.9» → «گواهی شمش نقره»
+function prettyPart(raw) {
+  const s = norm(raw).replace(/\((?:پ|ن)\)\s*$/, '').trim()
+  const negin = s.match(/زعفران\s*\d*\s*نگین\s*(.+)$/)
+  if (negin) return negin[1].trim()
+  const pooshal = s.match(/زعفران\s*\d*\s*پوشال\s*(.+)$/)
+  if (pooshal) return `${pooshal[1].trim()} (پوشال)`
+  if (/شمش\s*نقره/.test(s)) return 'گواهی شمش نقره'
+  if (/شمش\s*طلا/.test(s)) return 'گواهی شمش طلا'
+  if (/سکه/.test(s)) return 'گواهی سکه طلا'
+  return s
+}
+
+// ستون درصدِ گزارش صندوق‌های زعفران ناهم‌تراز است (مقدار ریالى خام به‌جاى درصد)،
+// اما ستون ارزش روز (n1) درست است — سهم هر قلم از سبد را از روى n1 حساب مى‌کنیم.
+function partsFromValue(holdings) {
+  const agg = new Map()
+  for (const h of holdings) {
+    const v = Number(h.n1) || 0
+    if (v <= 0) continue
+    const k = prettyPart(h.name)
+    agg.set(k, (agg.get(k) || 0) + v)
+  }
+  const total = [...agg.values()].reduce((s, v) => s + v, 0)
+  if (total <= 0) throw new Error('ارزش روز هیچ قلمى ثبت نشده است')
+  return [...agg.entries()]
+    .map(([n, v]) => ({ name: n, pct: +(v / total * 100).toFixed(1) }))
+    .sort((a, b) => b.pct - a.pct)
+}
+
 async function main() {
   const out = await buildSymbol(name, { verbose: false })
   const holdings = out.months[out.months.length - 1].holdings
   const scale = pctScale(holdings)
+
+  if (kind === 'saffron') return { parts: partsFromValue(holdings) }
 
   // سلامت‌سنجی: ستون درصد بعضی قالب‌های اکسل صندوق ناهم‌ترازه (تعداد عدد هر ردیف
   // با فرض ۱۲تایی parseHoldingRows جور در نمی‌آید) و یک مبلغ ریالی خام به‌جای

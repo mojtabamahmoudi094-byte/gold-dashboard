@@ -14,6 +14,13 @@ import { SubPageHeader, cream } from '../fundShared'
 
 type Slice = { name: string; value: number; color: string; hint?: string }
 
+// پالت قاچ‌های صندوق‌های زعفران (تفکیک برند گواهی) — هماهنگ با پالت دونات پورتفوی
+const SAFFRON_COLORS = [
+  'oklch(0.74 0.19 40)', 'oklch(0.82 0.15 70)', 'oklch(0.72 0.19 25)',
+  'oklch(0.78 0.13 300)', 'oklch(0.76 0.14 210)', 'oklch(0.75 0.17 150)',
+  'oklch(0.8 0.1 330)', 'oklch(0.84 0.03 240)',
+]
+
 export default function FundHoldingsPage() {
   const params = useParams()
   const slug = decodeURIComponent((params?.slug as string) || '')
@@ -22,6 +29,7 @@ export default function FundHoldingsPage() {
   const [asset, setAsset] = useState<any>(null)
   const [goldW, setGoldW] = useState(FUND_WEIGHTS)
   const [silverW, setSilverW] = useState(SILVER_FUND_WEIGHTS)
+  const [saffronW, setSaffronW] = useState<Record<string, { parts: { name: string; pct: number }[] }>>({})
   const [hi, setHi] = useState<number | null>(null)
 
   useEffect(() => {
@@ -37,6 +45,7 @@ export default function FundHoldingsPage() {
       setAsset(a ?? null)
       if (a?.category === 'طلا') fetch('/fund-weights/gold.json').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setGoldW(w => ({ ...w, ...j.weights })) }).catch(() => {})
       else if (a?.category === 'نقره') fetch('/fund-weights/silver.json').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setSilverW(w => ({ ...w, ...j.weights })) }).catch(() => {})
+      else if (a?.category === 'زعفران') fetch('/fund-weights/saffron.json').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setSaffronW(j.weights) }).catch(() => {})
     })
   }, [slug])
 
@@ -57,6 +66,12 @@ export default function FundHoldingsPage() {
       { name: 'گواهی نقره', value: w.silver, color: '#C0C8D8' },
       { name: 'سایر دارایی‌ها', value: w.other, color: '#94A3B8' },
     ]
+  } else if (asset?.category === 'زعفران') {
+    // ستون درصدِ گزارش این صندوق‌ها ناهم‌تراز است؛ سهم هر قلم از ارزش روز حساب شده
+    const w = saffronW[asset.name]
+    if (w?.parts?.length) slices = w.parts.map((p, i) => ({
+      name: p.name, value: p.pct, color: SAFFRON_COLORS[i % SAFFRON_COLORS.length],
+    }))
   }
   slices = slices.filter(s => s.value > 0)
   const total = slices.reduce((s, x) => s + x.value, 0) || 1
@@ -93,7 +108,11 @@ export default function FundHoldingsPage() {
             borderRadius: 16, padding: '20px 22px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
           }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: t.textBright, marginBottom: 4 }}>ترکیب دارایی صندوق {asset.name}</div>
-            <div style={{ fontSize: 10.5, color: cr, marginBottom: 16 }}>وزن تقریبی هر دارایی — منبع آخرین گزارش کدال</div>
+            <div style={{ fontSize: 10.5, color: cr, marginBottom: 16 }}>
+              {asset.category === 'زعفران'
+                ? 'سهم هر قلم از سبد گواهی‌های صندوق (بر پایهٔ ارزش روز) — منبع آخرین گزارش پورتفوی کدال'
+                : 'وزن تقریبی هر دارایی — منبع آخرین گزارش کدال'}
+            </div>
 
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 16 : 32 }}>
               <svg viewBox="0 0 200 200" style={{ width: isMobile ? 220 : 250, flexShrink: 0, overflow: 'visible' }} onMouseLeave={() => setHi(null)}>

@@ -39,6 +39,13 @@ const fundMetricSeries = (rows: FundSnapshotRow[], key: keyof FundSnapshotRow): 
 
 
 // ارزش بازار دلاری — روزی یک‌بار ساعت ۱۳ تهران توسط sync-usd-market-value.js محاسبه می‌شود
+// پالت قاچ‌های ترکیب دارایی صندوق‌های زعفران (تفکیک برند گواهی)
+const SAFFRON_BAR_COLORS = [
+  'oklch(0.74 0.19 40)', 'oklch(0.82 0.15 70)', 'oklch(0.72 0.19 25)',
+  'oklch(0.78 0.13 300)', 'oklch(0.76 0.14 210)', 'oklch(0.75 0.17 150)',
+  'oklch(0.8 0.1 330)', 'oklch(0.84 0.03 240)',
+]
+
 const usdFmt = (v: number) =>
   v >= 1e9
     ? `$${(v / 1e9).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`
@@ -67,6 +74,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   // حباب صندوق (اسمی/ذاتی/واقعی) — همان منطق /analysis/gold و /analysis/silver، برای این یک صندوق
   const [goldWeights, setGoldWeights] = useState(FUND_WEIGHTS)
   const [silverWeights, setSilverWeights] = useState(SILVER_FUND_WEIGHTS)
+  const [saffronWeights, setSaffronWeights] = useState<Record<string, { parts: { name: string; pct: number }[] }>>({})
   const [bubbleRaw, setBubbleRaw] = useState<{ nav: number | null; marketBubbles: { bullion: number | null; coin: number | null } | null; silverBubble: number | null } | null>(null)
   const [bubbleHistory, setBubbleHistory] = useState<{ trade_date: string; bubble_asmi: number | null; bubble_zati: number | null; bubble_vaqei: number | null; bubble_vaqei_zscore?: number | null; bubble_vaqei_pctile?: number | null; bubble_vaqei_sample?: number | null }[]>([])
   const [bubbleRange, setBubbleRange] = useState<30 | 90 | 365>(30)
@@ -80,6 +88,9 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
     } else if (asset?.category === 'نقره') {
       fetch('/fund-weights/silver.json').then(r => r.ok ? r.json() : null)
         .then(j => { if (j?.weights) setSilverWeights(w => ({ ...w, ...j.weights })) }).catch(() => {})
+    } else if (asset?.category === 'زعفران') {
+      fetch('/fund-weights/saffron.json').then(r => r.ok ? r.json() : null)
+        .then(j => { if (j?.weights) setSaffronWeights(j.weights) }).catch(() => {})
     }
   }, [asset?.category])
 
@@ -273,6 +284,13 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
       }
     }
     if (bubbleAsmi != null && bubbleZati != null) bubbleVaqei = bubbleAsmi + bubbleZati
+  }
+  // زعفران حباب ندارد، اما ترکیب دارایی‌اش از گزارش پورتفوی کدال موجود است
+  if (asset.category === 'زعفران') {
+    const parts = saffronWeights[asset.name]?.parts
+    if (parts?.length) compositionBars = parts.map((p, i) => ({
+      label: p.name, pct: p.pct, color: SAFFRON_BAR_COLORS[i % SAFFRON_BAR_COLORS.length],
+    }))
   }
   const pctFmt = (v: number | null) => v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}٪`
   const pctColor = (v: number | null) => v == null ? undefined : v >= 0 ? '#FF4D6A' : '#00E5A0'
