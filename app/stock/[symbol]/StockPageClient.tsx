@@ -17,7 +17,8 @@ import { shouldUseDark } from '../../../lib/theme'
 import {
   type Theme, M_ACCENT, Q_ACCENT, H_ACCENT, GREEN, RED,
   hemat, mrial, gPct, pct, toneColor, ToneIcon,
-  SectionCard, SectionLinkCard, MonthlySection, PortfolioSection, QuarterlyFinSection, ShareholdersSection,
+  SectionCard, SquareLinkGrid, SquareLinkCard, MonthlyIcon, QuarterlyIcon, ShareholdersIcon,
+  MonthlySection, PortfolioSection, QuarterlyFinSection, ShareholdersSection,
 } from './sections'
 
 // حالت کارتی — فعلاً فقط شبندر (آزمایشی)؛ بعد از تأیید برای همه نمادها فعال می‌شود
@@ -344,50 +345,35 @@ export default function StockPage({ symbol, initialData, initialReports }: {
               )}
 
               {cardMode ? (
-                <>
+                <SquareLinkGrid isMobile={isMobile}>
                   {/* کارت گزارش ماهانه — لینک به صفحه کامل */}
                   {lastM && (
-                    <SectionLinkCard
-                      href={`/stock/${enc}/monthly`}
-                      title={lastM.kind === 'portfolio' ? 'پرتفوی سرمایه‌گذاری' : 'گزارش فعالیت ماهانه'}
-                      badge={`${reports!.months.length.toLocaleString('fa-IR')} ماه`}
-                      accent={M_ACCENT}
-                      t={t}
-                      chips={lastM.kind === 'portfolio' ? [
-                        { label: `ارزش پرتفوی ${monthLabel(lastM.period)}`, value: mrial(lastM.totalMv), color: M_ACCENT },
-                        { label: 'سود تحقق‌نیافته', value: mrial(lastM.gain), color: (lastM.gain ?? 0) >= 0 ? GREEN : RED },
-                      ] : [
-                        { label: `${(lastM.kind ?? 'production') === 'production' ? 'فروش' : 'درآمد'} ${monthLabel(lastM.period)}`, value: mrial(lastM.month), color: M_ACCENT },
-                        { label: 'تجمعی سال مالی', value: mrial(lastM.cum) },
-                      ]}
-                      desc="روند ماهانه، محصولات برتر و نرخ فروش — برای مشاهده جزئیات کامل کلیک کنید"
+                    <SquareLinkCard
+                      href={`/stock/${enc}/monthly`} isMobile={isMobile} t={t} accent={M_ACCENT}
+                      title={lastM.kind === 'portfolio' ? 'پرتفوی ماهانه' : 'گزارش ماهانه'}
+                      stat={lastM.kind === 'portfolio'
+                        ? { label: `ارزش پرتفوی ${monthLabel(lastM.period)}`, value: mrial(lastM.totalMv) }
+                        : { label: `${(lastM.kind ?? 'production') === 'production' ? 'فروش' : 'درآمد'} ${monthLabel(lastM.period)}`, value: mrial(lastM.month) }}
+                      icon={<MonthlyIcon size={isMobile ? 18 : 23} />}
                     />
                   )}
                   {/* کارت گزارش‌های فصلی */}
                   {lastQ && (
-                    <SectionLinkCard
-                      href={`/stock/${enc}/quarterly`}
-                      title="گزارش‌های فصلی"
-                      badge={`${reports!.quarters.length.toLocaleString('fa-IR')} دوره`}
-                      accent={Q_ACCENT}
-                      t={t}
-                      chips={[
-                        { label: 'درآمد عملیاتی آخرین دوره', value: mrial(lastQ.revenue), color: Q_ACCENT },
-                        { label: 'سود خالص دوره', value: mrial(lastQ.net), color: (lastQ.net ?? 0) >= 0 ? GREEN : RED },
-                        { label: 'سود هر سهم (EPS)', value: lastQ.eps === null ? '—' : `${lastQ.eps.toLocaleString('fa-IR')} ریال` },
-                      ]}
-                      desc="صورت سود و زیان دوره‌ای، حاشیه سود و جدول همه دوره‌ها — برای مشاهده کامل کلیک کنید"
+                    <SquareLinkCard
+                      href={`/stock/${enc}/quarterly`} isMobile={isMobile} t={t} accent={Q_ACCENT}
+                      title="گزارش فصلی"
+                      stat={{ label: 'سود خالص آخرین دوره', value: mrial(lastQ.net), color: (lastQ.net ?? 0) >= 0 ? GREEN : RED }}
+                      icon={<QuarterlyIcon size={isMobile ? 18 : 23} />}
                     />
                   )}
                   {/* کارت سهامداران عمده */}
-                  <SectionLinkCard
-                    href={`/stock/${enc}/shareholders`}
+                  <SquareLinkCard
+                    href={`/stock/${enc}/shareholders`} isMobile={isMobile} t={t} accent={H_ACCENT}
                     title="سهامداران عمده"
-                    accent={H_ACCENT}
-                    t={t}
-                    desc="ترکیب مالکیت سهامداران عمده، ورود و خروج روزانه — برای مشاهده کامل کلیک کنید"
+                    stat={{ label: 'ورود و خروج مالکان', value: 'به‌روزرسانی روزانه' }}
+                    icon={<ShareholdersIcon size={isMobile ? 18 : 23} />}
                   />
-                </>
+                </SquareLinkGrid>
               ) : (
                 <>
                   {reports && reports.months.length > 0 && (

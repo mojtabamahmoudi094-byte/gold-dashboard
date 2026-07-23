@@ -113,45 +113,143 @@ export function SectionCard({ title, badge, accent, t, children }: {
   )
 }
 
-// کارت لینکی — خلاصه یک بخش که با کلیک به صفحه کامل خودش می‌رود
-export function SectionLinkCard({ href, title, badge, accent, desc, t, chips }: {
-  href: string; title: string; badge?: string; accent: string; desc: string; t: Theme
-  chips?: { label: string; value: string; color?: string }[]
-}) {
+// نگاشت اکسنت برای تم روشن — نسخهٔ تیره‌تر با کنتراست کافی (WCAG) روی پس‌زمینه سفید
+const LIGHT_TEXT_ACCENT: Record<string, string> = {
+  '#FACC15': '#A16207',  // ماهانه
+  '#F59E0B': '#B45309',  // فصلی
+  '#a78bfa': '#7C3AED',  // سهامداران
+}
+
+// شبکه ۳تایی کارت‌های مربعی — دسکتاپ ۳ مربع ثابت، موبایل ۳ مربع کوچک کنار هم
+export function SquareLinkGrid({ isMobile, children }: { isMobile: boolean; children: React.ReactNode }) {
   return (
-    <Link href={href} style={{ textDecoration: 'none', display: 'block' }} aria-label={`${title} — مشاهده صفحه کامل`}>
-      <section className="section-link-card" style={{
-        background: t.panel, border: `0.5px solid ${t.line}`, borderRadius: 16,
-        padding: '20px 20px 22px', marginTop: 22, backdropFilter: 'blur(12px)', minWidth: 0,
-        cursor: 'pointer', transition: 'border-color .18s ease, transform .18s ease',
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: isMobile ? 'repeat(3, minmax(0, 1fr))' : 'repeat(3, 224px)',
+      gap: isMobile ? 10 : 16,
+      marginTop: 22,
+      justifyContent: 'flex-start',   // در RTL یعنی چسبیده به راست، هم‌تراز با بقیه سکشن‌ها
+    }}>
+      {children}
+    </div>
+  )
+}
+
+const sqIconProps = (accent: string, size: number) => ({
+  width: size, height: size, viewBox: '0 0 24 24', fill: 'none' as const,
+  stroke: accent, strokeWidth: 1.9,
+  strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+})
+
+// آیکن‌های سه کارت (بدون کتابخانه)
+export const MonthlyIcon = ({ size = 23 }: { size?: number }) => (
+  <svg {...sqIconProps(M_ACCENT, size)}>
+    <path d="M4 20h16" />
+    <line x1="8"  y1="17" x2="8"  y2="13" strokeWidth={2.6} />
+    <line x1="12" y1="17" x2="12" y2="9"  strokeWidth={2.6} />
+    <line x1="16" y1="17" x2="16" y2="5"  strokeWidth={2.6} />
+  </svg>
+)
+export const QuarterlyIcon = ({ size = 23 }: { size?: number }) => (
+  <svg {...sqIconProps(Q_ACCENT, size)}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5" />
+    <line x1="9" y1="13" x2="15" y2="13" />
+    <line x1="9" y1="17" x2="13" y2="17" />
+  </svg>
+)
+export const ShareholdersIcon = ({ size = 23 }: { size?: number }) => (
+  <svg {...sqIconProps(H_ACCENT, size)}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3.5 20c0-3.1 2.5-5.1 5.5-5.1s5.5 2 5.5 5.1" />
+    <circle cx="17.5" cy="9" r="2.4" />
+    <path d="M16.5 15.4c2.5.4 4.2 2.2 4.2 4.6" />
+  </svg>
+)
+
+// کارت مربعی لینکی — آیکن + عنوان + یک آمار کلیدی + «مشاهده»؛ کل کارت لینک است
+export function SquareLinkCard({ href, title, accent, stat, t, isMobile, icon }: {
+  href: string; title: string; accent: string
+  stat: { label: string; value: string; color?: string }
+  t: Theme; isMobile: boolean; icon: React.ReactNode
+}) {
+  const textAccent = t.isDark ? accent : (LIGHT_TEXT_ACCENT[accent] ?? accent)
+  const cls = `sq-card-${accent.replace('#', '')}`   // کلاس یکتا per-accent — جلوگیری از تداخل hover سه کارت
+  return (
+    <Link href={href} style={{ textDecoration: 'none', display: 'block', minWidth: 0 }}
+      aria-label={`${title} — مشاهده صفحه کامل`}>
+      <div className={cls} style={{
+        position: 'relative', overflow: 'hidden', minWidth: 0,
+        aspectRatio: isMobile ? '1 / 1.18' : '1 / 1.02',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: isMobile ? 7 : 11, textAlign: 'center',
+        padding: isMobile ? '10px 8px' : '18px 16px',
+        background: t.panel,
+        border: `0.5px solid ${t.line}`,
+        borderRadius: isMobile ? 14 : 20,
+        backdropFilter: 'blur(12px)',
+        cursor: 'pointer',
+        transition: 'border-color .18s ease, transform .18s ease, box-shadow .18s ease',
       }}>
-        <style>{`.section-link-card:hover { border-color: ${accent}66 !important; transform: translateY(-2px) }`}</style>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-          <span style={{ width: 9, height: 9, borderRadius: 3, background: accent, flexShrink: 0, boxShadow: `0 0 10px ${accent}` }} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: t.text }}>{title}</span>
-          {badge && (
-            <span style={{
-              fontSize: 10, padding: '3px 9px', borderRadius: 7,
-              background: `${accent}14`, border: `0.5px solid ${accent}40`, color: accent,
-            }}>{badge}</span>
-          )}
+        <style>{`
+          .${cls}:hover {
+            border-color: ${accent}66 !important;
+            transform: translateY(-3px);
+            box-shadow: ${t.isDark
+              ? `0 12px 32px rgba(0,0,0,0.35), 0 0 0 1px ${accent}22`
+              : `0 10px 26px rgba(15,30,46,0.10), 0 0 0 1px ${accent}33`};
+          }
+          .${cls}:active { transform: translateY(-1px) scale(0.99); }
+          a:focus-visible .${cls} { outline: 3px solid ${accent}; outline-offset: 3px; }
+          @media (prefers-reduced-motion: reduce) {
+            .${cls}, .${cls}:hover, .${cls}:active { transform: none; transition: border-color .18s ease; }
+          }
+        `}</style>
+
+        {/* هالهٔ اکسنت بالای کارت — صرفاً تزئینی */}
+        <div aria-hidden style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: `radial-gradient(ellipse 90% 55% at 50% -10%, ${accent}${t.isDark ? '1f' : '14'}, transparent 70%)`,
+        }} />
+
+        {/* آیکون در نشان مربع‌گرد */}
+        <span style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          width: isMobile ? 36 : 46, height: isMobile ? 36 : 46,
+          borderRadius: isMobile ? 10 : 13,
+          background: `${accent}14`, border: `0.5px solid ${accent}40`,
+          boxShadow: t.isDark ? `0 0 14px ${accent}22` : 'none',
+        }}>
+          {icon}
+        </span>
+
+        <span style={{
+          fontSize: isMobile ? 12.5 : 15, fontWeight: 800, color: t.text,
+          lineHeight: 1.45, maxWidth: '100%',
+        }}>{title}</span>
+
+        {/* یک آمار کلیدی — الگوی flex برای ellipsis فارسی */}
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 0, maxWidth: '100%' }}>
+          <span style={{ fontSize: isMobile ? 10 : 10.5, color: t.muted }}>{stat.label}</span>
           <span style={{
-            marginRight: 'auto', fontSize: 11.5, fontWeight: 700, color: accent,
-            display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
-          }}>
-            مشاهده کامل
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
-            </svg>
-          </span>
-        </div>
-        {chips && chips.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            {chips.map(c => <Chip key={c.label} t={t} label={c.label} value={c.value} color={c.color} />)}
-          </div>
-        )}
-        <div style={{ fontSize: 11.5, color: t.muted, lineHeight: 1.9 }}>{desc}</div>
-      </section>
+            fontSize: isMobile ? 12 : 15.5, fontWeight: 700,
+            color: stat.color ?? textAccent,
+            maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{stat.value}</span>
+        </span>
+
+        <span style={{
+          display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+          fontSize: isMobile ? 10 : 11.5, fontWeight: 700, color: textAccent,
+        }}>
+          مشاهده
+          <svg width={isMobile ? 11 : 13} height={isMobile ? 11 : 13} viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
+          </svg>
+        </span>
+      </div>
     </Link>
   )
 }
