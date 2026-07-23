@@ -285,6 +285,14 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
     }
     if (bubbleAsmi != null && bubbleZati != null) bubbleVaqei = bubbleAsmi + bubbleZati
   }
+  // وزن‌هایى که از «ارزش روز» حساب شده‌اند (ستون درصد گزارش خراب بوده) سهم نقد را
+  // لحاظ نمى‌کنند، پس حباب ذاتىِ ساخته‌شده از آن‌ها کمى بزرگ‌نمایى دارد
+  const weightsAreApprox = asset.category === 'طلا'
+    ? !!goldWeights[asset.name]?.approx
+    : asset.category === 'نقره'
+      ? !!silverWeights[asset.name]?.approx
+      : false
+
   // زعفران حباب ندارد، اما ترکیب دارایی‌اش از گزارش پورتفوی کدال موجود است
   if (asset.category === 'زعفران') {
     const parts = saffronWeights[asset.name]?.parts
@@ -406,7 +414,11 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
                 { label: 'حباب اسمی', v: bubbleAsmi, tip: '(قیمت پایانی − NAV ابطال) ÷ NAV' },
-                { label: 'حباب ذاتی', v: bubbleZati, tip: 'سهم سکه × حباب سکه بورس کالا + سهم شمش × حباب شمش بورس کالا' },
+                {
+                  label: 'حباب ذاتی', v: bubbleZati,
+                  tip: 'سهم سکه × حباب سکه بورس کالا + سهم شمش × حباب شمش بورس کالا'
+                    + (weightsAreApprox ? ' — ستون درصد گزارش کدال این صندوق ناهم‌تراز بود؛ وزن‌ها از ارزش روز حساب شده و سهم نقد لحاظ نشده، پس این عدد کمی بزرگ‌نمایی دارد.' : ''),
+                },
                 { label: 'حباب واقعی', v: bubbleVaqei, tip: 'حباب اسمی + حباب ذاتی' },
               ].map(b => (
                 <div key={b.label} title={b.tip} style={{

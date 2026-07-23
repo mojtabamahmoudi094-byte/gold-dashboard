@@ -67,25 +67,51 @@ async function main() {
 
   if (kind === 'saffron') return { parts: partsFromValue(holdings) }
 
+  // سهم هر گروه دارایی از «ارزش روز» — پشتیبانِ حالتی که ستون درصد ناهم‌تراز است.
+  // توجه: جمع اقلام ۱۰۰٪ در نظر گرفته می‌شود، یعنى سهم نقد صندوق قابل استخراج نیست
+  // و صفر فرض مى‌شود (خروجى با approx:true علامت مى‌خورد تا در سایت شفاف گفته شود).
+  const shareOfValue = (() => {
+    const total = holdings.reduce((s, h) => s + (Number(h.n1) || 0), 0)
+    if (total <= 0) return null
+    return (pattern) => holdings
+      .filter(h => pattern.test(norm(h.name)))
+      .reduce((s, h) => s + (Number(h.n1) || 0), 0) / total * 100
+  })()
+
   // سلامت‌سنجی: ستون درصد بعضی قالب‌های اکسل صندوق ناهم‌ترازه (تعداد عدد هر ردیف
   // با فرض ۱۲تایی parseHoldingRows جور در نمی‌آید) و یک مبلغ ریالی خام به‌جای
   // درصد استخراج می‌شود — رخ‌داده در عمل برای بعضی صندوق‌ها. یک وزن معتبر هرگز
   // از ۱۰۰٪ بیشتر نمی‌شود؛ در غیر این صورت به‌جای عدد ساختگی خطا برمی‌گردانیم
   // تا در سایت مقدار هاردکد قبلی (fallback) جایگزینش نشود.
   if (kind === 'silver') {
-    const silver = sumPct(holdings, /نقره/, scale)
-    if (silver > 100.5) throw new Error(`مقدار نامعتبر (نقره=${silver.toFixed(0)}٪) — ستون درصد این صندوق ناهم‌تراز است`)
+    let silver = sumPct(holdings, /نقره/, scale)
+    let approx = false
+    if (silver > 100.5) {
+      if (!shareOfValue) throw new Error(`مقدار نامعتبر (نقره=${silver.toFixed(0)}٪) و ارزش روزى هم ثبت نشده`)
+      silver = shareOfValue(/نقره/)
+      approx = true
+    }
     const other = Math.max(0, 100 - silver)
-    return { silver: +silver.toFixed(1), other: +other.toFixed(1) }
+    const out = { silver: +silver.toFixed(1), other: +other.toFixed(1) }
+    return approx ? { ...out, approx: true } : out
   }
-  const coin = sumPct(holdings, /سکه/, scale)
-  const bar = sumPct(holdings, /شمش طلا|شمش‌طلا/, scale)
-  const silverBar = sumPct(holdings, /شمش نقره/, scale)
+
+  let coin = sumPct(holdings, /سکه/, scale)
+  let bar = sumPct(holdings, /شمش طلا|شمش‌طلا/, scale)
+  let silverBar = sumPct(holdings, /شمش نقره/, scale)
+  let approx = false
   if (coin > 100.5 || bar > 100.5 || silverBar > 100.5) {
-    throw new Error(`مقدار نامعتبر (سکه=${coin.toFixed(0)}٪ شمش=${bar.toFixed(0)}٪) — ستون درصد این صندوق ناهم‌تراز است`)
+    if (!shareOfValue) {
+      throw new Error(`مقدار نامعتبر (سکه=${coin.toFixed(0)}٪ شمش=${bar.toFixed(0)}٪) و ارزش روزى هم ثبت نشده`)
+    }
+    coin = shareOfValue(/سکه/)
+    bar = shareOfValue(/شمش طلا|شمش‌طلا/)
+    silverBar = shareOfValue(/شمش نقره/)
+    approx = true
   }
   const liq = Math.max(0, 100 - coin - bar - silverBar)
-  return { coin: +coin.toFixed(1), bar: +(bar + silverBar).toFixed(1), liq: +liq.toFixed(1) }
+  const goldOut = { coin: +coin.toFixed(1), bar: +(bar + silverBar).toFixed(1), liq: +liq.toFixed(1) }
+  return approx ? { ...goldOut, approx: true } : goldOut
 }
 
 main()

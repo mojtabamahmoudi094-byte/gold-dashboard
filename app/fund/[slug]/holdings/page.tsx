@@ -52,9 +52,12 @@ export default function FundHoldingsPage() {
   const t: any = isDark ? darkTheme : lightTheme
   const cr = cream(t)
 
+  // approx: ستون درصدِ گزارش خراب بوده و وزن‌ها از ارزش روز حساب شده — سهم نقد لحاظ نشده
+  let approx = false
   let slices: Slice[] = []
   if (asset?.category === 'طلا') {
     const w = goldW[asset.name]
+    approx = !!w?.approx
     if (w) slices = [
       { name: 'سکه طلا', value: w.coin, color: '#FACC15' },
       { name: 'شمش طلا', value: w.bar, color: '#F59E0B' },
@@ -62,6 +65,7 @@ export default function FundHoldingsPage() {
     ]
   } else if (asset?.category === 'نقره') {
     const w = silverW[asset.name]
+    approx = !!w?.approx
     if (w) slices = [
       { name: 'گواهی نقره', value: w.silver, color: '#C0C8D8' },
       { name: 'سایر دارایی‌ها', value: w.other, color: '#94A3B8' },
@@ -113,6 +117,17 @@ export default function FundHoldingsPage() {
                 ? 'سهم هر قلم از سبد گواهی‌های صندوق (بر پایهٔ ارزش روز) — منبع آخرین گزارش پورتفوی کدال'
                 : 'وزن تقریبی هر دارایی — منبع آخرین گزارش کدال'}
             </div>
+
+            {approx && (
+              <div style={{
+                fontSize: 10.5, color: cr, lineHeight: 1.9, marginBottom: 14,
+                padding: '9px 12px', borderRadius: 10,
+                background: 'rgba(245,158,11,0.08)', border: '0.5px solid rgba(245,158,11,0.3)',
+              }}>
+                ستون درصدِ گزارش کدال این صندوق ناهم‌تراز بود، بنابراین وزن‌ها از «ارزش روز» هر قلم محاسبه شده است.
+                در این حالت <b>سهم نقد و سایر دارایی‌های صندوق قابل استخراج نیست</b> و صفر فرض شده — پس درصدها فقط نسبت اقلام دارایی به یکدیگر است و کمی بزرگ‌تر از وزن واقعی در کل صندوق نشان داده می‌شود.
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 16 : 32 }}>
               <svg viewBox="0 0 200 200" style={{ width: isMobile ? 220 : 250, flexShrink: 0, overflow: 'visible' }} onMouseLeave={() => setHi(null)}>
