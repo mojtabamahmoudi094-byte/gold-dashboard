@@ -228,7 +228,7 @@ function ArchiveInner() {
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch('/api/funds/archive?days=30', { cache: 'no-store' })
+      const res = await fetch('/api/funds/archive', { cache: 'no-store' })
       if (!res.ok) { setLoading(false); return }
       const json = await res.json()
       setData(json)
@@ -306,7 +306,7 @@ function ArchiveInner() {
           آرشیو تابلوخوانی صندوق‌های {catInfo.label}
         </h1>
         <div style={{ fontSize: 11.5, color: t.muted, marginBottom: 16, lineHeight: 1.9 }}>
-          تا ۳۰ روز معاملاتی اخیر
+          همه روزهای معاملاتی ثبت‌شده
         </div>
 
         {/* انتخاب متریک */}
