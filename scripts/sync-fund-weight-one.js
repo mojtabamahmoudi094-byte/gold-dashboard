@@ -60,12 +60,19 @@ function partsFromValue(holdings) {
     .sort((a, b) => b.pct - a.pct)
 }
 
+// خودترمیمى: هر اجرا از آخرین گزارش ماهانه دوباره محاسبه مى‌کند و همیشه اول ستون
+// درصد را امتحان مى‌کند. اگر ماه بعد گزارش سالمى منتشر شود، مسیر پشتیبانِ «ارزش روز»
+// اصلاً اجرا نمى‌شود، approx در خروجى نمى‌آید و وزن‌هاى دقیق (شامل سهم نقد) جاى
+// مقادیر بزرگ‌نمایى‌شده را مى‌گیرند — نیازى به دخالت دستى نیست. `period` هم ذخیره
+// مى‌شود تا در سایت معلوم باشد عدد از کدام گزارش آمده.
 async function main() {
   const out = await buildSymbol(name, { verbose: false })
-  const holdings = out.months[out.months.length - 1].holdings
+  const last = out.months[out.months.length - 1]
+  const holdings = last.holdings
+  const period = last.date || null
   const scale = pctScale(holdings)
 
-  if (kind === 'saffron') return { parts: partsFromValue(holdings) }
+  if (kind === 'saffron') return { parts: partsFromValue(holdings), period }
 
   // سهم هر گروه دارایی از «ارزش روز» — پشتیبانِ حالتی که ستون درصد ناهم‌تراز است.
   // توجه: جمع اقلام ۱۰۰٪ در نظر گرفته می‌شود، یعنى سهم نقد صندوق قابل استخراج نیست
@@ -92,7 +99,7 @@ async function main() {
       approx = true
     }
     const other = Math.max(0, 100 - silver)
-    const out = { silver: +silver.toFixed(1), other: +other.toFixed(1) }
+    const out = { silver: +silver.toFixed(1), other: +other.toFixed(1), period }
     return approx ? { ...out, approx: true } : out
   }
 
@@ -110,7 +117,7 @@ async function main() {
     approx = true
   }
   const liq = Math.max(0, 100 - coin - bar - silverBar)
-  const goldOut = { coin: +coin.toFixed(1), bar: +(bar + silverBar).toFixed(1), liq: +liq.toFixed(1) }
+  const goldOut = { coin: +coin.toFixed(1), bar: +(bar + silverBar).toFixed(1), liq: +liq.toFixed(1), period }
   return approx ? { ...goldOut, approx: true } : goldOut
 }
 

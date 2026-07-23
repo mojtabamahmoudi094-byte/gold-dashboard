@@ -1,6 +1,6 @@
 // حباب‌های بازار بورس کالا + حباب ذاتی صندوق‌ها — منطق مشترک بین /analysis/gold و /signals
 
-export const FUND_WEIGHTS: Record<string, { coin: number; bar: number; liq: number; approx?: boolean }> = {
+export const FUND_WEIGHTS: Record<string, { coin: number; bar: number; liq: number; approx?: boolean; period?: string }> = {
   'رز ترنج':   { coin: 9.5,  bar: 88.3,  liq: 2.2  },
   'آتش':       { coin: 0.0,  bar: 98.0,  liq: 2.0  },
   'درخشان':    { coin: 0.0,  bar: 96.9,  liq: 3.1  },
@@ -36,7 +36,7 @@ export const FUND_WEIGHTS: Record<string, { coin: number; bar: number; liq: numb
 }
 
 // وزن گواهی نقره در ترکیب دارایی صندوق‌های نقره (٪) — مابقی: سایر دارایی‌ها
-export const SILVER_FUND_WEIGHTS: Record<string, { silver: number; other: number; approx?: boolean }> = {
+export const SILVER_FUND_WEIGHTS: Record<string, { silver: number; other: number; approx?: boolean; period?: string }> = {
   'نقرسا':  { silver: 0,   other: 100 },
   'نقرین':  { silver: 25,  other: 75  },
   'نقرفام': { silver: 99,  other: 1   },

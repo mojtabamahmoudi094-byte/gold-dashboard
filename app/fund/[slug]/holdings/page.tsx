@@ -29,7 +29,7 @@ export default function FundHoldingsPage() {
   const [asset, setAsset] = useState<any>(null)
   const [goldW, setGoldW] = useState(FUND_WEIGHTS)
   const [silverW, setSilverW] = useState(SILVER_FUND_WEIGHTS)
-  const [saffronW, setSaffronW] = useState<Record<string, { parts: { name: string; pct: number }[] }>>({})
+  const [saffronW, setSaffronW] = useState<Record<string, { parts: { name: string; pct: number }[]; period?: string }>>({})
   const [hi, setHi] = useState<number | null>(null)
 
   useEffect(() => {
@@ -54,10 +54,12 @@ export default function FundHoldingsPage() {
 
   // approx: ستون درصدِ گزارش خراب بوده و وزن‌ها از ارزش روز حساب شده — سهم نقد لحاظ نشده
   let approx = false
+  let period: string | null = null
   let slices: Slice[] = []
   if (asset?.category === 'طلا') {
     const w = goldW[asset.name]
     approx = !!w?.approx
+    period = w?.period ?? null
     if (w) slices = [
       { name: 'سکه طلا', value: w.coin, color: '#FACC15' },
       { name: 'شمش طلا', value: w.bar, color: '#F59E0B' },
@@ -66,6 +68,7 @@ export default function FundHoldingsPage() {
   } else if (asset?.category === 'نقره') {
     const w = silverW[asset.name]
     approx = !!w?.approx
+    period = w?.period ?? null
     if (w) slices = [
       { name: 'گواهی نقره', value: w.silver, color: '#C0C8D8' },
       { name: 'سایر دارایی‌ها', value: w.other, color: '#94A3B8' },
@@ -73,6 +76,7 @@ export default function FundHoldingsPage() {
   } else if (asset?.category === 'زعفران') {
     // ستون درصدِ گزارش این صندوق‌ها ناهم‌تراز است؛ سهم هر قلم از ارزش روز حساب شده
     const w = saffronW[asset.name]
+    period = w?.period ?? null
     if (w?.parts?.length) slices = w.parts.map((p, i) => ({
       name: p.name, value: p.pct, color: SAFFRON_COLORS[i % SAFFRON_COLORS.length],
     }))
@@ -116,6 +120,7 @@ export default function FundHoldingsPage() {
               {asset.category === 'زعفران'
                 ? 'سهم هر قلم از سبد گواهی‌های صندوق (بر پایهٔ ارزش روز) — منبع آخرین گزارش پورتفوی کدال'
                 : 'وزن تقریبی هر دارایی — منبع آخرین گزارش کدال'}
+              {period && <> · دورهٔ گزارش {period}</>}
             </div>
 
             {approx && (
@@ -126,6 +131,8 @@ export default function FundHoldingsPage() {
               }}>
                 ستون درصدِ گزارش کدال این صندوق ناهم‌تراز بود، بنابراین وزن‌ها از «ارزش روز» هر قلم محاسبه شده است.
                 در این حالت <b>سهم نقد و سایر دارایی‌های صندوق قابل استخراج نیست</b> و صفر فرض شده — پس درصدها فقط نسبت اقلام دارایی به یکدیگر است و کمی بزرگ‌تر از وزن واقعی در کل صندوق نشان داده می‌شود.
+                <br />
+                به‌محض اینکه گزارش ماهانهٔ بعدی با ستون درصدِ سالم منتشر شود، همین اعداد در به‌روزرسانی خودکار بعدی با وزن دقیق (شامل سهم نقد) جایگزین می‌شوند و این پیام برداشته می‌شود.
               </div>
             )}
 
