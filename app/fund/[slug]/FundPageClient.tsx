@@ -601,6 +601,11 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
         {!isAyar && (
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+        {/* نمودار قیمت (فقط صندوق‌های غیر عیار — عیار به کارت تحلیل تکنیکال منتقل شد) */}
+        {history.length >= 3 && (
+          <FundPriceChart t={t} history={history} />
+        )}
+
         {/* جدول معاملات حقیقی */}
         <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
           <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 12 }}>
