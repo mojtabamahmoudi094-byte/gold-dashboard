@@ -147,4 +147,9 @@ async function main() {
   console.log(`✅ ${ok} نماد محاسبه شد، ${skipped} رد شد (بدون گزارش سالانه)؛ صدک صنعتی برای ${peByIndustry.size} صنعت`)
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+if (require.main === module) {
+  main().catch(e => { console.error(e); process.exit(1) })
+}
+
+// توابع خالص برای تست واحد (tests/fundamentalsCompute.test.ts)
+module.exports = { latestAnnual, computeFundamentals, percentileOf, median, div }

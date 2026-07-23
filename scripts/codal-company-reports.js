@@ -64,14 +64,17 @@ function diag(msg) {
   try { fs.appendFileSync(DIAG_FILE, line) } catch {}
   try { process.stdout.write(line) } catch {}
 }
-process.on('uncaughtException', (e) => { diag(`FATAL uncaughtException: ${(e && e.stack) || e}`); process.exit(1) })
-process.on('unhandledRejection', (e) => { diag(`FATAL unhandledRejection: ${(e && e.stack) || e}`) })
-process.on('exit', (code) => { diag(`EXIT code=${code} ${mem()}`) })
-process.on('beforeExit', (code) => { diag(`beforeExit code=${code}`) })
-for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP', 'SIGABRT']) {
-  process.on(sig, () => { diag(`SIGNAL ${sig} — پردازش توسط سیستم متوقف شد`); process.exit(1) })
+// زیر vitest ثبت نشوند — این هندلرها process.exit می‌زنند و teardown تست را خراب می‌کنند
+if (!process.env.VITEST) {
+  process.on('uncaughtException', (e) => { diag(`FATAL uncaughtException: ${(e && e.stack) || e}`); process.exit(1) })
+  process.on('unhandledRejection', (e) => { diag(`FATAL unhandledRejection: ${(e && e.stack) || e}`) })
+  process.on('exit', (code) => { diag(`EXIT code=${code} ${mem()}`) })
+  process.on('beforeExit', (code) => { diag(`beforeExit code=${code}`) })
+  for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP', 'SIGABRT']) {
+    process.on(sig, () => { diag(`SIGNAL ${sig} — پردازش توسط سیستم متوقف شد`); process.exit(1) })
+  }
+  diag(`▶ شروع اجرا — pid=${process.pid} node=${process.version} argv=${process.argv.slice(2).join(' ')}`)
 }
-diag(`▶ شروع اجرا — pid=${process.pid} node=${process.version} argv=${process.argv.slice(2).join(' ')}`)
 
 // ماسک BrsAPI روی base64: QQQaQQQ = %2f و OOObOOO = %2b
 // نکته: link_excel کدال نباید unmask شود (id در path است؛ %2f را IIS رد می‌کند).

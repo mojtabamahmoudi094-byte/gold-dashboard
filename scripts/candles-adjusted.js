@@ -485,4 +485,9 @@ async function main() {
   if (total === 0) process.exit(1) // برای run-with-alert
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+if (require.main === module) {
+  main().catch(e => { console.error(e); process.exit(1) })
+}
+
+// توابع خالص برای تست واحد (tests/candlesAdjusted.test.ts)
+module.exports = { parseHistory, parseSharesBlob, computeMethodCoefs }
