@@ -22,9 +22,6 @@ import {
   MonthlySection, PortfolioSection, QuarterlyFinSection, ShareholdersSection,
 } from './sections'
 
-// کارت «نمودار تابلوخوانی» — فعلاً فقط شبندر (آزمایشی)؛ بعد از تأیید برای همه فعال می‌شود
-const TAPE_CARD_SYMBOLS = new Set(['شبندر'])
-
 
 type SnapshotRow = {
   trade_date_shamsi: string
@@ -347,7 +344,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
               )}
 
               {cardMode ? (
-                <SquareLinkGrid isMobile={isMobile} cols={2 + (lastM ? 1 : 0) + (lastQ ? 1 : 0) + (TAPE_CARD_SYMBOLS.has(symbol) ? 1 : 0)}>
+                <SquareLinkGrid isMobile={isMobile} cols={3 + (lastM ? 1 : 0) + (lastQ ? 1 : 0)}>
                   {/* کارت گزارش ماهانه — لینک به صفحه کامل */}
                   {lastM && (
                     <SquareLinkCard
@@ -383,14 +380,12 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                     icon={<CodalIcon size={isMobile ? 18 : 23} />}
                   />
                   {/* کارت نمودار تابلوخوانی */}
-                  {TAPE_CARD_SYMBOLS.has(symbol) && (
-                    <SquareLinkCard
-                      href={`/stock/${enc}/tape`} isMobile={isMobile} t={t} accent={T_ACCENT}
-                      title="نمودار تابلوخوانی"
-                      stat={{ label: 'حقیقی و حقوقی روزانه', value: '۱۰ روز اخیر' }}
-                      icon={<TapeIcon size={isMobile ? 18 : 23} />}
-                    />
-                  )}
+                  <SquareLinkCard
+                    href={`/stock/${enc}/tape`} isMobile={isMobile} t={t} accent={T_ACCENT}
+                    title="نمودار تابلوخوانی"
+                    stat={{ label: 'حقیقی و حقوقی روزانه', value: '۱۰ روز اخیر' }}
+                    icon={<TapeIcon size={isMobile ? 18 : 23} />}
+                  />
                 </SquareLinkGrid>
               ) : (
                 <>
