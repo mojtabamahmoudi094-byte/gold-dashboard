@@ -966,7 +966,11 @@ async function main() {
 }
 
 // codal-watch.js این ماژول را require می‌کند و فقط buildSymbol را صدا می‌زند
-module.exports = { buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR, parseMonthly, parseFinancials, upsertReport, faDate }
+// codal-backfill-quarterly.js هم بلوک‌های پایین‌دستی (فچ کدال، pick، پارس، ratios) را لازم دارد
+module.exports = {
+  buildSymbol, fetchAnnouncements, sbClient, diag, OUT_DIR, parseMonthly, parseFinancials, upsertReport, faDate,
+  codalVariants, codalPage, fetchWorkbook, pickReports, firstParsable, computeRatios, norm, faNum, sleep,
+}
 
 if (require.main === module) {
   main().catch(e => { console.error(e); process.exit(1) })
