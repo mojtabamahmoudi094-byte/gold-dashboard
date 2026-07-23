@@ -50,3 +50,5 @@ scripts/.env.report
 scripts/*-state.json
 scripts/*.log
 scripts/reports-out/
+test-results/
+playwright-report/
