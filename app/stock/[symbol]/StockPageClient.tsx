@@ -17,7 +17,7 @@ import { shouldUseDark } from '../../../lib/theme'
 import {
   type Theme, M_ACCENT, Q_ACCENT, H_ACCENT, GREEN, RED,
   hemat, mrial, gPct, pct, toneColor, ToneIcon,
-  SectionCard, SquareLinkGrid, SquareLinkCard, MonthlyIcon, QuarterlyIcon, ShareholdersIcon,
+  SectionCard, SquareLinkGrid, SquareLinkCard, MonthlyIcon, QuarterlyIcon, ShareholdersIcon, CodalIcon, C_ACCENT,
   MonthlySection, PortfolioSection, QuarterlyFinSection, ShareholdersSection,
 } from './sections'
 
@@ -345,7 +345,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
               )}
 
               {cardMode ? (
-                <SquareLinkGrid isMobile={isMobile}>
+                <SquareLinkGrid isMobile={isMobile} cols={2 + (lastM ? 1 : 0) + (lastQ ? 1 : 0)}>
                   {/* کارت گزارش ماهانه — لینک به صفحه کامل */}
                   {lastM && (
                     <SquareLinkCard
@@ -373,6 +373,13 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                     stat={{ label: 'ورود و خروج مالکان', value: 'به‌روزرسانی روزانه' }}
                     icon={<ShareholdersIcon size={isMobile ? 18 : 23} />}
                   />
+                  {/* کارت اطلاعیه‌های کدال */}
+                  <SquareLinkCard
+                    href={`/stock/${enc}/codal`} isMobile={isMobile} t={t} accent={C_ACCENT}
+                    title="اطلاعیه‌های کدال"
+                    stat={{ label: 'اطلاعیه‌های رسمی ناشر', value: 'دریافت زنده' }}
+                    icon={<CodalIcon size={isMobile ? 18 : 23} />}
+                  />
                 </SquareLinkGrid>
               ) : (
                 <>
@@ -395,7 +402,8 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                   </div>
                 </SectionCard>
               )}
-              <CodalAnnouncements symbol={symbol} isDark={isDark} isMobile={isMobile} pageSize={cardMode ? 5 : undefined} />
+              {/* در حالت کارتی، اطلاعیه‌ها کارت مربعی شده‌اند و صفحه مخصوص خودشان را دارند */}
+              {!cardMode && <CodalAnnouncements symbol={symbol} isDark={isDark} isMobile={isMobile} />}
               <AiChatSection symbol={symbol} t={t} isMobile={isMobile} />
               <TelegramChannelCta context="stock" />
               <CommentsSection targetType="stock" targetKey={symbol} isDark={isDark} />

@@ -13,6 +13,7 @@ export type Theme = { panel: string; text: string; muted: string; line: string; 
 export const M_ACCENT = '#FACC15'   // زرد طلایی — فعالیت ماهانه
 export const Q_ACCENT = '#F59E0B'   // کهربایی — گزارش فصلی
 export const H_ACCENT = '#a78bfa'   // بنفش — سهامداران عمده
+export const C_ACCENT = '#38BDF8'   // آبی آسمانی — اطلاعیه‌های کدال
 export const GREEN = 'oklch(0.74 0.16 150)'
 export const RED   = 'oklch(0.68 0.19 25)'
 const AI_ACCENT = '#2DD4BF'
@@ -118,14 +119,18 @@ const LIGHT_TEXT_ACCENT: Record<string, string> = {
   '#FACC15': '#A16207',  // ماهانه
   '#F59E0B': '#B45309',  // فصلی
   '#a78bfa': '#7C3AED',  // سهامداران
+  '#38BDF8': '#0369A1',  // کدال
 }
 
-// شبکه ۳تایی کارت‌های مربعی — دسکتاپ ۳ مربع ثابت، موبایل ۳ مربع کوچک کنار هم
-export function SquareLinkGrid({ isMobile, children }: { isMobile: boolean; children: React.ReactNode }) {
+// شبکه کارت‌های مربعی — دسکتاپ مربع‌های ثابت کنار هم، موبایل ۳تایی=یک ردیف / ۴تایی=۲×۲
+export function SquareLinkGrid({ isMobile, cols = 3, children }: {
+  isMobile: boolean; cols?: number; children: React.ReactNode
+}) {
+  const mobileCols = cols >= 4 ? 2 : 3
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: isMobile ? 'repeat(3, minmax(0, 1fr))' : 'repeat(3, 224px)',
+      gridTemplateColumns: isMobile ? `repeat(${mobileCols}, minmax(0, 1fr))` : `repeat(${cols}, 224px)`,
       gap: isMobile ? 10 : 16,
       marginTop: 22,
       justifyContent: 'flex-start',   // در RTL یعنی چسبیده به راست، هم‌تراز با بقیه سکشن‌ها
@@ -157,6 +162,13 @@ export const QuarterlyIcon = ({ size = 23 }: { size?: number }) => (
     <path d="M14 3v5h5" />
     <line x1="9" y1="13" x2="15" y2="13" />
     <line x1="9" y1="17" x2="13" y2="17" />
+  </svg>
+)
+export const CodalIcon = ({ size = 23 }: { size?: number }) => (
+  <svg {...sqIconProps(C_ACCENT, size)}>
+    <path d="M3 11l14-5v12L3 13v-2z" />
+    <path d="M17 8a4 4 0 0 1 0 6" />
+    <path d="M7 13.5V18a1.5 1.5 0 0 0 3 0v-3" />
   </svg>
 )
 export const ShareholdersIcon = ({ size = 23 }: { size?: number }) => (
