@@ -14,6 +14,7 @@ export const M_ACCENT = '#FACC15'   // زرد طلایی — فعالیت ماه
 export const Q_ACCENT = '#F59E0B'   // کهربایی — گزارش فصلی
 export const H_ACCENT = '#a78bfa'   // بنفش — سهامداران عمده
 export const C_ACCENT = '#38BDF8'   // آبی آسمانی — اطلاعیه‌های کدال
+export const T_ACCENT = '#00E5A0'   // سبز نئونی — نمودار تابلوخوانی (هماهنگ با نمودارهای صندوق)
 export const GREEN = 'oklch(0.74 0.16 150)'
 export const RED   = 'oklch(0.68 0.19 25)'
 const AI_ACCENT = '#2DD4BF'
@@ -120,6 +121,7 @@ const LIGHT_TEXT_ACCENT: Record<string, string> = {
   '#F59E0B': '#B45309',  // فصلی
   '#a78bfa': '#7C3AED',  // سهامداران
   '#38BDF8': '#0369A1',  // کدال
+  '#00E5A0': '#047857',  // تابلوخوانی
 }
 
 // شبکه کارت‌های مربعی — دسکتاپ مربع‌های ثابت کنار هم، موبایل ۳تایی=یک ردیف / ۴تایی=۲×۲
@@ -127,10 +129,11 @@ export function SquareLinkGrid({ isMobile, cols = 3, children }: {
   isMobile: boolean; cols?: number; children: React.ReactNode
 }) {
   const mobileCols = cols >= 4 ? 2 : 3
+  const colW = cols >= 5 ? 196 : 224   // ۵ کارت باید در کانتینر ۱۱۰۰px جا شود
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: isMobile ? `repeat(${mobileCols}, minmax(0, 1fr))` : `repeat(${cols}, 224px)`,
+      gridTemplateColumns: isMobile ? `repeat(${mobileCols}, minmax(0, 1fr))` : `repeat(${cols}, ${colW}px)`,
       gap: isMobile ? 10 : 16,
       marginTop: 22,
       justifyContent: 'flex-start',   // در RTL یعنی چسبیده به راست، هم‌تراز با بقیه سکشن‌ها
@@ -169,6 +172,15 @@ export const CodalIcon = ({ size = 23 }: { size?: number }) => (
     <path d="M3 11l14-5v12L3 13v-2z" />
     <path d="M17 8a4 4 0 0 1 0 6" />
     <path d="M7 13.5V18a1.5 1.5 0 0 0 3 0v-3" />
+  </svg>
+)
+export const TapeIcon = ({ size = 23 }: { size?: number }) => (
+  <svg {...sqIconProps(T_ACCENT, size)}>
+    <path d="M3 20h18" />
+    <rect x="5" y="9" width="3" height="8" rx="1" />
+    <rect x="10.5" y="5" width="3" height="12" rx="1" />
+    <rect x="16" y="12" width="3" height="5" rx="1" />
+    <path d="M4 6l4-2 4 3 5-4" strokeWidth={1.6} />
   </svg>
 )
 export const ShareholdersIcon = ({ size = 23 }: { size?: number }) => (

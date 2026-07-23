@@ -17,9 +17,13 @@ import { shouldUseDark } from '../../../lib/theme'
 import {
   type Theme, M_ACCENT, Q_ACCENT, H_ACCENT, GREEN, RED,
   hemat, mrial, gPct, pct, toneColor, ToneIcon,
-  SectionCard, SquareLinkGrid, SquareLinkCard, MonthlyIcon, QuarterlyIcon, ShareholdersIcon, CodalIcon, C_ACCENT,
+  SectionCard, SquareLinkGrid, SquareLinkCard, MonthlyIcon, QuarterlyIcon, ShareholdersIcon, CodalIcon, TapeIcon,
+  C_ACCENT, T_ACCENT,
   MonthlySection, PortfolioSection, QuarterlyFinSection, ShareholdersSection,
 } from './sections'
+
+// کارت «نمودار تابلوخوانی» — فعلاً فقط شبندر (آزمایشی)؛ بعد از تأیید برای همه فعال می‌شود
+const TAPE_CARD_SYMBOLS = new Set(['شبندر'])
 
 
 type SnapshotRow = {
@@ -343,7 +347,7 @@ export default function StockPage({ symbol, initialData, initialReports }: {
               )}
 
               {cardMode ? (
-                <SquareLinkGrid isMobile={isMobile} cols={2 + (lastM ? 1 : 0) + (lastQ ? 1 : 0)}>
+                <SquareLinkGrid isMobile={isMobile} cols={2 + (lastM ? 1 : 0) + (lastQ ? 1 : 0) + (TAPE_CARD_SYMBOLS.has(symbol) ? 1 : 0)}>
                   {/* کارت گزارش ماهانه — لینک به صفحه کامل */}
                   {lastM && (
                     <SquareLinkCard
@@ -378,6 +382,15 @@ export default function StockPage({ symbol, initialData, initialReports }: {
                     stat={{ label: 'اطلاعیه‌های رسمی ناشر', value: 'دریافت زنده' }}
                     icon={<CodalIcon size={isMobile ? 18 : 23} />}
                   />
+                  {/* کارت نمودار تابلوخوانی */}
+                  {TAPE_CARD_SYMBOLS.has(symbol) && (
+                    <SquareLinkCard
+                      href={`/stock/${enc}/tape`} isMobile={isMobile} t={t} accent={T_ACCENT}
+                      title="نمودار تابلوخوانی"
+                      stat={{ label: 'حقیقی و حقوقی روزانه', value: '۱۰ روز اخیر' }}
+                      icon={<TapeIcon size={isMobile ? 18 : 23} />}
+                    />
+                  )}
                 </SquareLinkGrid>
               ) : (
                 <>

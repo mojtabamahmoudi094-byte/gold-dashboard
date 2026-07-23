@@ -587,6 +587,28 @@ async function main() {
       else console.log(`✅ stock_legalflow_daily بروز شد (${symLegalRows.length} نماد)`)
     }
 
+    // ── تابلوخوانی روزانه هر نماد (خام حقیقی/حقوقی) — برای نمودارهای /stock/[symbol]/tape ──
+    // آخرین upsert روز = مقادیر پایان روز؛ همان الگوی stock_snapshot_daily
+    const tapeRows = []
+    for (const it of watchItems) {
+      const sym = clean(it.l18)
+      if (!sym) continue
+      tapeRows.push({
+        symbol: sym, trade_date: today, trade_date_shamsi: todayShamsi,
+        pc: num(it.pc), tval: num(it.tval), tvol: num(it.tvol),
+        buy_i_volume: num(it.Buy_I_Volume), sell_i_volume: num(it.Sell_I_Volume),
+        buy_n_volume: num(it.Buy_N_Volume), sell_n_volume: num(it.Sell_N_Volume),
+        buy_count_i: num(it.Buy_CountI), sell_count_i: num(it.Sell_CountI),
+        buy_count_n: num(it.Buy_CountN), sell_count_n: num(it.Sell_CountN),
+        updated: out.updated,
+      })
+    }
+    if (tapeRows.length > 0) {
+      const { error: tapeErr } = await sb.from('stock_tape_daily').upsert(tapeRows, { onConflict: 'symbol,trade_date' })
+      if (tapeErr) console.error(`[stocks-industries] stock_tape_daily: ${tapeErr.message}`)
+      else console.log(`✅ stock_tape_daily بروز شد (${tapeRows.length} نماد)`)
+    }
+
     // ── «رصد لحظه‌ای پورتفو»: تاریخچه ۵دقیقه‌ای فقط برای نمادهای پورتفوی کاربران ──
     if (watchSymbols.size > 0) {
       for (const it of watchItems) {
