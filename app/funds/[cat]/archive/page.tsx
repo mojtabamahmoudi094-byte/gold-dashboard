@@ -171,8 +171,19 @@ function TrendLine({ t, cream, points, unit }: {
         })}
         {/* خط صفر */}
         <line x1={PX} y1={zeroY} x2={W - PX} y2={zeroY} stroke={t.muted} strokeWidth={1} strokeDasharray="5 3" opacity={0.6} />
+        {/* خط دو رنگ — بالای صفر سبز، زیر صفر قرمز (کلیپ با خط صفر) */}
+        <defs>
+          <clipPath id="clipAboveZero">
+            <rect x={0} y={0} width={W} height={zeroY} />
+          </clipPath>
+          <clipPath id="clipBelowZero">
+            <rect x={0} y={zeroY} width={W} height={H + 22 - zeroY} />
+          </clipPath>
+        </defs>
         <path d={linePath} fill="none" stroke={GREEN} strokeWidth="2.2"
-          strokeLinecap="round" strokeLinejoin="round" />
+          strokeLinecap="round" strokeLinejoin="round" clipPath="url(#clipAboveZero)" />
+        <path d={linePath} fill="none" stroke={RED} strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round" clipPath="url(#clipBelowZero)" />
         {pts.map((pt, i) => {
           const col = pt.v >= 0 ? GREEN : RED
           const label = `${pt.v >= 0 ? '+' : ''}${pt.v.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}`
