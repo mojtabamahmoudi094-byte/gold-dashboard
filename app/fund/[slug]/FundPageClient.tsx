@@ -11,6 +11,7 @@ import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
 import CommentsSection from '../../components/CommentsSection'
+import { NavCard } from './fundShared'
 import { FUND_WEIGHTS, SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { type ChartModalPoint } from '../../../components/ChartModal'
 
@@ -208,6 +209,9 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   const isPositive = changePct > 0
   const isNegative = changePct < 0
 
+  // چیدمان کارتی جدید — فعلاً فقط برای صندوق «عیار» (پایلوت). تأیید شد → بقیه صندوق‌ها
+  const isAyar = asset.name === 'عیار'
+
   // دوره ریال: trade_value > 1e6 (raw ریال). کار می‌کند برای همه صندوق‌ها از جمله نقره/زعفران
   const priceIsRial = safe(record.trade_value) > 1e6
   const priceToman = (v: number) => priceIsRial ? Math.round(v / 10) : v
@@ -372,8 +376,37 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
             tooltip="نسبت سرانه خریدار به سرانه فروشنده. بالای ۱ یعنی خریداران قوی‌ترند" />
         </div>
 
+        {/* حباب صندوق (عیار): یک کارت، سه حباب زیر هم */}
+        {isAyar && (bubbleAsmi != null || bubbleZati != null) && (
+          <div style={{
+            background: t.panel, border: `0.5px solid ${t.border}`, borderTop: `2px solid ${t.accent}55`,
+            borderRadius: 14, padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.textBright, marginBottom: 12 }}>حباب صندوق</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { label: 'حباب اسمی', v: bubbleAsmi, tip: '(قیمت پایانی − NAV ابطال) ÷ NAV' },
+                { label: 'حباب ذاتی', v: bubbleZati, tip: 'سهم سکه × حباب سکه بورس کالا + سهم شمش × حباب شمش بورس کالا' },
+                { label: 'حباب واقعی', v: bubbleVaqei, tip: 'حباب اسمی + حباب ذاتی' },
+              ].map(b => (
+                <div key={b.label} title={b.tip} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 14px', borderRadius: 10, cursor: 'help',
+                  background: t.cardInner ?? 'rgba(255,255,255,0.02)', border: `0.5px solid ${t.border}`,
+                }}>
+                  <span style={{ fontSize: 12.5, color: t.text }}>{b.label}</span>
+                  <span style={{ fontSize: 17, fontWeight: 800, fontFamily: 'system-ui, sans-serif', color: pctColor(b.v) ?? t.textBright }}>
+                    {pctFmt(b.v)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* حباب صندوق — فقط طلا/نقره (وزن ترکیب دارایی فقط برای این دو دسته موجود است) */}
-        {(bubbleAsmi != null || bubbleZati != null) && (
+        {!isAyar && (bubbleAsmi != null || bubbleZati != null) && (
           <div style={{
             background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 14,
             padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
@@ -531,23 +564,42 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
           loading={snapshotLoading}
         />
 
-        {/* پورتفوی کدال + گزارش فصلی (در صورت وجود JSON در public/portfolio) */}
-        <CodalSections t={t} slug={slug} isMobile={isMobile} />
+        {/* کارت‌های ورود به زیرصفحه‌ها (عیار) */}
+        {isAyar ? (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>
+            <NavCard t={t} href={`/fund/${encodeURIComponent(slug)}/holdings`} accent="#FACC15"
+              title="ترکیب دارایی صندوق" subtitle="نمودار دایره‌ای وزن سکه، شمش و نقد"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>} />
+            <NavCard t={t} href={`/fund/${encodeURIComponent(slug)}/bubble-trend`} accent="#A78BFA"
+              title="روند حباب" subtitle="نمودار میله‌ای و خطی دو‌رنگ + آرشیو نامحدود + عادتِ خودِ صندوق"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M7 14l4-4 4 4 4-6" /></svg>} />
+            <NavCard t={t} href={`/fund/${encodeURIComponent(slug)}/tape`} accent="#00E5A0"
+              title="تابلوخوانی" subtitle="جریان پول، سرانه، قدرت خریدار، ارزش و حجم حقیقی و حقوقی"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>} />
+            <NavCard t={t} href={`/technical/${encodeURIComponent(asset.name.replace(/\s+/g, '-'))}`} accent="#38BDF8"
+              title="تحلیل تکنیکال" subtitle="نمودار کندلی، اندیکاتورها و الگوهای قیمت"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5v14M9 8h4M9 16h4M15 3v18M15 7h3M15 14h3" /></svg>} />
+            <NavCard t={t} href={`/fund/${encodeURIComponent(slug)}/announcements`} accent="#60A5FA"
+              title="اطلاعیه‌های کدال" subtitle="گزارش‌ها، افشای اطلاعات و مجامع صندوق"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>} />
+          </div>
+        ) : (
+          <>
+            {/* پورتفوی کدال + گزارش فصلی (در صورت وجود JSON در public/portfolio) */}
+            <CodalSections t={t} slug={slug} isMobile={isMobile} />
 
-        {/* اطلاعیه‌های کدال — دریافت زنده کلاینت‌ساید */}
-        <CodalAnnouncements symbol={slug} isDark={isDark} isMobile={isMobile} />
+            {/* اطلاعیه‌های کدال — دریافت زنده کلاینت‌ساید */}
+            <CodalAnnouncements symbol={slug} isDark={isDark} isMobile={isMobile} />
+          </>
+        )}
 
         <TelegramChannelCta context="fund" />
 
         <CommentsSection targetType="fund" targetKey={slug} isDark={isDark} />
 
-        {/* ─── بخش گیت‌شده: فقط برای اعضا ─── */}
+        {/* ─── بخش گیت‌شده: فقط برای اعضا (برای عیار به زیرصفحهٔ تابلوخوانی منتقل شد) ─── */}
+        {!isAyar && (
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-        {/* نمودار قیمت */}
-        {history.length >= 3 && (
-          <FundPriceChart t={t} history={history} />
-        )}
 
         {/* جدول معاملات حقیقی */}
         <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
@@ -908,6 +960,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
           )}
 
         </div>
+        )}
         {/* ─── پایان بخش گیت‌شده ─── */}
 
       </div>
