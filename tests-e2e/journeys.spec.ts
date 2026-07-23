@@ -42,6 +42,14 @@ test('صفحه صندوق تابش: حباب + بنر کانال تلگرام', 
   await expectBrandClean(page)
 })
 
+test('نماد متوقف فولاد: بنر توقف به‌جای «پیدا نشد»', async ({ page }) => {
+  // فولاد از ۱۴۰۴/۱۲ متوقف است — seed-halted-symbols + carry-forward باید نگهش دارند (فیکس ۰۷-۲۳)
+  await page.goto(`/stock/${encodeURIComponent('فولاد')}`)
+  await expect(page.locator('body')).toContainText('متوقف است', { timeout: 30_000 })
+  await expect(page.locator('body')).not.toContainText('پیدا نشد')
+  await expectBrandClean(page)
+})
+
 test('صفحه سهم شبندر: هدر قیمت رندر می‌شود', async ({ page }) => {
   // شبندر: نماد بزرگ و حاضر در snapshot صنایع. (فولاد عمداً نه — متوقف و کلاً غایب از پایپلاین، یافتهٔ ۰۷-۲۳)
   await page.goto(`/stock/${encodeURIComponent('شبندر')}`)
