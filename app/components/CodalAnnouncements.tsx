@@ -67,12 +67,15 @@ const pubKey = (a: Ann) => toEnDigits(String(a.date_publish ?? ''))
 
 type State = 'loading' | 'ok' | 'empty' | 'error'
 
-export default function CodalAnnouncements({ symbol, isDark, isMobile }: {
+export default function CodalAnnouncements({ symbol, isDark, isMobile, pageSize }: {
   symbol: string; isDark: boolean; isMobile: boolean
+  // اگر ست شود، به‌جای «نمایش همه» صفحه‌بندی pageSize‌تایی فعال می‌شود
+  pageSize?: number
 }) {
   const [list, setList] = useState<Ann[]>([])
   const [state, setState] = useState<State>('loading')
   const [expanded, setExpanded] = useState(false)
+  const [page, setPage] = useState(0)
 
   const load = useCallback(async (force = false) => {
     if (!symbol) return
@@ -109,13 +112,19 @@ export default function CodalAnnouncements({ symbol, isDark, isMobile }: {
   }, [symbol])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { setPage(0) }, [symbol])
 
   const panel = isDark ? 'rgba(10,18,30,0.88)' : 'rgba(255,255,255,0.9)'
   const text  = isDark ? '#E8F4FF' : '#0F1E2E'
   const muted = isDark ? '#ddd5bd' : '#6B7F90'
   const line  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,30,46,0.08)'
 
-  const shown = expanded ? list : list.slice(0, SHOW_LIMIT)
+  // حالت صفحه‌بندی: pageSize اطلاعیه در هر صفحه؛ حالت قدیمی: SHOW_LIMIT + «نمایش همه»
+  const totalPages = pageSize ? Math.max(1, Math.ceil(list.length / pageSize)) : 1
+  const safePage = Math.min(page, totalPages - 1)
+  const shown = pageSize
+    ? list.slice(safePage * pageSize, (safePage + 1) * pageSize)
+    : (expanded ? list : list.slice(0, SHOW_LIMIT))
 
   return (
     <section style={{
@@ -182,14 +191,38 @@ export default function CodalAnnouncements({ symbol, isDark, isMobile }: {
               ) : <div key={i}>{row}</div>
             })}
           </div>
-          {list.length > SHOW_LIMIT && (
+          {pageSize ? (totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={safePage === 0}
+                style={{
+                  fontSize: 11, padding: '6px 16px', borderRadius: 8, minHeight: 36,
+                  cursor: safePage === 0 ? 'default' : 'pointer', opacity: safePage === 0 ? 0.4 : 1,
+                  background: 'transparent', border: `0.5px solid ${line}`, color: muted, fontFamily: 'inherit',
+                }}
+              >قبلی</button>
+              <span style={{ fontSize: 11, color: muted }}>
+                صفحه {(safePage + 1).toLocaleString('fa-IR')} از {totalPages.toLocaleString('fa-IR')}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={safePage >= totalPages - 1}
+                style={{
+                  fontSize: 11, padding: '6px 16px', borderRadius: 8, minHeight: 36,
+                  cursor: safePage >= totalPages - 1 ? 'default' : 'pointer', opacity: safePage >= totalPages - 1 ? 0.4 : 1,
+                  background: `${ACCENT}14`, border: `0.5px solid ${ACCENT}40`, color: ACCENT, fontFamily: 'inherit',
+                }}
+              >بعدی</button>
+            </div>
+          )) : (list.length > SHOW_LIMIT && (
             <button onClick={() => setExpanded(e => !e)} style={{
               marginTop: 12, fontSize: 11, padding: '6px 16px', borderRadius: 8, cursor: 'pointer',
               background: 'transparent', border: `0.5px solid ${line}`, color: muted, fontFamily: 'inherit',
             }}>
               {expanded ? 'نمایش کمتر' : `نمایش همه (${list.length.toLocaleString('fa-IR')})`}
             </button>
-          )}
+          ))}
           <div style={{ fontSize: 9.5, color: muted, marginTop: 10 }}>
             منبع: سامانه کدال (codal.ir) — دریافت زنده از مرورگر شما
           </div>
