@@ -20,3 +20,7 @@ rsync -az --delete .next/standalone/ "$SERVER:$DEST/app/"
 
 echo "==> restart + smoke test"
 ssh "$SERVER" "systemctl restart bourssanj-site && sleep 3 && curl -sfo /dev/null -w '%{http_code}' http://127.0.0.1:3000/ && echo ' OK'"
+
+# کرون‌ها از /opt/bourssanj می‌خوانند — فقط ff-only تا تغییرات push‌نشده سرور از بین نرود
+echo "==> git pull کرون‌ریپو /opt/bourssanj"
+ssh "$SERVER" "cd /opt/bourssanj && git pull --ff-only || echo 'WARN: pull ff-only شکست خورد — تغییر لوکال سرور را دستی بررسی کن'"
