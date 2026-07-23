@@ -752,9 +752,18 @@ export default function FundsCatPage() {
         {/* نمودار ورود و خروج پول حقیقی */}
         {!loading && funds.length > 0 && (
           <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
-            <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em', marginBottom: 16 }}>
-              ورود و خروج پول حقیقی
-              <span style={{ fontSize: 10, color: cream, marginRight: 8 }}>میلیارد تومان</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em' }}>
+                ورود و خروج پول حقیقی
+                <span style={{ fontSize: 10, color: cream, marginRight: 8 }}>میلیارد تومان</span>
+              </div>
+              <Link href={`/funds/${slug}/archive`} aria-label="آرشیو روزهای گذشته" style={{
+                fontSize: 10, fontWeight: 700, color: '#00E5A0', textDecoration: 'none',
+                padding: '3px 9px', borderRadius: 7, flexShrink: 0,
+                background: '#00E5A012', border: '0.5px solid #00E5A038',
+              }}>
+                آرشیو
+              </Link>
             </div>
             {(() => {
               const flows = funds.map(f => {
@@ -769,7 +778,8 @@ export default function FundsCatPage() {
 
               return (
                 <div style={{ overflowX: 'auto' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', minWidth: flows.length * 30, height: barMaxH * 2 + 50, position: 'relative', paddingTop: 25 }}>
+                  {/* +75 فضای پایین — لیبل مقدارِ میله منفی بلند روی ردیف نماد نیفتد */}
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: flows.length * 30, height: barMaxH * 2 + 75, position: 'relative', paddingTop: 25 }}>
                     <div style={{ position: 'absolute', left: 0, right: 0, top: barMaxH + 35, height: 1, background: `${t.muted}33` }} />
 
                     {flows.map((f, i) => {
@@ -825,9 +835,16 @@ export default function FundsCatPage() {
               <div style={{ fontSize: 11, color: t.muted, letterSpacing: '0.04em' }}>
                 سرانه‌ی خرید و فروش حقیقی
               </div>
-              <div style={{ display: 'flex', gap: 14, fontSize: 10 }}>
+              <div style={{ display: 'flex', gap: 14, fontSize: 10, alignItems: 'center' }}>
                 <span style={{ color: '#00E5A0' }}>■ سرانه خریدار</span>
                 <span style={{ color: '#FF4D6A' }}>■ سرانه فروشنده</span>
+                <Link href={`/funds/${slug}/archive?m=percap`} aria-label="آرشیو روزهای گذشته" style={{
+                  fontSize: 10, fontWeight: 700, color: '#00E5A0', textDecoration: 'none',
+                  padding: '3px 9px', borderRadius: 7, flexShrink: 0,
+                  background: '#00E5A012', border: '0.5px solid #00E5A038',
+                }}>
+                  آرشیو
+                </Link>
               </div>
             </div>
             {(() => {
