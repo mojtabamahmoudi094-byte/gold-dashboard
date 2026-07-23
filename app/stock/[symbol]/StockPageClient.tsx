@@ -21,8 +21,6 @@ import {
   MonthlySection, PortfolioSection, QuarterlyFinSection, ShareholdersSection,
 } from './sections'
 
-// حالت کارتی — فعلاً فقط شبندر (آزمایشی)؛ بعد از تأیید برای همه نمادها فعال می‌شود
-const CARD_MODE_SYMBOLS = new Set(['شبندر'])
 
 type SnapshotRow = {
   trade_date_shamsi: string
@@ -138,8 +136,8 @@ export default function StockPage({ symbol, initialData, initialReports }: {
 
   const pcColor = (v: number | null) => (v === null || v === 0 ? text : v > 0 ? GREEN : RED)
 
-  // حالت کارتی: بخش‌های ماهانه/فصلی/سهامداران کارت لینکی می‌شوند و اطلاعیه‌های کدال ۵تایی صفحه‌بندی
-  const cardMode = CARD_MODE_SYMBOLS.has(symbol)
+  // حالت کارتی برای همه نمادها: ماهانه/فصلی/سهامداران/کدال کارت مربعی با صفحه مستقل
+  const cardMode = true
   const enc = encodeURIComponent(symbol)
 
   return (
