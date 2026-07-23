@@ -148,16 +148,37 @@ async function updateStockIndustriesUsd(rate) {
   else console.log(`[sync-usd-market-value] ✅ ${symbolCount} نماد/صندوق سهامی به‌روز شد (نرخ دلار: ${rate.toLocaleString('fa-IR')} ریال)`)
 }
 
+// ── آخرین ردیف هر صندوق کالایی (وقتی ردیف امروز موجود نیست — روز غیرمعاملاتی) ──
+async function latestGoldFundRows() {
+  const { data: assets } = await sb().from('assets').select('id')
+  const out = []
+  for (const a of assets || []) {
+    const { data } = await sb()
+      .from('gold_funds')
+      .select('id, market_value')
+      .eq('asset_id', a.id)
+      .not('market_value', 'is', null)
+      .order('trade_date_shamsi', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1)
+    if (data && data[0]) out.push(data[0])
+  }
+  return out
+}
+
 // ── صندوق‌های کالایی (طلا/نقره/زعفران) در gold_funds ─────────────────────────
 async function updateGoldFundsUsd(rate, date) {
-  const { data: rows, error } = await sb()
+  const { data: todayRows, error } = await sb()
     .from('gold_funds')
     .select('id, market_value')
     .eq('trade_date_shamsi', date)
     .not('market_value', 'is', null)
 
   if (error) { console.warn('[sync-usd-market-value] خواندن gold_funds ناموفق:', error.message); return }
-  if (!rows || rows.length === 0) { console.warn(`[sync-usd-market-value] هیچ ردیف gold_funds با market_value برای ${date} پیدا نشد`); return }
+
+  // اگر ردیف امروز نبود (روز غیرمعاملاتی/قبل از سینک صندوق‌ها) آخرین ردیف هر صندوق را به‌روز کن
+  const rows = (todayRows && todayRows.length > 0) ? todayRows : await latestGoldFundRows()
+  if (!rows || rows.length === 0) { console.warn('[sync-usd-market-value] هیچ ردیف gold_funds با market_value پیدا نشد'); return }
 
   let updated = 0
   for (const r of rows) {

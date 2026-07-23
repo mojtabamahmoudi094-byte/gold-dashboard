@@ -10,6 +10,9 @@ import { safe, fmtCompact as fmtVal, fmtHomat } from '../../../lib/format'
 
 const COMMODITY_CATS = ['gold', 'silver', 'saffron']
 
+// آدرس صفحهٔ صندوق: پایلوت عیار با نام فارسی، بقیه با slug (ISIN)
+const fundHref = (f: any) => f.symbol === 'عیار' ? `/fund/${encodeURIComponent(f.symbol)}` : `/fund/${f.slug}`
+
 const CAT_MAP: Record<string, { label: string; category: string; color: string }> = {
   gold:    { label: 'طلا',    category: 'طلا',    color: 'oklch(0.82 0.15 70)' },
   silver:  { label: 'نقره',   category: 'نقره',   color: 'oklch(0.84 0.03 240)' },
@@ -346,7 +349,7 @@ export default function FundsCatPage() {
               <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 12, letterSpacing: '0.02em' }}>{title}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {rows.map((f, i) => (
-                  <Link key={f.slug} href={`/fund/${f.slug}`} style={{ textDecoration: 'none' }}>
+                  <Link key={f.slug} href={fundHref(f)} style={{ textDecoration: 'none' }}>
                     <div
                       style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 8px', borderRadius: 8, margin: '0 -8px', transition: 'background 0.15s' }}
                       onMouseEnter={e => ((e.currentTarget as HTMLDivElement).style.background = `${color}15`)}
@@ -505,7 +508,7 @@ export default function FundsCatPage() {
                 return (
                   <Link
                     key={i}
-                    href={`/fund/${f.slug}`}
+                    href={fundHref(f)}
                     style={{
                       textDecoration: 'none',
                       display: 'block',
@@ -614,7 +617,7 @@ export default function FundsCatPage() {
                         transition: 'background 0.15s',
                         cursor: 'pointer',
                       }}
-                        onClick={() => router.push(`/fund/${f.slug}`)}
+                        onClick={() => router.push(fundHref(f))}
                         onMouseEnter={e => (e.currentTarget.style.background = `${t.accent}0D`)}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
@@ -630,7 +633,7 @@ export default function FundsCatPage() {
                           </span>
                         </td>
                         <td style={{ padding: '10px 8px', fontWeight: 700 }}>
-                          <Link href={`/fund/${f.slug}`} style={{ color: t.accent, textDecoration: 'none' }}>{f.symbol}</Link>
+                          <Link href={fundHref(f)} style={{ color: t.accent, textDecoration: 'none' }}>{f.symbol}</Link>
                         </td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{f.priceClose.toLocaleString('fa-IR')}</td>
                         <td style={{ padding: '10px 8px', color: t.text }}>{f.priceLast.toLocaleString('fa-IR')}</td>
@@ -734,7 +737,7 @@ export default function FundsCatPage() {
 
                   return (
                     <Link
-                      href={`/fund/${f.slug}`}
+                      href={fundHref(f)}
                       key={i}
                       title={`${f.symbol}\nتغییر: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}٪\nارزش معاملات: ${tvStr(f.tradeValue)}`}
                       style={{

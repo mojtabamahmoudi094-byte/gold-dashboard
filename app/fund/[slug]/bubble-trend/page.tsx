@@ -46,7 +46,7 @@ export default function FundBubbleTrendPage() {
 
   useEffect(() => {
     if (!slug) return
-    supabase.from('assets').select('*').eq('slug', slug).single().then(({ data: a }) => {
+    supabase.from('assets').select('*').or(`slug.eq.${slug},name.eq.${slug}`).limit(1).maybeSingle().then(({ data: a }) => {
       setAsset(a ?? null)
       if (!a) { setHist([]); return }
       supabase.from('fund_bubble_daily')

@@ -15,8 +15,9 @@ export async function GET(req: Request) {
   const { data: asset, error: assetErr } = await sb
     .from('assets')
     .select('id')
-    .eq('slug', slug)
-    .single()
+    .or(`slug.eq.${slug},name.eq.${slug}`)
+    .limit(1)
+    .maybeSingle()
   if (assetErr || !asset) {
     return NextResponse.json({ rows: [] }, { status: 404 })
   }

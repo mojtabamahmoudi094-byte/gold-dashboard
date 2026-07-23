@@ -33,7 +33,7 @@ export default function FundHoldingsPage() {
 
   useEffect(() => {
     if (!slug) return
-    supabase.from('assets').select('*').eq('slug', slug).single().then(({ data: a }) => {
+    supabase.from('assets').select('*').or(`slug.eq.${slug},name.eq.${slug}`).limit(1).maybeSingle().then(({ data: a }) => {
       setAsset(a ?? null)
       if (a?.category === 'طلا') fetch('/fund-weights/gold.json').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setGoldW(w => ({ ...w, ...j.weights })) }).catch(() => {})
       else if (a?.category === 'نقره') fetch('/fund-weights/silver.json').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setSilverW(w => ({ ...w, ...j.weights })) }).catch(() => {})

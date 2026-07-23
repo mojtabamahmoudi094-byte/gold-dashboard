@@ -11,7 +11,7 @@ import { useIsMobile } from '../../../lib/useIsMobile'
 import { safe, fmtNum as fmtVal } from '../../../lib/format'
 import CodalAnnouncements from '../../components/CodalAnnouncements'
 import CommentsSection from '../../components/CommentsSection'
-import { NavCard } from './fundShared'
+import { SquareLinkGrid, SquareLinkCard, TapeIcon, CodalIcon } from '../../stock/[symbol]/sections'
 import { FUND_WEIGHTS, SILVER_FUND_WEIGHTS } from '../../../lib/goldBubbles'
 import { type ChartModalPoint } from '../../../components/ChartModal'
 
@@ -157,8 +157,9 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
       const { data: assetData } = await supabase
         .from('assets')
         .select('*')
-        .eq('slug', slug)
-        .single()
+        .or(`slug.eq.${slug},name.eq.${slug}`)
+        .limit(1)
+        .maybeSingle()
       if (!assetData) { setLoading(false); return }
       setAsset(assetData)
 
@@ -564,26 +565,34 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
           loading={snapshotLoading}
         />
 
-        {/* کارت‌های ورود به زیرصفحه‌ها (عیار) */}
-        {isAyar ? (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>
-            <NavCard t={t} href={`/fund/${encodeURIComponent(slug)}/holdings`} accent="#FACC15"
-              title="ترکیب دارایی صندوق" subtitle="نمودار دایره‌ای وزن سکه، شمش و نقد"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>} />
-            <NavCard t={t} href={`/fund/${encodeURIComponent(slug)}/bubble-trend`} accent="#A78BFA"
-              title="روند حباب" subtitle="نمودار میله‌ای و خطی دو‌رنگ + آرشیو نامحدود + عادتِ خودِ صندوق"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M7 14l4-4 4 4 4-6" /></svg>} />
-            <NavCard t={t} href={`/fund/${encodeURIComponent(slug)}/tape`} accent="#00E5A0"
-              title="تابلوخوانی" subtitle="جریان پول، سرانه، قدرت خریدار، ارزش و حجم حقیقی و حقوقی"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>} />
-            <NavCard t={t} href={`/technical/${encodeURIComponent(asset.name.replace(/\s+/g, '-'))}`} accent="#38BDF8"
-              title="تحلیل تکنیکال" subtitle="نمودار کندلی، اندیکاتورها و الگوهای قیمت"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5v14M9 8h4M9 16h4M15 3v18M15 7h3M15 14h3" /></svg>} />
-            <NavCard t={t} href={`/fund/${encodeURIComponent(slug)}/announcements`} accent="#60A5FA"
-              title="اطلاعیه‌های کدال" subtitle="گزارش‌ها، افشای اطلاعات و مجامع صندوق"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>} />
-          </div>
-        ) : (
+        {/* کارت‌های مربعی ورود به زیرصفحه‌ها (عیار) — همان الگوی کارت‌های نماد بورسی */}
+        {isAyar ? (() => {
+          const sqT = { panel: t.panel, text: t.textBright, muted: t.muted, line: t.border, isDark }
+          const enc = encodeURIComponent(slug)
+          const topHold = [...compositionBars].sort((a, b) => b.pct - a.pct)[0]
+          const ic = (accent: string, d: React.ReactNode) => (
+            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>{d}</svg>
+          )
+          return (
+            <SquareLinkGrid isMobile={isMobile} cols={5}>
+              <SquareLinkCard href={`/fund/${enc}/holdings`} isMobile={isMobile} t={sqT} accent="#FACC15"
+                title="ترکیب دارایی" icon={ic('#FACC15', <><circle cx="12" cy="12" r="9" /><path d="M12 3v9l6.4 6.4" /></>)}
+                stat={{ label: 'بیشترین دارایی', value: topHold ? `${topHold.label} ${topHold.pct.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}٪` : 'نمودار دایره‌ای' }} />
+              <SquareLinkCard href={`/fund/${enc}/bubble-trend`} isMobile={isMobile} t={sqT} accent="#a78bfa"
+                title="روند حباب" icon={ic('#a78bfa', <><path d="M3 3v18h18" /><path d="M7 14l4-4 4 4 4-6" /></>)}
+                stat={{ label: 'حباب واقعی امروز', value: pctFmt(bubbleVaqei), color: pctColor(bubbleVaqei) }} />
+              <SquareLinkCard href={`/fund/${enc}/tape`} isMobile={isMobile} t={sqT} accent="#00E5A0"
+                title="تابلوخوانی" icon={<TapeIcon size={isMobile ? 18 : 23} />}
+                stat={{ label: 'حقیقی و حقوقی', value: '۱۰ روز اخیر' }} />
+              <SquareLinkCard href={`/technical/${encodeURIComponent(asset.name.replace(/\s+/g, '-'))}`} isMobile={isMobile} t={sqT} accent="#38BDF8"
+                title="تحلیل تکنیکال" icon={ic('#38BDF8', <><path d="M9 5v14M9 8h4M9 16h4M15 3v18M15 7h3M15 14h3" /></>)}
+                stat={{ label: 'کندل و اندیکاتور', value: 'نمودار قیمت' }} />
+              <SquareLinkCard href={`/fund/${enc}/announcements`} isMobile={isMobile} t={sqT} accent="#60A5FA"
+                title="اطلاعیه‌های کدال" icon={<CodalIcon size={isMobile ? 18 : 23} />}
+                stat={{ label: 'اطلاعیه‌های ناشر', value: 'دریافت زنده' }} />
+            </SquareLinkGrid>
+          )
+        })() : (
           <>
             {/* پورتفوی کدال + گزارش فصلی (در صورت وجود JSON در public/portfolio) */}
             <CodalSections t={t} slug={slug} isMobile={isMobile} />
