@@ -10,8 +10,10 @@ import { safe, fmtCompact as fmtVal, fmtHomat } from '../../../lib/format'
 
 const COMMODITY_CATS = ['gold', 'silver', 'saffron']
 
-// آدرس صفحهٔ صندوق: پایلوت عیار با نام فارسی، بقیه با slug (ISIN)
-const fundHref = (f: any) => f.symbol === 'عیار' ? `/fund/${encodeURIComponent(f.symbol)}` : `/fund/${f.slug}`
+// آدرس صفحهٔ صندوق: صندوق‌های کالایی با نام فارسی، صندوق‌های بورسی با slug (ISIN)
+const fundHref = (f: any) => ['طلا', 'نقره', 'زعفران'].includes(f.category)
+  ? `/fund/${encodeURIComponent(f.symbol)}`
+  : `/fund/${f.slug}`
 
 const CAT_MAP: Record<string, { label: string; category: string; color: string }> = {
   gold:    { label: 'طلا',    category: 'طلا',    color: 'oklch(0.82 0.15 70)' },

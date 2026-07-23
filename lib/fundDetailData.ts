@@ -5,7 +5,7 @@ export async function resolveFundAsset(key: string) {
   const { data } = await supabase
     .from('assets')
     .select('*')
-    .or(`slug.eq.${key},name.eq.${key}`)
+    .or(`slug.eq."${key}",name.eq."${key}"`)
     .limit(1)
     .maybeSingle()
   return data ?? null

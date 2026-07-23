@@ -29,7 +29,7 @@ export default function FundAnnouncementsPage() {
 
   useEffect(() => {
     if (!slug) return
-    supabase.from('assets').select('name').or(`slug.eq.${slug},name.eq.${slug}`).limit(1).maybeSingle()
+    supabase.from('assets').select('name').or(`slug.eq."${slug}",name.eq."${slug}"`).limit(1).maybeSingle()
       .then(({ data }) => setAsset(data ?? null))
   }, [slug])
 

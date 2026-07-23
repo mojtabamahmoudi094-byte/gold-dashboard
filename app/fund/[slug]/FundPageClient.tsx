@@ -157,7 +157,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
       const { data: assetData } = await supabase
         .from('assets')
         .select('*')
-        .or(`slug.eq.${slug},name.eq.${slug}`)
+        .or(`slug.eq."${slug}",name.eq."${slug}"`)
         .limit(1)
         .maybeSingle()
       if (!assetData) { setLoading(false); return }
@@ -210,8 +210,8 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
   const isPositive = changePct > 0
   const isNegative = changePct < 0
 
-  // چیدمان کارتی جدید — فعلاً فقط برای صندوق «عیار» (پایلوت). تأیید شد → بقیه صندوق‌ها
-  const isAyar = asset.name === 'عیار'
+  // چیدمان کارتی: همهٔ صندوق‌های کالایی (طلا/نقره/زعفران). صندوق‌های بورسی چیدمان قدیمی را نگه می‌دارند
+  const isCommodity = ['طلا', 'نقره', 'زعفران'].includes(asset.category)
 
   // دوره ریال: trade_value > 1e6 (raw ریال). کار می‌کند برای همه صندوق‌ها از جمله نقره/زعفران
   const priceIsRial = safe(record.trade_value) > 1e6
@@ -378,7 +378,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
         </div>
 
         {/* حباب صندوق (عیار): یک کارت، سه حباب زیر هم */}
-        {isAyar && (bubbleAsmi != null || bubbleZati != null) && (
+        {isCommodity && (bubbleAsmi != null || bubbleZati != null) && (
           <div style={{
             background: t.panel, border: `0.5px solid ${t.border}`, borderTop: `2px solid ${t.accent}55`,
             borderRadius: 14, padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
@@ -407,7 +407,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
         )}
 
         {/* حباب صندوق — فقط طلا/نقره (وزن ترکیب دارایی فقط برای این دو دسته موجود است) */}
-        {!isAyar && (bubbleAsmi != null || bubbleZati != null) && (
+        {!isCommodity && (bubbleAsmi != null || bubbleZati != null) && (
           <div style={{
             background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 14,
             padding: '16px 18px', backdropFilter: 'blur(12px)', minWidth: 0,
@@ -565,33 +565,37 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
           loading={snapshotLoading}
         />
 
-        {/* کارت‌های مربعی ورود به زیرصفحه‌ها (عیار) — همان الگوی کارت‌های نماد بورسی */}
-        {isAyar ? (() => {
+        {/* کارت‌های مربعی ورود به زیرصفحه‌ها — همان الگوی کارت‌های نماد بورسی */}
+        {isCommodity ? (() => {
           const sqT = { panel: t.panel, text: t.textBright, muted: t.muted, line: t.border, isDark }
           const enc = encodeURIComponent(slug)
           const topHold = [...compositionBars].sort((a, b) => b.pct - a.pct)[0]
           const ic = (accent: string, d: React.ReactNode) => (
             <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>{d}</svg>
           )
-          return (
-            <SquareLinkGrid isMobile={isMobile} cols={5}>
-              <SquareLinkCard href={`/fund/${enc}/holdings`} isMobile={isMobile} t={sqT} accent="#FACC15"
+          // ترکیب دارایی و حباب فقط برای طلا/نقره داده دارند — زعفران این دو کارت را ندارد
+          const cards = [
+            compositionBars.length > 0 && (
+              <SquareLinkCard key="holdings" href={`/fund/${enc}/holdings`} isMobile={isMobile} t={sqT} accent="#FACC15"
                 title="ترکیب دارایی" icon={ic('#FACC15', <><circle cx="12" cy="12" r="9" /><path d="M12 3v9l6.4 6.4" /></>)}
                 stat={{ label: 'بیشترین دارایی', value: topHold ? `${topHold.label} ${topHold.pct.toLocaleString('fa-IR', { maximumFractionDigits: 0 })}٪` : 'نمودار دایره‌ای' }} />
-              <SquareLinkCard href={`/fund/${enc}/bubble-trend`} isMobile={isMobile} t={sqT} accent="#a78bfa"
+            ),
+            (bubbleVaqei != null || bubbleAsmi != null || bubbleHistory.length >= 2) && (
+              <SquareLinkCard key="bubble" href={`/fund/${enc}/bubble-trend`} isMobile={isMobile} t={sqT} accent="#a78bfa"
                 title="روند حباب" icon={ic('#a78bfa', <><path d="M3 3v18h18" /><path d="M7 14l4-4 4 4 4-6" /></>)}
-                stat={{ label: 'حباب واقعی امروز', value: pctFmt(bubbleVaqei), color: pctColor(bubbleVaqei) }} />
-              <SquareLinkCard href={`/fund/${enc}/tape`} isMobile={isMobile} t={sqT} accent="#00E5A0"
-                title="تابلوخوانی" icon={<TapeIcon size={isMobile ? 18 : 23} />}
-                stat={{ label: 'حقیقی و حقوقی', value: '۱۰ روز اخیر' }} />
-              <SquareLinkCard href={`/technical/${encodeURIComponent(asset.name.replace(/\s+/g, '-'))}`} isMobile={isMobile} t={sqT} accent="#38BDF8"
-                title="تحلیل تکنیکال" icon={ic('#38BDF8', <><path d="M9 5v14M9 8h4M9 16h4M15 3v18M15 7h3M15 14h3" /></>)}
-                stat={{ label: 'کندل و اندیکاتور', value: 'نمودار قیمت' }} />
-              <SquareLinkCard href={`/fund/${enc}/announcements`} isMobile={isMobile} t={sqT} accent="#60A5FA"
-                title="اطلاعیه‌های کدال" icon={<CodalIcon size={isMobile ? 18 : 23} />}
-                stat={{ label: 'اطلاعیه‌های ناشر', value: 'دریافت زنده' }} />
-            </SquareLinkGrid>
-          )
+                stat={{ label: 'حباب واقعی امروز', value: pctFmt(bubbleVaqei ?? bubbleAsmi), color: pctColor(bubbleVaqei ?? bubbleAsmi) }} />
+            ),
+            <SquareLinkCard key="tape" href={`/fund/${enc}/tape`} isMobile={isMobile} t={sqT} accent="#00E5A0"
+              title="تابلوخوانی" icon={<TapeIcon size={isMobile ? 18 : 23} />}
+              stat={{ label: 'حقیقی و حقوقی', value: '۱۰ روز اخیر' }} />,
+            <SquareLinkCard key="tech" href={`/technical/${encodeURIComponent(asset.name.replace(/\s+/g, '-'))}`} isMobile={isMobile} t={sqT} accent="#38BDF8"
+              title="تحلیل تکنیکال" icon={ic('#38BDF8', <><path d="M9 5v14M9 8h4M9 16h4M15 3v18M15 7h3M15 14h3" /></>)}
+              stat={{ label: 'کندل و اندیکاتور', value: 'نمودار قیمت' }} />,
+            <SquareLinkCard key="codal" href={`/fund/${enc}/announcements`} isMobile={isMobile} t={sqT} accent="#60A5FA"
+              title="اطلاعیه‌های کدال" icon={<CodalIcon size={isMobile ? 18 : 23} />}
+              stat={{ label: 'اطلاعیه‌های ناشر', value: 'دریافت زنده' }} />,
+          ].filter(Boolean)
+          return <SquareLinkGrid isMobile={isMobile} cols={cards.length}>{cards}</SquareLinkGrid>
         })() : (
           <>
             {/* پورتفوی کدال + گزارش فصلی (در صورت وجود JSON در public/portfolio) */}
@@ -607,7 +611,7 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
         <CommentsSection targetType="fund" targetKey={slug} isDark={isDark} />
 
         {/* ─── بخش گیت‌شده: فقط برای اعضا (برای عیار به زیرصفحهٔ تابلوخوانی منتقل شد) ─── */}
-        {!isAyar && (
+        {!isCommodity && (
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* نمودار قیمت (فقط صندوق‌های غیر عیار — عیار به کارت تحلیل تکنیکال منتقل شد) */}

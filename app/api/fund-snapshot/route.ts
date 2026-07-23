@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const { data: asset, error: assetErr } = await sb
     .from('assets')
     .select('id')
-    .or(`slug.eq.${slug},name.eq.${slug}`)
+    .or(`slug.eq."${slug}",name.eq."${slug}"`)
     .limit(1)
     .maybeSingle()
   if (assetErr || !asset) {

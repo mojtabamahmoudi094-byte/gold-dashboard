@@ -36,7 +36,7 @@ function ArchiveInner() {
 
   useEffect(() => {
     if (!slug) return
-    supabase.from('assets').select('*').or(`slug.eq.${slug},name.eq.${slug}`).limit(1).maybeSingle().then(({ data: a }) => {
+    supabase.from('assets').select('*').or(`slug.eq."${slug}",name.eq."${slug}"`).limit(1).maybeSingle().then(({ data: a }) => {
       setAsset(a ?? null)
       if (!a) { setAll([]); return }
       supabase.from('gold_funds').select('*').eq('asset_id', a.id)

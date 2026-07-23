@@ -321,7 +321,7 @@ export function ChartKeyframes() {
 // دریافت کل تاریخچهٔ صندوق (آرشیو نامحدود) با همهٔ ستون‌های تابلوخوانی
 export async function fetchFundFullHistory(supabase: any, slug: string): Promise<{ asset: any | null; rows: any[] }> {
   // آدرس می‌تواند slug (ISIN) یا نام نماد باشد
-  const { data: asset } = await supabase.from('assets').select('*').or(`slug.eq.${slug},name.eq.${slug}`).limit(1).maybeSingle()
+  const { data: asset } = await supabase.from('assets').select('*').or(`slug.eq."${slug}",name.eq."${slug}"`).limit(1).maybeSingle()
   if (!asset) return { asset: null, rows: [] }
   const { data } = await supabase
     .from('gold_funds')
