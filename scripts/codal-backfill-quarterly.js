@@ -33,7 +33,7 @@ const path = require('path')
 const fs = require('fs')
 
 const {
-  sbClient, codalVariants, codalPage, pickReports, firstParsable,
+  sbClient, codalVariants, pickReports, firstParsable,
   parseFinancials, computeRatios, upsertReport, faDate, norm, faNum, sleep,
 } = require('./codal-company-reports.js')
 
@@ -51,16 +51,35 @@ const ALL = process.argv.includes('--all')
 
 const log = (m) => console.log(`[${new Date().toISOString()}] ${m}`)
 
-// ═══ فچ کدال بر اساس دوره — صفحه‌به‌صفحه عقب می‌رویم تا انتشارِ قدیمی‌تر از FROM ═══
-// شرط توقف روی «تاریخ انتشار» است: انتشار همیشه ≥ پایان دوره است، پس وقتی انتشار از FROM
-// قدیمی‌تر شد، دورهٔ ≥ FROM دیگر نمی‌آید. سقف صفحه بالاتر از اسکریپت اصلی چون ۵+ سال عقب می‌رویم.
-const MAX_PAGES = 120
+// ═══ فچ کدال با فیلتر تاریخ انتشار (FromDate/ToDate) ═══
+// نسخهٔ اول از صفحهٔ ۱ (جدیدترین) عقب می‌رفت تا به قدیمی‌ها برسد — برای هر نماد ۲۰–۳۰ صفحهٔ
+// بی‌مصرف اخیر هم فچ می‌شد و بودجهٔ ۴۲۹ کدال (که با codal-watch هم‌IP است) زود تمام می‌شد
+// (عملاً هر نماد یک throttle ۱۵ دقیقه‌ای = ~۷ روز برای کل اجرا). فیلتر تاریخ فقط نامه‌های
+// بازهٔ هدف را می‌دهد — چند صفحه به‌جای ده‌ها.
+// نکته: نامهٔ دورهٔ قدیمی که «بعد از» TO منتشر شده (بک‌لاگ درپادی) این‌جا نمی‌آید، ولی خط
+// لولهٔ اصلی (انتشار ≥ ۱۴۰۴) همان را پوشش می‌دهد — بدون گپ.
+const MAX_PAGES = 40
+const CODAL_Q = 'https://search.codal.ir/api/search/v2/q'
+  + '?Audited=true&AuditorRef=-1&Category=-1&Childs=false&CompanyState=-1&CompanyType=-1'
+  + '&Consolidatable=true&IsNotAudited=false&Length=-1&LetterType=-1&Mains=true'
+  + '&NotAudited=true&NotConsolidatable=true&Publisher=false&TracingNo=-1&search=true'
+  + `&FromDate=${encodeURIComponent(FROM)}&ToDate=${encodeURIComponent(TO)}`
+
+async function codalPageOld(sym, p) {
+  const url = `${CODAL_Q}&Symbol=${encodeURIComponent(sym)}&PageNumber=${p}`
+  const res = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: { 'User-Agent': 'Mozilla/5.0' } })
+  if (res.status === 429) throw new Error('کدال ۴۲۹ (rate limit)')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return (await res.json())?.Letters ?? []
+}
 
 async function fetchOldLetters(symbol) {
+  // تشخیص املای کدال هم با همان صفحهٔ فیلترشده — نمادی که در بازه نامه ندارد همان empty درست است
   let sym = null
+  let first = []
   for (const v of codalVariants(symbol)) {
-    const first = await codalPage(v, 1)
-    await sleep(1500)
+    first = await codalPageOld(v, 1)
+    await sleep(3000)
     if (first.some(l => l.Symbol === v)) { sym = v; break }
   }
   if (!sym) return []
@@ -68,13 +87,13 @@ async function fetchOldLetters(symbol) {
 
   const out = []
   for (let p = 1; p <= MAX_PAGES; p++) {
-    const letters = await codalPage(sym, p)
+    const letters = p === 1 ? first : await codalPageOld(sym, p)
     if (!letters.length) break
     let old = false
     for (const l of letters) {
       if (l.Symbol !== sym) continue
       const pub = faDate(l.PublishDateTime ?? l.SentDateTime)
-      if (pub && pub < FROM) { old = true; continue }
+      if (pub && pub < FROM) { old = true; continue }   // گارد دوم — اگر فیلترِ کدال نشتی داشت
       out.push({
         l18: symbol,
         title: l.Title,
@@ -85,7 +104,7 @@ async function fetchOldLetters(symbol) {
       })
     }
     if (old) break
-    await sleep(1500)
+    if (p < MAX_PAGES) await sleep(3000)
   }
   return out
 }
