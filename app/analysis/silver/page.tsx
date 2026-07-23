@@ -44,7 +44,7 @@ export default function SilverAnalysisPage() {
   const [weights, setWeights] = useState<typeof SILVER_FUND_WEIGHTS>(SILVER_FUND_WEIGHTS)
 
   useEffect(() => {
-    fetch('/fund-weights/silver.json').then(r => r.ok ? r.json() : null)
+    fetch('/api/fund-weights?kind=silver').then(r => r.ok ? r.json() : null)
       .then(j => { if (j?.weights) setWeights(w => ({ ...w, ...j.weights })) })
       .catch(() => {})
   }, [])

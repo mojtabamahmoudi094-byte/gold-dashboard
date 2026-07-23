@@ -43,9 +43,9 @@ export default function FundHoldingsPage() {
     if (!slug) return
     supabase.from('assets').select('*').or(`slug.eq."${slug}",name.eq."${slug}"`).limit(1).maybeSingle().then(({ data: a }) => {
       setAsset(a ?? null)
-      if (a?.category === 'طلا') fetch('/fund-weights/gold.json').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setGoldW(w => ({ ...w, ...j.weights })) }).catch(() => {})
-      else if (a?.category === 'نقره') fetch('/fund-weights/silver.json').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setSilverW(w => ({ ...w, ...j.weights })) }).catch(() => {})
-      else if (a?.category === 'زعفران') fetch('/fund-weights/saffron.json').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setSaffronW(j.weights) }).catch(() => {})
+      if (a?.category === 'طلا') fetch('/api/fund-weights?kind=gold').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setGoldW(w => ({ ...w, ...j.weights })) }).catch(() => {})
+      else if (a?.category === 'نقره') fetch('/api/fund-weights?kind=silver').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setSilverW(w => ({ ...w, ...j.weights })) }).catch(() => {})
+      else if (a?.category === 'زعفران') fetch('/api/fund-weights?kind=saffron').then(r => r.ok ? r.json() : null).then(j => { if (j?.weights) setSaffronW(j.weights) }).catch(() => {})
     })
   }, [slug])
 

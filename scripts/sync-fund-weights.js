@@ -91,12 +91,35 @@ async function main() {
 
   if (PROBE) { console.log('\n--probe: فایلی نوشته نشد'); return }
 
+  const files = {
+    'gold.json': { updated: new Date().toISOString(), weights: goldOut },
+    'silver.json': { updated: new Date().toISOString(), weights: silverOut },
+    'saffron.json': { updated: new Date().toISOString(), weights: saffronOut },
+  }
+
+  // ۱) نسخهٔ ریپو (لوکال/توسعه)
   const outDir = path.join(__dirname, '..', 'public', 'fund-weights')
   fs.mkdirSync(outDir, { recursive: true })
-  fs.writeFileSync(path.join(outDir, 'gold.json'), JSON.stringify({ updated: new Date().toISOString(), weights: goldOut }, null, 0))
-  fs.writeFileSync(path.join(outDir, 'silver.json'), JSON.stringify({ updated: new Date().toISOString(), weights: silverOut }, null, 0))
-  fs.writeFileSync(path.join(outDir, 'saffron.json'), JSON.stringify({ updated: new Date().toISOString(), weights: saffronOut }, null, 0))
-  console.log(`\nنوشته شد: ${outDir}/gold.json ، ${outDir}/silver.json ، ${outDir}/saffron.json`)
+  for (const [f, data] of Object.entries(files)) {
+    fs.writeFileSync(path.join(outDir, f), JSON.stringify(data, null, 0))
+  }
+  console.log(`\nنوشته شد: ${outDir}/{gold,silver,saffron}.json`)
+
+  // ۲) مسیر تولید — بیرونِ دایرکتوری سایت، چون هر دیپلوی با `rsync --delete`
+  //    محتوای /opt/bourssanj-site/app را بازنویسی می‌کند. روت /api/fund-weights
+  //    اول از این‌جا می‌خواند و اگر نبود به نسخهٔ همراه ریپو برمی‌گردد.
+  const liveDir = process.env.FUND_WEIGHTS_DIR || '/opt/bourssanj-site/data/fund-weights'
+  try {
+    fs.mkdirSync(liveDir, { recursive: true })
+    for (const [f, data] of Object.entries(files)) {
+      // اگر هیچ صندوقی از یک دسته پارس نشد، فایل زندهٔ قبلی را با خالی خراب نکن
+      if (Object.keys(data.weights).length === 0) { console.log(`… ${f} خالی بود — نسخهٔ زنده دست‌نخورده ماند`); continue }
+      fs.writeFileSync(path.join(liveDir, f), JSON.stringify(data, null, 0))
+    }
+    console.log(`نوشته شد (تولید): ${liveDir}`)
+  } catch (e) {
+    console.warn(`نوشتن در مسیر تولید (${liveDir}) ناموفق بود: ${e.message}`)
+  }
 }
 
 main().catch(e => { console.error(e); process.exit(1) })

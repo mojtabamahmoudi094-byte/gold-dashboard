@@ -83,13 +83,13 @@ export default function FundDetailPage({ slug, initialAsset, initialRecord }: {
 
   useEffect(() => {
     if (asset?.category === 'طلا') {
-      fetch('/fund-weights/gold.json').then(r => r.ok ? r.json() : null)
+      fetch('/api/fund-weights?kind=gold').then(r => r.ok ? r.json() : null)
         .then(j => { if (j?.weights) setGoldWeights(w => ({ ...w, ...j.weights })) }).catch(() => {})
     } else if (asset?.category === 'نقره') {
-      fetch('/fund-weights/silver.json').then(r => r.ok ? r.json() : null)
+      fetch('/api/fund-weights?kind=silver').then(r => r.ok ? r.json() : null)
         .then(j => { if (j?.weights) setSilverWeights(w => ({ ...w, ...j.weights })) }).catch(() => {})
     } else if (asset?.category === 'زعفران') {
-      fetch('/fund-weights/saffron.json').then(r => r.ok ? r.json() : null)
+      fetch('/api/fund-weights?kind=saffron').then(r => r.ok ? r.json() : null)
         .then(j => { if (j?.weights) setSaffronWeights(j.weights) }).catch(() => {})
     }
   }, [asset?.category])

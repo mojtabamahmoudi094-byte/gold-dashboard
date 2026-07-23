@@ -743,7 +743,7 @@ function GoldFundsMatrix({ border, muted, text, accent, bg }: any) {
   const [weights, setWeights] = useState<typeof FUND_WEIGHTS>(FUND_WEIGHTS)
 
   useEffect(() => {
-    fetch('/fund-weights/gold.json').then(r => r.ok ? r.json() : null)
+    fetch('/api/fund-weights?kind=gold').then(r => r.ok ? r.json() : null)
       .then(j => { if (j?.weights) setWeights(w => ({ ...w, ...j.weights })) })
       .catch(() => {})
   }, [])
