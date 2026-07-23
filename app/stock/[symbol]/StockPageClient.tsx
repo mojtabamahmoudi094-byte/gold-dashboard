@@ -28,6 +28,8 @@ type Sym = {
   pc: number | null; pcp: number | null
   tval: number | null; tvol: number | null
   mv: number | null; mv_usd?: number | null; pe: number | null
+  // نماد متوقف — از فید لحظه‌ای حذف شده، قیمت آخرین روز معاملاتی carry-forward شده
+  halted?: boolean; haltedLastDate?: string
 }
 type Industry = {
   id: number | null; name: string; count: number
@@ -197,6 +199,15 @@ export default function StockPage({ symbol, initialData, initialReports }: {
           const chgC = up ? GREEN : down ? RED : muted
           return (
             <>
+              {s.halted && (
+                <div style={{
+                  marginTop: 14, padding: '12px 16px', borderRadius: 12, fontSize: 13, lineHeight: 1.9,
+                  background: 'rgba(239,168,80,0.1)', border: '1px solid rgba(239,168,80,0.35)', color: text,
+                }}>
+                  ⏸️ نماد «{s.l18}» متوقف است و فعلاً معامله نمی‌شود
+                  {s.haltedLastDate ? ` — قیمت‌ها مربوط به آخرین روز معاملاتی (${new Date(s.haltedLastDate + 'T12:00:00').toLocaleDateString('fa-IR')}) است.` : ' — قیمت‌ها مربوط به آخرین روز معاملاتی است.'}
+                </div>
+              )}
               {/* هدر hero */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
