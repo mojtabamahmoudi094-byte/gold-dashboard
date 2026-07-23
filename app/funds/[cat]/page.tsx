@@ -666,15 +666,56 @@ export default function FundsCatPage() {
               <span style={{ fontSize: 10, color: cream, marginRight: 8 }}>اندازه: ارزش معاملات · رنگ: درصد تغییر</span>
             </div>
             <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: 2,
+              position: 'relative',
               borderRadius: 8, overflow: 'hidden',
-              minHeight: 300,
+              height: 'clamp(300px, 45vw, 460px)',
             }}>
               {(() => {
-                const sortedByValue = [...funds].sort((a, b) => b.tradeValue - a.tradeValue)
-                const totalLog = sortedByValue.reduce((s, f) => s + Math.log(f.tradeValue + 1), 0)
+                const sortedByValue = [...funds].filter(f => f.tradeValue > 0).sort((a, b) => b.tradeValue - a.tradeValue)
+                const total = sortedByValue.reduce((s, f) => s + f.tradeValue, 0)
+                if (total <= 0) return null
+
+                // چیدمان treemap مربعی‌شده (squarified) در فضای واحد 100×45
+                const W = 100, H = 45
+                const areas = sortedByValue.map(f => (f.tradeValue / total) * W * H)
+                type R = { x: number; y: number; w: number; h: number }
+                const rects: R[] = []
+                let x = 0, y = 0, w = W, h = H
+                let row: number[] = []
+                const worstRatio = (r: number[], side: number) => {
+                  const sum = r.reduce((a, b) => a + b, 0)
+                  const mx = Math.max(...r), mn = Math.min(...r)
+                  const s2 = sum * sum
+                  return Math.max((side * side * mx) / s2, s2 / (side * side * mn))
+                }
+                const layoutRow = (r: number[]) => {
+                  const sum = r.reduce((a, b) => a + b, 0)
+                  if (w >= h) {
+                    const rw = sum / h
+                    let ry = y
+                    for (const a of r) { rects.push({ x, y: ry, w: rw, h: a / rw }); ry += a / rw }
+                    x += rw; w -= rw
+                  } else {
+                    const rh = sum / w
+                    let rx = x
+                    for (const a of r) { rects.push({ x: rx, y, w: a / rh, h: rh }); rx += a / rh }
+                    y += rh; h -= rh
+                  }
+                }
+                for (const a of areas) {
+                  const side = Math.min(w, h)
+                  if (row.length && worstRatio([...row, a], side) > worstRatio(row, side)) {
+                    layoutRow(row); row = [a]
+                  } else {
+                    row.push(a)
+                  }
+                }
+                if (row.length) layoutRow(row)
+
                 return sortedByValue.map((f, i) => {
-                  const pct = (Math.log(f.tradeValue + 1) / totalLog) * 100
+                  const r = rects[i]
+                  if (!r) return null
+                  const areaPct = (r.w * r.h) / (W * H) * 100
                   const changePct = f.changePct
 
                   let bgColor: string
@@ -687,8 +728,9 @@ export default function FundsCatPage() {
                   else if (changePct > -1.5) { bgColor = '#8B2E2E'; textColor = '#FFFFFF' }
                   else { bgColor = '#C0392B'; textColor = '#FFFFFF' }
 
-                  const isLarge = pct > 5
-                  const isMedium = pct > 3
+                  const isLarge = areaPct > 5
+                  const isMedium = areaPct > 2
+                  const isTiny = areaPct < 0.7
 
                   return (
                     <Link
@@ -697,18 +739,20 @@ export default function FundsCatPage() {
                       title={`${f.symbol}\nتغییر: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}٪\nارزش معاملات: ${tvStr(f.tradeValue)}`}
                       style={{
                         textDecoration: 'none',
-                        flexBasis: `${Math.max(pct, 2.5)}%`,
-                        flexGrow: 1,
-                        minWidth: 50,
-                        minHeight: isLarge ? 90 : isMedium ? 70 : 50,
+                        position: 'absolute',
+                        right: `${(r.x / W) * 100}%`,
+                        top: `${(r.y / H) * 100}%`,
+                        width: `${(r.w / W) * 100}%`,
+                        height: `${(r.h / H) * 100}%`,
                         background: bgColor,
-                        borderRadius: 4,
+                        boxSizing: 'border-box',
+                        border: '1px solid rgba(0,0,0,0.35)',
+                        borderRadius: 3,
                         display: 'flex', flexDirection: 'column',
                         alignItems: 'center', justifyContent: 'center',
-                        padding: '6px 4px',
+                        padding: '2px',
                         cursor: 'pointer',
                         transition: 'transform 0.15s, box-shadow 0.15s',
-                        position: 'relative',
                         overflow: 'hidden',
                       }}
                       onMouseEnter={e => {
@@ -726,18 +770,21 @@ export default function FundsCatPage() {
                         fontSize: isLarge ? 13 : isMedium ? 11 : 9,
                         fontWeight: 700, color: textColor,
                         textAlign: 'center', lineHeight: 1.2,
+                        maxWidth: '100%', whiteSpace: 'nowrap',
                       }}>
                         {f.symbol}
                       </div>
-                      <div style={{
-                        fontSize: isLarge ? 12 : isMedium ? 10 : 8,
-                        fontWeight: 600, color: textColor,
-                        opacity: 0.9, marginTop: 2,
-                      }}>
-                        {changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}٪
-                      </div>
+                      {!isTiny && (
+                        <div style={{
+                          fontSize: isLarge ? 12 : isMedium ? 10 : 8,
+                          fontWeight: 600, color: textColor,
+                          opacity: 0.9, marginTop: 2, whiteSpace: 'nowrap',
+                        }}>
+                          {changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}٪
+                        </div>
+                      )}
                       {isLarge && (
-                        <div style={{ fontSize: 9, color: textColor, opacity: 0.6, marginTop: 2 }}>
+                        <div style={{ fontSize: 9, color: textColor, opacity: 0.6, marginTop: 2, whiteSpace: 'nowrap' }}>
                           {tvStr(f.tradeValue)}
                         </div>
                       )}
