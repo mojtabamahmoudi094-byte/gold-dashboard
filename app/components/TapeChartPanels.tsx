@@ -58,7 +58,8 @@ export function FlowBarsPanel({ t, title, unit, flows, archiveHref }: {
   const cream = creamOf(t)
   if (flows.length === 0) return null
   const maxAbs = Math.max(...flows.map(f => Math.abs(f.net)), 1)
-  const barMaxH = 100
+  // بلندتر از نسخه صندوق + فضای پایین بیشتر تا لیبل مقدارِ میله منفی بلند روی ردیف تاریخ نیفتد
+  const barMaxH = 120
   return (
     <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '16px 18px', backdropFilter: 'blur(12px)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
@@ -69,7 +70,7 @@ export function FlowBarsPanel({ t, title, unit, flows, archiveHref }: {
         <ArchiveLink href={archiveHref} color={t.accent ?? '#00E5A0'} />
       </div>
       <div style={{ overflowX: 'auto', direction: 'ltr' }}>
-        <div style={{ display: 'flex', alignItems: 'center', minWidth: flows.length * 50, height: barMaxH * 2 + 50, position: 'relative', direction: 'ltr', paddingTop: 25 }}>
+        <div style={{ display: 'flex', alignItems: 'center', minWidth: flows.length * 50, height: barMaxH * 2 + 75, position: 'relative', direction: 'ltr', paddingTop: 25 }}>
           <div style={{ position: 'absolute', left: 0, right: 0, top: barMaxH + 35, height: 1, background: `${t.muted}33` }} />
           {flows.map((f, i) => {
             const isPos = f.net >= 0
