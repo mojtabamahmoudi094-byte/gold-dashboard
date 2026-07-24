@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
           "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://us.i.posthog.com https://us-assets.i.posthog.com",
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data: https:",
-          "connect-src 'self' https://www.google-analytics.com https://us.i.posthog.com https://us-assets.i.posthog.com https://jtrusonoqkolckhidgch.supabase.co wss://jtrusonoqkolckhidgch.supabase.co",
+          "connect-src 'self' https://www.google-analytics.com https://us.i.posthog.com https://us-assets.i.posthog.com https://jtrusonoqkolckhidgch.supabase.co wss://jtrusonoqkolckhidgch.supabase.co https://db.bourssanj.ir wss://db.bourssanj.ir",
           "font-src 'self' data:",
           "frame-ancestors 'self'",
         ].join("; "),
